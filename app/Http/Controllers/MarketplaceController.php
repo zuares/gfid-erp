@@ -22,6 +22,7 @@ use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Marketplace\Ads\ItemHppResolver;
 use App\Services\Marketplace\MarketplaceApiGateway;
+use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\MarketplaceIssueService;
 use App\Services\MarketplaceSyncService;
 use App\Services\OrderFulfillmentService;
@@ -1852,11 +1853,11 @@ class MarketplaceController extends Controller
         $store->loadMissing('channel');
         $channelCode = strtolower(trim((string) $store->channel?->code));
 
-        if (! in_array($channelCode, ['shopee', 'shp'], true)) {
+        if (! in_array($channelCode, ['shopee', 'shp', 'tiktok', 'ttk', 'tkt'], true)) {
             return response()->json([
                 'success' => false,
                 'code' => 'SETTLEMENT_CHANNEL_UNSUPPORTED',
-                'message' => "Sync settlement saat ini hanya tersedia untuk Shopee. Toko {$store->name} memakai channel ".($store->channel?->name ?? 'tidak dikenal').'.',
+                'message' => "Sync settlement saat ini tersedia untuk Shopee dan TikTok Finance. Toko {$store->name} memakai channel ".($store->channel?->name ?? 'tidak dikenal').'.',
             ], 422);
         }
 
@@ -3137,9 +3138,9 @@ class MarketplaceController extends Controller
 
         $channelName = $store->channel?->name ?? 'channel marketplace';
         $channelCode = $store->channel?->code;
-        $connectUrl = in_array(strtolower((string) $channelCode), ['shopee', 'shp'], true)
-            ? url('/marketplace/shopee/connect')
-            : url('/marketplace/settings');
+        $connectUrl = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
+            ? url('/marketplace/tiktok/connect')
+            : url('/marketplace/shopee/connect');
 
         // Kunci yang SAMA dengan yang dipakai `marketplace:sync-settlements` (lihat
         // config marketplace.settlement_lock_ttl) supaya sync manual dari tombol UI dan
@@ -3167,9 +3168,14 @@ class MarketplaceController extends Controller
                     $store->loadMissing('channel');
                     $channelName = $store->channel?->name ?? $channelName;
                     $channelCode = $store->channel?->code ?? $channelCode;
-                    $connectUrl = in_array(strtolower((string) $channelCode), ['shopee', 'shp'], true)
-                        ? url('/marketplace/shopee/connect')
-                        : url('/marketplace/settings');
+                    $connectUrl = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
+                        ? url('/marketplace/tiktok/connect')
+                        : url('/marketplace/shopee/connect');
+                    $status = $store->connection_status;
+                } elseif (in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)) {
+                    $tiktok = app(\App\Services\Channels\TikTokShop\TikTokShopChannel::class);
+                    $tiktok->refreshToken($store);
+                    $store->refresh();
                     $status = $store->connection_status;
                 }
             } catch (\Throwable $e) {
@@ -3225,17 +3231,23 @@ class MarketplaceController extends Controller
 
         try {
             if ($isBackfill) {
-                $result = $this->sync->syncSettlementsBackfill(
-                    $store,
-                    $timeFrom,
-                    $timeTo,
-                );
+                $result = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
+                    ? $this->sync->syncTikTokFinance($store, $timeFrom, $timeTo, false, function (array $progress) use ($progressKey, $store): void {
+                        Cache::put($progressKey, array_merge($progress, [
+                            'store_id' => $store->id,
+                            'store_name' => $store->name,
+                        ]), 1800);
+                    }, 200)
+                    : $this->sync->syncSettlementsBackfill($store, $timeFrom, $timeTo);
             } else {
-                $result = $this->sync->syncSettlements(
-                    $store,
-                    $timeFrom,
-                    $timeTo,
-                );
+                $result = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
+                    ? $this->sync->syncTikTokFinance($store, $timeFrom, $timeTo, false, function (array $progress) use ($progressKey, $store): void {
+                        Cache::put($progressKey, array_merge($progress, [
+                            'store_id' => $store->id,
+                            'store_name' => $store->name,
+                        ]), 1800);
+                    }, 200)
+                    : $this->sync->syncSettlements($store, $timeFrom, $timeTo);
             }
 
             Cache::put($progressKey, array_merge([
@@ -3310,6 +3322,9 @@ class MarketplaceController extends Controller
         $backfillMonths = (int) ($data['backfill_months'] ?? 0);
         $isBackfill = $backfillMonths > 0;
         $isAll = ! $isBackfill && $request->boolean('all');
+        $store->loadMissing('channel');
+        $channelCode = strtolower(trim((string) ($store->channel?->code ?? '')));
+        $isTikTokFinance = in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true);
 
         // Background dispatch tidak melakukan refresh token di request path.
         // Kalau token expired, worker akan menangani refresh saat job benar-benar jalan.
@@ -3326,10 +3341,10 @@ class MarketplaceController extends Controller
             'phase' => 'queued',
             'percent' => 2,
             'label' => $isBackfill
-                ? "Settlement backfill {$backfillMonths} bulan sedang antre…"
+                ? ($isTikTokFinance ? "Finance TikTok backfill {$backfillMonths} bulan sedang antre…" : "Settlement backfill {$backfillMonths} bulan sedang antre…")
                 : ($isAll
-                    ? "Settlement sync semua batch untuk {$store->name} sedang antre…"
-                    : "Settlement sync untuk {$store->name} sedang antre…"),
+                    ? ($isTikTokFinance ? "Finance TikTok semua order untuk {$store->name} sedang antre…" : "Settlement sync semua batch untuk {$store->name} sedang antre…")
+                    : ($isTikTokFinance ? "Finance TikTok untuk {$store->name} sedang antre…" : "Settlement sync untuk {$store->name} sedang antre…")),
             'store_id' => $store->id,
             'store_name' => $store->name,
             'mode' => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
@@ -3339,22 +3354,34 @@ class MarketplaceController extends Controller
             'updated_at' => now()->toISOString(),
         ], 1800);
 
-        $options = [
-            '--store' => $store->id,
-        ];
+        $options = $isTikTokFinance
+            ? ['--store_id' => $store->id, '--channel' => 'tiktok', '--mode' => 'missing']
+            : ['--store' => $store->id];
 
         if ($isBackfill) {
-            $options['--from'] = $fromDate;
-            $options['--to'] = $toDate;
-            $options['--all'] = true;
+            if ($isTikTokFinance) {
+                $options['--from'] = $fromDate;
+                $options['--to'] = $toDate;
+            } else {
+                $options['--from'] = $fromDate;
+                $options['--to'] = $toDate;
+                $options['--all'] = true;
+            }
         } elseif ($isAll) {
-            $options['--all'] = true;
+            if ($isTikTokFinance) {
+                $options['--months'] = 12;
+            } else {
+                $options['--all'] = true;
+            }
         }
 
         // Dispatch ke queue — TIDAK dieksekusi sekarang. Kalau dispatch gagal,
         // jangan tinggalkan progress palsu berstatus queued selama 30 menit.
         try {
-            $pending = \Illuminate\Support\Facades\Artisan::queue('marketplace:sync-settlements', $options);
+            $pending = \Illuminate\Support\Facades\Artisan::queue(
+                $isTikTokFinance ? 'marketplace:sync-finance' : 'marketplace:sync-settlements',
+                $options
+            );
             if ($isBackfill || $isAll) {
                 $pending->onQueue('heavy'); // backfill escrow per order = lama → jangan sumbat queue default
             }
@@ -3382,10 +3409,10 @@ class MarketplaceController extends Controller
         }
 
         $queuedMessage = $isBackfill
-            ? "Backfill settlement {$backfillMonths} bulan untuk {$store->name} telah dikirim ke latar belakang. Proses akan berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi."
+            ? ($isTikTokFinance ? "Backfill Finance TikTok {$backfillMonths} bulan untuk {$store->name} telah dikirim ke latar belakang. Proses membutuhkan queue worker aktif." : "Backfill settlement {$backfillMonths} bulan untuk {$store->name} telah dikirim ke latar belakang. Proses akan berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi.")
             : ($isAll
-                ? "Settlement sync semua batch untuk {$store->name} telah dikirim ke latar belakang. Proses akan berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi."
-                : "Sinkronisasi settlement toko {$store->name} telah dikirim ke latar belakang. Proses berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi.");
+                ? ($isTikTokFinance ? "Sync semua Finance TikTok untuk {$store->name} telah dikirim ke latar belakang. Proses membutuhkan queue worker aktif." : "Settlement sync semua batch untuk {$store->name} telah dikirim ke latar belakang. Proses akan berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi.")
+                : ($isTikTokFinance ? "Sinkronisasi Finance TikTok toko {$store->name} telah dikirim ke latar belakang. Proses membutuhkan queue worker aktif." : "Sinkronisasi settlement toko {$store->name} telah dikirim ke latar belakang. Proses berjalan bertahap dan progress bisa dipantau di bar bawah. PENTING: proses ini butuh queue worker aktif di server (php artisan queue:work) — kalau tidak ada worker yang berjalan, job akan menunggu di antrian tanpa pernah dieksekusi."));
 
         return response()->json([
             'success' => true,
@@ -3424,6 +3451,16 @@ class MarketplaceController extends Controller
         $data = $request->validate([
             'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
+
+        $store->loadMissing('channel');
+        $incomeChannel = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($incomeChannel, ['shopee', 'shp'], true)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'INCOME_ESTIMATE_CHANNEL_UNSUPPORTED',
+                'message' => 'Estimasi income detail hanya tersedia untuk Shopee. TikTok memakai Finance API melalui tombol Tarik Settlement.',
+            ], 422);
+        }
 
         if ($response = $this->ensureSettlementStoreSyncable($store)) {
             return $response;
@@ -3479,7 +3516,8 @@ class MarketplaceController extends Controller
     public function settlements(Request $request): JsonResponse
     {
         $query = MarketplaceOrderSettlement::with([
-            'store:id,name',
+            'store:id,name,channel_id',
+            'store.channel:id,code,name',
             'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,subtotal_items,total_paid_customer',
             'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
@@ -3490,6 +3528,13 @@ class MarketplaceController extends Controller
         $settlementStatus = strtolower((string) $request->input('settlement_status', ''));
         $includeMissingPending = $settlementStatus === 'belum_cair'
             || $request->input('tab') === 'belum_cair';
+        $isTikTokFinanceChannel = static function ($channelQuery): void {
+            $channelQuery->whereIn('code', ['tiktok', 'ttk', 'tkt']);
+        };
+        $isTikTokFinanceFinal = static function ($settlementQuery) use ($isTikTokFinanceChannel): void {
+            $settlementQuery->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+                ->whereHas('store.channel', $isTikTokFinanceChannel);
+        };
 
         if ($sortBy === 'ordered_at') {
             $query->orderBy(
@@ -3601,7 +3646,12 @@ class MarketplaceController extends Controller
 
         if ($request->filled('tab')) {
             if ($request->tab === 'cair') {
-                $query->whereNotNull('settlement_time')
+                $query->where(function ($q) use ($isTikTokFinanceFinal) {
+                        $q->whereNotNull('settlement_time')
+                            ->orWhere(function ($financeQuery) use ($isTikTokFinanceFinal) {
+                                $isTikTokFinanceFinal($financeQuery);
+                            });
+                    })
                     ->where(function ($q) {
                         $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                     })
@@ -3610,6 +3660,11 @@ class MarketplaceController extends Controller
                     });
             } elseif ($request->tab === 'belum_cair') {
                 $query->whereNull('settlement_time')
+                    ->where(function ($q) use ($isTikTokFinanceChannel) {
+                        $q->where('data_status', '!=', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+                            ->orWhereNull('data_status')
+                            ->orWhereDoesntHave('store.channel', $isTikTokFinanceChannel);
+                    })
                     ->where(function ($q) {
                         $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                     });
@@ -3657,7 +3712,12 @@ class MarketplaceController extends Controller
         // Tetap pisahkan dari tab lama agar keduanya dapat dipakai tanpa
         // mengubah perilaku filter tab yang sudah ada.
         if ($settlementStatus === 'cair') {
-            $query->whereNotNull('settlement_time')
+            $query->where(function ($q) use ($isTikTokFinanceFinal) {
+                    $q->whereNotNull('settlement_time')
+                        ->orWhere(function ($financeQuery) use ($isTikTokFinanceFinal) {
+                            $isTikTokFinanceFinal($financeQuery);
+                        });
+                })
                 ->where(function ($q) {
                     $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                 })
@@ -3666,6 +3726,11 @@ class MarketplaceController extends Controller
                 });
         } elseif ($settlementStatus === 'belum_cair') {
             $query->whereNull('settlement_time')
+                ->where(function ($q) use ($isTikTokFinanceChannel) {
+                    $q->where('data_status', '!=', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+                        ->orWhereNull('data_status')
+                        ->orWhereDoesntHave('store.channel', $isTikTokFinanceChannel);
+                })
                 ->where(function ($q) {
                     $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                 })
@@ -3808,6 +3873,9 @@ class MarketplaceController extends Controller
             $isBookingOnly = filled($bookingSn)
                 && filled($orderChannelId)
                 && (string) $orderChannelId === (string) $bookingSn;
+            $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt'], true)
+                && $s->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
+            $isFinalSettlement = (bool) $s->settlement_time || $isTikTokFinanceFinal;
             $breakdown = $s->marketplaceFeeBreakdown();
             $feeTotals = $s->marketplaceFeeCategoryTotals($breakdown);
             $sellerBurdenTotal = (float) ($feeTotals['seller'] ?? 0);
@@ -3864,15 +3932,12 @@ class MarketplaceController extends Controller
             } elseif ($isReturning) {
                 $netIncome = 0;
                 // cogs tetap terisi
-            } elseif (! $s->settlement_time && $payoutAmount !== null) {
-                // Sama seperti halaman Orders: payout aktual lebih dipercaya
-                // daripada estimasi marketplace/fallback lokal. Nilai ini hanya
-                // dipakai untuk tampilan pending, bukan ditulis ke settlement.
+            } elseif (! $isFinalSettlement && $payoutAmount !== null) {
+                // Payout aktual menjadi sumber utama. Escrow/income estimate
+                // hanya dipakai bila payout belum tersedia.
                 $netIncome = $payoutAmount;
                 $incomeEstimationSource = 'payout';
-            } elseif (! $s->settlement_time && $estimatedEscrowAmount !== null) {
-                // Untuk pending, prioritaskan angka dari Shopee. Rumus 24% hanya
-                // fallback bila income detail belum berhasil disinkronkan.
+            } elseif (! $isFinalSettlement && $estimatedEscrowAmount !== null) {
                 $netIncome = $estimatedEscrowAmount;
                 $isEstimatedIncome = true;
                 $incomeEstimationSource = 'estimated_escrow';
@@ -3941,16 +4006,17 @@ class MarketplaceController extends Controller
                 'ad_cost' => (float) $s->ad_cost,
                 'final_income' => (float) $netIncome,
                 'estimated_escrow_amount' => $estimatedEscrowAmount !== null ? $estimatedEscrowAmount : null,
-                'estimated_payout_at' => ! $s->settlement_time
+                'estimated_payout_at' => ! $isFinalSettlement
                     ? $s->order?->incomeEstimate?->estimated_payout_at?->toISOString()
                     : null,
-                'income_estimate_synced_at' => ! $s->settlement_time
+                'income_estimate_synced_at' => ! $isFinalSettlement
                     ? $s->order?->incomeEstimate?->synced_at?->toISOString()
                     : null,
-                'has_income_estimate' => ! $s->settlement_time && $estimatedEscrowAmount !== null,
+                'has_income_estimate' => ! $isFinalSettlement && $estimatedEscrowAmount !== null,
                 'is_estimated_income' => $isEstimatedIncome,
                 'income_estimation_source' => $incomeEstimationSource,
-                'fee_is_final' => (bool) $s->settlement_time,
+                'is_finance_final' => $isTikTokFinanceFinal,
+                'fee_is_final' => $isFinalSettlement,
                 'cogs' => (float) $cogs,
                 'gross_profit' => (float) $grossProfit,
                 'gross_after_voucher' => $grossAfterVoucherTotal,
@@ -3965,7 +4031,7 @@ class MarketplaceController extends Controller
                 'fee_breakdown' => $breakdown,
                 'fee_percent' => $feePercent,
                 'fee_percent_toko' => $feePercentToko,
-                'settlement_status' => $s->settlement_time ? 'cair' : 'belum_cair',
+                'settlement_status' => $isFinalSettlement ? 'cair' : 'belum_cair',
                 'settlement_recorded' => ! (bool) $s->getAttribute('is_missing_settlement'),
                 'settlement_time' => $s->settlement_time?->toISOString(),
                 'synced_at' => $s->synced_at?->toISOString(),
@@ -4039,6 +4105,7 @@ class MarketplaceController extends Controller
                     'ad_cost',
                     'final_income',
                     'settlement_time',
+                    'data_status',
                     'synced_at',
                     'raw_json',
                 ]);
@@ -4111,9 +4178,6 @@ class MarketplaceController extends Controller
                 if ($isReturning) {
                     $countReturning++;
                 }
-                if (is_null($s->settlement_time) && ! in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND'])) {
-                    $countUnsettled++;
-                }
                 if (in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND'])) {
                     $countBatal++;
                 }
@@ -4128,6 +4192,13 @@ class MarketplaceController extends Controller
                 }) : 0;
                 $isCancelledOrReturned = in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
                 $isReturning = in_array($st, ['TO_RETURN', 'RETURNING']);
+                $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt'], true)
+                    && $s->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
+                $isFinalSettlement = (bool) $s->settlement_time || $isTikTokFinanceFinal;
+
+                if (! $isFinalSettlement && ! $isCancelledOrReturned) {
+                    $countUnsettled++;
+                }
 
                 if ($isCancelledOrReturned) {
                     $cogs = 0;
@@ -4139,7 +4210,7 @@ class MarketplaceController extends Controller
 
                 if ($isCancelledOrReturned || $isReturning) {
                     // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
-                } elseif (! $s->settlement_time && $payoutAmount !== null) {
+                } elseif (! $isFinalSettlement && $payoutAmount !== null) {
                     $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount)
                         - (float) data_get($s->raw_json, 'seller_discount', 0);
                     $tokoVoucher = $this->settlementVoucherTokoAmount($s);
@@ -4158,7 +4229,7 @@ class MarketplaceController extends Controller
                     $kpiMarketplace += $impliedMarketplaceFee;
                     $sellerFeeTotal += $impliedMarketplaceFee + $affiliateCommission;
                     $kpiNet += $payoutAmount;
-                } elseif (! $s->settlement_time && $estimatedEscrowAmount !== null) {
+                } elseif (! $isFinalSettlement && $estimatedEscrowAmount !== null) {
                     $estimatedShopeeCount++;
                     $estimateSyncedAt = $s->order?->incomeEstimate?->synced_at;
                     if ($estimateSyncedAt && (! $estimateLastSyncedAt || $estimateSyncedAt->gt($estimateLastSyncedAt))) {
@@ -4183,7 +4254,7 @@ class MarketplaceController extends Controller
                     $kpiMarketplace += $impliedMarketplaceFee;
                     $sellerFeeTotal += $impliedMarketplaceFee + $affiliateCommission;
                     $kpiNet += $estimatedEscrowAmount;
-                } elseif ((float) $s->final_income <= 0) {
+                } elseif (! $isFinalSettlement && (float) $s->final_income <= 0) {
                     $estimatedManualCount++;
                     $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
                     $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
@@ -4356,6 +4427,13 @@ class MarketplaceController extends Controller
             return null;
         }
 
+        // Escrow aktual dari payload settlement tetap menjadi sumber utama,
+        // termasuk saat release time belum dikirim oleh marketplace.
+        $escrowAmount = $this->settlementEscrowAmount($s);
+        if ($escrowAmount !== null) {
+            return max(0.0, $escrowAmount);
+        }
+
         $estimate = $s->order?->incomeEstimate;
         if ($estimate && $estimate->estimated_escrow_amount !== null) {
             return max(0.0, (float) $estimate->estimated_escrow_amount);
@@ -4381,9 +4459,8 @@ class MarketplaceController extends Controller
     }
 
     /**
-     * Ambil payout aktual dengan aturan pencocokan yang sama seperti Orders:
-     * store + channel_order_id/external_order_id. Payout hanya dipakai sebagai
-     * sumber tampilan; tidak mengubah final_income settlement di database.
+     * Ambil payout aktual per order. Payout hanya menjadi sumber tampilan;
+     * jika tidak ditemukan, caller memakai fallback escrow.
      *
      * @param iterable<int,MarketplaceOrderSettlement> $settlements
      * @return array<string,float>
@@ -4393,6 +4470,7 @@ class MarketplaceController extends Controller
         $keys = collect($settlements)
             ->flatMap(function (MarketplaceOrderSettlement $settlement): array {
                 $order = $settlement->order;
+
                 return collect([
                     $order?->channel_order_id,
                     $order?->external_order_id,

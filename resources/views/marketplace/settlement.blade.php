@@ -339,7 +339,7 @@
     <div class="ship-topbar">
         <div>
             <h1 class="title">Payment & Settlement</h1>
-            <div class="sub">Dana cair per order — breakdown fee, voucher, subsidi ongkir, dan net payout dari marketplace.</div>
+    <div class="sub">Dana cair per order — breakdown fee, voucher, subsidi ongkir, dan estimasi escrow dari marketplace.</div>
         </div>
         <div class="controls">
             <a href="{{ route('marketplace.income-detail') }}" class="btn btn-sm btn-ship-outline btn-pill">
@@ -733,7 +733,7 @@
         if (dateInput) {
             dateInput.placeholder = isPending ? 'Est. Tgl Cair...' : 'Tgl Cair Final...';
             dateInput.title = isPending
-                ? 'Memfilter estimated_payout_at dari Shopee'
+                ? 'Memfilter estimasi tanggal cair dari data escrow'
                 : 'Memfilter tanggal pencairan final';
         }
 
@@ -764,8 +764,16 @@
         return $('syncStore') ? $('syncStore').value : '';
     }
 
+    function isFinanceStore(store) {
+        return ['shopee', 'shp', 'tiktok', 'ttk', 'tkt'].includes(String(store?.channel?.code || '').toLowerCase());
+    }
+
     function isShopeeStore(store) {
         return ['shopee', 'shp'].includes(String(store?.channel?.code || '').toLowerCase());
+    }
+
+    function isTikTokStore(store) {
+        return ['tiktok', 'ttk', 'tkt'].includes(String(store?.channel?.code || '').toLowerCase());
     }
 
     function isActiveStore(store) {
@@ -776,13 +784,13 @@
         if (!isActiveStore(store)) {
             return { key: 'inactive', label: 'Nonaktif', icon: 'bi-pause-circle', note: 'Aktifkan toko untuk sync.' };
         }
-        if (!isShopeeStore(store)) {
-            return { key: 'attention', label: 'Tidak didukung', icon: 'bi-question-circle', note: 'Settlement saat ini hanya untuk Shopee.' };
+        if (!isFinanceStore(store)) {
+            return { key: 'attention', label: 'Tidak didukung', icon: 'bi-question-circle', note: 'Finance settlement tersedia untuk Shopee dan TikTok.' };
         }
 
         const connection = String(store.connection_status || '').toUpperCase();
         if (connection === 'CONNECTED') {
-            return { key: 'ready', label: 'Siap sync', icon: 'bi-check-circle', note: 'Credential aktif.' };
+            return { key: 'ready', label: 'Siap sync', icon: 'bi-check-circle', note: isTikTokStore(store) ? 'Finance API TikTok v202501 siap.' : 'Credential aktif.' };
         }
         if (connection === 'TOKEN_EXPIRED') {
             return { key: 'refresh', label: 'Refresh token', icon: 'bi-arrow-repeat', note: 'Akan dicoba refresh otomatis.' };
@@ -797,9 +805,9 @@
     }
 
     function getStoreAction(store, state) {
-        if (state.key !== 'attention' || !isShopeeStore(store)) return null;
+        if (state.key !== 'attention' || !isFinanceStore(store)) return null;
         if (String(store.connection_status || '').toUpperCase() === 'NOT_CONNECTED') {
-            return { url: '/marketplace/shopee/connect', label: 'Hubungkan' };
+            return { url: isTikTokStore(store) ? '/marketplace/tiktok/connect' : '/marketplace/shopee/connect', label: 'Hubungkan' };
         }
         return { url: '/marketplace/settings', label: 'Buka pengaturan' };
     }
@@ -1014,10 +1022,10 @@
             filterOpt.textContent = label;
             filterSel.appendChild(filterOpt);
 
-            const isActiveShopee = ['shopee', 'shp'].includes(String(s.channel?.code || '').toLowerCase())
+            const isActiveFinanceStore = isFinanceStore(s)
                 && s.status === 'active'
                 && s.is_active === true;
-            if (isActiveShopee) {
+            if (isActiveFinanceStore) {
                 const syncOpt = document.createElement('option');
                 syncOpt.value = s.id;
                 syncOpt.textContent = label;
@@ -1025,7 +1033,7 @@
             }
         });
 
-        const syncStores = stores.filter(s => ['shopee', 'shp'].includes(String(s.channel?.code || '').toLowerCase())
+        const syncStores = stores.filter(s => isFinanceStore(s)
             && s.status === 'active'
             && s.is_active === true);
         if (syncStores.length === 1) {
@@ -1417,7 +1425,7 @@
         const selectedFundMode = $('filterSettlementStatus')?.value || '';
         const pendingView = selectedFundMode === 'belum_cair';
         const dateHeading = pendingView ? 'Est. Tgl Cair' : (selectedFundMode === 'cair' ? 'Tgl Cair Final' : 'Cair / Estimasi');
-        const payoutHeading = pendingView ? 'Gross & Estimasi Payout' : 'Gross & Net Payout';
+        const payoutHeading = pendingView ? 'Gross & Estimasi Escrow' : 'Gross & Net Settlement';
         const feeHeading = pendingView ? 'Status Rincian Fee' : 'Biaya Marketplace';
 
         let html = `
@@ -1437,12 +1445,12 @@
             </thead>
             <tbody>
             ${settlements.map(s => {
-                const isPending = !s.settlement_time;
+                const isPending = !s.settlement_time && !s.is_finance_final;
                 const estimateSource = String(s.income_estimation_source || '');
                 const estimateSourceLabel = estimateSource === 'payout'
                     ? 'PAYOUT AKTUAL'
                     : (estimateSource === 'estimated_escrow'
-                        ? 'EST. SHOPEE'
+                        ? 'EST. ESCROW'
                         : (estimateSource === 'manual_24' ? 'EST. MANUAL 24%' : 'ESTIMASI BELUM TERSEDIA'));
                 const estimateSourceColor = estimateSource === 'payout'
                     ? '#15803d'
@@ -1450,8 +1458,8 @@
                 const estimateSyncText = s.income_estimate_synced_at
                     ? `Diperbarui ${fmtRelativeTime(s.income_estimate_synced_at)}`
                     : (estimateSource === 'payout'
-                        ? 'Diambil dari data payout'
-                        : (estimateSource === 'manual_24' ? 'Fallback lokal, bukan data Shopee' : 'Menunggu data income Shopee'));
+                        ? 'Diambil dari payout aktual'
+                        : (estimateSource === 'manual_24' ? 'Fallback lokal berdasarkan escrow' : 'Menunggu data escrow marketplace'));
                 const pendingDetailPlaceholder = `
                     <div style="padding:.45rem .55rem; border:1px dashed rgba(217,119,6,.38); border-radius:9px; background:rgba(245,158,11,.07); color:#92400e; font-size:.68rem; line-height:1.35;">
                         <strong>Belum final</strong><br>Rincian tersedia setelah settlement.
@@ -1471,7 +1479,7 @@
                             ? `<span class="oc-badge oc-badge-amber" style="font-size:.65rem">${s.estimated_payout_at ? 'Est. ' + fmtDateTime(s.estimated_payout_at) : 'Tanggal belum tersedia'}</span>
                                <div style="font-size:.62rem;color:${estimateSourceColor};font-weight:800;margin-top:5px;">${estimateSourceLabel}</div>
                                <div style="font-size:.6rem;color:#94a3b8;margin-top:2px;" title="${s.income_estimate_synced_at ? esc(fmtDateTime(s.income_estimate_synced_at)) : ''}">${estimateSyncText}</div>`
-                            : `${fmtDateTime(s.settlement_time)}<div style="font-size:.62rem;color:#15803d;font-weight:800;margin-top:4px;">CAIR • FINAL</div>`}
+                            : `${s.settlement_time ? fmtDateTime(s.settlement_time) : 'Finance API'}<div style="font-size:.62rem;color:#15803d;font-weight:800;margin-top:4px;">CAIR • FINAL${s.is_finance_final ? ' • TIKTOK' : ''}</div>`}
                     </td>
 
                     <td class="text-end">
@@ -1702,7 +1710,7 @@
     window.runSettlementSync = async function () {
         const storeId = getSyncStoreId() || $('filterStore').value;
         if (!storeId) {
-            alert('Pilih toko Shopee dulu di tab Sync sebelum memulai settlement sync.');
+            alert('Pilih toko Shopee atau TikTok dulu di tab Sync sebelum memulai sinkronisasi finance.');
             return;
         }
 
@@ -1749,7 +1757,13 @@
     window.runIncomeEstimateSync = async function () {
         const storeId = getSyncStoreId() || $('filterStore').value;
         if (!storeId) {
-            alert('Pilih satu toko Shopee di tab Sync sebelum memperbarui estimasi.');
+            alert('Pilih satu toko Shopee di tab Sync sebelum memperbarui estimasi income.');
+            return;
+        }
+
+        const selectedStore = stores.find(store => String(store.id) === String(storeId));
+        if (selectedStore && isTikTokStore(selectedStore)) {
+            alert('Estimasi income khusus Shopee. Untuk TikTok, gunakan tombol Tarik Settlement melalui Finance API.');
             return;
         }
 
@@ -1813,21 +1827,19 @@
 
     window.runSettlementSyncBackground = async function () {
         const targetStores = stores.filter(s => {
-            const channelCode = String(s.channel?.code || '').toLowerCase();
             const active = s.status === 'active' && s.is_active === true;
             const tokenReady = ['CONNECTED', 'TOKEN_EXPIRED'].includes(String(s.connection_status || '').toUpperCase());
-            return active && ['shopee', 'shp'].includes(channelCode) && tokenReady;
+            return active && isFinanceStore(s) && tokenReady;
         });
         const skippedStores = stores.filter(s => {
-            const channelCode = String(s.channel?.code || '').toLowerCase();
             return s.status === 'active'
                 && s.is_active === true
-                && ['shopee', 'shp'].includes(channelCode)
+                && isFinanceStore(s)
                 && !targetStores.includes(s);
         });
 
         if (!targetStores.length) {
-            alert('Tidak ada toko Shopee aktif dengan credential yang siap digunakan.');
+            alert('Tidak ada toko Shopee/TikTok aktif dengan credential yang siap digunakan.');
             return;
         }
 
@@ -1863,7 +1875,7 @@
                 failed ? 'Sebagian toko gagal diantrekan' : 'Sync semua toko dikirim',
                 failed || skipped
                     ? 'Toko valid tetap diproses; toko invalid/nonaktif dilewati.'
-                    : 'Semua toko Shopee aktif berhasil dikirim ke background queue.',
+                    : 'Semua toko Shopee/TikTok aktif berhasil dikirim ke background queue.',
                 meta);
             setSyncState(failed ? 'warn' : 'running', failed ? 'Parsial' : 'Antre');
             updateSyncDot(true);

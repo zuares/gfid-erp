@@ -839,7 +839,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame('regular', $progress['mode'] ?? null);
     }
 
-    public function test_settlement_sync_menolak_channel_non_shopee_sebelum_membuat_progress()
+    public function test_settlement_sync_mendukung_channel_tiktok_finance()
     {
         $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
         $store = Store::create([
@@ -852,12 +852,27 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'token_expires_at' => now()->addDay(),
         ]);
 
+        Artisan::shouldReceive('queue')
+            ->once()
+            ->with('marketplace:sync-finance', \Mockery::on(function (array $options) use ($store): bool {
+                return ($options['--store_id'] ?? null) === $store->id
+                    && ($options['--channel'] ?? null) === 'tiktok'
+                    && ($options['--mode'] ?? null) === 'missing';
+            }))
+            ->andReturn(new class
+            {
+                public function onQueue($queue)
+                {
+                    return $this;
+                }
+            });
+
         $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements-background', 'POST');
         $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store);
 
-        $this->assertSame(422, $response->getStatusCode());
-        $this->assertSame('SETTLEMENT_CHANNEL_UNSUPPORTED', $response->getData(true)['code']);
-        $this->assertNull(Cache::get('marketplace:settlement_sync_progress:'.$store->id));
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('queued', $response->getData(true)['status']);
+        $this->assertSame('queued', Cache::get('marketplace:settlement_sync_progress:'.$store->id)['status'] ?? null);
     }
 
     public function test_settlement_sync_menolak_toko_nonaktif_sebelum_membuat_progress()

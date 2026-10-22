@@ -252,10 +252,26 @@ class MarketplaceSyncFinanceCommand extends Command
                 }
 
                 $tiktokOrders = $ordersQuery->get();
+                $tiktokProgressKey = "marketplace:settlement_sync_progress:{$store->id}";
+                Cache::put($tiktokProgressKey, [
+                    'status' => 'running',
+                    'phase' => 'tiktok_finance',
+                    'percent' => $tiktokOrders->isEmpty() ? 100 : 5,
+                    'found' => $tiktokOrders->count(),
+                    'processed' => 0,
+                    'synced' => 0,
+                    'pending' => 0,
+                    'errors' => 0,
+                    'label' => $tiktokOrders->isEmpty()
+                        ? 'Tidak ada order TikTok yang perlu diproses.'
+                        : "Menarik Finance TikTok untuk {$tiktokOrders->count()} order…",
+                    'store_id' => $store->id,
+                    'store_name' => $store->name,
+                ], 1800);
                 $tiktokSynced = 0;
                 $tiktokPending = 0;
                 $tiktokErrors = 0;
-                foreach ($tiktokOrders as $tiktokOrder) {
+                foreach ($tiktokOrders as $index => $tiktokOrder) {
                     try {
                         $finance = $syncService->syncTikTokOrderFinance($store, $tiktokOrder);
                         if (($finance['status'] ?? null) === 'synced') {
@@ -272,9 +288,38 @@ class MarketplaceSyncFinanceCommand extends Command
                         $failureCount++;
                         $this->warn("   TikTok finance {$tiktokOrder->channel_order_id} gagal: {$e->getMessage()}");
                     }
+
+                    Cache::put($tiktokProgressKey, [
+                        'status' => 'running',
+                        'phase' => 'tiktok_finance',
+                        'percent' => $tiktokOrders->count() > 0
+                            ? min(99, (int) round((($index + 1) / $tiktokOrders->count()) * 100))
+                            : 100,
+                        'found' => $tiktokOrders->count(),
+                        'processed' => $index + 1,
+                        'synced' => $tiktokSynced,
+                        'pending' => $tiktokPending,
+                        'errors' => $tiktokErrors,
+                        'label' => "Finance TikTok: ".($index + 1)."/{$tiktokOrders->count()} order diproses…",
+                        'store_id' => $store->id,
+                        'store_name' => $store->name,
+                    ], 1800);
                 }
 
                 $this->info("   TikTok Finance: {$tiktokSynced} settled, {$tiktokPending} belum settled, {$tiktokErrors} error.");
+                Cache::put($tiktokProgressKey, [
+                    'status' => $tiktokErrors > 0 ? ($tiktokSynced > 0 ? 'warn' : 'error') : 'success',
+                    'phase' => 'store_done',
+                    'percent' => 100,
+                    'found' => $tiktokOrders->count(),
+                    'processed' => $tiktokOrders->count(),
+                    'synced' => $tiktokSynced,
+                    'pending' => $tiktokPending,
+                    'errors' => $tiktokErrors,
+                    'label' => "Finance TikTok selesai: {$tiktokSynced} settled, {$tiktokPending} belum settled, {$tiktokErrors} error.",
+                    'store_id' => $store->id,
+                    'store_name' => $store->name,
+                ], 1800);
             } elseif ($tiktokFinanceSupported) {
                 $this->info("   [DRY-RUN] Simulasi sinkronisasi finance TikTok dilewati.");
             } elseif (! $settlementSupported) {

@@ -1037,6 +1037,9 @@ class MarketplaceSyncService
             'fee_and_tax_amount' => $data['fee_and_tax_amount'] ?? null,
             'shipping_cost_amount' => $data['shipping_cost_amount'] ?? null,
             'settlement_amount' => $data['settlement_amount'] ?? null,
+            // Alias domain internal agar halaman Orders dan Settlement dapat
+            // membaca nominal escrow/net settlement dengan aturan yang sama.
+            'escrow_amount' => $hasStatement ? ($data['settlement_amount'] ?? null) : null,
             'fee_tax_amount' => $tax,
             'sku_transactions' => $skuTransactions,
         ]);
@@ -1085,6 +1088,125 @@ class MarketplaceSyncService
             'has_statement' => $hasStatement,
             'response' => $response,
         ];
+    }
+
+    /**
+     * Sinkronkan statement Finance TikTok untuk order lokal dalam satu toko.
+     * Endpoint Finance TikTok bekerja per order, sehingga orkestrasi batch perlu
+     * tetap berada di service agar tombol UI dan command memakai mapping yang sama.
+     *
+     * @return array{found:int,processed:int,synced:int,pending:int,skipped:int,errors:int,last_processed_id:int|null,message:string}
+     */
+    public function syncTikTokFinance(
+        Store $store,
+        ?int $timeFrom = null,
+        ?int $timeTo = null,
+        bool $missingOnly = false,
+        ?callable $progress = null,
+        int $limit = 200,
+    ): array {
+        $store->loadMissing('channel');
+        $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt'], true)) {
+            return [
+                'found' => 0,
+                'processed' => 0,
+                'synced' => 0,
+                'pending' => 0,
+                'skipped' => 0,
+                'errors' => 0,
+                'last_processed_id' => null,
+                'message' => "Channel {$channel} bukan TikTok Shop.",
+            ];
+        }
+
+        $limit = max(1, min($limit, 1000));
+        $ordersQuery = MarketplaceOrder::query()
+            ->where('store_id', $store->id)
+            ->when($timeFrom !== null, fn ($query) => $query->where('ordered_at', '>=', Carbon::createFromTimestamp($timeFrom)))
+            ->when($timeTo !== null, fn ($query) => $query->where('ordered_at', '<=', Carbon::createFromTimestamp($timeTo)))
+            ->when($missingOnly, function ($query): void {
+                $query->where(function ($nested): void {
+                    $nested->whereDoesntHave('settlement')
+                        ->orWhereHas('settlement', function ($settlement): void {
+                            $settlement->where('data_status', '!=', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+                                ->orWhereNull('data_status');
+                        });
+                });
+            })
+            ->orderByDesc('ordered_at')
+            ->orderByDesc('id')
+            ->limit($limit);
+
+        $orders = $ordersQuery->get();
+        $summary = [
+            'found' => $orders->count(),
+            'processed' => 0,
+            'synced' => 0,
+            'pending' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+            'last_processed_id' => null,
+        ];
+
+        $this->reportProgress($progress, [
+            'status' => 'running',
+            'phase' => 'tiktok_finance',
+            'percent' => $summary['found'] > 0 ? 5 : 100,
+            'found' => $summary['found'],
+            'processed' => 0,
+            'synced' => 0,
+            'pending' => 0,
+            'errors' => 0,
+            'label' => $summary['found'] > 0
+                ? "Menarik Finance TikTok untuk {$summary['found']} order…"
+                : 'Tidak ada order TikTok yang perlu diproses.',
+        ]);
+
+        foreach ($orders as $order) {
+            $summary['last_processed_id'] = $order->id;
+
+            try {
+                $result = $this->syncTikTokOrderFinance($store, $order);
+                $status = $result['status'] ?? 'skipped';
+                if ($status === 'synced') {
+                    $summary['synced']++;
+                } elseif ($status === 'pending') {
+                    $summary['pending']++;
+                } elseif ($status === 'error') {
+                    $summary['errors']++;
+                } else {
+                    $summary['skipped']++;
+                }
+            } catch (\Throwable $e) {
+                $summary['errors']++;
+                Log::warning('TikTok Finance batch order gagal', [
+                    'store_id' => $store->id,
+                    'order_id' => $order->channel_order_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            $summary['processed']++;
+            $this->reportProgress($progress, [
+                'status' => 'running',
+                'phase' => 'tiktok_finance',
+                'percent' => $summary['found'] > 0
+                    ? min(99, (int) round(($summary['processed'] / $summary['found']) * 100))
+                    : 100,
+                'found' => $summary['found'],
+                'processed' => $summary['processed'],
+                'synced' => $summary['synced'],
+                'pending' => $summary['pending'],
+                'errors' => $summary['errors'],
+                'last_processed_id' => $summary['last_processed_id'],
+                'label' => "Finance TikTok: {$summary['processed']}/{$summary['found']} order diproses…",
+            ]);
+        }
+
+        $summary['message'] = "Finance TikTok selesai: {$summary['synced']} settled, {$summary['pending']} belum settled, {$summary['errors']} error.";
+
+        return $summary;
     }
 
     /**
