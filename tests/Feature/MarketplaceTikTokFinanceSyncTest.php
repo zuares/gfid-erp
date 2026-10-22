@@ -172,4 +172,25 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame(1000.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.transaction_fee'));
         $this->assertSame(766.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.taxes.vat'));
     }
+
+    public function test_legacy_tiktok_payload_does_not_double_count_aggregate_fee(): void
+    {
+        $settlement = new MarketplaceOrderSettlement([
+            'commission_fee' => 33187,
+            'escrow_tax' => 0,
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'fee_and_tax_amount' => '-33187',
+                'fee_tax_amount' => '739',
+                'sku_transactions' => [[
+                    'fee_tax_breakdown' => [
+                        'fee' => ['platform_commission_amount' => '-33187'],
+                        'tax' => ['sales_tax' => '-739'],
+                    ],
+                ]],
+            ],
+        ]);
+
+        $this->assertSame(33926.0, $settlement->totalDeductions());
+    }
 }

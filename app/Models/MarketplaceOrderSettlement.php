@@ -107,8 +107,12 @@ class MarketplaceOrderSettlement extends Model
 
         // TikTok v202501 already maps fee and tax into the canonical columns
         // below. Do not count the aggregate API fields a second time in the
-        // generic fee-field fallback.
-        if (is_array($raw['tiktok_fee_breakdown'] ?? null)) {
+        // generic fee-field fallback. The source/sku checks also cover rows
+        // synced before tiktok_fee_breakdown was normalized.
+        $isTikTokFinancePayload = is_array($raw['tiktok_fee_breakdown'] ?? null)
+            || is_array($raw['sku_transactions'] ?? null)
+            || str_contains(strtolower((string) ($raw['source'] ?? '')), 'tiktok');
+        if ($isTikTokFinancePayload) {
             $usedKeys['fee_and_tax_amount'] = true;
             $usedKeys['fee_tax_amount'] = true;
             $usedKeys['tiktok_fee_breakdown'] = true;
@@ -240,6 +244,17 @@ class MarketplaceOrderSettlement extends Model
         [$escrowTax, $escrowTaxKey] = $consumeFirst(['escrow_tax'], $this->escrow_tax);
         $push('Pajak (Escrow)', $escrowTax, 'seller', $escrowTaxKey);
         $usedKeys['escrow_tax'] = true;
+
+        // Before the normalized TikTok breakdown was introduced, the service
+        // stored the tax aggregate in raw_json.fee_tax_amount while leaving
+        // escrow_tax empty. Preserve that tax once without re-adding the full
+        // fee_and_tax_amount aggregate.
+        if ($isTikTokFinancePayload && $amountOf($escrowTax) <= 0) {
+            $legacyTikTokTax = data_get($raw, 'fee_tax_amount');
+            if ($legacyTikTokTax !== null && $legacyTikTokTax !== '') {
+                $push('Pajak TikTok', $legacyTikTokTax, 'seller', 'fee_tax_amount');
+            }
+        }
 
         [$adCost, $adCostKey] = $consumeFirst(['ad_cost'], $this->ad_cost);
         $push('Biaya Iklan', $adCost, 'seller', $adCostKey);
