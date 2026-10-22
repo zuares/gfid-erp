@@ -113,8 +113,13 @@ class MarketplaceFinanceReconciliationService
             $metrics['gross_sales'] += (float) ($item['gross_sales_invoice'] ?? $item['escrow_gross'] ?? 0);
             $metrics['total_escrow_fee'] += abs((float) ($item['total_components'] ?? 0));
             $incomeStatus = $item['income_status'] ?? 'unknown';
-            if (array_key_exists($incomeStatus, ['pending' => true, 'to_release' => true, 'released' => true])) {
-                $metrics[$incomeStatus] += (float) ($item['actual_net_income'] ?? 0);
+            $incomeMetric = match ($incomeStatus) {
+                'pending' => 'pending_income',
+                'to_release', 'released' => $incomeStatus,
+                default => null,
+            };
+            if ($incomeMetric !== null) {
+                $metrics[$incomeMetric] += (float) ($item['actual_net_income'] ?? 0);
             }
             if ($item['status'] !== 'matched') {
                 $metrics['unreconciled_amount'] += abs((float) ($item['actual_net_income'] ?? 0) - (float) ($item['allocated_amount'] ?? 0));

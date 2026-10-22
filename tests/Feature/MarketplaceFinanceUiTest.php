@@ -38,6 +38,30 @@ class MarketplaceFinanceUiTest extends TestCase
         }
     }
 
+    public function test_overview_handles_pending_income_status(): void
+    {
+        $store = Store::create([
+            'code' => 'OVERVIEW-PENDING-STORE',
+            'name' => 'Overview Pending Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'channel' => 'tiktok',
+            'order_sn' => 'OVERVIEW-PENDING-001',
+            'currency' => 'IDR',
+            'gross_amount' => 100000,
+            'net_amount' => 95000,
+            'escrow_status' => EscrowStatus::PENDING,
+            'income_status' => IncomeStatus::PENDING,
+        ]);
+
+        $this->get('/marketplace/finance')
+            ->assertOk()
+            ->assertSee('Pending Income');
+    }
+
     public function test_filters_are_available_for_reconciliation_and_fee_analysis(): void
     {
         $store = Store::create([
