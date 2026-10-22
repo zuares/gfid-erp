@@ -32,7 +32,6 @@ class MarketplaceSkuMappingUiTest extends TestCase
             ->get(route('marketplace.sku-mapping'))
             ->assertOk()
             ->assertSee("const FMT = new Intl.NumberFormat('id-ID');", false)
-            ->assertSee('mappingChannelFilter', false)
             ->assertSee('unmappedDateRange', false)
             ->assertSee("mode: 'range'", false)
             ->assertSee('Nama Variant', false)
@@ -41,6 +40,26 @@ class MarketplaceSkuMappingUiTest extends TestCase
             ->assertSee('autoMapConfirmModal', false)
             ->assertSee('confirmUnmappedAutoMap', false)
             ->assertSee('Tidak ada order item yang perlu dipetakan otomatis', false)
+            ->assertSee('Mapping Terdaftar', false)
+            ->assertSee('Edit SKU Mapping', false)
+            ->assertSee('mapSaveButton', false);
+    }
+
+    public function test_registered_sku_mappings_have_a_dedicated_page(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-REGISTERED-SKU-PAGE-'.uniqid(),
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.sku-mapping.registered'))
+            ->assertOk()
+            ->assertSee('Mapping Terdaftar', false)
+            ->assertSee('mappingSearch', false)
+            ->assertSee('mappingChannelFilter', false)
+            ->assertSee('mappingStockFilter', false)
+            ->assertSee('SKU Belum Dipetakan', false)
             ->assertSee('Edit SKU Mapping', false)
             ->assertSee('mapSaveButton', false);
     }

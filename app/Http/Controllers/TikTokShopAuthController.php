@@ -111,21 +111,42 @@ class TikTokShopAuthController extends Controller
             (string) $authCode,
             session()->pull('tiktok_connect_store_id'),
             session()->pull('marketplace_integration') === 'ads_read_only',
+            (string) Str::uuid(),
         );
+
+        ProcessTikTokShopOAuthJob::putStatus($job->connectionId, [
+            'status' => 'queued',
+            'message' => 'Permintaan koneksi TikTok Shop sedang diproses.',
+        ]);
 
         // Do not make outbound DNS/HTTPS calls from PHP-FPM. On macOS Herd,
         // both cURL and PHP streams can abort inside getaddrinfo after FPM
         // forks. The queue CLI process handles the TikTok calls safely.
         if (app()->environment('testing')) {
-            app(\App\Services\TikTokShop\TikTokShopOAuthService::class)
+            $result = app(\App\Services\TikTokShop\TikTokShopOAuthService::class)
                 ->process($job->authCode, $job->targetStoreId, $job->readOnlyIntegration);
+            ProcessTikTokShopOAuthJob::putStatus($job->connectionId, $result);
         } else {
             dispatch($job);
         }
 
-        return redirect('/marketplace/toko?connecting=1')->with(
+        return redirect('/marketplace/toko?connecting=1&connection_id=' . $job->connectionId)->with(
             'success',
             'Permintaan koneksi TikTok Shop sedang diproses. Muat ulang halaman dalam beberapa detik.'
         );
+    }
+
+    public function connectionStatus(string $connectionId)
+    {
+        $status = Cache::get(ProcessTikTokShopOAuthJob::cacheKey($connectionId));
+
+        if (! is_array($status)) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Status koneksi TikTok Shop sudah kedaluwarsa. Silakan mulai koneksi ulang.',
+            ], 404);
+        }
+
+        return response()->json($status);
     }
 }

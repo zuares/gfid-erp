@@ -968,6 +968,126 @@ class MarketplaceSyncService
     ];
 
     /**
+     * Sync TikTok's official per-order finance statement.
+     * A successful response without sku_transactions means the order is not
+     * settled yet; it must remain pending rather than becoming a fake payout.
+     */
+    public function syncTikTokOrderFinance(Store $store, MarketplaceOrder $order): array
+    {
+        $store->loadMissing('channel');
+        $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt'], true)) {
+            return ['status' => 'skipped', 'message' => "Channel {$channel} bukan TikTok Shop."];
+        }
+
+        $orderId = trim((string) $order->channel_order_id);
+        if ($orderId === '') {
+            return ['status' => 'skipped', 'message' => 'Order ID TikTok kosong.'];
+        }
+
+        $response = $this->gateway->getOrderStatementTransactions($store, $orderId);
+        if (! empty($response['error']) || (isset($response['code']) && (int) $response['code'] !== 0)) {
+            $message = (string) ($response['message'] ?? $response['error'] ?? 'Finance TikTok gagal diambil.');
+            $order->update([
+                'settlement_sync_error_code' => 'tiktok_finance_api_error',
+                'settlement_sync_failed_at' => now(),
+                'settlement_sync_last_attempt_at' => now(),
+            ]);
+
+            return ['status' => 'error', 'message' => $message, 'response' => $response];
+        }
+
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $skuTransactions = is_array($data['sku_transactions'] ?? null)
+            ? array_values($data['sku_transactions'])
+            : [];
+        $hasStatement = $skuTransactions !== [];
+
+        $amount = static fn (mixed $value): float => is_numeric($value) ? (float) $value : 0.0;
+        $sumBreakdown = static function (array $rows) use ($amount): float {
+            $total = 0.0;
+            foreach ($rows as $value) {
+                if (is_numeric($value)) {
+                    $total += abs($amount($value));
+                }
+            }
+
+            return round($total, 2);
+        };
+
+        $commission = 0.0;
+        $tax = 0.0;
+        foreach ($skuTransactions as $transaction) {
+            $breakdown = is_array($transaction['fee_tax_breakdown'] ?? null)
+                ? $transaction['fee_tax_breakdown']
+                : [];
+            $commission += $sumBreakdown(is_array($breakdown['fee'] ?? null) ? $breakdown['fee'] : []);
+            $tax += $sumBreakdown(is_array($breakdown['tax'] ?? null) ? $breakdown['tax'] : []);
+        }
+        if ($commission <= 0 && $tax <= 0) {
+            $commission = abs($amount($data['fee_and_tax_amount'] ?? 0));
+        }
+
+        $settlementAmount = $amount($data['settlement_amount'] ?? 0);
+        $raw = array_merge((array) $order->settlement?->raw_json, [
+            'source' => 'tiktok_finance_202501_order_statement_transactions',
+            'order_id' => $data['order_id'] ?? $orderId,
+            'currency' => $data['currency'] ?? $order->currency ?? 'IDR',
+            'revenue_amount' => $data['revenue_amount'] ?? null,
+            'fee_and_tax_amount' => $data['fee_and_tax_amount'] ?? null,
+            'shipping_cost_amount' => $data['shipping_cost_amount'] ?? null,
+            'settlement_amount' => $data['settlement_amount'] ?? null,
+            'fee_tax_amount' => $tax,
+            'sku_transactions' => $skuTransactions,
+        ]);
+
+        $settlement = MarketplaceOrderSettlement::firstOrNew([
+            'store_id' => $store->id,
+            'channel_order_id' => $orderId,
+        ]);
+        $settlement->fill([
+            'order_id' => $order->id,
+            'buyer_payment_amount' => $this->nn($this->decimalValue($order->total_paid_customer ?? $order->total_amount ?? 0)),
+            'commission_fee' => $this->nn($this->decimalValue($commission)),
+            'service_fee' => '0.00',
+            'transaction_fee' => '0.00',
+            'affiliate_fee' => '0.00',
+            'actual_shipping_fee' => $this->nn($this->decimalValue(abs($amount($data['shipping_cost_amount'] ?? 0)))),
+            'final_income' => $this->nn($this->decimalValue($settlementAmount)),
+            'raw_json' => $raw,
+            'synced_at' => now(),
+            'data_status' => $hasStatement
+                ? MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
+                : MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
+            'data_quality_flags' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'has_sku_transactions' => $hasStatement,
+                'reason' => $hasStatement ? null : 'tiktok_order_not_settled',
+            ],
+            'data_checked_at' => now(),
+        ])->save();
+
+        $order->update([
+            'settlement_sync_error_code' => null,
+            'settlement_sync_failed_at' => null,
+            'settlement_sync_last_attempt_at' => null,
+            'financial_data_status' => $hasStatement
+                ? MarketplaceFinancialDataQualityService::ORDER_READY
+                : MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE,
+            'financial_issue_reason' => $hasStatement ? null : 'tiktok_order_not_settled',
+            'financial_checked_at' => now(),
+        ]);
+
+        return [
+            'status' => $hasStatement ? 'synced' : 'pending',
+            'order_id' => $orderId,
+            'settlement_amount' => $settlementAmount,
+            'has_statement' => $hasStatement,
+            'response' => $response,
+        ];
+    }
+
+    /**
      * Sync settlement / escrow data per order dari marketplace.
      *
      * Alur: query order eligible → panggil finance API (dengan retry) → validasi

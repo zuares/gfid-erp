@@ -197,7 +197,17 @@ window.mpHelpers = (function () {
             ...opts,
             headers,
         }).then(async r => {
-            const p = await r.json().catch(() => ({ message: 'Response tidak valid.' }));
+            const raw = await r.text();
+            let p;
+            try {
+                p = raw ? JSON.parse(raw) : {};
+            } catch (error) {
+                p = {
+                    message: r.status >= 500
+                        ? `Server mengembalikan HTTP ${r.status}. Coba ulangi setelah service selesai.`
+                        : 'Response tidak valid dari server.',
+                };
+            }
             if (!r.ok) {
                 const err = new Error(p.message || p.error || 'API error');
                 err.status = r.status;

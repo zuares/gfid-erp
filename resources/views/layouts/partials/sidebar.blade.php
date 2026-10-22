@@ -1986,6 +1986,10 @@
                                 :active="request()->routeIs('marketplace.sku-mapping')">
                                 Pemetaan SKU
                             </x-sidebar.sub-link>
+                            <x-sidebar.sub-link href="{{ route('marketplace.sku-mapping.registered') }}" icon="bi bi-list-check"
+                                :active="request()->routeIs('marketplace.sku-mapping.registered')">
+                                Mapping Terdaftar
+                            </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceSync)
                             <x-sidebar.sub-link href="{{ route('marketplace.sync') }}" icon="bi bi-arrow-down-circle"

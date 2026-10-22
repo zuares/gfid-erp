@@ -8,6 +8,7 @@
 @endpush
 
 @section('content')
+<div class="orders-page">
     @if(isset($isDummy) && $isDummy)
     <div style="background-color: #fff3cd; color: #856404; padding: 10px 15px; border-radius: 6px; border: 1px solid #ffeeba; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
         <div>
@@ -67,6 +68,7 @@
         </div>
     </div> <!-- end .card-main -->
     @include('marketplace.partials.orders-modals')
+</div>
 @endsection
 
 @push('scripts')

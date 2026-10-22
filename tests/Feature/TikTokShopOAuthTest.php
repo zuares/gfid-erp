@@ -81,7 +81,7 @@ class TikTokShopOAuthTest extends TestCase
             'state' => $query['state'],
         ]));
 
-        $response->assertRedirect('/marketplace/toko?connecting=1');
+        $response->assertRedirectContains('/marketplace/toko?connecting=1&connection_id=');
 
         $store = Store::query()->where('external_shop_id', 'shop-id-test')->firstOrFail();
         $this->assertSame('shop-cipher-test', $store->credential('shop_cipher'));
@@ -149,7 +149,7 @@ class TikTokShopOAuthTest extends TestCase
             'code' => 'authorization-code-cache-test',
             'state' => $query['state'],
         ]));
-        $response->assertRedirect('/marketplace/toko?connecting=1');
+        $response->assertRedirectContains('/marketplace/toko?connecting=1&connection_id=');
         $this->assertDatabaseHas('stores', [
             'external_shop_id' => 'shop-id-cache-state-test',
         ]);
@@ -197,7 +197,7 @@ class TikTokShopOAuthTest extends TestCase
             'code' => 'authorization-code-no-state-test',
         ]));
 
-        $response->assertRedirect('/marketplace/toko?connecting=1');
+        $response->assertRedirectContains('/marketplace/toko?connecting=1&connection_id=');
         $this->assertDatabaseHas('stores', [
             'external_shop_id' => 'shop-id-no-state-test',
         ]);
@@ -221,12 +221,9 @@ class TikTokShopOAuthTest extends TestCase
                 ],
             ]),
             'https://open-api.tiktokglobalshop.com/seller/202309/shops*' => Http::response([
-                'code' => 0,
-                'data' => ['shops' => [[
-                    'id' => 'shop-id-active-test',
-                    'region' => 'ID',
-                ]]],
-            ]),
+                'code' => 105005,
+                'message' => 'Access denied. This app has not been granted any access scope required by this endpoint.',
+            ], 401),
             'https://open-api.tiktokglobalshop.com/authorization/202309/shops*' => Http::response([
                 'code' => 0,
                 'data' => ['shops' => [[
@@ -249,7 +246,7 @@ class TikTokShopOAuthTest extends TestCase
         $this->actingAs($user)->get(route('marketplace.tiktok.callback', [
             'code' => 'authorization-code-merge-test',
             'state' => $query['state'],
-        ]))->assertRedirect('/marketplace/toko?connecting=1');
+        ]))->assertRedirectContains('/marketplace/toko?connecting=1&connection_id=');
 
         $store = Store::query()->where('external_shop_id', 'shop-id-active-test')->firstOrFail();
         $this->assertSame('shop-cipher-authorized-test', $store->credential('shop_cipher'));
@@ -291,7 +288,55 @@ class TikTokShopOAuthTest extends TestCase
             'state' => $query['state'],
         ]));
 
-        $response->assertRedirect('/marketplace/toko?connecting=1');
+        $response->assertRedirectContains('/marketplace/toko?connecting=1&connection_id=');
         $this->assertDatabaseMissing('stores', ['external_shop_id' => 'shop-id-test']);
+    }
+
+    public function test_missing_tiktok_scope_is_exposed_as_connection_status(): void
+    {
+        config()->set('tiktok_shop.app_key', 'app-key-test');
+        config()->set('tiktok_shop.app_secret', 'app-secret-test');
+        config()->set('tiktok_shop.service_id', 'service-test-123');
+
+        Queue::fake();
+        Http::fake([
+            'https://auth.tiktok-shops.com/api/v2/token/get*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'access_token' => 'access-token-scope-test',
+                    'refresh_token' => 'refresh-token-scope-test',
+                    'user_type' => 0,
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/seller/202309/shops*' => Http::response([
+                'code' => 105005,
+                'message' => 'Access denied. This app has not been granted any access scope required by this endpoint.',
+                'request_id' => 'request-id-scope-test',
+            ], 401),
+        ]);
+
+        $user = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'TTK-OAUTH-SCOPE-'.uniqid(),
+        ]);
+
+        $start = $this->actingAs($user)->get(route('marketplace.tiktok.connect'));
+        parse_str((string) parse_url($start->headers->get('Location'), PHP_URL_QUERY), $query);
+
+        $response = $this->actingAs($user)->get(route('marketplace.tiktok.callback', [
+            'code' => 'authorization-code-scope-test',
+            'state' => $query['state'],
+        ]));
+
+        $location = $response->headers->get('Location');
+        parse_str((string) parse_url($location, PHP_URL_QUERY), $redirectQuery);
+        $connectionId = $redirectQuery['connection_id'] ?? null;
+
+        $this->assertNotEmpty($connectionId);
+        $status = $this->actingAs($user)->getJson('/api/marketplace/tiktok/connection-status/' . $connectionId);
+        $status->assertOk()
+            ->assertJsonPath('status', 'failed')
+            ->assertJsonPath('code', 105005);
+        $status->assertJsonFragment(['message' => 'Scope TikTok Shop belum aktif. Aktifkan seller.shop.info dan seller.authorization.info di Partner Center, lalu revoke dan hubungkan ulang toko.']);
     }
 }

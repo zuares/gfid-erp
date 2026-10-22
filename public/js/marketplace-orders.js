@@ -3689,8 +3689,13 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
         $('asOrderSn').value = orderSn;
         window._asBookingSn = bookingSn || null;
         window._asPlatform = null;
+        window._asTiktokSellerShipping = false;
         $('asOptions').innerHTML = '';
         $('asSubmitBtn').disabled = true;
+        $('asSubmitBtn').innerHTML = 'Konfirmasi Pengiriman';
+        $('asAlert').className = 'alert alert-info py-2';
+        $('asAlert').style.cssText = '';
+        $('asAlert').innerHTML = 'Silakan pilih metode pengiriman untuk order ini.';
 
         const modal = new bootstrap.Modal($('arrangeShipmentModal'));
         modal.show();
@@ -3718,6 +3723,49 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             // together on submit. Do not render TikTok as Shopee pickup/dropoff.
             if (responseData.platform === 'tiktok') {
                 window._asPlatform = 'tiktok';
+                const isSellerShipping = responseData.is_seller_shipping === true
+                    || String(responseData.shipping_type || '').toUpperCase().includes('SELLER');
+                window._asTiktokSellerShipping = isSellerShipping;
+                const hasPackage = Boolean(responseData.package_id);
+                const packageStatus = hasPackage
+                    ? `<span style="display:inline-flex;align-items:center;gap:.3rem;color:#047857;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:999px;padding:.2rem .55rem;font-size:.68rem;font-weight:700">● Package siap</span>`
+                    : `<span style="display:inline-flex;align-items:center;gap:.3rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:999px;padding:.2rem .55rem;font-size:.68rem;font-weight:700">● Package belum dibuat</span>`;
+
+                $('asAlert').className = 'alert py-2 mb-3';
+                $('asAlert').style.cssText = 'font-size:.76rem;background:#f0f9ff;border:1px solid #bae6fd;color:#0c4a6e;border-radius:12px';
+                $('asAlert').innerHTML = `<div style="display:flex;align-items:center;gap:.55rem;font-weight:700"><span style="font-size:1rem">🛍️</span> TikTok Shop Fulfillment</div><div style="margin-top:.2rem;color:#0369a1">Atur pengiriman langsung ke TikTok Shop. Stok lokal tidak dipotong pada proses ini.</div>`;
+
+                if (isSellerShipping) {
+                    $('asOptions').innerHTML = `
+                        <div style="border:1px solid #e2e8f0;border-radius:15px;padding:1rem;background:linear-gradient(145deg,#fff 0%,#f8fafc 100%)">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;margin-bottom:.9rem">
+                                <div>
+                                    <div style="font-size:.68rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em;font-weight:800">Metode pengiriman</div>
+                                    <div style="font-size:1rem;font-weight:800;color:#0f172a;margin-top:.15rem">Seller Shipping</div>
+                                </div>
+                                ${packageStatus}
+                            </div>
+                            <div style="font-size:.75rem;line-height:1.5;color:#475569;background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:.65rem .75rem;margin-bottom:.9rem">
+                                Masukkan resi dari ekspedisi pilihan Anda. TikTok akan menerima status pengiriman melalui data ini.
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label mb-1" style="font-size:.76rem;font-weight:700;color:#334155">Nomor resi</label>
+                                <div style="position:relative"><span style="position:absolute;left:.7rem;top:.48rem;color:#64748b">#</span><input class="form-control form-control-sm" style="padding-left:1.8rem;border-radius:9px" id="asTtTrackingNumber" type="text" autocomplete="off" placeholder="Contoh: JNE123456789"></div>
+                            </div>
+                            <div class="mb-1">
+                                <label class="form-label mb-1" style="font-size:.76rem;font-weight:700;color:#334155">Shipping provider ID</label>
+                                <input class="form-control form-control-sm" style="border-radius:9px" id="asTtShippingProviderId" type="text" autocomplete="off" placeholder="Contoh: JNE">
+                                <div style="font-size:.68rem;color:#94a3b8;margin-top:.35rem">Gunakan ID provider yang terdaftar di TikTok Shop.</div>
+                            </div>
+                            <input type="hidden" id="asTtPackageId" value="${esc(responseData.package_id || '')}">
+                            ${hasPackage ? `<div style="font-size:.7rem;color:#64748b;margin-top:.8rem">Package ID: <code>${esc(responseData.package_id)}</code></div>` : `<div style="font-size:.7rem;color:#b45309;margin-top:.8rem">Package ID belum tersedia. Sinkronkan detail order terlebih dahulu.</div>`}
+                        </div>
+                    `;
+                    $('asSubmitBtn').disabled = !hasPackage;
+                    $('asSubmitBtn').innerHTML = hasPackage ? '🚚 Kirim ke TikTok Shop' : '🔄 Sinkronkan Order Terlebih Dahulu';
+                    return;
+                }
+
                 const services = Array.isArray(responseData.shipping_services)
                     ? responseData.shipping_services
                     : [];
@@ -3732,35 +3780,52 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
                 }).join('');
 
                 $('asOptions').innerHTML = `
-                    <div class="alert alert-info py-2" style="font-size:.78rem">
-                        TikTok Shop membuat package dan label resmi berdasarkan berat, dimensi, dan layanan yang dipilih.
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label" style="font-size:.8rem">Layanan Pengiriman TikTok</label>
-                        <select class="form-select form-select-sm" id="asTtShippingService">
-                            <option value="">Gunakan layanan default TikTok</option>${serviceOptions}
-                        </select>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label" style="font-size:.8rem">Berat (gram)</label>
-                            <input class="form-control form-control-sm" id="asTtWeight" type="number" min="0.01" step="0.01" value="${esc(weight.value ?? 1000)}">
+                    <div style="border:1px solid #e2e8f0;border-radius:15px;padding:1rem;background:linear-gradient(145deg,#fff 0%,#f8fafc 100%)">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;margin-bottom:.9rem">
+                            <div>
+                                <div style="font-size:.68rem;color:#64748b;text-transform:uppercase;letter-spacing:.08em;font-weight:800">Metode pengiriman</div>
+                                <div style="font-size:1rem;font-weight:800;color:#0f172a;margin-top:.15rem">TikTok Shipping</div>
+                            </div>
+                            ${packageStatus}
                         </div>
-                        <div class="col-6">
-                            <label class="form-label" style="font-size:.8rem">Metode serah-terima</label>
-                            <select class="form-select form-select-sm" id="asTtHandover">
-                                <option value="DROP_OFF" selected>Drop-off</option>
-                                <option value="PICKUP">Pickup</option>
+                        <div style="font-size:.75rem;line-height:1.5;color:#475569;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.65rem .75rem;margin-bottom:.9rem">
+                            TikTok membuat label resmi berdasarkan layanan, berat, dan dimensi paket. Proses ini hanya mengatur fulfillment marketplace.
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label mb-1" style="font-size:.76rem;font-weight:700;color:#334155">Layanan pengiriman</label>
+                            <select class="form-select form-select-sm" style="border-radius:9px" id="asTtShippingService">
+                                <option value="">Otomatis — gunakan layanan TikTok</option>${serviceOptions}
                             </select>
+                            <div style="font-size:.68rem;color:#94a3b8;margin-top:.35rem">Pilihan layanan berasal dari yang tersedia untuk order ini.</div>
                         </div>
-                        <div class="col-4"><label class="form-label" style="font-size:.8rem">Panjang (cm)</label><input class="form-control form-control-sm" id="asTtLength" type="number" min="0.01" step="0.01" value="${esc(dimension.length ?? 20)}"></div>
-                        <div class="col-4"><label class="form-label" style="font-size:.8rem">Lebar (cm)</label><input class="form-control form-control-sm" id="asTtWidth" type="number" min="0.01" step="0.01" value="${esc(dimension.width ?? 15)}"></div>
-                        <div class="col-4"><label class="form-label" style="font-size:.8rem">Tinggi (cm)</label><input class="form-control form-control-sm" id="asTtHeight" type="number" min="0.01" step="0.01" value="${esc(dimension.height ?? 5)}"></div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label mb-1" style="font-size:.76rem;font-weight:700;color:#334155">Berat (gram)</label>
+                                <input class="form-control form-control-sm" style="border-radius:9px" id="asTtWeight" type="number" min="0.01" step="0.01" value="${esc(weight.value ?? 1000)}">
+                            </div>
+                            ${responseData.supports_handover_method ? `<div class="col-6">
+                                <label class="form-label mb-1" style="font-size:.76rem;font-weight:700;color:#334155">Serah-terima</label>
+                                <select class="form-select form-select-sm" style="border-radius:9px" id="asTtHandover">
+                                    <option value="DROP_OFF" selected>Drop-off</option>
+                                    <option value="PICKUP">Pickup</option>
+                                </select>
+                            </div>` : `<div class="col-6" style="display:flex;align-items:end;padding-bottom:.35rem"><div style="font-size:.7rem;color:#64748b">📍 Pickup/drop-off mengikuti pengaturan gudang Seller Center.</div></div>`}
+                        </div>
+                        <div style="font-size:.76rem;font-weight:700;color:#334155;margin:.95rem 0 .45rem">Dimensi paket (cm)</div>
+                        <div class="row g-2">
+                            <div class="col-4"><input class="form-control form-control-sm" style="border-radius:9px" id="asTtLength" type="number" min="0.01" step="0.01" value="${esc(dimension.length ?? 20)}" placeholder="Panjang"></div>
+                            <div class="col-4"><input class="form-control form-control-sm" style="border-radius:9px" id="asTtWidth" type="number" min="0.01" step="0.01" value="${esc(dimension.width ?? 15)}" placeholder="Lebar"></div>
+                            <div class="col-4"><input class="form-control form-control-sm" style="border-radius:9px" id="asTtHeight" type="number" min="0.01" step="0.01" value="${esc(dimension.height ?? 5)}" placeholder="Tinggi"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.7rem;color:#64748b;margin-top:.8rem">
+                            <span>${hasPackage ? 'Package sudah dialokasikan oleh TikTok.' : 'Package akan dibuat saat dikonfirmasi.'}</span>
+                            ${hasPackage ? `<code>${esc(responseData.package_id)}</code>` : ''}
+                        </div>
+                        <input type="hidden" id="asTtPackageId" value="${esc(responseData.package_id || '')}">
                     </div>
-                    <input type="hidden" id="asTtPackageId" value="${esc(responseData.package_id || '')}">
-                    ${responseData.package_id ? `<div class="small text-muted mt-2">Package ID: ${esc(responseData.package_id)}</div>` : ''}
                 `;
                 $('asSubmitBtn').disabled = false;
+                $('asSubmitBtn').innerHTML = hasPackage ? '🚚 Konfirmasi & Kirim Paket' : '📦 Buat Package & Atur Pengiriman';
                 return;
             }
 
@@ -3925,16 +3990,24 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             };
             params = {
                 package_id: document.getElementById('asTtPackageId')?.value || null,
-                shipping_service_id: document.getElementById('asTtShippingService')?.value || null,
-                handover_method: document.getElementById('asTtHandover')?.value || 'DROP_OFF',
-                weight: { value: String(numberValue('asTtWeight') || 1000), unit: 'GRAM' },
-                dimension: {
+            };
+            if (window._asTiktokSellerShipping) {
+                params.self_shipment = {
+                    tracking_number: document.getElementById('asTtTrackingNumber')?.value?.trim() || '',
+                    shipping_provider_id: document.getElementById('asTtShippingProviderId')?.value?.trim() || '',
+                };
+            } else {
+                params.shipping_service_id = document.getElementById('asTtShippingService')?.value || null;
+                const handover = document.getElementById('asTtHandover')?.value;
+                if (handover) params.handover_method = handover;
+                params.weight = { value: String(numberValue('asTtWeight') || 1000), unit: 'GRAM' };
+                params.dimension = {
                     length: String(numberValue('asTtLength') || 20),
                     width: String(numberValue('asTtWidth') || 15),
                     height: String(numberValue('asTtHeight') || 5),
                     unit: 'CM',
-                },
-            };
+                };
+            }
         } else if (method === 'dropoff') {
             params = { dropoff: {} };
             const branchSelect = document.getElementById('asDropoffBranch');
@@ -3960,22 +4033,39 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             params.auto_sync_only = 1;
         }
 
+        if (window._asPlatform === 'tiktok' && window._asTiktokSellerShipping) {
+            const trackingNumber = params.self_shipment?.tracking_number || '';
+            const providerId = params.self_shipment?.shipping_provider_id || '';
+            if (!trackingNumber || !providerId) {
+                btn.disabled = false;
+                btn.innerHTML = '🚚 Kirim ke TikTok Shop';
+                const oldAlert = document.getElementById('asTtValidationAlert');
+                if (oldAlert) oldAlert.remove();
+                $('asOptions').insertAdjacentHTML('afterbegin', '<div id="asTtValidationAlert" class="alert alert-warning py-2" style="font-size:.75rem;border-radius:10px">Lengkapi nomor resi dan shipping provider ID terlebih dahulu.</div>');
+                return;
+            }
+        }
+
         try {
             const shipUrl = window._asBookingSn
                 ? `/api/marketplace/stores/${storeId}/bookings/${window._asBookingSn}/ship`
                 : `/api/marketplace/stores/${storeId}/orders/${orderSn}/ship`;
-            await api(shipUrl, {
+            const shipResult = await api(shipUrl, {
                 method: 'POST',
                 body: JSON.stringify(params)
             });
+
+            const isQueued = shipResult && shipResult.queued === true;
             
             bootstrap.Modal.getInstance($('arrangeShipmentModal')).hide();
             
             if (window.Swal) {
                 Swal.fire({
-                    icon: 'success',
-                    title: 'Berhasil!',
-                    text: 'Atur pengiriman sukses untuk ' + orderSn,
+                    icon: isQueued ? 'info' : 'success',
+                    title: isQueued ? 'Sedang diproses' : 'Berhasil!',
+                    text: isQueued
+                        ? 'Pengiriman TikTok masuk antrean. Pastikan queue worker aktif; status akan berubah setelah API selesai.'
+                        : 'Atur pengiriman sukses untuk ' + orderSn,
                     timer: 3000,
                     showConfirmButton: false
                 });
@@ -3985,7 +4075,9 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             
             loadOrders();
 
-            if ($('asPrintDocument') && $('asPrintDocument').checked) {
+            // Label TikTok baru tersedia setelah queued shipment selesai.
+            // Jangan membuka endpoint cetak sebelum package benar-benar shipped.
+            if (!isQueued && $('asPrintDocument') && $('asPrintDocument').checked) {
                 printDocument(storeId, orderSn, window._asBookingSn, false);
             }
         } catch (e) {

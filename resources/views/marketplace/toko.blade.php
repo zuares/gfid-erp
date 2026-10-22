@@ -917,6 +917,72 @@
         renderStoreCards();
     }
 
+    function clearTikTokConnectionQuery() {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('connecting');
+        url.searchParams.delete('connection_id');
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : '') + url.hash);
+    }
+
+    async function watchTikTokConnection() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('connecting') !== '1') return;
+
+        const connectionId = params.get('connection_id');
+        if (!connectionId) {
+            clearTikTokConnectionQuery();
+            return;
+        }
+
+        const startedAt = Date.now();
+        const timeoutMs = 120000;
+
+        while (Date.now() - startedAt < timeoutMs) {
+            try {
+                const result = await api('/api/marketplace/tiktok/connection-status/' + encodeURIComponent(connectionId));
+
+                if (result.status === 'success') {
+                    clearTikTokConnectionQuery();
+                    if (window.GFID?.toast) {
+                        window.GFID.toast(result.message || 'Toko TikTok Shop berhasil terhubung.');
+                    }
+                    await loadAll();
+                    return;
+                }
+
+                if (result.status === 'failed') {
+                    clearTikTokConnectionQuery();
+                    const footer = result.code ? 'Kode TikTok: ' + result.code : undefined;
+                    if (window.GFID?.errorAlert) {
+                        window.GFID.errorAlert(result.message || 'Koneksi TikTok Shop gagal.', { footer });
+                    } else {
+                        alert(result.message || 'Koneksi TikTok Shop gagal.');
+                    }
+                    return;
+                }
+            } catch (error) {
+                // A transient 404/network error should not hide the final queue result.
+                // The timeout below will show a visible warning if the status never arrives.
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        clearTikTokConnectionQuery();
+        const message = 'Status koneksi TikTok Shop belum diterima. Pastikan queue worker berjalan, lalu muat ulang halaman.';
+        if (window.Swal) {
+            window.Swal.fire({
+                icon: 'warning',
+                title: 'Koneksi masih diproses',
+                text: message,
+                confirmButtonText: 'Mengerti',
+                confirmButtonColor: '#334155',
+            });
+        } else {
+            alert(message);
+        }
+    }
+
     function storePlatformKey(store) {
         const code = String(store?.channel?.code || '').toUpperCase();
         if (['SHP', 'SHOPEE'].includes(code)) return 'shopee';
@@ -1881,6 +1947,7 @@
 
     window.loadAll = loadAll;
     loadAll();
+    watchTikTokConnection();
 })();
 </script>
 @endpush

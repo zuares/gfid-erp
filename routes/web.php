@@ -99,6 +99,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/fulfillment/{fulfillment}/process',    [MarketplaceController::class, 'fulfillmentProcess'])->name('marketplace.fulfillment.process');
     Route::get('/marketplace/fulfillment/{fulfillment}/history',    [FulfillmentController::class, 'history'])->name('marketplace.fulfillment.history');
     Route::get('/marketplace/picking',     [MarketplaceController::class, 'picking'])->name('marketplace.picking');
+    Route::get('/marketplace/sku-mapping/registered', [MarketplaceController::class, 'skuMappingRegistered'])->name('marketplace.sku-mapping.registered');
     Route::get('/marketplace/sku-mapping', [MarketplaceController::class, 'skuMapping'])->name('marketplace.sku-mapping');
     Route::get('/marketplace/sync',        [MarketplaceController::class, 'sync'])->name('marketplace.sync');
     Route::get('/marketplace/settlement',  [MarketplaceFinanceController::class, 'settlement'])->name('marketplace.settlement');
@@ -151,6 +152,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
     Route::get('/channels',                    [MarketplaceController::class, 'channels']);
+    Route::get('/tiktok/connection-status/{connectionId}', [TikTokShopAuthController::class, 'connectionStatus'])
+        ->where('connectionId', '[0-9a-fA-F-]{36}');
     Route::get('/stores',                      [MarketplaceController::class, 'stores']);
     Route::get('/stores/{store}/shop-info',    [MarketplaceController::class, 'shopInfo']);
     Route::get('/stores/{store}/escrow-list', [EscrowController::class, 'list'])->name('marketplace.api.escrow-list');

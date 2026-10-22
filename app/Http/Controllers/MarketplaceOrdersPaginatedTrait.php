@@ -7,6 +7,7 @@ use App\Models\MpIncome;
 use App\Models\MarketplaceAdsDaily;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use Illuminate\Http\JsonResponse;
 
 trait MarketplaceOrdersPaginatedTrait
@@ -509,7 +510,13 @@ trait MarketplaceOrdersPaginatedTrait
             }
         }
 
-        if ($amount === null && $order->settlement?->final_income !== null) {
+        $storeChannel = strtolower(trim((string) ($order->store?->channel?->code ?? '')));
+        $isTikTokPending = in_array($storeChannel, ['tiktok', 'ttk', 'tkt'], true)
+            && $order->settlement
+            && $order->settlement->data_status !== MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
+            && ! $order->settlement->settlement_time;
+
+        if ($amount === null && ! $isTikTokPending && $order->settlement?->final_income !== null) {
             $amount = (float) $order->settlement->final_income;
             $source = 'settlement';
         }

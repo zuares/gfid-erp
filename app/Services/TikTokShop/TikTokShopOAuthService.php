@@ -12,7 +12,9 @@ use Illuminate\Support\Facades\Log;
 
 class TikTokShopOAuthService
 {
-    public function process(string $authCode, ?int $targetStoreId = null, bool $readOnlyIntegration = false): void
+    protected ?array $lastApiError = null;
+
+    public function process(string $authCode, ?int $targetStoreId = null, bool $readOnlyIntegration = false): array
     {
         try {
             $appKey = trim((string) config('tiktok_shop.app_key'));
@@ -20,7 +22,10 @@ class TikTokShopOAuthService
             $authUrl = rtrim(trim((string) config('tiktok_shop.auth_url', 'https://auth.tiktok-shops.com')), '/');
 
             if (! $appKey || ! $appSecret) {
-                throw new \RuntimeException('TIKTOK_SHOP_APP_KEY dan TIKTOK_SHOP_APP_SECRET belum lengkap di .env.');
+                return [
+                    'status' => 'failed',
+                    'message' => 'Konfigurasi TikTok Shop belum lengkap. Isi App Key dan App Secret terlebih dahulu.',
+                ];
             }
 
             // This service runs in the queue CLI process, not the forked FPM
@@ -40,7 +45,22 @@ class TikTokShopOAuthService
                     'request_id' => $tokenData['request_id'] ?? null,
                     'message' => $tokenData['message'] ?? null,
                 ]);
-                return;
+
+                $tokenErrorCode = (int) ($tokenData['code'] ?? 0);
+                $tokenErrorMessage = strtolower((string) ($tokenData['message'] ?? ''));
+
+                return [
+                    'status' => 'failed',
+                    'message' => $tokenErrorCode === 36004003
+                        || str_contains($tokenErrorMessage, 'invalid client_key')
+                        ? 'App Key TikTok Shop tidak cocok dengan aplikasi yang digunakan. Samakan App Key, App Secret, dan Service ID dari aplikasi yang sama di Partner Center dan .env, lalu mulai koneksi ulang.'
+                        : ($tokenErrorCode === 1042
+                            ? 'Ticket TikTok Shop sudah kedaluwarsa atau sudah digunakan. Mulai koneksi ulang dari halaman toko.'
+                            : ($tokenErrorCode === 36004004
+                                ? 'Kode otorisasi TikTok Shop sudah kedaluwarsa atau sudah digunakan. Mulai koneksi ulang tanpa memakai URL callback lama.'
+                                : 'TikTok Shop menolak proses otorisasi. Mulai koneksi ulang dan coba lagi.')),
+                    'code' => $tokenData['code'] ?? null,
+                ];
             }
 
             $data = $tokenData['data'] ?? $tokenData;
@@ -54,7 +74,10 @@ class TikTokShopOAuthService
                     'request_id' => $tokenData['request_id'] ?? null,
                     'message' => $tokenData['message'] ?? null,
                 ]);
-                return;
+                return [
+                    'status' => 'failed',
+                    'message' => 'TikTok Shop tidak mengembalikan access token. Mulai koneksi ulang.',
+                ];
             }
 
             if ($userType !== null && $userType !== 0) {
@@ -62,7 +85,10 @@ class TikTokShopOAuthService
                     'user_type' => $userType,
                     'request_id' => $tokenData['request_id'] ?? null,
                 ]);
-                return;
+                return [
+                    'status' => 'failed',
+                    'message' => 'Akun yang dipilih bukan akun seller TikTok Shop.',
+                ];
             }
 
             $shops = array_values(array_filter(
@@ -72,7 +98,19 @@ class TikTokShopOAuthService
 
             if (empty($shops)) {
                 Log::warning('TikTok authorization returned no shops');
-                return;
+
+                if ((int) ($this->lastApiError['code'] ?? 0) === 105005) {
+                    return [
+                        'status' => 'failed',
+                        'message' => 'Scope TikTok Shop belum aktif. Aktifkan seller.shop.info dan seller.authorization.info di Partner Center, lalu revoke dan hubungkan ulang toko.',
+                        'code' => 105005,
+                    ];
+                }
+
+                return [
+                    'status' => 'failed',
+                    'message' => 'Tidak ada toko TikTok Shop aktif pada akun yang dipilih. Pastikan akun seller sudah memiliki toko aktif.',
+                ];
             }
 
             $accessTokenExpiresIn = $data['access_token_expire_in'] ?? $data['expires_in'] ?? null;
@@ -153,12 +191,24 @@ class TikTokShopOAuthService
                 'shop_count' => count($shops),
             ]);
 
+            return [
+                'status' => 'success',
+                'message' => count($shops) === 1
+                    ? 'Toko TikTok Shop berhasil terhubung.'
+                    : count($shops) . ' toko TikTok Shop berhasil terhubung.',
+                'shop_count' => count($shops),
+            ];
+
         } catch (\Throwable $e) {
             Log::error('TikTok Shop OAuth job failed', [
                 'exception' => get_class($e),
                 'message' => $e->getMessage(),
             ]);
 
+            return [
+                'status' => 'failed',
+                'message' => 'Koneksi TikTok Shop gagal diproses. Cek konfigurasi dan log aplikasi.',
+            ];
         }
     }
 
@@ -183,11 +233,12 @@ class TikTokShopOAuthService
         );
 
         $authorizedShops = [];
-        foreach ($activeShops as $shop) {
-            if (filled($shop['shop_cipher'] ?? null)) {
-                continue;
-            }
+        $needsAuthorizedShopLookup = empty($activeShops)
+            || collect($activeShops)->contains(
+                static fn (array $shop): bool => blank($shop['shop_cipher'] ?? null)
+            );
 
+        if ($needsAuthorizedShopLookup) {
             $authorizedShops = $this->fetchShopList(
                 $appKey,
                 $appSecret,
@@ -195,7 +246,6 @@ class TikTokShopOAuthService
                 '/authorization/202309/shops',
                 'TikTok Get Authorized Shops'
             );
-            break;
         }
 
         $merged = [];
@@ -245,6 +295,10 @@ class TikTokShopOAuthService
 
             $json = $response->json() ?? [];
             if (! $response->successful() || (isset($json['code']) && (int) $json['code'] !== 0)) {
+                $this->lastApiError ??= [
+                    'code' => $json['code'] ?? null,
+                    'message' => $json['message'] ?? null,
+                ];
                 Log::warning($label . ' failed', [
                     'path' => $path,
                     'http_status' => $response->status(),

@@ -379,6 +379,13 @@
                         <i class="bi bi-shop" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
                     </div>
 
+                    <div style="position:relative; min-width:130px; width:130px;">
+                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterPlatform">
+                            <option value="">Semua Platform</option>
+                        </select>
+                        <i class="bi bi-globe2" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                    </div>
+
                     <div style="position:relative; min-width:125px; width:125px;">
                         <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterStatus" onchange="loadSettlements()">
                             <option value="">Semua Status</option>
@@ -619,6 +626,7 @@
 
         return {
             store_id: $('filterStore')?.value || '',
+            platform: $('filterPlatform')?.value || '',
             status: $('filterStatus')?.value || '',
             settlement_status: $('filterSettlementStatus')?.value || '',
             search: $('filterSearch')?.value || '',
@@ -646,6 +654,7 @@
         if (!state) return;
 
         if ($('filterStore')) $('filterStore').value = state.store_id || '';
+        if ($('filterPlatform')) $('filterPlatform').value = state.platform || '';
         if ($('filterStatus')) $('filterStatus').value = state.status || '';
         if ($('filterSettlementStatus')) {
             $('filterSettlementStatus').value = Object.prototype.hasOwnProperty.call(state, 'settlement_status')
@@ -974,11 +983,28 @@
 
     function populateStoreSelects() {
         const filterSel = $('filterStore');
+        const platformSel = $('filterPlatform');
         const syncSel = $('syncStore');
         if (!filterSel || !syncSel) return;
 
         filterSel.innerHTML = '<option value="">Semua Toko</option>';
+        if (platformSel) platformSel.innerHTML = '<option value="">Semua Platform</option>';
         syncSel.innerHTML = '<option value="">Pilih Toko</option>';
+
+        const platforms = new Map();
+        stores.forEach(s => {
+            const code = String(s.channel?.code || '').trim().toLowerCase();
+            const name = String(s.channel?.name || code || 'Platform').trim();
+            if (code && !platforms.has(code)) platforms.set(code, name);
+        });
+        if (platformSel) {
+            platforms.forEach((name, code) => {
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = name;
+                platformSel.appendChild(option);
+            });
+        }
 
         stores.forEach(s => {
             const label = s.name + ' (' + (s.channel?.name || '?') + ')';
@@ -1338,6 +1364,7 @@
 
         const params = new URLSearchParams();
         if ($('filterStore').value) params.append('store_id', $('filterStore').value);
+        if ($('filterPlatform').value) params.append('platform', $('filterPlatform').value);
         if ($('filterStatus').value) params.append('status', $('filterStatus').value);
         if ($('filterSettlementStatus').value) params.append('settlement_status', $('filterSettlementStatus').value);
         if ($('filterSearch').value) params.append('search', $('filterSearch').value);
@@ -1412,13 +1439,19 @@
             ${settlements.map(s => {
                 const isPending = !s.settlement_time;
                 const estimateSource = String(s.income_estimation_source || '');
-                const estimateSourceLabel = estimateSource === 'estimated_escrow'
-                    ? 'EST. SHOPEE'
-                    : (estimateSource === 'manual_24' ? 'EST. MANUAL 24%' : 'ESTIMASI BELUM TERSEDIA');
-                const estimateSourceColor = estimateSource === 'estimated_escrow' ? '#b45309' : '#64748b';
+                const estimateSourceLabel = estimateSource === 'payout'
+                    ? 'PAYOUT AKTUAL'
+                    : (estimateSource === 'estimated_escrow'
+                        ? 'EST. SHOPEE'
+                        : (estimateSource === 'manual_24' ? 'EST. MANUAL 24%' : 'ESTIMASI BELUM TERSEDIA'));
+                const estimateSourceColor = estimateSource === 'payout'
+                    ? '#15803d'
+                    : (estimateSource === 'estimated_escrow' ? '#b45309' : '#64748b');
                 const estimateSyncText = s.income_estimate_synced_at
                     ? `Diperbarui ${fmtRelativeTime(s.income_estimate_synced_at)}`
-                    : (estimateSource === 'manual_24' ? 'Fallback lokal, bukan data Shopee' : 'Menunggu data income Shopee');
+                    : (estimateSource === 'payout'
+                        ? 'Diambil dari data payout'
+                        : (estimateSource === 'manual_24' ? 'Fallback lokal, bukan data Shopee' : 'Menunggu data income Shopee'));
                 const pendingDetailPlaceholder = `
                     <div style="padding:.45rem .55rem; border:1px dashed rgba(217,119,6,.38); border-radius:9px; background:rgba(245,158,11,.07); color:#92400e; font-size:.68rem; line-height:1.35;">
                         <strong>Belum final</strong><br>Rincian tersedia setelah settlement.

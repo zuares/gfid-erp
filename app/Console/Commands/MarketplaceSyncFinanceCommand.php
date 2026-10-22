@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use App\Services\MarketplaceSyncService;
 use Carbon\Carbon;
@@ -229,8 +230,54 @@ class MarketplaceSyncFinanceCommand extends Command
 
             $channelCode = strtolower((string) ($store->channel?->code ?? ''));
             $settlementSupported = in_array($channelCode, ['shopee', 'shp'], true);
+            $tiktokFinanceSupported = in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true);
 
-            if (! $settlementSupported) {
+            if ($tiktokFinanceSupported && ! $dryRun) {
+                $ordersQuery = MarketplaceOrder::query()
+                    ->where('store_id', $store->id)
+                    ->whereBetween('ordered_at', [
+                        Carbon::createFromTimestamp($targetDate, config('app.timezone')),
+                        Carbon::createFromTimestamp($syncEndTimestamp, config('app.timezone')),
+                    ])
+                    ->orderBy('id');
+
+                if ($missingOnly) {
+                    $ordersQuery->where(function ($query): void {
+                        $query->whereDoesntHave('settlement')
+                            ->orWhereHas('settlement', function ($settlement): void {
+                                $settlement->where('data_status', '!=', 'complete')
+                                    ->orWhereNull('data_status');
+                            });
+                    });
+                }
+
+                $tiktokOrders = $ordersQuery->get();
+                $tiktokSynced = 0;
+                $tiktokPending = 0;
+                $tiktokErrors = 0;
+                foreach ($tiktokOrders as $tiktokOrder) {
+                    try {
+                        $finance = $syncService->syncTikTokOrderFinance($store, $tiktokOrder);
+                        if (($finance['status'] ?? null) === 'synced') {
+                            $tiktokSynced++;
+                            $totalSyncedToFinance++;
+                        } elseif (($finance['status'] ?? null) === 'pending') {
+                            $tiktokPending++;
+                        } elseif (($finance['status'] ?? null) === 'error') {
+                            $tiktokErrors++;
+                            $failureCount++;
+                        }
+                    } catch (\Throwable $e) {
+                        $tiktokErrors++;
+                        $failureCount++;
+                        $this->warn("   TikTok finance {$tiktokOrder->channel_order_id} gagal: {$e->getMessage()}");
+                    }
+                }
+
+                $this->info("   TikTok Finance: {$tiktokSynced} settled, {$tiktokPending} belum settled, {$tiktokErrors} error.");
+            } elseif ($tiktokFinanceSupported) {
+                $this->info("   [DRY-RUN] Simulasi sinkronisasi finance TikTok dilewati.");
+            } elseif (! $settlementSupported) {
                 $this->info("   Settlement dilewati: channel {$channelCode} belum mendukung escrow detail.");
             } elseif ($dryRun) {
                 $this->info("   [DRY-RUN] Simulasi sinkronisasi settlement dilewati.");

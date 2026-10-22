@@ -15,6 +15,7 @@ use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceProduct;
 use App\Models\MarketplacePromotion;
 use App\Models\MarketplaceSyncLog;
+use App\Models\MpIncome;
 use App\Models\OrderFulfillment;
 use App\Models\SkuMapping;
 use App\Models\Store;
@@ -100,6 +101,11 @@ class MarketplaceController extends Controller
     public function skuMapping(): \Illuminate\View\View
     {
         return view('marketplace.sku-mapping');
+    }
+
+    public function skuMappingRegistered(): \Illuminate\View\View
+    {
+        return view('marketplace.sku-mapping-registered');
     }
 
     public function sync(): \Illuminate\View\View
@@ -3474,7 +3480,7 @@ class MarketplaceController extends Controller
     {
         $query = MarketplaceOrderSettlement::with([
             'store:id,name',
-            'order:id,channel_order_id,booking_sn,order_status,ordered_at,subtotal_items,total_paid_customer',
+            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,subtotal_items,total_paid_customer',
             'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
         ]);
@@ -3500,6 +3506,14 @@ class MarketplaceController extends Controller
 
         if ($request->filled('store_id')) {
             $query->where('store_id', $request->store_id);
+        }
+
+        if ($request->filled('platform')) {
+            $platform = strtolower(trim((string) $request->input('platform')));
+            $query->whereHas('store.channel', function ($channelQuery) use ($platform) {
+                $channelQuery->whereRaw('LOWER(code) = ?', [$platform])
+                    ->orWhereRaw('LOWER(name) = ?', [$platform]);
+            });
         }
 
         if ($request->filled('status')) {
@@ -3694,6 +3708,13 @@ class MarketplaceController extends Controller
             if ($request->filled('store_id')) {
                 $pendingOrdersQuery->where('store_id', $request->store_id);
             }
+            if ($request->filled('platform')) {
+                $platform = strtolower(trim((string) $request->input('platform')));
+                $pendingOrdersQuery->whereHas('store.channel', function ($channelQuery) use ($platform) {
+                    $channelQuery->whereRaw('LOWER(code) = ?', [$platform])
+                        ->orWhereRaw('LOWER(name) = ?', [$platform]);
+                });
+            }
             if ($request->filled('status')) {
                 $pendingOrdersQuery->where('order_status', $request->status);
             }
@@ -3779,8 +3800,9 @@ class MarketplaceController extends Controller
             });
         }
 
+        $payoutLookup = [];
         $metaQuery = clone $query;
-        $formatSettlement = function ($s) {
+        $formatSettlement = function ($s) use (&$payoutLookup) {
             $orderChannelId = $s->order?->channel_order_id ?: $s->channel_order_id;
             $bookingSn = $s->order?->booking_sn ?: data_get($s->raw_json, 'booking_sn');
             $isBookingOnly = filled($bookingSn)
@@ -3823,6 +3845,7 @@ class MarketplaceController extends Controller
             }) : 0;
 
             $netIncome = (float) $s->final_income;
+            $payoutAmount = $this->settlementPayoutAmount($s, $payoutLookup);
             $estimatedEscrowAmount = $isBookingOnly ? null : $this->settlementEstimatedEscrowAmount($s);
             $isEstimatedIncome = false;
             $incomeEstimationSource = null;
@@ -3841,6 +3864,12 @@ class MarketplaceController extends Controller
             } elseif ($isReturning) {
                 $netIncome = 0;
                 // cogs tetap terisi
+            } elseif (! $s->settlement_time && $payoutAmount !== null) {
+                // Sama seperti halaman Orders: payout aktual lebih dipercaya
+                // daripada estimasi marketplace/fallback lokal. Nilai ini hanya
+                // dipakai untuk tampilan pending, bukan ditulis ke settlement.
+                $netIncome = $payoutAmount;
+                $incomeEstimationSource = 'payout';
             } elseif (! $s->settlement_time && $estimatedEscrowAmount !== null) {
                 // Untuk pending, prioritaskan angka dari Shopee. Rumus 24% hanya
                 // fallback bila income detail belum berhasil disinkronkan.
@@ -3946,6 +3975,7 @@ class MarketplaceController extends Controller
 
         if ($includeMissingPending || $sortBy === 'final_income') {
             $allRows = $query->get()->concat($pendingRows);
+            $payoutLookup = $this->settlementPayoutLookup($allRows);
             $sortValue = function ($s) use ($sortBy) {
                 if ($sortBy === 'ordered_at') {
                     return $s->order?->ordered_at?->timestamp ?? 0;
@@ -3978,6 +4008,7 @@ class MarketplaceController extends Controller
                 ->values();
         } else {
             $paginator = $query->paginate($request->input('per_page', 50));
+            $payoutLookup = $this->settlementPayoutLookup($paginator->getCollection());
             $paginator->setCollection($paginator->getCollection()->map($formatSettlement));
             $metaRowsForSettlement = null;
         }
@@ -4011,6 +4042,8 @@ class MarketplaceController extends Controller
                     'synced_at',
                     'raw_json',
                 ]);
+                // KPI menghitung seluruh hasil filter, bukan hanya halaman aktif.
+                $payoutLookup = $this->settlementPayoutLookup($metaRows);
             }
             $metaRows = $metaRows
                 ->reject(fn ($settlement) => $this->isBookingOnlySettlement($settlement))
@@ -4102,9 +4135,29 @@ class MarketplaceController extends Controller
                 $kpiCogs += $cogs;
 
                 $estimatedEscrowAmount = $this->settlementEstimatedEscrowAmount($s);
+                $payoutAmount = $this->settlementPayoutAmount($s, $payoutLookup);
 
                 if ($isCancelledOrReturned || $isReturning) {
                     // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
+                } elseif (! $s->settlement_time && $payoutAmount !== null) {
+                    $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount)
+                        - (float) data_get($s->raw_json, 'seller_discount', 0);
+                    $tokoVoucher = $this->settlementVoucherTokoAmount($s);
+                    $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
+                    $affiliateCommission = (float) (
+                        data_get($s->raw_json, 'affiliate_commission')
+                        ?? data_get($s->raw_json, 'affiliate_commission_amount')
+                        ?? data_get($s->raw_json, 'affiliate_fee')
+                        ?? data_get($s->raw_json, 'affiliate_commission_fee')
+                        ?? data_get($s->raw_json, 'seller_affiliate_fee')
+                        ?? $s->activity_fee
+                        ?? 0
+                    );
+                    $impliedMarketplaceFee = max($grossAfterVT - $payoutAmount - $affiliateCommission, 0);
+                    $kpiAffiliate += $affiliateCommission;
+                    $kpiMarketplace += $impliedMarketplaceFee;
+                    $sellerFeeTotal += $impliedMarketplaceFee + $affiliateCommission;
+                    $kpiNet += $payoutAmount;
                 } elseif (! $s->settlement_time && $estimatedEscrowAmount !== null) {
                     $estimatedShopeeCount++;
                     $estimateSyncedAt = $s->order?->incomeEstimate?->synced_at;
@@ -4325,6 +4378,75 @@ class MarketplaceController extends Controller
         }
 
         return max(0.0, (float) $value);
+    }
+
+    /**
+     * Ambil payout aktual dengan aturan pencocokan yang sama seperti Orders:
+     * store + channel_order_id/external_order_id. Payout hanya dipakai sebagai
+     * sumber tampilan; tidak mengubah final_income settlement di database.
+     *
+     * @param iterable<int,MarketplaceOrderSettlement> $settlements
+     * @return array<string,float>
+     */
+    private function settlementPayoutLookup(iterable $settlements): array
+    {
+        $keys = collect($settlements)
+            ->flatMap(function (MarketplaceOrderSettlement $settlement): array {
+                $order = $settlement->order;
+                return collect([
+                    $order?->channel_order_id,
+                    $order?->external_order_id,
+                    $settlement->channel_order_id,
+                ])
+                    ->filter(fn ($value) => trim((string) $value) !== '')
+                    ->map(fn ($value) => [
+                        'store_id' => (int) $settlement->store_id,
+                        'value' => trim((string) $value),
+                    ])
+                    ->all();
+            })
+            ->unique(fn (array $row): string => $row['store_id'].'|'.$row['value'])
+            ->values();
+
+        if ($keys->isEmpty()) {
+            return [];
+        }
+
+        $lookup = [];
+        foreach ($keys->groupBy('store_id') as $storeId => $rows) {
+            $rows->pluck('value')->unique()->values()->chunk(500)->each(function ($orderIds) use ($storeId, &$lookup): void {
+                MpIncome::query()
+                    ->where('store_id', (int) $storeId)
+                    ->whereIn('platform_order_id', $orderIds->all())
+                    ->whereNotNull('net_payout_actual')
+                    ->get(['store_id', 'platform_order_id', 'net_payout_actual'])
+                    ->each(function (MpIncome $income) use (&$lookup): void {
+                        $lookup[(int) $income->store_id.'|'.trim((string) $income->platform_order_id)] =
+                            (float) $income->net_payout_actual;
+                    });
+            });
+        }
+
+        return $lookup;
+    }
+
+    private function settlementPayoutAmount(MarketplaceOrderSettlement $settlement, array $lookup): ?float
+    {
+        $storeId = (int) $settlement->store_id;
+        $order = $settlement->order;
+        foreach ([$order?->channel_order_id, $order?->external_order_id, $settlement->channel_order_id] as $orderId) {
+            $orderId = trim((string) $orderId);
+            if ($orderId === '') {
+                continue;
+            }
+
+            $key = $storeId.'|'.$orderId;
+            if (array_key_exists($key, $lookup)) {
+                return max(0.0, (float) $lookup[$key]);
+            }
+        }
+
+        return null;
     }
 
     /**

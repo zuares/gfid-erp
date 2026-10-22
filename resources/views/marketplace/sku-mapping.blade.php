@@ -9,6 +9,8 @@
         <button type="button" class="btn btn-dark btn-sm fw-bold"
             style="border-radius:999px;font-size:.78rem"
             onclick="mpMapping.open('', loadMappings)">+ Tambah Mapping</button>
+        <a href="{{ route('marketplace.sku-mapping.registered') }}" class="btn btn-light border btn-sm fw-bold"
+            style="border-radius:999px;font-size:.78rem">Mapping Terdaftar</a>
         <button type="button" class="btn btn-light border btn-sm"
             style="border-radius:999px;font-size:.78rem;font-weight:700"
             onclick="loadMappings()">↻ Refresh</button>
@@ -68,34 +70,6 @@
         <div id="unmappedBody"><div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div></div>
     </x-gf.panel>
 
-    {{-- Existing Mappings --}}
-    <x-gf.panel title="Mapping Terdaftar" subtitle="Seluruh mapping SKU marketplace → item internal.">
-        <x-slot:actions>
-            <div class="d-flex flex-wrap gap-2 justify-content-end">
-                <input type="text" id="mappingSearch" placeholder="Cari SKU atau item…"
-                    style="border-radius:999px;font-size:.75rem;padding:.3rem .85rem;border:1px solid rgba(15,23,42,.1);background:#fff;min-width:200px"
-                    oninput="filterMappings(this.value)">
-                <select id="mappingChannelFilter" class="form-select form-select-sm"
-                    style="border-radius:999px;font-size:.75rem;width:auto;min-width:130px"
-                    onchange="applyMappingFilters()">
-                    <option value="">Semua Channel</option>
-                    <option value="global">Global</option>
-                    <option value="shopee">Shopee</option>
-                    <option value="tiktok">TikTok</option>
-                    <option value="tokopedia">Tokopedia</option>
-                    <option value="lazada">Lazada</option>
-                </select>
-                <select id="mappingStockFilter" class="form-select form-select-sm"
-                    style="border-radius:999px;font-size:.75rem;width:auto;min-width:125px"
-                    onchange="applyMappingFilters()">
-                    <option value="">Semua Stok</option>
-                    <option value="available">Ada Stok</option>
-                    <option value="empty">Stok Habis</option>
-                </select>
-            </div>
-        </x-slot:actions>
-        <div id="mappingsBody"><div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div></div>
-    </x-gf.panel>
 </x-gf.page>
 
 @include('marketplace._mapping-modal')
@@ -145,8 +119,6 @@
 
     async function loadData() {
         $('unmappedBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
-        $('mappingsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
-
         const unmappedParams = unmappedRequestParams();
         const params = mappingParams();
 
@@ -165,10 +137,8 @@
 
         if (mp.status === 'rejected') {
             console.error('Failed to load mappings:', mp.reason);
-            $('mappingsBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat daftar mapping.</div>';
         } else {
             mappingsPaginator = mp.value || null;
-            renderMappings();
         }
 
         renderKpi();
@@ -274,17 +244,13 @@
     }
     
     async function reloadMappingsOnly() {
-        $('mappingsBody').innerHTML = '<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Memuat…</div>';
-        
         const params = mappingParams();
         
         try {
             mappingsPaginator = await api('/api/sku-mappings?' + params.toString());
-            renderMappings();
             renderKpi();
         } catch (e) {
             console.error(e);
-            $('mappingsBody').innerHTML = '<div class="oc-empty text-danger">Gagal memuat daftar mapping.</div>';
         }
     }
 

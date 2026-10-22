@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 class TikTokShopChannel implements MarketplaceChannel
 {
+    private const SEA_REGIONS = ['ID', 'SG', 'PH', 'VN', 'TH', 'MY'];
+
     // ─── Credential helpers ───────────────────────────────────────────────────
 
     protected function baseUrl(Store $store): string
@@ -312,6 +314,33 @@ class TikTokShopChannel implements MarketplaceChannel
     {
         $context = $this->logisticsContext($store, $orderSn);
         $orderId = $context['order_id'];
+        $isSellerShipping = $this->isSellerShipping($context);
+        $responseMeta = [
+            'platform' => 'tiktok',
+            'order_id' => $orderId,
+            'package_id' => $context['package_id'],
+            'shipping_type' => $context['shipping_type'],
+            'is_seller_shipping' => $isSellerShipping,
+            'is_tiktok_shipping' => ! $isSellerShipping,
+            'supports_handover_method' => ! $this->isSeaStore($store),
+            'delivery_option' => $context['delivery_option'],
+        ];
+
+        // Seller Shipping does not use TikTok's eligible shipping-service
+        // query. The seller provides carrier/tracking data in ship().
+        if ($isSellerShipping) {
+            return [
+                'code' => 0,
+                'message' => 'Success',
+                'response' => array_merge($responseMeta, [
+                    'shipping_services' => [],
+                    'weight' => $context['weight'],
+                    'dimension' => $context['dimension'],
+                    'order_line_item_ids' => $context['order_line_item_ids'],
+                    'order_line_list' => $context['order_line_list'],
+                ]),
+            ];
+        }
 
         // An existing package already has its shipping service allocated. In
         // that case the UI only needs to confirm handover; querying eligible
@@ -320,18 +349,13 @@ class TikTokShopChannel implements MarketplaceChannel
             return [
                 'code' => 0,
                 'message' => 'Success',
-                'response' => [
-                    'platform' => 'tiktok',
-                    'order_id' => $orderId,
-                    'package_id' => $context['package_id'],
-                    'shipping_type' => $context['shipping_type'],
-                    'delivery_option' => $context['delivery_option'],
+                'response' => array_merge($responseMeta, [
                     'shipping_services' => [],
                     'weight' => $context['weight'],
                     'dimension' => $context['dimension'],
                     'order_line_item_ids' => $context['order_line_item_ids'],
                     'order_line_list' => $context['order_line_list'],
-                ],
+                ]),
             ];
         }
 
@@ -353,18 +377,13 @@ class TikTokShopChannel implements MarketplaceChannel
         }
 
         $data = is_array($response['data'] ?? null) ? $response['data'] : [];
-        $response['response'] = [
-            'platform' => 'tiktok',
-            'order_id' => $orderId,
-            'package_id' => $context['package_id'],
-            'shipping_type' => $context['shipping_type'],
-            'delivery_option' => $context['delivery_option'],
+        $response['response'] = array_merge($responseMeta, [
             'shipping_services' => $data['shipping_services'] ?? [],
             'weight' => $body['weight'] ?? null,
             'dimension' => $body['dimension'] ?? null,
             'order_line_item_ids' => $context['order_line_item_ids'],
             'order_line_list' => $context['order_line_list'],
-        ];
+        ]);
 
         return $response;
     }
@@ -374,8 +393,16 @@ class TikTokShopChannel implements MarketplaceChannel
         $context = $this->logisticsContext($store, $orderSn);
         $orderId = $context['order_id'];
         $packageId = trim((string) ($params['package_id'] ?? $context['package_id'] ?? ''));
+        $isSellerShipping = $this->isSellerShipping($context, $params);
 
-        if ($packageId === '') {
+        if ($isSellerShipping && $packageId === '') {
+            return [
+                'error' => 'seller_shipping_package_id_missing',
+                'message' => 'Package ID TikTok belum tersedia untuk Seller Shipping. Sinkronkan detail pesanan terlebih dahulu.',
+            ];
+        }
+
+        if (! $isSellerShipping && $packageId === '') {
             $shipType = (string) ($params['ship_type'] ?? '1');
             $createPayload = [
                 'ship_type' => $shipType,
@@ -409,7 +436,17 @@ class TikTokShopChannel implements MarketplaceChannel
             }
         }
 
-        $shipPayload = $this->buildShipPayload($params);
+        $shipPayload = $this->buildShipPayload($store, $params, $context);
+        $selfShipment = $shipPayload['self_shipment'] ?? [];
+        if ($isSellerShipping
+            && (trim((string) ($selfShipment['tracking_number'] ?? '')) === ''
+                || trim((string) ($selfShipment['shipping_provider_id'] ?? '')) === '')) {
+            return [
+                'error' => 'self_shipment_required',
+                'message' => 'Seller Shipping memerlukan nomor resi dan shipping_provider_id.',
+                'package_id' => $packageId,
+            ];
+        }
         $shipped = $this->post(
             $store,
             '/fulfillment/202309/packages/' . rawurlencode($packageId) . '/ship',
@@ -461,9 +498,17 @@ class TikTokShopChannel implements MarketplaceChannel
                 ];
             }
 
+            // TikTok requires the document type for this endpoint. Without
+            // it the API returns 36009004 ("DocumentType is required") even
+            // when the package has already been shipped.
             $result = $this->get(
                 $store,
-                '/fulfillment/202309/packages/' . rawurlencode($packageId) . '/shipping_documents'
+                '/fulfillment/202309/packages/' . rawurlencode($packageId) . '/shipping_documents',
+                [
+                    'document_type' => 'SHIPPING_LABEL',
+                    'document_size' => 'A6',
+                    'document_format' => 'PDF',
+                ]
             );
             if (($result['code'] ?? null) !== 0) {
                 return $result;
@@ -488,6 +533,28 @@ class TikTokShopChannel implements MarketplaceChannel
     }
 
     /**
+     * Ambil rincian transaksi keuangan per order dari TikTok Shop.
+     *
+     * Endpoint v202501 menggantikan versi v202309 dan mengembalikan
+     * revenue, fee/tax, ongkir, settlement_amount, serta rincian SKU.
+     */
+    public function getOrderStatementTransactions(Store $store, string $orderId): array
+    {
+        $orderId = trim($orderId);
+        if ($orderId === '') {
+            return [
+                'error' => 'order_id_missing',
+                'message' => 'Order ID TikTok wajib diisi.',
+            ];
+        }
+
+        return $this->get(
+            $store,
+            '/finance/202501/orders/' . rawurlencode($orderId) . '/statement_transactions'
+        );
+    }
+
+    /**
      * TikTok's tracking API is order-based, unlike Shopee's order detail
      * package shape. Keep a small compatibility response for the shared
      * logistics service/controller.
@@ -503,6 +570,8 @@ class TikTokShopChannel implements MarketplaceChannel
         $tracking = $data['tracking_number']
             ?? data_get($data, 'packages.0.tracking_number')
             ?? data_get($data, 'package_list.0.tracking_number')
+            ?? data_get($data, 'tracking.0.tracking_number')
+            ?? data_get($data, 'tracking.0.tracking_no')
             ?? data_get($data, 'tracking_info.0.tracking_number');
 
         $result['response'] = ['tracking_number' => $tracking, 'raw' => $data];
@@ -512,7 +581,7 @@ class TikTokShopChannel implements MarketplaceChannel
     public function getTrackingInfo(Store $store, string $orderSn): array
     {
         $result = $this->getTrackingNumber($store, $orderSn);
-        $tracking = data_get($result, 'response.raw.tracking_info', []);
+        $tracking = data_get($result, 'response.raw.tracking', data_get($result, 'response.raw.tracking_info', []));
         $result['response']['tracking_info'] = is_array($tracking) ? $tracking : [];
         return $result;
     }
@@ -522,22 +591,68 @@ class TikTokShopChannel implements MarketplaceChannel
         return $this->get($store, '/fulfillment/202309/packages/' . rawurlencode($packageId));
     }
 
-    protected function buildShipPayload(array $params): array
+    protected function buildShipPayload(Store $store, array $params, array $context): array
     {
         $payload = [];
-        if (isset($params['dropoff'])) {
-            $payload['handover_method'] = 'DROP_OFF';
-        } elseif (isset($params['pickup'])) {
-            $payload['handover_method'] = 'PICKUP';
+
+        if ($this->isSellerShipping($context, $params)) {
+            $selfShipment = is_array($params['self_shipment'] ?? null)
+                ? $params['self_shipment']
+                : [
+                    'tracking_number' => $params['tracking_number'] ?? null,
+                    'shipping_provider_id' => $params['shipping_provider_id'] ?? null,
+                ];
+            $selfShipment = array_filter(
+                $selfShipment,
+                static fn ($value): bool => $value !== null && trim((string) $value) !== ''
+            );
+            if ($selfShipment !== []) {
+                $payload['self_shipment'] = $selfShipment;
+            }
+
+            return $payload;
         }
 
-        foreach (['handover_method', 'pickup_slot', 'self_shipment'] as $key) {
-            if (array_key_exists($key, $params) && $params[$key] !== null && $params[$key] !== []) {
-                $payload[$key] = $params[$key];
+        // TikTok's SEA API no longer accepts handover_method/pickup_slot for
+        // ID, SG, PH, VN, TH, and MY. Collection is configured in Seller
+        // Center warehouse settings, so omit these fields in those regions.
+        if (! $this->isSeaStore($store)) {
+            if (isset($params['dropoff'])) {
+                $payload['handover_method'] = 'DROP_OFF';
+            } elseif (isset($params['pickup'])) {
+                $payload['handover_method'] = 'PICKUP';
+            }
+
+            foreach (['handover_method', 'pickup_slot'] as $key) {
+                if (array_key_exists($key, $params) && $params[$key] !== null && $params[$key] !== []) {
+                    $payload[$key] = $params[$key];
+                }
             }
         }
 
         return $payload;
+    }
+
+    protected function isSellerShipping(array $context, array $params = []): bool
+    {
+        $shippingType = trim((string) ($params['shipping_type'] ?? ''));
+        if ($shippingType === '') {
+            $shippingType = trim((string) ($context['shipping_type'] ?? ''));
+        }
+        if ($shippingType === '') {
+            $shippingType = trim((string) ($context['delivery_option'] ?? ''));
+        }
+        $shippingType = strtoupper($shippingType);
+        $shippingType = str_replace(['-', ' '], '_', $shippingType);
+
+        return str_contains($shippingType, 'SELLER')
+            || in_array($shippingType, ['SELF', 'SELF_SHIPPING', 'MERCHANT'], true);
+    }
+
+    protected function isSeaStore(Store $store): bool
+    {
+        $region = strtoupper(trim((string) $store->region));
+        return in_array(substr($region, 0, 2), self::SEA_REGIONS, true);
     }
 
     protected function isAlreadyShipped(array $response): bool
@@ -601,7 +716,12 @@ class TikTokShopChannel implements MarketplaceChannel
         return [
             'order_id' => $orderId,
             'package_id' => $packageId !== '' ? $packageId : null,
-            'shipping_type' => $package['shipping_type'] ?? $raw['shipping_type'] ?? null,
+            'shipping_type' => $package['shipping_type']
+                ?? $package['shipping_type_name']
+                ?? $raw['shipping_type']
+                ?? $raw['shipping_type_name']
+                ?? $raw['fulfillment_type']
+                ?? null,
             'delivery_option' => $package['delivery_option'] ?? $raw['delivery_option'] ?? $raw['delivery_option_id'] ?? null,
             'order_line_item_ids' => array_values(array_unique($orderLineItemIds)),
             'order_line_list' => $orderLineList,

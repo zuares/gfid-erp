@@ -370,9 +370,26 @@ class MarketplaceLogisticsController extends Controller
             // selected shipping method is not silently discarded.
             $isAutoSync = $request->boolean('is_auto_sync')
                 || $request->boolean('auto_sync_only');
+            $channelCode = strtoupper(trim((string) ($store->channel?->code ?? '')));
+            $isTikTok = in_array($channelCode, ['TTK', 'TKT', 'TIKTOK', 'TIKTOK SHOP'], true);
             $params = $request->input('params');
             if (! is_array($params)) {
-                $params = $request->only(['pickup', 'dropoff', 'non_integrated']);
+                $params = $isTikTok
+                    ? $request->only([
+                        'package_id',
+                        'shipping_type',
+                        'shipping_service_id',
+                        'handover_method',
+                        'pickup_slot',
+                        'self_shipment',
+                        'tracking_number',
+                        'shipping_provider_id',
+                        'weight',
+                        'dimension',
+                        'ship_type',
+                        'order_line_item',
+                    ])
+                    : $request->only(['pickup', 'dropoff', 'non_integrated']);
             }
 
             $methodNames = ['pickup', 'dropoff', 'non_integrated'];
@@ -395,7 +412,7 @@ class MarketplaceLogisticsController extends Controller
 
             // Shopee requires exactly one shipping mode. Do this validation
             // here so an empty/ambiguous payload cannot reach the API.
-            if (! $isAutoSync && $selectedMethods->count() !== 1) {
+            if (! $isTikTok && ! $isAutoSync && $selectedMethods->count() !== 1) {
                 return response()->json([
                     'error' => true,
                     'message' => 'Pilih tepat satu metode pengiriman: pickup, dropoff, atau non_integrated.',
@@ -409,6 +426,24 @@ class MarketplaceLogisticsController extends Controller
                 if (is_array($params[$method]) && empty($params[$method])) {
                     $params[$method] = new \stdClass();
                 }
+            }
+
+            // TikTok's fulfillment endpoint can take longer than the browser
+            // request allowed by Herd/ngrok. Queue the actual ship operation
+            // so the user gets an immediate JSON response and the default
+            // queue worker performs the API call safely in the background.
+            if ($isTikTok && ! $isAutoSync) {
+                \App\Jobs\ProcessTikTokShipmentJob::dispatch(
+                    (int) $store->id,
+                    $orderSn,
+                    $params
+                );
+
+                return response()->json([
+                    'success' => true,
+                    'queued' => true,
+                    'message' => 'Pengiriman TikTok masuk antrean. Status akan diperbarui setelah API TikTok selesai.',
+                ], 202);
             }
 
             $result = $this->logistics->arrangeShipment($store, $orderSn, $params, $isAutoSync);
@@ -751,8 +786,8 @@ class MarketplaceLogisticsController extends Controller
 
             // Batasi download PDF supaya request cetak selesai sebelum batas
             // Nginx/PHP-FPM dan tidak berubah menjadi 502 Bad Gateway.
-            $download = \Illuminate\Support\Facades\Http::connectTimeout(5)
-                ->timeout(20)
+            $download = \Illuminate\Support\Facades\Http::connectTimeout(3)
+                ->timeout(8)
                 ->get($docUrl);
             if (! $download->successful()) {
                 throw new \RuntimeException('Dokumen resi TikTok gagal diunduh (HTTP ' . $download->status() . ').');

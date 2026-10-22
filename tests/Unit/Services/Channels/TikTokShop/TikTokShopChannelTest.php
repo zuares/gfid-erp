@@ -231,4 +231,51 @@ class TikTokShopChannelTest extends TestCase
                 && $request->body() === '{"status":"ALL","locale":"id-ID"}';
         });
     }
+
+    public function test_order_finance_uses_the_v202501_statement_transactions_endpoint(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-FINANCE-API',
+            'name' => 'TikTok Finance API Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202501/orders/ORDER-FIN-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'order_id' => 'ORDER-FIN-1',
+                    'currency' => 'IDR',
+                    'revenue_amount' => '120000',
+                    'fee_and_tax_amount' => '-6000',
+                    'shipping_cost_amount' => '-25000',
+                    'settlement_amount' => '89000',
+                    'sku_transactions' => [],
+                ],
+            ]),
+        ]);
+
+        $result = app(TikTokShopChannel::class)
+            ->getOrderStatementTransactions($store, 'ORDER-FIN-1');
+
+        $this->assertSame('89000', $result['data']['settlement_amount']);
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'GET'
+                && str_contains($request->url(), '/finance/202501/orders/ORDER-FIN-1/statement_transactions?')
+                && str_contains($request->url(), 'app_key=app-key-test')
+                && str_contains($request->url(), 'shop_cipher=shop-cipher-test')
+                && str_contains($request->url(), 'sign=');
+        });
+    }
 }

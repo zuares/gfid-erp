@@ -181,6 +181,23 @@ class MarketplaceLogisticsService
                 $existingOrder->update(['raw_json' => $rawJson]);
             }
 
+            // TikTok's ship endpoint is already the fulfillment action. Do
+            // not block the browser request with sleep(3) plus tracking and
+            // order-detail calls; behind nginx/ngrok those follow-up calls
+            // can exceed the request timeout and turn a successful shipment
+            // into a non-JSON 502 response. Tracking is picked up by the next
+            // marketplace sync / Sync Resi action.
+            if (in_array($channelCode, ['TTK', 'TKT', 'TIKTOK', 'TIKTOK SHOP'], true)) {
+                if ($existingOrder) {
+                    $existingOrder->update([
+                        'order_status' => 'PROCESSED',
+                        'shipping_arranged_at' => now(),
+                    ]);
+                }
+
+                return $result;
+            }
+
             try {
                 // Background async AWB update
                 sleep(3);

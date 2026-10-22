@@ -1984,6 +1984,10 @@
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.sku-mapping') ? 'active' : '' }}">
                                     <span class="icon">🔗</span><span>Pemetaan SKU</span>
                                 </a>
+                                <a href="{{ route('marketplace.sku-mapping.registered') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.sku-mapping.registered') ? 'active' : '' }}">
+                                    <span class="icon">✅</span><span>Mapping Terdaftar</span>
+                                </a>
                             @endif
 
                             @if ($hasMarketplaceSync)

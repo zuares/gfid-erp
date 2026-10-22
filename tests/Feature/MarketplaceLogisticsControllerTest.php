@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\MarketplaceLogisticsController;
+use App\Jobs\ProcessTikTokShipmentJob;
 use App\Models\Store;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use App\Services\Channels\Shopee\ShopeeChannel;
 use App\Services\Marketplace\MarketplaceLogisticsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -183,5 +185,28 @@ class MarketplaceLogisticsControllerTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertTrue($response->getData(true)['success']);
+    }
+
+    public function test_tiktok_arrange_shipment_is_queued_to_avoid_browser_timeout(): void
+    {
+        $store = new Store();
+        $store->id = 17;
+        $store->setRelation('channel', (object) ['code' => 'tiktok']);
+        Queue::fake();
+
+        $request = Request::create('/ship', 'POST', [
+            'package_id' => 'TT-PACKAGE-QUEUE-001',
+            'shipping_service_id' => 'SERVICE-001',
+        ]);
+        $response = app(MarketplaceLogisticsController::class)
+            ->arrangeShipment($request, $store, 'TT-ORDER-QUEUE-001');
+
+        $this->assertSame(202, $response->getStatusCode());
+        $this->assertTrue($response->getData(true)['queued']);
+        Queue::assertPushed(ProcessTikTokShipmentJob::class, function (ProcessTikTokShipmentJob $job): bool {
+            return $job->storeId === 17
+                && $job->orderSn === 'TT-ORDER-QUEUE-001'
+                && $job->params['package_id'] === 'TT-PACKAGE-QUEUE-001';
+        });
     }
 }
