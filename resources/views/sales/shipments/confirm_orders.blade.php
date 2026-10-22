@@ -739,12 +739,42 @@ body[data-theme="dark"] .sd-marketplace-title{color:#bfdbfe}body[data-theme="dar
             return ['needs_review' => false, 'item_mismatch' => false, 'qty_mismatch' => false, 'unverified' => false];
         }
 
-        $sourceItemId = static fn ($item): int => (int) (is_array($item)
-            ? ($item['item_id'] ?? 0)
-            : (($item->internal_item_id ?? null) ?: ($item->item_id ?? 0)));
-        $sourceQty = static fn ($item): int => (int) (is_array($item)
-            ? ($item['qty'] ?? $item['quantity'] ?? $item['model_quantity_purchased'] ?? 0)
-            : ($item->qty ?? 0));
+        $shipmentItemCodeById = $shipmentLines->mapWithKeys(fn ($line) => [
+            (int) $line->item_id => strtoupper(trim((string) ($line->item?->code ?? ''))),
+        ]);
+        $shipmentItemIdByCode = $shipmentItemCodeById->filter()->flip();
+        $sourceSku = static fn ($item): string => strtoupper(trim((string) (is_array($item)
+            ? ($item['sku'] ?? $item['model_sku'] ?? $item['item_sku'] ?? '')
+            : ($item->model_sku ?: $item->item_sku ?: $item->item_code_snapshot ?: ''))));
+        $sourceItemId = static function ($item) use ($shipmentItemIdByCode, $shipmentItemCodeById, $sourceSku): int {
+            $itemId = (int) (is_array($item)
+                ? ($item['item_id'] ?? 0)
+                : (($item->internal_item_id ?? null) ?: ($item->item_id ?? 0)));
+            if ($itemId > 0) {
+                return $itemId;
+            }
+
+            $sku = $sourceSku($item);
+            if (preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches)) {
+                return (int) ($shipmentItemIdByCode->get($matches[1]) ?? 0);
+            }
+
+            return 0;
+        };
+        $sourceQty = static function ($item) use ($sourceSku, $sourceItemId, $shipmentItemCodeById): int {
+            $qty = (int) (is_array($item)
+                ? ($item['qty'] ?? $item['quantity'] ?? $item['model_quantity_purchased'] ?? 0)
+                : ($item->qty ?? 0));
+            $sku = $sourceSku($item);
+            if (!preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches)) {
+                return $qty;
+            }
+
+            $itemId = $sourceItemId($item);
+            $internalCode = is_array($item) ? '' : strtoupper(trim((string) ($item->internalItem?->code ?? '')));
+            $internalCode = $internalCode ?: ($shipmentItemCodeById->get($itemId) ?? '');
+            return $internalCode === $matches[1] ? $qty * (int) $matches[2] : $qty;
+        };
         $shipmentByItem = $shipmentLines->groupBy(fn ($line) => (int) ($line->item_id ?? 0))
             ->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'));
         $sourceByItem = $sourceItems->groupBy($sourceItemId)

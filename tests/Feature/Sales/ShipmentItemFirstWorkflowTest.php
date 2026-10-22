@@ -820,6 +820,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
     public function test_confirmation_marks_per_order_item_and_quantity_differences_for_review(): void
     {
         [$user, $store, $scannedItem] = $this->shipmentContext();
+        $scannedItem->update(['code' => 'S2RDM']);
         $differentItem = Item::create([
             'code' => 'ITEM-FIRST-DIFFERENT',
             'name' => 'Different marketplace item',
@@ -837,8 +838,9 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         ]);
 
         foreach ([
-            ['number' => 'ORDER-ITEM-DIFF-001', 'source_item' => $differentItem, 'source_qty' => 1],
-            ['number' => 'ORDER-QTY-DIFF-001', 'source_item' => $scannedItem, 'source_qty' => 3],
+            ['number' => 'ORDER-ITEM-DIFF-001', 'source_item' => $differentItem, 'source_qty' => 1, 'shipment_qty' => 1],
+            ['number' => 'ORDER-QTY-DIFF-001', 'source_item' => $scannedItem, 'source_qty' => 3, 'shipment_qty' => 1],
+            ['number' => 'ORDER-PACK-SKU-6', 'source_item' => $scannedItem, 'source_qty' => 1, 'source_sku' => 'S2RDM-6', 'shipment_qty' => 6],
         ] as $case) {
             $order = MarketplaceOrder::create([
                 'store_id' => $store->id,
@@ -854,8 +856,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
                 'item_id' => $case['source_item']->id,
                 'internal_item_id' => $case['source_item']->id,
                 'item_name' => $case['source_item']->name,
-                'item_sku' => $case['source_item']->code,
-                'model_sku' => $case['source_item']->code,
+                'item_sku' => $case['source_sku'] ?? $case['source_item']->code,
+                'model_sku' => $case['source_sku'] ?? $case['source_item']->code,
                 'qty' => $case['source_qty'],
             ]);
             $fulfillment = OrderFulfillment::create([
@@ -874,8 +876,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
                 'shipment_id' => $shipment->id,
                 'shipment_order_scan_id' => $scan->id,
                 'item_id' => $scannedItem->id,
-                'qty_scanned' => 1,
-                'allocated_qty' => 1,
+                'qty_scanned' => $case['shipment_qty'],
+                'allocated_qty' => $case['shipment_qty'],
             ]);
         }
 
@@ -884,6 +886,8 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('Selisih item')
             ->assertSee('Selisih qty')
             ->assertSee('data-order-problem="true"', false)
+            ->assertSee('data-order-problem="false"', false)
+            ->assertSee('S2RDM-6')
             ->assertSee('Shipment Test Store');
 
         $html = $response->getContent();
