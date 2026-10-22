@@ -50,4 +50,21 @@ class MarketplaceSalesDashboardAccessTest extends TestCase
             ->assertDontSee('Marketplace Finance')
             ->assertDontSee('AMS Performance &amp; Report', false);
     }
+
+    public function test_owner_sidebar_shows_marketplace_finance_navigation(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-FINANCE-SIDEBAR-'.uniqid(),
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.finance.transactions'))
+            ->assertOk()
+            ->assertSee('Finance Overview')
+            ->assertSee('Finance Transactions')
+            ->assertSee('Finance Settlements')
+            ->assertSee('Finance Reconciliation')
+            ->assertSee('Finance Fee Analysis');
+    }
 }

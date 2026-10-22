@@ -2038,6 +2038,28 @@
                             </button>
                             <div class="collapse sidebar-nested-collapse {{ $openMarketplaceFinanceGroup ? 'show' : '' }}" id="navMarketplaceOwnerFinance">
                                 @php $subhead('Analisa'); @endphp
+                        @if ($hasMarketplaceFinance)
+                            <x-sidebar.sub-link href="{{ route('marketplace.finance.index') }}" icon="bi bi-wallet2"
+                                :active="request()->routeIs('marketplace.finance.index')">
+                                Finance Overview
+                            </x-sidebar.sub-link>
+                            <x-sidebar.sub-link href="{{ route('marketplace.finance.transactions') }}" icon="bi bi-list-columns-reverse"
+                                :active="request()->routeIs('marketplace.finance.transactions')">
+                                Finance Transactions
+                            </x-sidebar.sub-link>
+                            <x-sidebar.sub-link href="{{ route('marketplace.finance.settlements') }}" icon="bi bi-bank"
+                                :active="request()->routeIs('marketplace.finance.settlements')">
+                                Finance Settlements
+                            </x-sidebar.sub-link>
+                            <x-sidebar.sub-link href="{{ route('marketplace.finance.reconciliation') }}" icon="bi bi-check2-square"
+                                :active="request()->routeIs('marketplace.finance.reconciliation')">
+                                Finance Reconciliation
+                            </x-sidebar.sub-link>
+                            <x-sidebar.sub-link href="{{ route('marketplace.finance.fee-analysis') }}" icon="bi bi-percent"
+                                :active="request()->routeIs('marketplace.finance.fee-analysis')">
+                                Finance Fee Analysis
+                            </x-sidebar.sub-link>
+                        @endif
                         @if ($hasMarketplaceSalesDashboard)
                             <x-sidebar.sub-link href="{{ route('marketplace.dashboard.sales') }}" icon="bi bi-speedometer2"
                                 :active="request()->routeIs('marketplace.dashboard.sales')">
