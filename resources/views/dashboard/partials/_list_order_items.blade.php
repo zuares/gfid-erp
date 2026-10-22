@@ -16,6 +16,8 @@
                     $summaryGapKnown = true;
                     $summaryProductionStock = 0;
                     $summaryProductionKnown = true;
+                    $summaryWipStock = 0;
+                    $summaryWipKnown = true;
                     foreach ($rows as $summaryRow) {
                         $summaryCategory = $summaryRow['category'] ?? 'Tanpa kategori';
                         $summary = $categorySummaries[$summaryCategory] ?? [
@@ -46,6 +48,14 @@
                             $summary['production_stock'] += $productionStock;
                             $summaryProductionStock += $productionStock;
                         }
+                        if (($summaryRow['wip_stock_qty'] ?? null) === null) {
+                            $summary['wip_known'] = false;
+                            $summaryWipKnown = false;
+                        } else {
+                            $wipStock = (float) $summaryRow['wip_stock_qty'];
+                            $summary['wip_stock'] = ($summary['wip_stock'] ?? 0) + $wipStock;
+                            $summaryWipStock += $wipStock;
+                        }
                         $categorySummaries[$summaryCategory] = $summary;
                     }
                     $summaryGapState = !$summaryGapKnown ? 'unknown' : ($summaryGap < 0 ? 'short' : 'safe');
@@ -69,6 +79,10 @@
                         <span><i class="bi bi-gear-wide-connected" aria-hidden="true"></i> Stok produksi</span>
                         <strong>{{ $summaryProductionKnown ? $qty($summaryProductionStock) . ' pcs' : '—' }}</strong>
                     </div>
+                    <div class="ditem-summary-item">
+                        <span><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Stok WIP</span>
+                        <strong>{{ $summaryWipKnown ? $qty($summaryWipStock) . ' pcs' : '—' }}</strong>
+                    </div>
                 </div>
                 <table class="ditem-table">
                     <thead>
@@ -77,7 +91,8 @@
                             <th>Kode item internal</th>
                             <th class="numeric">Permintaan</th>
                             <th class="numeric ditem-mobile-secondary">Stok FG/RTS</th>
-                            <th class="numeric ditem-mobile-secondary">Stok produksi / WIP</th>
+                            <th class="numeric ditem-mobile-secondary">Stok produksi</th>
+                            <th class="numeric ditem-mobile-secondary">Stok WIP</th>
                             <th class="numeric">Selisih kurang</th>
                         </tr>
                     </thead>
@@ -92,6 +107,7 @@
                                 $demand = (float) ($row['demand_qty'] ?? 0);
                                 $stock = $row['stock_qty'] ?? null;
                                 $productionStock = $row['production_stock_qty'] ?? null;
+                                $wipStock = $row['wip_stock_qty'] ?? null;
                                 $wipStages = [
                                     'CUT' => $row['wip_cut_qty'] ?? null,
                                     'SEW' => $row['wip_sew_qty'] ?? null,
@@ -109,6 +125,8 @@
                                         'stock_known' => false,
                                         'production_stock' => 0,
                                         'production_known' => false,
+                                        'wip_stock' => 0,
+                                        'wip_known' => false,
                                         'gap' => 0,
                                     ];
                                     $categoryGap = $categorySummary['stock_known'] ? $categorySummary['gap'] : null;
@@ -120,6 +138,7 @@
                                     <td></td>
                                     <td><span class="ditem-category-name"><i class="bi bi-tag"></i> {{ $category }}</span></td>
                                     <td class="numeric ditem-category-total" title="Total permintaan kategori">{{ $qty($categorySummary['demand']) }} pcs</td>
+                                    <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="numeric ditem-gap ditem-category-total">
@@ -156,10 +175,22 @@
                                     @else
                                         0 pcs
                                     @endif
-                                    @if($productionStock !== null)
-                                        <div class="ditem-wip-breakdown" title="Rincian stok setengah jadi per tahap produksi">
+                                </td>
+                                <td class="numeric ditem-production-stock ditem-mobile-secondary {{ $wipStock !== null && $wipStock > 0 ? 'has-stock' : '' }}">
+                                    @if($wipStock === null)
+                                        —
+                                    @elseif($wipStock > 0)
+                                        <span class="ditem-production-indicator" title="Ada stok setengah jadi di proses produksi">
+                                            <i class="bi bi-arrow-repeat ditem-production-icon" aria-hidden="true"></i>
+                                            <span>{{ $qty($wipStock) }} pcs</span>
+                                        </span>
+                                    @else
+                                        0 pcs
+                                    @endif
+                                    @if($wipStock !== null)
+                                        <div class="ditem-wip-breakdown" title="CUT {{ $wipStages['CUT'] === null ? '—' : $qty($wipStages['CUT']) }} · SEW {{ $wipStages['SEW'] === null ? '—' : $qty($wipStages['SEW']) }} · FIN {{ $wipStages['FIN'] === null ? '—' : $qty($wipStages['FIN']) }} · PACK {{ $wipStages['PACK'] === null ? '—' : $qty($wipStages['PACK']) }}">
                                             @foreach($wipStages as $stage => $stageQty)
-                                                <span>{{ $stage }} {{ $stageQty === null ? '—' : $qty($stageQty) }}</span>@if(!$loop->last) · @endif
+                                                <span>{{ substr($stage, 0, 1) }}{{ $stageQty === null ? '—' : $qty($stageQty) }}</span>@if(!$loop->last) · @endif
                                             @endforeach
                                         </div>
                                     @endif

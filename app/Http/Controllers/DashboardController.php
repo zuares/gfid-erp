@@ -31,13 +31,14 @@ class DashboardController extends Controller
         'SEW'      => 'WIP-SEW',
         'FIN'      => 'WIP-FIN',
         'PACK'     => 'WIP-PACK',
+        'PRD'      => 'WH-PRD',
         'FG'       => 'FG',
         'RTS'      => 'WH-RTS',
     ];
 
     /** Status order yang masih perlu diproses/dikemas oleh tim. */
     private const DASHBOARD_PENDING_ORDER_STATUSES = ['READY_TO_SHIP', 'PROCESSED'];
-    private const PRODUCTION_WAREHOUSE_CODES = ['WIP-CUT', 'WIP-SEW', 'WIP-FIN', 'WIP-PACK'];
+    private const WIP_WAREHOUSE_CODES = ['WIP-CUT', 'WIP-SEW', 'WIP-FIN', 'WIP-PACK'];
 
     public function __construct(
         private InventoryIntelligenceService $inventoryIntelligence,
@@ -451,6 +452,27 @@ class DashboardController extends Controller
         return 'created_at';
     }
 
+    /** Ubah SKU bundle marketplace, misalnya S3RDM-3 menjadi S3RDM x3. */
+    private function normalizeMarketplaceBundleSku(?string $sku, mixed $qty): array
+    {
+        $sku = strtoupper(trim((string) $sku));
+        $qty = (float) $qty;
+
+        if (preg_match('/^(.+)-(1|3|6)$/', $sku, $matches)) {
+            return [
+                'sku' => $matches[1],
+                'qty' => $qty * (int) $matches[2],
+                'multiplier' => (int) $matches[2],
+            ];
+        }
+
+        return [
+            'sku' => $sku,
+            'qty' => $qty,
+            'multiplier' => 1,
+        ];
+    }
+
     /** Pesanan belum dikirim (perlu diproses + siap kirim). */
     private function mpUnshippedCount(): int
     {
@@ -543,6 +565,36 @@ class DashboardController extends Controller
                 })
                 ->get();
 
+            // SKU bundle marketplace seperti S3RDM-3 harus memakai item dasar
+            // S3RDM dan qty-nya dikalikan 3 saat dihitung di dashboard.
+            $bundleBaseItemsByCode = collect();
+            if (Schema::hasTable('items')) {
+                $bundleBaseCodes = collect($orderItems)
+                    ->map(function ($item) {
+                        $data = (array) $item;
+                        return $this->normalizeMarketplaceBundleSku(
+                            $data['model_sku']
+                                ?? $data['item_sku']
+                                ?? $data['marketplace_sku']
+                                ?? $data['external_sku']
+                                ?? $data['item_code_snapshot']
+                                ?? null,
+                            1,
+                        )['sku'];
+                    })
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if ($bundleBaseCodes !== []) {
+                    $bundleBaseItemsByCode = DB::table('items')
+                        ->whereIn('code', $bundleBaseCodes)
+                        ->get(['id', 'code'])
+                        ->keyBy(fn ($item) => strtoupper(trim((string) $item->code)));
+                }
+            }
+
             $itemIdColumns = collect(['internal_item_id', 'item_id'])
                 ->filter(fn ($column) => Schema::hasColumn('marketplace_order_items', $column))
                 ->values()
@@ -558,16 +610,20 @@ class DashboardController extends Controller
                 })
                 ->filter()
                 ->unique()
+                ->values()
+                ->merge($bundleBaseItemsByCode->pluck('id'))
+                ->filter()
+                ->unique()
                 ->values();
 
-            // Stok siap jual tetap dipisahkan dari stok yang masih berada di
-            // proses produksi agar selisih fulfillment tidak tertutup.
+            // Stok WH-RTS dipisahkan dari stok WH-PRD dan WIP agar posisi
+            // fulfillment tetap terlihat sesuai gudangnya.
             $stockByItemId = collect();
             if ($itemIds->isNotEmpty()
                 && Schema::hasTable('inventory_stocks')
                 && Schema::hasTable('warehouses')) {
-                $sellableWarehouseCodes = [self::WH['FG'], self::WH['RTS']];
-                $stockWarehouseCodes = array_merge($sellableWarehouseCodes, self::PRODUCTION_WAREHOUSE_CODES);
+                $sellableWarehouseCodes = [self::WH['RTS']];
+                $stockWarehouseCodes = array_merge($sellableWarehouseCodes, [self::WH['PRD']], self::WIP_WAREHOUSE_CODES);
                 $stockByItemId = DB::table('inventory_stocks as s')
                     ->join('warehouses as w', 'w.id', '=', 's.warehouse_id')
                     ->whereIn('w.code', $stockWarehouseCodes)
@@ -578,8 +634,12 @@ class DashboardController extends Controller
                         $sellableWarehouseCodes,
                     )
                     ->selectRaw(
-                        'COALESCE(SUM(CASE WHEN w.code IN (?, ?, ?, ?) THEN s.qty ELSE 0 END), 0) as production_stock_qty',
-                        self::PRODUCTION_WAREHOUSE_CODES,
+                        'COALESCE(SUM(CASE WHEN w.code = ? THEN s.qty ELSE 0 END), 0) as production_stock_qty',
+                        [self::WH['PRD']],
+                    )
+                    ->selectRaw(
+                        'COALESCE(SUM(CASE WHEN w.code IN (?, ?, ?, ?) THEN s.qty ELSE 0 END), 0) as wip_stock_qty',
+                        self::WIP_WAREHOUSE_CODES,
                     )
                     ->selectRaw(
                         'COALESCE(SUM(CASE WHEN w.code = ? THEN s.qty ELSE 0 END), 0) as wip_cut_qty',
@@ -642,7 +702,6 @@ class DashboardController extends Controller
                         break;
                     }
                 }
-                $internalItem = $internalItemId ? $internalItemsById->get($internalItemId) : null;
 
                 $name = $itemData['item_name']
                     ?? $itemData['item_name_snapshot']
@@ -656,15 +715,22 @@ class DashboardController extends Controller
                     ?? $itemData['external_sku']
                     ?? $itemData['item_code_snapshot']
                     ?? null;
+                $normalizedSku = $this->normalizeMarketplaceBundleSku($sku, $itemData['qty'] ?? 0);
+                $bundleBaseItem = $bundleBaseItemsByCode->get($normalizedSku['sku']);
+                if ($bundleBaseItem) {
+                    $internalItemId = (int) $bundleBaseItem->id;
+                }
+                $internalItem = $internalItemId ? $internalItemsById->get($internalItemId) : null;
                 $stockData = $internalItemId ? $stockByItemId->get($internalItemId) : null;
 
                 $itemsByOrder[$orderId][] = [
                     'name' => trim((string) $name) ?: 'Produk belum dipetakan',
                     'variant' => trim((string) $variant),
-                    'sku' => trim((string) $sku),
-                    'qty' => (float) ($itemData['qty'] ?? 0),
+                    'sku' => $normalizedSku['sku'],
+                    'qty' => $normalizedSku['qty'],
                     'stock_qty' => $internalItemId ? (float) ($stockData->stock_qty ?? 0) : null,
                     'production_stock_qty' => $internalItemId ? (float) ($stockData->production_stock_qty ?? 0) : null,
+                    'wip_stock_qty' => $internalItemId ? (float) ($stockData->wip_stock_qty ?? 0) : null,
                     'wip_cut_qty' => $internalItemId ? (float) ($stockData->wip_cut_qty ?? 0) : null,
                     'wip_sew_qty' => $internalItemId ? (float) ($stockData->wip_sew_qty ?? 0) : null,
                     'wip_fin_qty' => $internalItemId ? (float) ($stockData->wip_fin_qty ?? 0) : null,
@@ -709,6 +775,7 @@ class DashboardController extends Controller
                             'demand_qty' => 0,
                             'stock_qty' => $item['stock_qty'] ?? null,
                             'production_stock_qty' => $item['production_stock_qty'] ?? null,
+                            'wip_stock_qty' => $item['wip_stock_qty'] ?? null,
                             'wip_cut_qty' => $item['wip_cut_qty'] ?? null,
                             'wip_sew_qty' => $item['wip_sew_qty'] ?? null,
                             'wip_fin_qty' => $item['wip_fin_qty'] ?? null,
@@ -848,9 +915,10 @@ class DashboardController extends Controller
                     }
 
                     $sku = trim((string) ($item->marketplace_sku ?: ($item->model_sku ?: ($item->item_sku ?: $item->external_sku))));
+                    $normalizedSku = $this->normalizeMarketplaceBundleSku($sku, $item->qty ?? 0);
                     $itemsByOrder[$orderId][] = [
-                        'sku' => $sku !== '' ? $sku : 'SKU belum ada',
-                        'qty' => (float) ($item->qty ?? 0),
+                        'sku' => $normalizedSku['sku'] !== '' ? $normalizedSku['sku'] : 'SKU belum ada',
+                        'qty' => $normalizedSku['qty'],
                     ];
                 }
             }

@@ -154,7 +154,7 @@
     .ditem-table td { padding: .52rem .55rem; border-bottom: 1px solid var(--dsh-border); vertical-align: middle; }
     .ditem-table tr:last-child td { border-bottom: 0; }
     .ditem-table .numeric { text-align: right; white-space: nowrap; }
-    .ditem-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; margin-bottom: .6rem; }
+    .ditem-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .45rem; margin-bottom: .6rem; }
     .ditem-summary-item { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .45rem .55rem; border: 1px solid var(--dsh-border); border-radius: 7px; color: var(--dsh-muted); font-size: .68rem; }
     .ditem-summary-item span { display: inline-flex; align-items: center; gap: .25rem; }
     .ditem-summary-item strong { color: var(--text, #0f172a); font-size: .84rem; }
@@ -273,7 +273,7 @@
         .ditem-table th:nth-child(1), .ditem-table td:nth-child(1) { width: 8%; }
         .ditem-table th:nth-child(2), .ditem-table td:nth-child(2) { width: 47%; }
         .ditem-table th:nth-child(3), .ditem-table td:nth-child(3) { width: 23%; }
-        .ditem-table th:nth-child(6), .ditem-table td:nth-child(6) { width: 22%; }
+        .ditem-table th:nth-child(7), .ditem-table td:nth-child(7) { width: 22%; }
         .ditem-table .ditem-number { width: 24px; }
         .ditem-code { font-size: .68rem; overflow-wrap: anywhere; }
         .ditem-gap { width: auto; }
