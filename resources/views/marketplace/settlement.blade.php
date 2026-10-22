@@ -499,6 +499,14 @@
 
             <div class="settlement-sync-action-strip">
                 <div style="display:flex; flex-wrap:wrap; gap:.75rem; align-items:flex-end;">
+                    <div class="settlement-sync-field" style="min-width:160px;">
+                        <label for="syncPlatform">Platform</label>
+                        <select class="form-select form-select-sm w-100" style="padding-left:26px; cursor:pointer;" id="syncPlatform">
+                            <option value="">Semua Platform</option>
+                        </select>
+                        <i class="bi bi-globe2" style="position:absolute;left:8px;top:50%;transform:translateY(8px);color:#94a3b8;font-size:.75rem"></i>
+                    </div>
+
                     <div class="settlement-sync-field">
                         <label for="syncStore">Toko</label>
                         <select class="form-select form-select-sm w-100" style="padding-left:26px; cursor:pointer;" id="syncStore">
@@ -780,6 +788,36 @@
         return store?.status === 'active' && store?.is_active === true;
     }
 
+    function storePlatformCode(store) {
+        return String(store?.channel?.code || '').trim().toLowerCase();
+    }
+
+    function populateSyncStoreSelect(preferredStoreId = '') {
+        const platformSel = $('syncPlatform');
+        const storeSel = $('syncStore');
+        if (!storeSel) return;
+
+        const selectedPlatform = String(platformSel?.value || '').trim().toLowerCase();
+        const currentStoreId = String(preferredStoreId || storeSel.value || '');
+        const candidates = stores.filter(store => isFinanceStore(store)
+            && isActiveStore(store)
+            && (!selectedPlatform || storePlatformCode(store) === selectedPlatform));
+
+        storeSel.innerHTML = '<option value="">Pilih Toko</option>';
+        candidates.forEach(store => {
+            const option = document.createElement('option');
+            option.value = store.id;
+            option.textContent = `${store.name} (${store.channel?.name || '?'})`;
+            storeSel.appendChild(option);
+        });
+
+        if (candidates.some(store => String(store.id) === currentStoreId)) {
+            storeSel.value = currentStoreId;
+        } else if (candidates.length === 1) {
+            storeSel.value = String(candidates[0].id);
+        }
+    }
+
     function getStoreSyncState(store) {
         if (!isActiveStore(store)) {
             return { key: 'inactive', label: 'Nonaktif', icon: 'bi-pause-circle', note: 'Aktifkan toko untuk sync.' };
@@ -1004,11 +1042,13 @@
     function populateStoreSelects() {
         const filterSel = $('filterStore');
         const platformSel = $('filterPlatform');
+        const syncPlatformSel = $('syncPlatform');
         const syncSel = $('syncStore');
         if (!filterSel || !syncSel) return;
 
         filterSel.innerHTML = '<option value="">Semua Toko</option>';
         if (platformSel) platformSel.innerHTML = '<option value="">Semua Platform</option>';
+        if (syncPlatformSel) syncPlatformSel.innerHTML = '<option value="">Semua Platform</option>';
         syncSel.innerHTML = '<option value="">Pilih Toko</option>';
 
         const platforms = new Map();
@@ -1026,6 +1066,15 @@
             });
         }
 
+        if (syncPlatformSel) {
+            platforms.forEach((name, code) => {
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = name;
+                syncPlatformSel.appendChild(option);
+            });
+        }
+
         stores.forEach(s => {
             const label = s.name + ' (' + (s.channel?.name || '?') + ')';
 
@@ -1034,23 +1083,9 @@
             filterOpt.textContent = label;
             filterSel.appendChild(filterOpt);
 
-            const isActiveFinanceStore = isFinanceStore(s)
-                && s.status === 'active'
-                && s.is_active === true;
-            if (isActiveFinanceStore) {
-                const syncOpt = document.createElement('option');
-                syncOpt.value = s.id;
-                syncOpt.textContent = label;
-                syncSel.appendChild(syncOpt);
-            }
         });
 
-        const syncStores = stores.filter(s => isFinanceStore(s)
-            && s.status === 'active'
-            && s.is_active === true);
-        if (syncStores.length === 1) {
-            syncSel.value = String(syncStores[0].id);
-        }
+        populateSyncStoreSelect();
         renderStoreHealth();
     }
 
@@ -1272,16 +1307,31 @@
 
         const filterStore = $('filterStore');
         const syncStore = $('syncStore');
+        const syncPlatform = $('syncPlatform');
         if (syncStore) {
             syncStore.dataset.manual = '0';
             syncStore.addEventListener('change', () => {
                 syncStore.dataset.manual = '1';
+                const selectedStore = stores.find(store => String(store.id) === String(syncStore.value));
+                if (syncPlatform && selectedStore) {
+                    syncPlatform.value = storePlatformCode(selectedStore);
+                }
+            });
+        }
+        if (syncPlatform) {
+            syncPlatform.addEventListener('change', () => {
+                if (syncStore) syncStore.dataset.manual = '0';
+                populateSyncStoreSelect();
             });
         }
         if (filterStore && syncStore) {
             filterStore.addEventListener('change', () => {
                 if (syncStore.dataset.manual !== '1') {
                     syncStore.value = filterStore.value;
+                    const selectedStore = stores.find(store => String(store.id) === String(syncStore.value));
+                    if (syncPlatform && selectedStore) {
+                        syncPlatform.value = storePlatformCode(selectedStore);
+                    }
                 }
             });
         }
@@ -1290,10 +1340,18 @@
             const activeSyncStores = stores.filter(s => ['shopee', 'shp'].includes(String(s.channel?.code || '').toLowerCase())
                 && s.status === 'active'
                 && s.is_active === true);
-            syncStore.value = activeSyncStores.length === 1 ? String(activeSyncStores[0].id) : '';
+            if (activeSyncStores.length === 1) {
+                syncStore.value = String(activeSyncStores[0].id);
+                if (syncPlatform) syncPlatform.value = storePlatformCode(activeSyncStores[0]);
+            }
         }
 
         restoreSettlementFilterState();
+        const restoredStore = stores.find(store => String(store.id) === String(syncStore?.value || ''));
+        if (syncPlatform && restoredStore) {
+            syncPlatform.value = storePlatformCode(restoredStore);
+        }
+        populateSyncStoreSelect(syncStore?.value || '');
         updateSettlementModeLabels();
 
         const filterSearch = $('filterSearch');
@@ -1931,15 +1989,18 @@
     };
 
     window.runSettlementSyncBackground = async function () {
+        const selectedPlatform = String($('syncPlatform')?.value || '').trim().toLowerCase();
         const targetStores = stores.filter(s => {
             const active = s.status === 'active' && s.is_active === true;
             const tokenReady = ['CONNECTED', 'TOKEN_EXPIRED'].includes(String(s.connection_status || '').toUpperCase());
-            return active && isFinanceStore(s) && tokenReady;
+            return active && isFinanceStore(s) && tokenReady
+                && (!selectedPlatform || storePlatformCode(s) === selectedPlatform);
         });
         const skippedStores = stores.filter(s => {
             return s.status === 'active'
                 && s.is_active === true
                 && isFinanceStore(s)
+                && (!selectedPlatform || storePlatformCode(s) === selectedPlatform)
                 && !targetStores.includes(s);
         });
 

@@ -3355,7 +3355,7 @@ class MarketplaceController extends Controller
         ], 1800);
 
         $options = $isTikTokFinance
-            ? ['--store_id' => $store->id, '--channel' => 'tiktok', '--mode' => 'missing']
+            ? ['--store_id' => $store->id, '--channel' => 'tiktok', '--mode' => $isBackfill ? 'full' : 'missing']
             : ['--store' => $store->id];
 
         if ($isBackfill) {

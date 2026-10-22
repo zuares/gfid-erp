@@ -1177,10 +1177,21 @@ class MarketplaceSyncService
         }
 
         $limit = max(1, min($limit, 1000));
+        $fromDate = $timeFrom !== null
+            ? Carbon::createFromTimestamp($timeFrom, config('app.timezone'))->toDateTimeString()
+            : null;
+        $toDate = $timeTo !== null
+            ? Carbon::createFromTimestamp($timeTo, config('app.timezone'))->toDateTimeString()
+            : null;
+
+        // Sebagian order lama hanya punya order_date. Gunakan tanggal itu
+        // sebagai fallback agar backfill tidak menghilangkan order tersebut.
+        $orderDateExpression = 'COALESCE(ordered_at, order_date)';
+
         $ordersQuery = MarketplaceOrder::query()
             ->where('store_id', $store->id)
-            ->when($timeFrom !== null, fn ($query) => $query->where('ordered_at', '>=', Carbon::createFromTimestamp($timeFrom, config('app.timezone'))))
-            ->when($timeTo !== null, fn ($query) => $query->where('ordered_at', '<=', Carbon::createFromTimestamp($timeTo, config('app.timezone'))))
+            ->when($fromDate !== null, fn ($query) => $query->whereRaw("{$orderDateExpression} >= ?", [$fromDate]))
+            ->when($toDate !== null, fn ($query) => $query->whereRaw("{$orderDateExpression} <= ?", [$toDate]))
             ->when($missingOnly, function ($query): void {
                 $query->where(function ($nested): void {
                     $nested->whereDoesntHave('settlement')
@@ -1310,14 +1321,38 @@ class MarketplaceSyncService
             'last_processed_id' => null,
         ];
         $beforeId = null;
+        $batchNumber = 0;
 
         while (true) {
+            $batchNumber++;
+            $baseTotals = $totals;
+            $batchProgress = $progress ? function (array $payload) use ($progress, $baseTotals, $batchNumber): void {
+                foreach ([
+                    'found', 'processed', 'synced', 'pending', 'skipped', 'errors',
+                    'unsettled_found', 'estimates_updated', 'estimates_unmatched',
+                    'estimate_errors',
+                ] as $key) {
+                    $payload[$key] = (int) ($baseTotals[$key] ?? 0) + (int) ($payload[$key] ?? 0);
+                }
+
+                $payload['batch'] = $batchNumber;
+                $payload['label'] = isset($payload['processed'], $payload['found'])
+                    ? "Finance TikTok: {$payload['processed']} order diproses (batch {$batchNumber})…"
+                    : ($payload['label'] ?? "Finance TikTok batch {$batchNumber}…");
+
+                try {
+                    $progress($payload);
+                } catch (\Throwable) {
+                    // Progress hanya observabilitas; jangan menggagalkan sync.
+                }
+            } : null;
+
             $batch = $this->syncTikTokFinance(
                 $store,
                 $timeFrom,
                 $timeTo,
                 $missingOnly,
-                $progress,
+                $batchProgress,
                 $limit,
                 $beforeId,
             );
@@ -1348,6 +1383,7 @@ class MarketplaceSyncService
             $beforeId = $nextBeforeId;
         }
 
+        $totals['batches'] = $batchNumber;
         $totals['message'] = "Finance TikTok selesai: {$totals['synced']} settled, {$totals['pending']} belum settled, "
             . "{$totals['estimates_updated']} estimasi diperbarui, {$totals['errors']} error.";
 

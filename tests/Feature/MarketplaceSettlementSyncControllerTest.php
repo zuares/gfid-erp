@@ -875,6 +875,44 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame('queued', Cache::get('marketplace:settlement_sync_progress:'.$store->id)['status'] ?? null);
     }
 
+    public function test_backfill_tiktok_finance_menggunakan_mode_full()
+    {
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'TT-BF-'.rand(1000, 9999),
+            'name' => 'TikTok Backfill Test',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => ['access_token' => 'dummy-token'],
+            'token_expires_at' => now()->addDay(),
+        ]);
+
+        Artisan::shouldReceive('queue')
+            ->once()
+            ->with('marketplace:sync-finance', \Mockery::on(function (array $options) use ($store): bool {
+                return ($options['--store_id'] ?? null) === $store->id
+                    && ($options['--channel'] ?? null) === 'tiktok'
+                    && ($options['--mode'] ?? null) === 'full'
+                    && isset($options['--from'], $options['--to']);
+            }))
+            ->andReturn(new class
+            {
+                public function onQueue($queue)
+                {
+                    return $this;
+                }
+            });
+
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements-background', 'POST', [
+            'backfill_months' => 3,
+        ]);
+        $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('backfill', $response->getData(true)['mode']);
+    }
+
     public function test_settlement_sync_menolak_toko_nonaktif_sebelum_membuat_progress()
     {
         $store = $this->createStore();

@@ -255,7 +255,10 @@ class MarketplaceSyncFinanceCommand extends Command
                 $failureCount += $tiktokErrors;
 
                 $this->info("   TikTok Finance: {$tiktokSynced} settled, {$tiktokPending} belum settled, "
-                    . "{$estimateUpdated} estimasi diperbarui, {$tiktokErrors} error.");
+                    . "{$estimateUpdated} estimasi diperbarui, {$tiktokErrors} error. "
+                    . "Total order diproses: " . (int) ($tiktokResult['processed'] ?? 0)
+                    . " dari " . (int) ($tiktokResult['found'] ?? 0)
+                    . " kandidat dalam " . (int) ($tiktokResult['batches'] ?? 1) . " batch.");
                 Cache::put($tiktokProgressKey, [
                     'status' => $tiktokErrors > 0 ? ($tiktokSynced > 0 ? 'warn' : 'error') : 'success',
                     'phase' => 'store_done',
@@ -265,6 +268,7 @@ class MarketplaceSyncFinanceCommand extends Command
                     'synced' => $tiktokSynced,
                     'pending' => $tiktokPending,
                     'errors' => $tiktokErrors,
+                    'batches' => $tiktokResult['batches'] ?? 1,
                     'estimates_updated' => $estimateUpdated,
                     'label' => "Finance TikTok selesai: {$tiktokSynced} settled, {$tiktokPending} belum settled, "
                         . "{$estimateUpdated} estimasi diperbarui, {$tiktokErrors} error.",
