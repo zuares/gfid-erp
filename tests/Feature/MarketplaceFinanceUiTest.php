@@ -115,4 +115,40 @@ class MarketplaceFinanceUiTest extends TestCase
             ->assertSee('Menampilkan 1–25 dari 51 transaksi')
             ->assertDontSee('PAGINATION-ORDER-001');
     }
+
+    public function test_fee_analysis_aggregates_in_sql_and_paginates_orders(): void
+    {
+        $store = Store::create([
+            'code' => 'FEE-PAGINATION-STORE',
+            'name' => 'Fee Pagination Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        for ($index = 1; $index <= 51; $index++) {
+            $transaction = MarketplaceFinancialTransaction::create([
+                'store_id' => $store->id,
+                'channel' => 'shopee',
+                'order_sn' => 'FEE-PAGINATION-ORDER-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT),
+                'currency' => 'IDR',
+                'gross_amount' => 100000,
+                'net_amount' => 95000,
+                'escrow_status' => EscrowStatus::PENDING,
+                'income_status' => IncomeStatus::PENDING,
+            ]);
+            MarketplaceFinancialComponent::create([
+                'financial_transaction_id' => $transaction->id,
+                'component_code' => 'admin_fee',
+                'component_name' => 'Admin Fee',
+                'amount' => 5000,
+                'direction' => ComponentDirection::DEBIT,
+                'dedupe_key' => hash('sha256', 'fee-pagination-'.$index),
+            ]);
+        }
+
+        $this->get('/marketplace/finance/fee-analysis')
+            ->assertOk()
+            ->assertSee('Menampilkan 1–50 dari 51 order')
+            ->assertSee('Admin Fee');
+    }
 }

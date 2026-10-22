@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Marketplace;
 
+use Carbon\CarbonImmutable;
 use App\Http\Controllers\Controller;
 use App\Models\MarketplaceFinanceSettlement;
 use App\Models\MarketplaceFinancialComponent;
@@ -87,56 +88,85 @@ class MarketplaceFinanceController extends Controller
     {
         $filters = $this->filters($request);
         $stores = $this->stores();
-        $components = MarketplaceFinancialComponent::query()
-            ->with('financialTransaction.store')
-            ->whereHas('financialTransaction', function ($query) use ($filters): void {
-                if ($filters['store_id'] !== null) {
-                    $query->where('store_id', $filters['store_id']);
-                }
-                if ($filters['order_sn'] !== null) {
-                    $query->where('order_sn', $filters['order_sn']);
-                }
-                if ($filters['date_from'] !== null) {
-                    $query->whereDate($filters['date_basis'], '>=', $filters['date_from']);
-                }
-                if ($filters['date_to'] !== null) {
-                    $query->whereDate($filters['date_basis'], '<=', $filters['date_to']);
-                }
-            })
-            ->orderBy('component_code')
-            ->get();
+        $componentQuery = $this->feeComponentQuery($filters);
 
-        $byType = $components->groupBy('component_code')->map(fn (Collection $items): array => [
-            'label' => $items->first()->component_name ?: $items->first()->component_code,
-            'code' => $items->first()->component_code,
-            'amount' => round($items->sum(fn ($item): float => abs((float) $item->amount)), 2),
-            'count' => $items->count(),
-        ])->values();
-
-        $byStore = $components->groupBy(fn ($item): int|string => $item->financialTransaction?->store_id ?? 'unknown')
-            ->map(fn (Collection $items, int|string $storeId): array => [
-                'store_id' => $storeId,
-                'store_name' => $items->first()->financialTransaction?->store?->name ?? 'Toko tidak diketahui',
-                'amount' => round($items->sum(fn ($item): float => abs((float) $item->amount)), 2),
-                'count' => $items->count(),
+        $byType = (clone $componentQuery)
+            ->select('fc.component_code as code')
+            ->selectRaw('COALESCE(MAX(fc.component_name), MAX(fc.component_code)) as label')
+            ->selectRaw('COUNT(fc.id) as count')
+            ->selectRaw('SUM(ABS(fc.amount)) as amount')
+            ->groupBy('fc.component_code')
+            ->orderBy('fc.component_code')
+            ->get()
+            ->map(fn ($row): array => [
+                'label' => $row->label ?: $row->code,
+                'code' => $row->code,
+                'amount' => round((float) $row->amount, 2),
+                'count' => (int) $row->count,
             ])->values();
 
-        $byOrder = $components->groupBy(fn ($item): string => (string) $item->financialTransaction?->order_sn)
-            ->map(function (Collection $items, string $orderSn): array {
-                $transaction = $items->first()->financialTransaction;
-                $gross = (float) ($transaction?->gross_amount ?? 0);
-                $fee = round($items->sum(fn ($item): float => abs((float) $item->amount)), 2);
+        $byStore = (clone $componentQuery)
+            ->leftJoin('stores as fee_store', 'fee_store.id', '=', 'ft.store_id')
+            ->select('ft.store_id')
+            ->selectRaw("COALESCE(MAX(fee_store.name), 'Toko tidak diketahui') as store_name")
+            ->selectRaw('COUNT(fc.id) as count')
+            ->selectRaw('SUM(ABS(fc.amount)) as amount')
+            ->groupBy('ft.store_id')
+            ->orderBy('store_name')
+            ->get()
+            ->map(fn ($row): array => [
+                'store_id' => $row->store_id ?? 'unknown',
+                'store_name' => $row->store_name ?: 'Toko tidak diketahui',
+                'amount' => round((float) $row->amount, 2),
+                'count' => (int) $row->count,
+            ])->values();
 
-                return [
-                    'order_sn' => $orderSn,
-                    'store_name' => $transaction?->store?->name ?? 'Toko tidak diketahui',
-                    'gross_amount' => round($gross, 2),
-                    'fee_amount' => $fee,
-                    'fee_percentage' => $gross > 0 ? round(($fee / $gross) * 100, 2) : null,
-                ];
-            })->values();
+        $byOrder = (clone $componentQuery)
+            ->leftJoin('stores as fee_store', 'fee_store.id', '=', 'ft.store_id')
+            ->select('ft.id as transaction_id', 'ft.order_sn', 'ft.gross_amount', 'ft.store_id')
+            ->selectRaw('MAX(fee_store.name) as store_name')
+            ->selectRaw('SUM(ABS(fc.amount)) as fee_amount')
+            ->groupBy('ft.id', 'ft.order_sn', 'ft.gross_amount', 'ft.store_id')
+            ->orderByDesc('ft.id')
+            ->paginate(50, ['*'], 'fee_page')
+            ->withQueryString();
+
+        $byOrder->setCollection($byOrder->getCollection()->map(function ($row): array {
+            $gross = (float) $row->gross_amount;
+            $fee = round((float) $row->fee_amount, 2);
+
+            return [
+                'order_sn' => (string) $row->order_sn,
+                'store_name' => $row->store_name ?: 'Toko tidak diketahui',
+                'gross_amount' => round($gross, 2),
+                'fee_amount' => $fee,
+                'fee_percentage' => $gross > 0 ? round(($fee / $gross) * 100, 2) : null,
+            ];
+        })->values());
 
         return view('marketplace.finance.fee-analysis', compact('byOrder', 'byStore', 'byType', 'filters', 'stores'));
+    }
+
+    private function feeComponentQuery(array $filters)
+    {
+        $query = MarketplaceFinancialComponent::query()
+            ->from('marketplace_financial_components as fc')
+            ->join('marketplace_financial_transactions as ft', 'ft.id', '=', 'fc.financial_transaction_id');
+
+        if ($filters['store_id'] !== null) {
+            $query->where('ft.store_id', $filters['store_id']);
+        }
+        if ($filters['order_sn'] !== null) {
+            $query->where('ft.order_sn', $filters['order_sn']);
+        }
+        if ($filters['date_from'] !== null) {
+            $query->where('ft.'.$filters['date_basis'], '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay());
+        }
+        if ($filters['date_to'] !== null) {
+            $query->where('ft.'.$filters['date_basis'], '<=', CarbonImmutable::parse($filters['date_to'])->endOfDay());
+        }
+
+        return $query;
     }
 
     private function reportData(Request $request): array

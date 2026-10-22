@@ -25,6 +25,14 @@
                 <div class="table-responsive"><table class="table mb-0"><thead><tr><th>Order</th><th>Fee %</th><th>Fee</th></tr></thead><tbody>
                     @forelse ($byOrder as $row)<tr><td><span class="fw-semibold">{{ $row['order_sn'] }}</span><br><small class="text-muted">{{ $row['store_name'] }}</small></td><td>{{ $row['fee_percentage'] === null ? '-' : number_format($row['fee_percentage'], 2, ',', '.') . '%' }}</td><td>Rp {{ $money($row['fee_amount']) }}</td></tr>@empty<tr><td colspan="3" class="text-center text-muted py-4">Belum ada fee.</td></tr>@endforelse
                 </tbody></table></div>
+                @if ($byOrder->hasPages())
+                    <div class="card-footer bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <span class="text-muted small">
+                            Menampilkan {{ number_format($byOrder->firstItem() ?? 0) }}–{{ number_format($byOrder->lastItem() ?? 0) }} dari {{ number_format($byOrder->total()) }} order
+                        </span>
+                        {{ $byOrder->onEachSide(1)->links() }}
+                    </div>
+                @endif
             </div>
         </div>
     </div>
