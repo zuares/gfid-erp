@@ -336,8 +336,7 @@
                 minmax(125px,1.05fr)
                 minmax(120px,.95fr)
                 minmax(145px,1.2fr)
-                minmax(145px,1.2fr)
-                minmax(190px,1.55fr);
+                minmax(145px,1.2fr);
             gap:.65rem;
             align-items:end;
         }
@@ -375,6 +374,13 @@
             cursor:not-allowed;
             opacity:.62;
             background:rgba(148,163,184,.08);
+        }
+        .settlement-filter-field input.flatpickr-input{
+            cursor:pointer;
+            padding-right:2.35rem;
+        }
+        .settlement-filter-field input.flatpickr-input:focus{
+            background:var(--card,#fff);
         }
         .settlement-filter-icon{
             position:absolute;
@@ -458,6 +464,10 @@
             padding:.8rem 1rem;
             border-bottom:1px solid var(--shp-border);
         }
+        .settlement-ledger-head-actions{ display:flex; align-items:center; justify-content:flex-end; gap:.65rem; min-width:0; }
+        .settlement-ledger-search{ position:relative; width:min(280px,32vw); min-width:220px; }
+        .settlement-ledger-search .settlement-filter-control{ min-height:34px; padding-left:2rem; }
+        .settlement-ledger-search .settlement-filter-icon{ bottom:.58rem; }
         .settlement-ledger-title{ color:var(--shp-text); font-size:.86rem; font-weight:850; }
         .settlement-ledger-meta{ color:var(--shp-muted); font-size:.7rem; }
         .settlement-ledger-status{ display:inline-flex; align-items:center; gap:.3rem; color:#15803d; font-size:.68rem; font-weight:850; }
@@ -539,6 +549,8 @@
             .settlement-page-sub{ max-width:34rem; }
             .settlement-kpi-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
             .settlement-ledger-head{ align-items:flex-start; flex-direction:column; }
+            .settlement-ledger-head-actions{ width:100%; justify-content:space-between; }
+            .settlement-ledger-search{ width:min(100%,360px); min-width:0; }
             .settlement-table-scroll{ overflow:visible; max-height:none; }
             .settlement-ledger-table{ display:block; }
             .settlement-ledger-table thead{ display:none; }
@@ -645,7 +657,7 @@
 
                     <div class="settlement-filter-field date">
                         <label class="settlement-filter-label" for="filterOrderDate">Tanggal order</label>
-                        <input type="text" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterOrderDate" placeholder="Pilih tanggal" aria-label="Filter tanggal order">
+                        <input type="text" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterOrderDate" placeholder="Pilih rentang" aria-label="Filter tanggal order">
                         <i class="bi bi-calendar3 settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
@@ -655,11 +667,6 @@
                         <i class="bi bi-calendar3 settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
-                    <div class="settlement-filter-field search">
-                        <label class="settlement-filter-label" for="filterSearch">Cari</label>
-                        <input type="search" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterSearch" placeholder="Order / produk / SKU" onkeyup="if(event.key==='Enter')loadSettlements()" aria-label="Cari order produk atau SKU">
-                        <i class="bi bi-search settlement-filter-icon" aria-hidden="true"></i>
-                    </div>
                 </div>
             </div>
         </div>
@@ -690,6 +697,20 @@
         </div>
 
         <div class="card-main settlement-ledger-card">
+            <div class="settlement-ledger-head">
+                <div>
+                    <div class="settlement-ledger-title">Ledger statements</div>
+                    <div class="settlement-ledger-meta" id="settlementLedgerMeta">Memuat data ledger…</div>
+                </div>
+                <div class="settlement-ledger-head-actions">
+                    <div class="settlement-ledger-search">
+                        <label class="visually-hidden" for="filterSearch">Cari ledger statements</label>
+                        <input type="search" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterSearch" placeholder="Cari order, produk, SKU" onkeyup="if(event.key==='Enter')loadSettlements()" aria-label="Cari order produk atau SKU">
+                        <i class="bi bi-search settlement-filter-icon" aria-hidden="true"></i>
+                    </div>
+                    <div class="settlement-ledger-status">Data tersimpan</div>
+                </div>
+            </div>
             <div id="settlementBody">
                 <div style="padding:2rem;text-align:center;color:var(--shp-muted);font-size:.85rem;">
                     <span class="spinner-border spinner-border-sm"></span> Memuat data...
@@ -920,16 +941,22 @@
         if ($('filterSearch')) $('filterSearch').value = state.search || '';
 
         if (fpOrderDate) {
-            if (state.order_date_from && state.order_date_to) {
-                fpOrderDate.setDate([state.order_date_from, state.order_date_to], false);
+            if (state.order_date_from) {
+                fpOrderDate.setDate(
+                    state.order_date_to ? [state.order_date_from, state.order_date_to] : [state.order_date_from],
+                    false,
+                );
             } else {
                 fpOrderDate.clear(false);
             }
         }
 
         if (fpSettlementDate) {
-            if (state.settlement_date_from && state.settlement_date_to) {
-                fpSettlementDate.setDate([state.settlement_date_from, state.settlement_date_to], false);
+            if (state.settlement_date_from) {
+                fpSettlementDate.setDate(
+                    state.settlement_date_to ? [state.settlement_date_from, state.settlement_date_to] : [state.settlement_date_from],
+                    false,
+                );
             } else {
                 fpSettlementDate.clear(false);
             }
@@ -1674,13 +1701,28 @@
 
         if (window.GFID && window.GFID.initDateRange) {
             const onDateClose = function(selectedDates) {
-                if (selectedDates.length === 2 || selectedDates.length === 0) {
+                if (selectedDates.length >= 1 || selectedDates.length === 0) {
                     currentPage = 1;
                     loadSettlements();
                 }
             };
-            fpOrderDate = window.GFID.initDateRange('#filterOrderDate', { onClose: onDateClose });
-            fpSettlementDate = window.GFID.initDateRange('#filterSettlementDate', { onClose: onDateClose });
+            const onDateOpen = function(selectedDates, dateStr, instance) {
+                [fpOrderDate, fpSettlementDate].forEach(picker => {
+                    if (picker && picker !== instance && picker.isOpen) {
+                        picker.close();
+                    }
+                });
+            };
+            const datePickerOptions = {
+                allowInput: false,
+                clickOpens: true,
+                closeOnSelect: true,
+                rangeSeparator: ' – ',
+                onOpen: onDateOpen,
+                onClose: onDateClose,
+            };
+            fpOrderDate = window.GFID.initDateRange('#filterOrderDate', datePickerOptions);
+            fpSettlementDate = window.GFID.initDateRange('#filterSettlementDate', datePickerOptions);
         }
 
         document.querySelectorAll('.filter-select').forEach(el => {
@@ -1842,14 +1884,22 @@
         params.append('page', currentPage);
         params.append('per_page', 50);
 
-        if (fpOrderDate && fpOrderDate.selectedDates && fpOrderDate.selectedDates.length === 2) {
-            params.append('order_date_from', fpOrderDate.formatDate(fpOrderDate.selectedDates[0], 'Y-m-d'));
-            params.append('order_date_to', fpOrderDate.formatDate(fpOrderDate.selectedDates[1], 'Y-m-d'));
+        if (fpOrderDate && fpOrderDate.selectedDates && fpOrderDate.selectedDates.length >= 1) {
+            const orderFrom = fpOrderDate.formatDate(fpOrderDate.selectedDates[0], 'Y-m-d');
+            const orderTo = fpOrderDate.selectedDates[1]
+                ? fpOrderDate.formatDate(fpOrderDate.selectedDates[1], 'Y-m-d')
+                : orderFrom;
+            params.append('order_date_from', orderFrom);
+            params.append('order_date_to', orderTo);
         }
 
-        if (fpSettlementDate && fpSettlementDate.selectedDates && fpSettlementDate.selectedDates.length === 2) {
-            params.append('settlement_date_from', fpSettlementDate.formatDate(fpSettlementDate.selectedDates[0], 'Y-m-d'));
-            params.append('settlement_date_to', fpSettlementDate.formatDate(fpSettlementDate.selectedDates[1], 'Y-m-d'));
+        if (fpSettlementDate && fpSettlementDate.selectedDates && fpSettlementDate.selectedDates.length >= 1) {
+            const settlementFrom = fpSettlementDate.formatDate(fpSettlementDate.selectedDates[0], 'Y-m-d');
+            const settlementTo = fpSettlementDate.selectedDates[1]
+                ? fpSettlementDate.formatDate(fpSettlementDate.selectedDates[1], 'Y-m-d')
+                : settlementFrom;
+            params.append('settlement_date_from', settlementFrom);
+            params.append('settlement_date_to', settlementTo);
         }
 
         try {
@@ -1881,6 +1931,9 @@
 
     function renderTable() {
         const body = $('settlementBody');
+        if ($('settlementLedgerMeta')) {
+            $('settlementLedgerMeta').textContent = `${paginationData?.total || 0} order dalam filter aktif`;
+        }
         if (!settlements.length) {
             body.innerHTML = '<div style="padding:3rem 1rem;text-align:center;color:var(--shp-muted);font-size:.9rem;">Tidak ada data settlement yang sesuai dengan filter.</div>';
             return;
@@ -1892,10 +1945,6 @@
         const feeHeading = pendingView ? 'Status Rincian Fee' : 'Biaya Marketplace';
 
         let html = `
-        <div class="settlement-ledger-head">
-            <div><div class="settlement-ledger-title">Ledger settlement</div><div class="settlement-ledger-meta">${paginationData?.total || 0} order dalam filter aktif</div></div>
-            <div class="settlement-ledger-status">Data tersimpan</div>
-        </div>
         <div class="settlement-table-scroll">
         <table class="table table-list settlement-ledger-table w-100" style="margin-bottom:0">
             <thead>
