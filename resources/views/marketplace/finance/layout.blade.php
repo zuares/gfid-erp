@@ -11,8 +11,17 @@
             'marketplace.finance.settlements' => ['eyebrow' => 'Cash-in tracking', 'title' => 'Settlements', 'description' => 'Pantau payout marketplace, alokasi order, dan status posting ke bank atau jurnal.', 'icon' => 'bi-bank', 'badge' => 'Payout monitoring'],
             'marketplace.finance.reconciliation' => ['eyebrow' => 'Finance audit', 'title' => 'Rekonsiliasi per Order', 'description' => 'Validasi gross, fee, dan net income setiap order tanpa bergantung pada payout atau mutasi bank.', 'icon' => 'bi-check2-square', 'badge' => 'Order-only audit'],
             'marketplace.finance.fee-analysis' => ['eyebrow' => 'Cost intelligence', 'title' => 'Fee Analysis', 'description' => 'Bandingkan beban fee berdasarkan tipe, toko, dan order untuk menemukan kebocoran margin.', 'icon' => 'bi-bar-chart-line', 'badge' => 'Aggregated costs'],
+            'marketplace.finance.sync-runs.show' => ['eyebrow' => 'Sync audit trail', 'title' => 'Audit Sinkronisasi', 'description' => 'Periksa hasil preflight, apply, dan verifikasi sinkronisasi Finance order-only.', 'icon' => 'bi-journal-check', 'badge' => 'Read-only audit'],
         ];
         $activeFinanceMeta = $financeMeta[$financeRoute] ?? $financeMeta['marketplace.finance.index'];
+        $syncState = $syncHealth['state'] ?? 'missing';
+        $syncStateIcon = [
+            'healthy' => 'bi-check-circle-fill',
+            'running' => 'bi-arrow-repeat',
+            'stale' => 'bi-clock-history',
+            'error' => 'bi-exclamation-octagon-fill',
+            'missing' => 'bi-question-circle',
+        ][$syncState] ?? 'bi-question-circle';
     @endphp
     <style>
         .finance-page { --finance-ink: var(--gf-color-content, #101828); --finance-muted: var(--gf-color-muted, #667085); --finance-line: var(--gf-color-line, #e4e7ec); --finance-soft: var(--gf-color-surface-muted, #f2f4f7); --finance-blue: var(--gf-color-brand-strong, #4142bb); --finance-brand: var(--gf-color-brand, #5b5ce2); --finance-accent: var(--gf-color-accent, #13b8c4); --finance-card-radius: var(--gf-radius-card, 16px); --finance-control-radius: var(--gf-radius-control, 10px); --finance-text-xs: .72rem; --finance-text-sm: .8rem; --finance-text-body: .875rem; container: finance-page / inline-size; width: 100%; max-width: var(--gf-content-max, 1280px); min-width: 0; margin: 0 auto; padding-top: 1.75rem !important; padding-inline: var(--gf-content-gutter, 1rem); padding-bottom: 2.5rem !important; color: var(--finance-ink); font-size: var(--finance-text-body); line-height: 1.45; }
@@ -67,6 +76,28 @@
         .finance-page .finance-callout > i { color: #2563eb; font-size: 1.1rem; margin-top: .1rem; }
         .finance-page .finance-callout strong { display: block; font-size: .88rem; color: #1e3a8a; }
         .finance-page .finance-callout span { display: block; font-size: .82rem; margin-top: .15rem; }
+        .finance-page .finance-sync-health { --sync-health-color: #475467; --sync-health-border: #d0d5dd; --sync-health-soft: #f8fafc; display: grid; grid-template-columns: auto minmax(0, 1.1fr) minmax(360px, 1fr) auto; gap: 1rem; align-items: center; margin-bottom: 1rem; padding: .9rem 1rem; border: 1px solid var(--sync-health-border); border-radius: 16px; color: var(--sync-health-color); background: var(--sync-health-soft); }
+        .finance-page .finance-sync-health--healthy { --sync-health-color: #067647; --sync-health-border: #abefc6; --sync-health-soft: #ecfdf3; }
+        .finance-page .finance-sync-health--running { --sync-health-color: #175cd3; --sync-health-border: #b2ddff; --sync-health-soft: #eff8ff; }
+        .finance-page .finance-sync-health--stale { --sync-health-color: #b54708; --sync-health-border: #fedf89; --sync-health-soft: #fffaeb; }
+        .finance-page .finance-sync-health--error { --sync-health-color: #b42318; --sync-health-border: #fecdca; --sync-health-soft: #fef3f2; }
+        .finance-page .finance-sync-health-icon { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid currentColor; border-radius: 12px; background: rgba(255, 255, 255, .7); }
+        .finance-page .finance-sync-health-icon i { color: inherit; font-size: 1.05rem; }
+        .finance-page .finance-sync-health--running .finance-sync-health-icon i { animation: finance-sync-spin 1.2s linear infinite; }
+        .finance-page .finance-sync-health-copy { min-width: 0; }
+        .finance-page .finance-sync-health-title { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; margin-bottom: .15rem; }
+        .finance-page .finance-sync-health-title strong { color: currentColor; font-size: .84rem; }
+        .finance-page .finance-sync-health-store { display: inline-flex; align-items: center; min-height: 22px; padding: 0 .45rem; border: 1px solid currentColor; border-radius: 999px; font-size: .62rem; font-weight: 800; }
+        .finance-page .finance-sync-health-copy p { margin: 0; color: #475467; font-size: .72rem; line-height: 1.4; }
+        .finance-page .finance-sync-health-boundary { display: block; margin-top: .18rem; color: #667085; font-size: .66rem; }
+        .finance-page .finance-sync-health-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; margin: 0; }
+        .finance-page .finance-sync-health-metric { min-width: 0; padding-left: .65rem; border-left: 1px solid color-mix(in srgb, var(--sync-health-color) 30%, transparent); }
+        .finance-page .finance-sync-health-metric dt { overflow: hidden; color: #667085; font-size: .61rem; font-weight: 800; letter-spacing: .035em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+        .finance-page .finance-sync-health-metric dd { margin: .1rem 0 0; overflow: hidden; color: #344054; font-size: .74rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+        .finance-page .finance-sync-health-link { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; min-height: 36px; padding: 0 .7rem; border: 1px solid currentColor; border-radius: 10px; color: inherit; background: rgba(255, 255, 255, .75); font-size: .68rem; font-weight: 800; text-decoration: none; white-space: nowrap; }
+        .finance-page .finance-sync-health-link:hover { color: inherit; background: #fff; }
+        .finance-page .finance-sync-health-link:focus-visible { outline: 3px solid color-mix(in srgb, var(--sync-health-color) 25%, transparent); outline-offset: 2px; }
+        @keyframes finance-sync-spin { to { transform: rotate(360deg); } }
         .finance-page .finance-reason { display: inline-flex; margin: .1rem .15rem .1rem 0; padding: .25rem .48rem; border-radius: 999px; background: #fff1f2; color: #be123c; font-size: .72rem; font-weight: 600; }
         .finance-page .finance-reason--neutral { background: #f1f5f9; color: #64748b; }
         .finance-page .finance-journal-count { display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .5rem; border: 1px solid var(--finance-line); border-radius: 999px; color: #475569; font-size: .78rem; font-weight: 650; }
@@ -207,6 +238,9 @@
             .finance-page .finance-kpi .card-body { padding: .9rem; }
             .finance-page .finance-number { font-size: 1.18rem; }
             .finance-page .finance-callout { padding: .8rem; }
+            .finance-page .finance-sync-health { grid-template-columns: auto minmax(0, 1fr); gap: .75rem; padding: .85rem; }
+            .finance-page .finance-sync-health-metrics { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+            .finance-page .finance-sync-health-link { grid-column: 1 / -1; width: 100%; min-height: 42px; }
             .finance-page .finance-table-wrap { overflow: visible; }
             .finance-page .finance-table { min-width: 0; border-collapse: separate; border-spacing: 0; background: var(--finance-soft); }
             .finance-page .finance-table tbody { display: grid; gap: .75rem; padding: .75rem; background: var(--finance-soft); }
@@ -315,6 +349,41 @@
             <a class="nav-link {{ request()->routeIs('marketplace.finance.fee-analysis') ? 'active' : '' }}" @if(request()->routeIs('marketplace.finance.fee-analysis')) aria-current="page" @endif href="{{ route('marketplace.finance.fee-analysis', request()->except('status')) }}"><i class="bi bi-bar-chart-line" aria-hidden="true"></i>Fee Analysis</a>
         </nav>
 
+        <section class="finance-sync-health finance-sync-health--{{ $syncState }}" aria-labelledby="finance-sync-health-title" role="status">
+            <span class="finance-sync-health-icon" aria-hidden="true"><i class="bi {{ $syncStateIcon }}"></i></span>
+            <div class="finance-sync-health-copy">
+                <div class="finance-sync-health-title">
+                    <strong id="finance-sync-health-title">{{ $syncHealth['label'] ?? 'Status sinkronisasi' }}</strong>
+                    <span class="finance-sync-health-store">{{ $syncHealth['store_name'] ?? 'Greatfit.id' }}</span>
+                </div>
+                <p>{{ $syncHealth['message'] ?? 'Riwayat sinkronisasi belum tersedia.' }}</p>
+                <span class="finance-sync-health-boundary">Order-only · tidak memproses payout, penerimaan bank, alokasi, atau jurnal.</span>
+            </div>
+            <dl class="finance-sync-health-metrics">
+                <div class="finance-sync-health-metric">
+                    <dt>Terakhir</dt>
+                    <dd>{{ ($syncHealth['last_at'] ?? null) ? $syncHealth['last_at']->timezone(config('app.timezone'))->format('d M H:i') : 'Belum ada' }}</dd>
+                </div>
+                <div class="finance-sync-health-metric">
+                    <dt>Sumber dipindai</dt>
+                    <dd>{{ number_format($syncHealth['summary']['scanned'] ?? 0) }}</dd>
+                </div>
+                <div class="finance-sync-health-metric">
+                    <dt>Order baru</dt>
+                    <dd>{{ number_format($syncHealth['summary']['transactions_created'] ?? 0) }}</dd>
+                </div>
+                <div class="finance-sync-health-metric">
+                    <dt>Order berubah</dt>
+                    <dd>{{ number_format($syncHealth['summary']['updated'] ?? 0) }}</dd>
+                </div>
+            </dl>
+            @if ($syncHealth['run'] ?? null)
+                <a class="finance-sync-health-link" href="{{ route('marketplace.finance.sync-runs.show', $syncHealth['run']) }}">
+                    <i class="bi bi-journal-text" aria-hidden="true"></i>Audit run #{{ $syncHealth['run']->id }}
+                </a>
+            @endif
+        </section>
+
         @hasSection('finance-sidebar')
             <div class="finance-sidebar-layout">
                 <aside class="finance-sidebar" aria-label="{{ $financeRoute === 'marketplace.finance.settlements' ? 'Filter settlement' : 'Filter transaksi' }}">
@@ -324,6 +393,10 @@
                     @yield('finance-content')
                 </main>
             </div>
+        @elseif (request()->routeIs('marketplace.finance.sync-runs.show'))
+            <main class="finance-tab-content">
+                @yield('finance-content')
+            </main>
         @else
             @include('marketplace.finance._filters')
             <main class="finance-tab-content">

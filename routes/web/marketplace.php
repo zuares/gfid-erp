@@ -56,6 +56,7 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
             Route::get('settlements', [MarketplaceFinanceController::class, 'settlements'])->name('settlements');
             Route::get('reconciliation', [MarketplaceFinanceController::class, 'reconciliation'])->name('reconciliation');
             Route::get('fee-analysis', [MarketplaceFinanceController::class, 'feeAnalysis'])->name('fee-analysis');
+            Route::get('sync-runs/{syncRun}', [MarketplaceFinanceController::class, 'syncRun'])->name('sync-runs.show');
         });
 
         // Audit dan testing kualitas data finansial — owner only.

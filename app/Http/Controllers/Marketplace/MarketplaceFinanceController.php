@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Models\MarketplaceFinanceSettlement;
+use App\Models\MarketplaceFinanceSyncRun;
 use App\Models\MarketplaceFinancialComponent;
 use App\Models\Store;
 use App\Services\Marketplace\Finance\MarketplaceFinanceReconciliationService;
+use App\Services\Marketplace\Finance\MarketplaceFinanceSyncHealthService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -15,6 +17,7 @@ class MarketplaceFinanceController extends Controller
 {
     public function __construct(
         private readonly MarketplaceFinanceReconciliationService $reconciliation,
+        private readonly MarketplaceFinanceSyncHealthService $syncHealth,
     ) {}
 
     public function index(Request $request)
@@ -41,6 +44,7 @@ class MarketplaceFinanceController extends Controller
             'storeNames' => $storeNames,
             'stores' => $stores,
             'transactions' => $transactions,
+            'syncHealth' => $this->syncHealth->orderSync(),
         ]);
     }
 
@@ -56,6 +60,7 @@ class MarketplaceFinanceController extends Controller
             'rows' => $rows,
             'storeNames' => $storeNames,
             'stores' => $stores,
+            'syncHealth' => $this->syncHealth->orderSync(),
         ]);
     }
 
@@ -76,6 +81,7 @@ class MarketplaceFinanceController extends Controller
             'rows' => $rows,
             'settlementModels' => $settlementModels,
             'stores' => $stores,
+            'syncHealth' => $this->syncHealth->orderSync(),
         ]);
     }
 
@@ -89,7 +95,12 @@ class MarketplaceFinanceController extends Controller
             'transactions' => $page['transactions'],
         ];
 
-        return view('marketplace.finance.reconciliation', compact('filters', 'report', 'stores'));
+        return view('marketplace.finance.reconciliation', [
+            'filters' => $filters,
+            'report' => $report,
+            'stores' => $stores,
+            'syncHealth' => $this->syncHealth->orderSync(),
+        ]);
     }
 
     public function feeAnalysis(Request $request)
@@ -156,7 +167,25 @@ class MarketplaceFinanceController extends Controller
             ];
         })->values());
 
-        return view('marketplace.finance.fee-analysis', compact('byOrder', 'byStore', 'byType', 'filters', 'stores'));
+        return view('marketplace.finance.fee-analysis', [
+            'byOrder' => $byOrder,
+            'byStore' => $byStore,
+            'byType' => $byType,
+            'filters' => $filters,
+            'stores' => $stores,
+            'syncHealth' => $this->syncHealth->orderSync(),
+        ]);
+    }
+
+    public function syncRun(int $syncRun)
+    {
+        $syncRun = MarketplaceFinanceSyncRun::query()->findOrFail($syncRun);
+        abort_unless(in_array($syncRun->trigger, ['order_schedule', 'order_manual'], true), 404);
+
+        return view('marketplace.finance.sync-run', [
+            'syncHealth' => $this->syncHealth->orderSync(),
+            'syncRunAudit' => $this->syncHealth->health($syncRun),
+        ]);
     }
 
     private function feeComponentQuery(array $filters)

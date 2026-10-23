@@ -7,10 +7,12 @@ use App\Domain\Marketplace\Finance\Enums\EscrowStatus;
 use App\Domain\Marketplace\Finance\Enums\IncomeStatus;
 use App\Domain\Marketplace\Finance\Enums\SettlementStatus;
 use App\Models\MarketplaceFinanceSettlement;
+use App\Models\MarketplaceFinanceSyncRun;
 use App\Models\MarketplaceFinancialComponent;
 use App\Models\MarketplaceFinancialTransaction;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -394,5 +396,98 @@ class MarketplaceFinanceUiTest extends TestCase
             ->assertOk()
             ->assertSee('Menampilkan 1–50 dari 51 order')
             ->assertSee('Admin Fee');
+    }
+
+    public function test_finance_pages_show_order_sync_health_and_audit_detail(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-23 15:25:00'));
+        $run = MarketplaceFinanceSyncRun::create([
+            'trigger' => 'order_schedule',
+            'status' => 'success',
+            'started_at' => now()->subMinutes(5),
+            'finished_at' => now()->subMinutes(4),
+            'output' => json_encode([
+                'scope' => 'order_only',
+                'store_name' => 'Greatfit.id',
+                'sources' => ['order_settlements', 'income_estimates', 'mp_incomes'],
+                'mode' => 'apply',
+                'preflight' => [
+                    'scanned' => 739,
+                    'transactions_created' => 2,
+                    'updated' => 1,
+                    'components_created' => 4,
+                    'unmatched' => 0,
+                    'duplicates' => 0,
+                    'errors' => 0,
+                ],
+                'apply' => [
+                    'scanned' => 739,
+                    'transactions_created' => 2,
+                    'updated' => 1,
+                    'components_created' => 4,
+                    'unmatched' => 0,
+                    'duplicates' => 0,
+                    'errors' => 0,
+                ],
+                'verification' => [
+                    'scanned' => 739,
+                    'transactions_created' => 0,
+                    'updated' => 0,
+                    'components_created' => 0,
+                    'unmatched' => 0,
+                    'duplicates' => 0,
+                    'errors' => 0,
+                ],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        $this->get('/marketplace/finance/transactions')
+            ->assertOk()
+            ->assertSee('Sinkronisasi sehat')
+            ->assertSee('Greatfit.id')
+            ->assertSeeInOrder(['Sumber dipindai', '739', 'Order baru', '2', 'Order berubah', '1'])
+            ->assertSee('Audit run #'.$run->id)
+            ->assertSee('tidak memproses payout, penerimaan bank, alokasi, atau jurnal');
+
+        $this->get('/marketplace/finance/sync-runs/'.$run->id)
+            ->assertOk()
+            ->assertSee('Audit run #'.$run->id)
+            ->assertSee('Status sukses bukan bukti payout diterima')
+            ->assertSee('Preflight')
+            ->assertSee('Verifikasi')
+            ->assertSee('order_settlements')
+            ->assertSee('mp_incomes');
+    }
+
+    public function test_finance_health_warns_when_order_sync_is_older_than_thirty_minutes(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-23 16:00:00'));
+        MarketplaceFinanceSyncRun::create([
+            'trigger' => 'order_schedule',
+            'status' => 'success',
+            'started_at' => now()->subMinutes(32),
+            'finished_at' => now()->subMinutes(31),
+            'output' => json_encode([
+                'store_name' => 'Greatfit.id',
+                'apply' => ['scanned' => 739, 'transactions_created' => 0, 'updated' => 0],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        $this->get('/marketplace/finance/reconciliation')
+            ->assertOk()
+            ->assertSee('Sinkronisasi terlambat')
+            ->assertSee('Belum ada run order-only yang selesai dalam 30 menit terakhir.');
+    }
+
+    public function test_finance_sync_audit_rejects_non_order_runs(): void
+    {
+        $run = MarketplaceFinanceSyncRun::create([
+            'trigger' => 'manual 30 hr · cek dulu',
+            'status' => 'success',
+            'started_at' => now(),
+            'finished_at' => now(),
+        ]);
+
+        $this->get('/marketplace/finance/sync-runs/'.$run->id)->assertNotFound();
     }
 }
