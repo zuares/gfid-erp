@@ -180,10 +180,10 @@ class MarketplaceAccountingPostingTest extends TestCase
         $this->assertSame($preview['total_debit'], $preview['total_credit']);
     }
 
-    public function test_wallet_topup_is_blocked_without_positive_clearing_funding(): void
+    public function test_wallet_topup_is_blocked_when_batch_has_no_clearing_funding(): void
     {
         $store = $this->seedFinancialData();
-        $this->createWalletAdTransaction($store, 'SPM-TOPUP-UNFUNDED', 'SPM_DEDUCT', -50, '2026-08-10 10:00:00');
+        $this->createWalletAdTransaction($store, 'SPM-TOPUP-UNFUNDED', 'SPM_DEDUCT', -500, '2026-08-10 10:00:00');
 
         $this->expectException(\Illuminate\Validation\ValidationException::class);
         $this->expectExceptionMessage('top up saldo iklan');
@@ -194,6 +194,26 @@ class MarketplaceAccountingPostingTest extends TestCase
             'date_from' => '2026-08-01',
             'date_to' => '2026-08-31',
         ]);
+    }
+
+    public function test_wallet_topup_can_use_same_batch_settlement_funding_without_negative_clearing(): void
+    {
+        $store = $this->seedFinancialData();
+        $this->createWalletAdTransaction($store, 'SPM-TOPUP-SETTLEMENT-FUNDED', 'SPM_DEDUCT', -50, '2026-08-10 10:00:00');
+
+        $preview = app(\App\Services\Marketplace\MarketplaceAccountingPostingService::class)->preview([
+            'store_id' => $store->id,
+            'date_basis' => 'ordered_at',
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-31',
+        ]);
+
+        $this->assertSame(185.0, (float) collect($preview['lines'])
+            ->where('account_code', '1302')
+            ->sum('debit') - collect($preview['lines'])
+            ->where('account_code', '1302')
+            ->sum('credit'));
+        $this->assertSame($preview['total_debit'], $preview['total_credit']);
     }
 
     public function test_wallet_can_be_excluded_from_settlement_posting(): void

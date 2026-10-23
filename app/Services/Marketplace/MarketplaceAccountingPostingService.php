@@ -58,21 +58,33 @@ class MarketplaceAccountingPostingService
         $adCostForGl = $includeAds ? $rawAdCostForGl : 0.0;
         $adWalletTopup = $includeAds ? $rawAdWalletTopup : 0.0;
         $clearing = $accounts[$this->accountCode('marketplace_receivable')];
-        $availableClearing = $this->positiveBalance($clearing->id);
-        if ($adWalletTopup > $availableClearing) {
-            throw ValidationException::withMessages([
-                'posting' => sprintf(
-                    'Posting diblokir: top up saldo iklan %s melebihi saldo positif %s sebesar %s. Rekonsiliasikan payout marketplace terlebih dahulu agar top up tidak membuat saldo clearing minus.',
-                    $this->formatAmount($adWalletTopup),
-                    $clearing->code,
-                    $this->formatAmount($availableClearing),
-                ),
-            ]);
-        }
         $pendingPayout = min(
             max(round((float) ($summary['payout'] ?? 0), 2), 0),
             $this->pendingPayoutCreditBalance($accounts[$this->accountCode('marketplace_payout_pending')]),
         );
+        $clearingBalanceBeforePosting = $this->clearingBalance($clearing->id);
+        $projectedClearingBalance = round(
+            $clearingBalanceBeforePosting
+                + (float) ($summary['payout'] ?? 0)
+                - $pendingPayout
+                - max($adWalletTopup, 0),
+            2,
+        );
+        if ($projectedClearingBalance < 0) {
+            $availableClearing = max(round(
+                $clearingBalanceBeforePosting
+                    + (float) ($summary['payout'] ?? 0)
+                    - $pendingPayout,
+                2,
+            ), 0);
+            throw ValidationException::withMessages([
+                'posting' => sprintf(
+                    'Posting diblokir: top up saldo iklan %s melebihi saldo positif 1302 yang tersedia setelah settlement sebesar %s. Rekonsiliasikan payout marketplace terlebih dahulu agar saldo clearing tidak minus.',
+                    $this->formatAmount($adWalletTopup),
+                    $this->formatAmount($availableClearing),
+                ),
+            ]);
+        }
         $lines = [
             $this->line($clearing, (float) $summary['payout'], 0),
             // Release cash that was received before the settlement became
@@ -351,24 +363,18 @@ class MarketplaceAccountingPostingService
 
     private function pendingPayoutCreditBalance(Account $account): float
     {
-        $balance = (float) JournalLine::query()
-            ->where('account_id', $account->id)
-            ->whereHas('journal', fn ($query) => $query->whereNull('voided_at'))
-            ->selectRaw('COALESCE(SUM(debit - credit), 0) as balance')
-            ->value('balance');
+        $balance = $this->clearingBalance($account->id);
 
         return max(round(-$balance, 2), 0);
     }
 
-    private function positiveBalance(int $accountId): float
+    private function clearingBalance(int $accountId): float
     {
-        $balance = (float) JournalLine::query()
+        return round((float) JournalLine::query()
             ->where('account_id', $accountId)
             ->whereHas('journal', fn ($query) => $query->whereNull('voided_at'))
             ->selectRaw('COALESCE(SUM(debit - credit), 0) as balance')
-            ->value('balance');
-
-        return max(round($balance, 2), 0);
+            ->value('balance'), 2);
     }
 
     private function formatAmount(float $amount): string
