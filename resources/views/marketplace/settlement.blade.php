@@ -2041,7 +2041,7 @@
                             ${isPending
                                 ? `<strong class="settlement-timeline-value muted">${s.estimated_payout_at ? 'Est. ' + fmtDateTime(s.estimated_payout_at) : 'Belum tersedia'}</strong>
                                    <span class="oc-badge oc-badge-amber" style="width:max-content;font-size:.6rem">${isTikTokFinance ? 'Menunggu statement' : estimateSourceLabel}</span>`
-                                : `<strong class="settlement-timeline-value">${s.settlement_time ? fmtDateTime(s.settlement_time) : 'Finance API'}</strong>
+                                : `<strong class="settlement-timeline-value">${s.settlement_time ? fmtDateTime(s.settlement_time) : 'Tanggal final belum tersedia'}</strong>
                                    <span class="oc-badge oc-badge-green" style="width:max-content;font-size:.6rem">${finalSourceLabel}</span>`}
                         </div>
                     </td>

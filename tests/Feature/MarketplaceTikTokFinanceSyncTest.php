@@ -168,6 +168,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame(8000.0, (float) $settlement->commission_fee);
         $this->assertSame(766.0, (float) $settlement->escrow_tax);
         $this->assertSame(8766.0, $settlement->totalDeductions());
+        $this->assertNull($settlement->settlement_time);
         $this->assertSame(5000.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.platform_commission_fee'));
         $this->assertSame(1000.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.transaction_fee'));
         $this->assertSame(766.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.taxes.vat'));

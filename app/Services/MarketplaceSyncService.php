@@ -1115,7 +1115,17 @@ class MarketplaceSyncService
                 data_get($skuTransactions, '0.statement_time')
                 ?? data_get($skuTransactions, '0.paid_time')
                 ?? data_get($skuTransactions, '0.settlement_time')
-            ) ?? now();
+            );
+        }
+
+        // Tanggal saat proses sync berjalan bukan tanggal pencairan. Jangan
+        // mengisi settlement_time dengan now() ketika Finance TikTok tidak
+        // mengirim timestamp statement; tanggal palsu tersebut merusak audit
+        // dan membuat payout terlihat cair pada hari sync.
+        if (! $statementTime) {
+            $statementTime = $this->normalizeOrderEventTimestamp(
+                data_get($order->settlement?->raw_json, 'tiktok_statement.statement_time')
+            );
         }
 
         $settlement = MarketplaceOrderSettlement::firstOrNew([
