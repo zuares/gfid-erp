@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Marketplace;
 
-use Carbon\CarbonImmutable;
 use App\Http\Controllers\Controller;
 use App\Models\MarketplaceFinanceSettlement;
 use App\Models\MarketplaceFinancialComponent;
 use App\Models\Store;
 use App\Services\Marketplace\Finance\MarketplaceFinanceReconciliationService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -83,11 +83,10 @@ class MarketplaceFinanceController extends Controller
     {
         $filters = $this->filters($request);
         $stores = $this->stores();
-        $page = $this->reconciliation->paginateReconciliation($filters, $this->transactionsPerPage($request));
+        $page = $this->reconciliation->paginateOrderReconciliation($filters, $this->transactionsPerPage($request));
         $report = [
             'summary' => $page['summary'],
             'transactions' => $page['transactions'],
-            'settlements' => $page['settlements'],
         ];
 
         return view('marketplace.finance.reconciliation', compact('filters', 'report', 'stores'));
@@ -109,13 +108,13 @@ class MarketplaceFinanceController extends Controller
             ->paginate(10, ['*'], 'fee_type_page')
             ->withQueryString();
         $byType->setCollection($byType->getCollection()->map(fn ($row): array => [
-                'label' => $row->code === 'unmapped_adjustment'
-                    ? 'Selisih settlement belum terpetakan'
-                    : ($row->label ?: $row->code),
-                'code' => $row->code,
-                'amount' => round((float) $row->amount, 2),
-                'count' => (int) $row->count,
-            ])->values());
+            'label' => $row->code === 'unmapped_adjustment'
+                ? 'Selisih settlement belum terpetakan'
+                : ($row->label ?: $row->code),
+            'code' => $row->code,
+            'amount' => round((float) $row->amount, 2),
+            'count' => (int) $row->count,
+        ])->values());
 
         $byStore = (clone $componentQuery)
             ->leftJoin('stores as fee_store', 'fee_store.id', '=', 'ft.store_id')
@@ -128,11 +127,11 @@ class MarketplaceFinanceController extends Controller
             ->paginate(10, ['*'], 'fee_store_page')
             ->withQueryString();
         $byStore->setCollection($byStore->getCollection()->map(fn ($row): array => [
-                'store_id' => $row->store_id ?? 'unknown',
-                'store_name' => $row->store_name ?: 'Toko tidak diketahui',
-                'amount' => round((float) $row->amount, 2),
-                'count' => (int) $row->count,
-            ])->values());
+            'store_id' => $row->store_id ?? 'unknown',
+            'store_name' => $row->store_name ?: 'Toko tidak diketahui',
+            'amount' => round((float) $row->amount, 2),
+            'count' => (int) $row->count,
+        ])->values());
 
         $byOrder = (clone $componentQuery)
             ->leftJoin('stores as fee_store', 'fee_store.id', '=', 'ft.store_id')

@@ -9,7 +9,7 @@
             'marketplace.finance.index' => ['eyebrow' => 'Finance control center', 'title' => 'Overview', 'description' => 'Ringkasan arus transaksi, income, settlement, dan risiko rekonsiliasi marketplace.', 'icon' => 'bi-grid-1x2', 'badge' => 'Read-only overview'],
             'marketplace.finance.transactions' => ['eyebrow' => 'Marketplace ledger', 'title' => 'Transactions', 'description' => 'Telusuri gross, fee, net income, dan posting jurnal per order.', 'icon' => 'bi-receipt', 'badge' => 'Order-level ledger'],
             'marketplace.finance.settlements' => ['eyebrow' => 'Cash-in tracking', 'title' => 'Settlements', 'description' => 'Pantau payout marketplace, alokasi order, dan status posting ke bank atau jurnal.', 'icon' => 'bi-bank', 'badge' => 'Payout monitoring'],
-            'marketplace.finance.reconciliation' => ['eyebrow' => 'Finance audit', 'title' => 'Reconciliation', 'description' => 'Temukan selisih antara order, escrow, income, settlement, dan jurnal.', 'icon' => 'bi-check2-square', 'badge' => 'Read-only audit'],
+            'marketplace.finance.reconciliation' => ['eyebrow' => 'Finance audit', 'title' => 'Rekonsiliasi per Order', 'description' => 'Validasi gross, fee, dan net income setiap order tanpa bergantung pada payout atau mutasi bank.', 'icon' => 'bi-check2-square', 'badge' => 'Order-only audit'],
             'marketplace.finance.fee-analysis' => ['eyebrow' => 'Cost intelligence', 'title' => 'Fee Analysis', 'description' => 'Bandingkan beban fee berdasarkan tipe, toko, dan order untuk menemukan kebocoran margin.', 'icon' => 'bi-bar-chart-line', 'badge' => 'Aggregated costs'],
         ];
         $activeFinanceMeta = $financeMeta[$financeRoute] ?? $financeMeta['marketplace.finance.index'];

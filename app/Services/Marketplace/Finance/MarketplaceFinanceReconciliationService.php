@@ -25,6 +25,16 @@ class MarketplaceFinanceReconciliationService
      */
     private const RECONCILIATION_CHUNK_SIZE = 250;
 
+    private const ORDER_REASON_KEYS = [
+        'order_unmatched',
+        'missing_escrow',
+        'missing_income',
+        'income_pending',
+        'amount_mismatch',
+        'fee_mismatch',
+        'duplicate_response',
+    ];
+
     /**
      * Read-only reconciliation over the bounded finance submodule.
      *
@@ -41,16 +51,21 @@ class MarketplaceFinanceReconciliationService
             $items[] = $item;
         });
 
+        $orderOnly = $filters['scope'] === 'order';
         $settlements = [];
-        $this->eachSettlementResult($filters, function (array $settlement) use (&$settlements, $filters): void {
-            if ($filters['status'] !== null && $settlement['status'] !== $filters['status']) {
-                return;
-            }
-            $settlements[] = $settlement;
-        });
+        if (! $orderOnly) {
+            $this->eachSettlementResult($filters, function (array $settlement) use (&$settlements, $filters): void {
+                if ($filters['status'] !== null && $settlement['status'] !== $filters['status']) {
+                    return;
+                }
+                $settlements[] = $settlement;
+            });
+        }
 
         $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
-        $reasonCounts = array_fill_keys(['missing_settlement', 'bank_unverified', 'journal_missing', 'amount_mismatch', 'fee_mismatch'], 0);
+        $reasonCounts = array_fill_keys($orderOnly
+            ? self::ORDER_REASON_KEYS
+            : ['missing_settlement', 'bank_unverified', 'journal_missing', 'amount_mismatch', 'fee_mismatch'], 0);
         foreach ($items as $item) {
             $counts[$item['status']]++;
             foreach (array_keys($reasonCounts) as $reason) {
@@ -76,7 +91,7 @@ class MarketplaceFinanceReconciliationService
                 'pending' => $counts['pending'],
                 'reason_counts' => $reasonCounts,
                 'unreconciled_amount' => round(array_sum(array_map(
-                    fn (array $item): float => abs((float) ($item['actual_net_income'] ?? 0) - (float) ($item['allocated_amount'] ?? 0)),
+                    fn (array $item): float => $this->unreconciledAmount($item, $orderOnly),
                     array_filter($items, fn (array $item): bool => $item['status'] !== 'matched'),
                 )), 2),
             ],
@@ -191,6 +206,20 @@ class MarketplaceFinanceReconciliationService
         ];
     }
 
+    /** Reconcile order, escrow, fee, and income without payout or bank criteria. */
+    public function paginateOrderReconciliation(array $filters = [], int $perPage = 50): array
+    {
+        $filters['scope'] = 'order';
+        $filters = $this->filters($filters);
+        $perPage = $this->normalisePerPage($perPage);
+
+        return [
+            'filters' => $filters,
+            'summary' => $this->summary($filters),
+            'transactions' => $this->paginateTransactionRows($filters, $perPage, 'reconciliation_transaction_page'),
+        ];
+    }
+
     /**
      * Calculate reconciliation counters in bounded chunks. This keeps the
      * summary accurate without retaining all derived rows in the request.
@@ -199,12 +228,15 @@ class MarketplaceFinanceReconciliationService
     {
         $filters = $this->filters($filters);
         $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
-        $reasonCounts = array_fill_keys(['missing_settlement', 'bank_unverified', 'journal_missing', 'amount_mismatch', 'fee_mismatch'], 0);
+        $orderOnly = $filters['scope'] === 'order';
+        $reasonCounts = array_fill_keys($orderOnly
+            ? self::ORDER_REASON_KEYS
+            : ['missing_settlement', 'bank_unverified', 'journal_missing', 'amount_mismatch', 'fee_mismatch'], 0);
         $transactionCount = 0;
         $settlementCount = 0;
         $unreconciledAmount = 0.0;
 
-        $this->eachTransactionResult($filters, function (array $item) use (&$counts, &$reasonCounts, &$transactionCount, &$unreconciledAmount, $filters): void {
+        $this->eachTransactionResult($filters, function (array $item) use (&$counts, &$reasonCounts, &$transactionCount, &$unreconciledAmount, $filters, $orderOnly): void {
             if ($filters['status'] !== null && $item['status'] !== $filters['status']) {
                 return;
             }
@@ -217,20 +249,22 @@ class MarketplaceFinanceReconciliationService
                 }
             }
             if ($item['status'] !== 'matched') {
-                $unreconciledAmount += abs((float) ($item['actual_net_income'] ?? 0) - (float) ($item['allocated_amount'] ?? 0));
+                $unreconciledAmount += $this->unreconciledAmount($item, $orderOnly);
             }
         });
 
-        $this->eachSettlementResult($filters, function (array $settlement) use (&$counts, &$settlementCount, $filters): void {
-            if ($filters['status'] !== null && $settlement['status'] !== $filters['status']) {
-                return;
-            }
+        if (! $orderOnly) {
+            $this->eachSettlementResult($filters, function (array $settlement) use (&$counts, &$settlementCount, $filters): void {
+                if ($filters['status'] !== null && $settlement['status'] !== $filters['status']) {
+                    return;
+                }
 
-            $settlementCount++;
-            if ($settlement['status'] !== 'matched') {
-                $counts[$settlement['status']]++;
-            }
-        });
+                $settlementCount++;
+                if ($settlement['status'] !== 'matched') {
+                    $counts[$settlement['status']]++;
+                }
+            });
+        }
 
         return [
             'transaction_count' => $transactionCount,
@@ -253,11 +287,12 @@ class MarketplaceFinanceReconciliationService
         $paginator = $this->transactionQuery($filters)
             ->paginate($perPage, ['*'], $pageName)
             ->withQueryString();
-        $journalCounts = $this->activeJournalCounts($paginator->getCollection());
+        $orderOnly = $filters['scope'] === 'order';
+        $journalCounts = $orderOnly ? [] : $this->activeJournalCounts($paginator->getCollection());
 
         $paginator->setCollection(
             $paginator->getCollection()
-                ->map(fn (MarketplaceFinancialTransaction $transaction): array => $this->transactionResult($transaction, $journalCounts))
+                ->map(fn (MarketplaceFinancialTransaction $transaction): array => $this->transactionResult($transaction, $journalCounts, $orderOnly))
                 ->values(),
         );
 
@@ -356,10 +391,11 @@ class MarketplaceFinanceReconciliationService
 
     private function eachTransactionResult(array $filters, callable $callback): void
     {
-        $this->transactionQuery($filters)->reorder('id')->chunkById(self::RECONCILIATION_CHUNK_SIZE, function (Collection $transactions) use ($callback): void {
-            $journalCounts = $this->activeJournalCounts($transactions);
+        $orderOnly = $filters['scope'] === 'order';
+        $this->transactionQuery($filters)->reorder('id')->chunkById(self::RECONCILIATION_CHUNK_SIZE, function (Collection $transactions) use ($callback, $orderOnly): void {
+            $journalCounts = $orderOnly ? [] : $this->activeJournalCounts($transactions);
             foreach ($transactions as $transaction) {
-                $callback($this->transactionResult($transaction, $journalCounts));
+                $callback($this->transactionResult($transaction, $journalCounts, $orderOnly));
             }
         }, 'id');
     }
@@ -375,6 +411,23 @@ class MarketplaceFinanceReconciliationService
 
     private function transactionQuery(array $filters): Builder
     {
+        $relations = [
+            'salesInvoice:id,grand_total',
+            'components:id,financial_transaction_id,component_code,amount,source_hash',
+        ];
+        if ($filters['scope'] !== 'order') {
+            $relations = array_merge($relations, [
+                'allocations:id,settlement_id,financial_transaction_id,allocated_amount',
+                'allocations.settlement:id,status,amount,journal_id,raw_payload',
+                'allocations.settlement.journal:id,voided_at',
+                'allocations.settlement.journal.lines:id,journal_id,debit',
+                'saleJournal:id,voided_at',
+                'saleJournal.lines:id,journal_id,debit',
+                'escrowJournal:id,voided_at',
+                'escrowJournal.lines:id,journal_id,debit',
+            ]);
+        }
+
         $query = MarketplaceFinancialTransaction::query()
             ->select([
                 'id',
@@ -393,18 +446,7 @@ class MarketplaceFinanceReconciliationService
                 'escrow_journal_id',
                 'created_at',
             ])
-            ->with([
-                'salesInvoice:id,grand_total',
-                'components:id,financial_transaction_id,component_code,amount,source_hash',
-                'allocations:id,settlement_id,financial_transaction_id,allocated_amount',
-                'allocations.settlement:id,status,amount,journal_id,raw_payload',
-                'allocations.settlement.journal:id,voided_at',
-                'allocations.settlement.journal.lines:id,journal_id,debit',
-                'saleJournal:id,voided_at',
-                'saleJournal.lines:id,journal_id,debit',
-                'escrowJournal:id,voided_at',
-                'escrowJournal.lines:id,journal_id,debit',
-            ]);
+            ->with($relations);
 
         if ($filters['store_id'] !== null) {
             $query->where('store_id', $filters['store_id']);
@@ -492,7 +534,7 @@ class MarketplaceFinanceReconciliationService
         return $perPage > 50 ? 50 : 25;
     }
 
-    private function transactionResult(MarketplaceFinancialTransaction $transaction, array $journalCounts = []): array
+    private function transactionResult(MarketplaceFinancialTransaction $transaction, array $journalCounts = [], bool $orderOnly = false): array
     {
         $reasons = [];
         $pending = false;
@@ -509,6 +551,9 @@ class MarketplaceFinanceReconciliationService
             $reasons[] = 'missing_income';
         } elseif (in_array($transaction->income_status, [IncomeStatus::PENDING, IncomeStatus::TO_RELEASE], true)) {
             $pending = true;
+            if ($orderOnly) {
+                $reasons[] = 'income_pending';
+            }
         }
 
         $totalComponents = round((float) $transaction->components->sum('amount'), 2);
@@ -533,28 +578,33 @@ class MarketplaceFinanceReconciliationService
             $reasons[] = 'fee_mismatch';
         }
 
-        $allocated = round((float) $transaction->allocations->sum('allocated_amount'), 2);
-        $receivedAllocated = round((float) $transaction->allocations
-            ->filter(fn ($allocation): bool => $allocation->settlement?->status === SettlementStatus::RECEIVED && ! $allocation->settlement->requiresBankVerification())
-            ->sum('allocated_amount'), 2);
-        if ($allocated <= self::TOLERANCE) {
-            $reasons[] = 'missing_settlement';
-            $pending = true;
-        }
-        if ($transaction->allocations->contains(fn ($allocation): bool => $allocation->settlement?->requiresBankVerification())) {
-            $reasons[] = 'bank_unverified';
-            $pending = true;
-        }
+        $allocated = 0.0;
+        $receivedAllocated = 0.0;
+        $journal = ['sale' => null, 'escrow' => null, 'settlement' => null];
+        if (! $orderOnly) {
+            $allocated = round((float) $transaction->allocations->sum('allocated_amount'), 2);
+            $receivedAllocated = round((float) $transaction->allocations
+                ->filter(fn ($allocation): bool => $allocation->settlement?->status === SettlementStatus::RECEIVED && ! $allocation->settlement->requiresBankVerification())
+                ->sum('allocated_amount'), 2);
+            if ($allocated <= self::TOLERANCE) {
+                $reasons[] = 'missing_settlement';
+                $pending = true;
+            }
+            if ($transaction->allocations->contains(fn ($allocation): bool => $allocation->settlement?->requiresBankVerification())) {
+                $reasons[] = 'bank_unverified';
+                $pending = true;
+            }
 
-        $journal = [
-            'sale' => $this->journalResult('marketplace_sale', $transaction->id, $transaction->saleJournal, (float) $transaction->gross_amount, $reasons, $transaction->salesInvoice !== null),
-            'escrow' => $this->journalResult('marketplace_escrow', $transaction->id, $transaction->escrowJournal, abs($totalComponents), $reasons, $transaction->escrow_status === EscrowStatus::FINALIZED && $transaction->components->isNotEmpty()),
-            'settlement' => $this->settlementJournalResult($transaction, $reasons),
-        ];
-        if (($journalCounts['marketplace_sale'][$transaction->id] ?? 0) > 1
-            || ($journalCounts['marketplace_escrow'][$transaction->id] ?? 0) > 1
-            || ($journalCounts['marketplace_settlement'][$transaction->id] ?? 0) > 1) {
-            $reasons[] = 'journal_duplicate';
+            $journal = [
+                'sale' => $this->journalResult('marketplace_sale', $transaction->id, $transaction->saleJournal, (float) $transaction->gross_amount, $reasons, $transaction->salesInvoice !== null),
+                'escrow' => $this->journalResult('marketplace_escrow', $transaction->id, $transaction->escrowJournal, abs($totalComponents), $reasons, $transaction->escrow_status === EscrowStatus::FINALIZED && $transaction->components->isNotEmpty()),
+                'settlement' => $this->settlementJournalResult($transaction, $reasons),
+            ];
+            if (($journalCounts['marketplace_sale'][$transaction->id] ?? 0) > 1
+                || ($journalCounts['marketplace_escrow'][$transaction->id] ?? 0) > 1
+                || ($journalCounts['marketplace_settlement'][$transaction->id] ?? 0) > 1) {
+                $reasons[] = 'journal_duplicate';
+            }
         }
 
         $reasons = array_values(array_unique($reasons));
@@ -571,6 +621,7 @@ class MarketplaceFinanceReconciliationService
             'total_components' => $totalComponents,
             'expected_net_income' => $expectedNet,
             'actual_net_income' => (float) $transaction->net_amount,
+            'net_difference' => $expectedNet === null ? null : round((float) $transaction->net_amount - $expectedNet, 2),
             'income_status' => $transaction->income_status?->value,
             'allocated_amount' => $allocated,
             'settlement_received_amount' => $receivedAllocated,
@@ -716,6 +767,17 @@ class MarketplaceFinanceReconciliationService
         return 'matched';
     }
 
+    private function unreconciledAmount(array $item, bool $orderOnly): float
+    {
+        if ($orderOnly) {
+            return $item['status'] === 'mismatch'
+                ? abs((float) ($item['net_difference'] ?? 0))
+                : 0.0;
+        }
+
+        return abs((float) ($item['actual_net_income'] ?? 0) - (float) ($item['allocated_amount'] ?? 0));
+    }
+
     private function different(float $left, float $right): bool
     {
         return abs(round($left - $right, 2)) > self::TOLERANCE;
@@ -730,6 +792,7 @@ class MarketplaceFinanceReconciliationService
 
         return [
             'store_id' => isset($filters['store_id']) && $filters['store_id'] !== '' ? (int) $filters['store_id'] : null,
+            'scope' => ($filters['scope'] ?? null) === 'order' ? 'order' : 'full',
             'date_basis' => $basis,
             'date_from' => $filters['date_from'] ?? null,
             'date_to' => $filters['date_to'] ?? null,

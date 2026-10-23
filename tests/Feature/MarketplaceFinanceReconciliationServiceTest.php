@@ -67,6 +67,91 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
         $this->assertNull($item['gross_sales_invoice']);
     }
 
+    public function test_order_reconciliation_ignores_payout_bank_and_journal_requirements(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-ONLY-MATCHED-001',
+            'channel_order_id' => 'ORDER-ONLY-MATCHED-001',
+            'order_date' => '2026-10-10',
+            'ordered_at' => '2026-10-10 09:00:00',
+            'order_status' => 'COMPLETED',
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        $transaction = MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel' => 'shopee',
+            'order_sn' => $order->channel_order_id,
+            'currency' => 'IDR',
+            'gross_amount' => 100000,
+            'net_amount' => 95000,
+            'escrow_status' => EscrowStatus::FINALIZED,
+            'income_status' => IncomeStatus::RELEASED,
+        ]);
+        MarketplaceFinancialComponent::create([
+            'financial_transaction_id' => $transaction->id,
+            'component_code' => 'admin_fee',
+            'component_name' => 'Admin Fee',
+            'amount' => 5000,
+            'direction' => ComponentDirection::DEBIT,
+            'dedupe_key' => str_repeat('o', 64),
+        ]);
+
+        $result = app(MarketplaceFinanceReconciliationService::class)->reconcile([
+            'store_id' => $store->id,
+            'scope' => 'order',
+        ]);
+        $item = $result['transactions'][0];
+
+        $this->assertSame('matched', $item['status']);
+        $this->assertSame([], $item['reasons']);
+        $this->assertSame(0.0, $item['net_difference']);
+        $this->assertSame(1, $result['summary']['matched']);
+        $this->assertSame(0, $result['summary']['settlement_count']);
+        $this->assertArrayNotHasKey('missing_settlement', $result['summary']['reason_counts']);
+        $this->assertDatabaseCount('journals', 0);
+        $this->assertDatabaseCount('marketplace_finance_settlements', 0);
+    }
+
+    public function test_order_reconciliation_keeps_unreleased_income_pending(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-ONLY-PENDING-001',
+            'channel_order_id' => 'ORDER-ONLY-PENDING-001',
+            'order_date' => '2026-10-10',
+            'ordered_at' => '2026-10-10 09:00:00',
+            'order_status' => 'COMPLETED',
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel' => 'shopee',
+            'order_sn' => $order->channel_order_id,
+            'currency' => 'IDR',
+            'gross_amount' => 100000,
+            'net_amount' => 100000,
+            'escrow_status' => EscrowStatus::SYNCED,
+            'income_status' => IncomeStatus::PENDING,
+        ]);
+
+        $result = app(MarketplaceFinanceReconciliationService::class)->reconcile([
+            'store_id' => $store->id,
+            'scope' => 'order',
+        ]);
+
+        $this->assertSame('pending', $result['transactions'][0]['status']);
+        $this->assertContains('income_pending', $result['transactions'][0]['reasons']);
+        $this->assertSame(1, $result['summary']['pending']);
+        $this->assertSame(1, $result['summary']['reason_counts']['income_pending']);
+    }
+
     public function test_one_posted_payout_allocated_to_two_orders_does_not_create_false_amount_mismatch(): void
     {
         $store = $this->store();

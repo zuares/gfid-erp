@@ -44,7 +44,7 @@
                         <option value="created_at" @selected(($filters['date_basis'] ?? '') === 'created_at')>Transaksi dicatat</option>
                         <option value="released_at" @selected(($filters['date_basis'] ?? '') === 'released_at')>Dana cair</option>
                     </select>
-                    <small class="text-muted">Settlement tetap menggunakan tanggal settlement.</small>
+                    <small class="text-muted">{{ $isReconciliation ? 'Rekonsiliasi mengikuti basis tanggal order yang dipilih.' : 'Settlement tetap menggunakan tanggal settlement.' }}</small>
                 </div>
                 <div class="finance-filter-field finance-filter-period-field">
                     <label class="form-label" id="finance-period-label" for="finance-period-display">Periode tanggal</label>

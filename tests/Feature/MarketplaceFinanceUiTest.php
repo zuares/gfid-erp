@@ -272,17 +272,19 @@ class MarketplaceFinanceUiTest extends TestCase
 
         $this->get('/marketplace/finance/reconciliation'.$query)
             ->assertOk()
-            ->assertSee('Dana masuk bank belum terverifikasi')
-            ->assertSee('UI-WALLET-WITHDRAWAL');
+            ->assertSee('Mode rekonsiliasi per order')
+            ->assertDontSee('Dana masuk bank belum terverifikasi')
+            ->assertDontSee('UI-WALLET-WITHDRAWAL');
     }
 
-    public function test_reconciliation_distinguishes_missing_payout_and_journal_from_bank_difference(): void
+    public function test_reconciliation_is_explicitly_limited_to_order_values(): void
     {
         $this->get('/marketplace/finance/reconciliation')
             ->assertOk()
             ->assertSee('Alasan yang perlu ditindaklanjuti')
-            ->assertSee('Bukan selisih mutasi bank yang sudah terverifikasi')
-            ->assertSee('Belum ada payout Finance pada filter ini');
+            ->assertSee('Gross · Fee · Net')
+            ->assertSee('Payout, alokasi settlement, mutasi bank, serta jurnal tidak memengaruhi hasil halaman ini')
+            ->assertDontSee('Detail settlement');
     }
 
     public function test_fee_analysis_explains_unmapped_settlement_adjustment(): void
