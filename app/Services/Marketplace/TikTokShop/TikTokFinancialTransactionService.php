@@ -40,6 +40,23 @@ class TikTokFinancialTransactionService
             ->all();
     }
 
+    /** @return array<int, array{code:string,label:string,description:string}> */
+    public function getDataSources(): array
+    {
+        return [
+            [
+                'code' => 'account',
+                'label' => 'Mutasi akun seller',
+                'description' => 'WITHDRAW, SETTLE, TRANSFER, REVERSE, PAYMENT, dan REFUND',
+            ],
+            [
+                'code' => 'statements',
+                'label' => 'Detail settlement statement',
+                'description' => 'ORDER, RESERVE, dan adjustment dengan rincian revenue, fee, pajak, dan ongkir',
+            ],
+        ];
+    }
+
     /**
      * Fetch one TikTok API page and upsert the normalized rows idempotently.
      * TikTok pagination is cursor based; the opaque cursor is returned intact.
@@ -138,6 +155,94 @@ class TikTokFinancialTransactionService
         ];
     }
 
+    /**
+     * Fetch all statement pages and their detail transaction pages for a date
+     * range. Statement rows are final settlement details, not account-level
+     * withdrawals, so they are persisted with a separate source namespace.
+     *
+     * @return array<string, mixed>
+     */
+    public function fetchStatementTransactions(Store $store, Carbon $from, Carbon $to, array $options = []): array
+    {
+        $this->assertTikTok($store);
+
+        $pageSize = min(100, max(1, (int) ($options['page_size'] ?? 100)));
+        $statusFilter = strtoupper(trim((string) ($options['status'] ?? '')));
+        $items = [];
+        $statementToken = '';
+        $statementPages = 0;
+        $transactionPages = 0;
+        $statements = 0;
+        $maxPages = 100;
+
+        for ($statementPages = 1; $statementPages <= $maxPages; $statementPages++) {
+            $statementResponse = $this->gateway->getStatements(
+                $store,
+                $from->timestamp,
+                $to->timestamp,
+                $statementToken,
+                $pageSize,
+            );
+            $this->assertSuccessfulResponse($statementResponse);
+
+            foreach ($this->extractStatements($statementResponse) as $statement) {
+                $statementId = trim((string) ($statement['id'] ?? $statement['statement_id'] ?? ''));
+                if ($statementId === '') {
+                    continue;
+                }
+
+                $statements++;
+                $transactionToken = '';
+                for ($statementTransactionPage = 1; $statementTransactionPage <= $maxPages; $statementTransactionPage++) {
+                    $transactionPages++;
+                    $transactionResponse = $this->gateway->getTransactionsByStatement(
+                        $store,
+                        $statementId,
+                        $transactionToken,
+                        $pageSize,
+                    );
+                    $this->assertSuccessfulResponse($transactionResponse);
+
+                    foreach ($this->extractStatementTransactions($transactionResponse) as $row) {
+                        $item = $this->normalizeStatementTransactionRow($row, $store, $statement);
+                        if ($statusFilter !== '' && $item['status'] !== $statusFilter) {
+                            continue;
+                        }
+
+                        $this->persist($item);
+                        $items[] = $item;
+                    }
+
+                    $nextTransactionToken = $this->nextPageToken($transactionResponse);
+                    if ($nextTransactionToken === '' || $nextTransactionToken === $transactionToken) {
+                        break;
+                    }
+                    $transactionToken = $nextTransactionToken;
+                }
+            }
+
+            $nextStatementToken = $this->nextPageToken($statementResponse);
+            if ($nextStatementToken === '' || $nextStatementToken === $statementToken) {
+                break;
+            }
+            $statementToken = $nextStatementToken;
+        }
+
+        return [
+            'items' => $items,
+            'summary' => $this->summary($items),
+            'pagination' => [
+                'page_size' => count($items),
+                'has_more' => false,
+                'next_page_token' => '',
+                'statements_fetched' => $statements,
+                'statement_pages_fetched' => $statementPages,
+                'transaction_pages_fetched' => $transactionPages,
+                'source_total_count' => count($items),
+            ],
+        ];
+    }
+
     /** @return array<string, mixed> */
     public function normalizeTransactionRow(array $row, Store $store): array
     {
@@ -167,6 +272,7 @@ class TikTokFinancialTransactionService
             'transaction_id' => $id,
             'store_id' => $store->id,
             'store_name' => $store->name,
+            'source' => 'withdrawals',
             'create_time' => $createdAt?->timestamp,
             'date_formatted' => $createdAt?->format('Y-m-d H:i:s') ?? '—',
             'date_human' => $createdAt?->translatedFormat('d M Y, H:i') ?? '—',
@@ -181,6 +287,80 @@ class TikTokFinancialTransactionService
             'badge' => $meta['badge'],
             'status' => $status,
             'reason' => trim((string) ($row['reason'] ?? $row['description'] ?? '')) ?: null,
+            'statement_id' => null,
+            'order_id' => null,
+            'adjustment_id' => null,
+            'settlement_amount' => null,
+            'revenue_amount' => null,
+            'shipping_cost_amount' => null,
+            'fee_tax_amount' => null,
+            'adjustment_amount' => null,
+            'reserve_amount' => null,
+            'raw_payload' => $row,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function normalizeStatementTransactionRow(array $row, Store $store, array $statement = []): array
+    {
+        $statementId = trim((string) ($statement['id'] ?? $statement['statement_id'] ?? ''));
+        $id = trim((string) ($row['id'] ?? $row['transaction_id'] ?? $row['adjustment_id'] ?? $row['order_id'] ?? ''));
+        if ($id === '') {
+            throw new RuntimeException('TikTok statement transaction tidak memiliki ID.');
+        }
+
+        $type = strtoupper(trim((string) ($row['type'] ?? $row['transaction_type'] ?? 'OTHER_ADJUSTMENT')));
+        $settlementAmount = $this->numericAmount($row['settlement_amount'] ?? null);
+        $revenueAmount = $this->numericAmount($row['revenue_amount'] ?? null);
+        $shippingCostAmount = $this->numericAmount($row['shipping_cost_amount'] ?? null);
+        $feeTaxAmount = $this->numericAmount($row['fee_tax_amount'] ?? null);
+        $adjustmentAmount = $this->numericAmount($row['adjustment_amount'] ?? null);
+        $reserveAmount = $this->numericAmount($row['reserve_amount'] ?? null);
+        $signedAmount = $settlementAmount
+            ?? $adjustmentAmount
+            ?? $reserveAmount
+            ?? 0.0;
+        $flow = $signedAmount < 0 ? 'MONEY_OUT' : ($signedAmount > 0 ? 'MONEY_IN' : 'UNKNOWN');
+        $amount = abs($signedAmount);
+        $createdAt = $this->timestamp(
+            $row['order_create_time']
+                ?? $row['create_time']
+                ?? $statement['create_time']
+                ?? $statement['statement_time']
+                ?? null,
+        );
+        $currency = strtoupper(trim((string) ($row['currency'] ?? $statement['currency'] ?? 'IDR'))) ?: 'IDR';
+        $status = strtoupper(trim((string) ($row['status'] ?? $statement['status'] ?? 'SETTLED'))) ?: 'SETTLED';
+        $meta = $this->statementTypeMeta($type);
+
+        return [
+            'transaction_id' => $id,
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+            'source' => 'statement_transactions',
+            'create_time' => $createdAt?->timestamp,
+            'date_formatted' => $createdAt?->format('Y-m-d H:i:s') ?? '—',
+            'date_human' => $createdAt?->translatedFormat('d M Y, H:i') ?? '—',
+            'amount' => round($amount, 2),
+            'signed_amount' => $signedAmount,
+            'formatted_amount' => $this->formatAmount($amount, $currency),
+            'signed_formatted_amount' => $this->formatSignedAmount($flow, $amount, $currency),
+            'currency' => $currency,
+            'money_flow' => $flow,
+            'transaction_type' => $type,
+            'transaction_type_label' => $meta['label'],
+            'badge' => $meta['badge'],
+            'status' => $status,
+            'reason' => trim((string) ($row['reason'] ?? $row['description'] ?? $row['adjustment_type'] ?? '')) ?: null,
+            'statement_id' => $statementId !== '' ? $statementId : null,
+            'order_id' => $row['order_id'] ?? $row['associated_order_id'] ?? $row['adjustment_order_id'] ?? null,
+            'adjustment_id' => $row['adjustment_id'] ?? null,
+            'settlement_amount' => $settlementAmount,
+            'revenue_amount' => $revenueAmount,
+            'shipping_cost_amount' => $shippingCostAmount,
+            'fee_tax_amount' => $feeTaxAmount,
+            'adjustment_amount' => $adjustmentAmount,
+            'reserve_amount' => $reserveAmount,
             'raw_payload' => $row,
         ];
     }
@@ -262,9 +442,11 @@ class TikTokFinancialTransactionService
         MarketplaceTikTokFinancialTransaction::updateOrCreate(
             [
                 'store_id' => $item['store_id'],
+                'source' => $item['source'],
                 'external_transaction_id' => $item['transaction_id'],
             ],
             [
+                'source' => $item['source'],
                 'transaction_type' => $item['transaction_type'],
                 'amount' => $item['amount'],
                 'currency' => $item['currency'],
@@ -273,6 +455,15 @@ class TikTokFinancialTransactionService
                 'transaction_created_at' => $item['create_time']
                     ? Carbon::createFromTimestamp($item['create_time'], config('app.timezone'))
                     : null,
+                'statement_id' => $item['statement_id'],
+                'order_id' => $item['order_id'],
+                'adjustment_id' => $item['adjustment_id'],
+                'settlement_amount' => $item['settlement_amount'],
+                'revenue_amount' => $item['revenue_amount'],
+                'shipping_cost_amount' => $item['shipping_cost_amount'],
+                'fee_tax_amount' => $item['fee_tax_amount'],
+                'adjustment_amount' => $item['adjustment_amount'],
+                'reserve_amount' => $item['reserve_amount'],
                 'source_payload' => $item['raw_payload'],
                 'synced_at' => now(),
             ],
@@ -292,6 +483,66 @@ class TikTokFinancialTransactionService
         if (! empty($response['error']) || (isset($response['code']) && (int) $response['code'] !== 0)) {
             throw new RuntimeException('TikTok Finance API Error: '.(string) ($response['message'] ?? $response['error'] ?? 'Unknown error'));
         }
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function extractStatements(array $response): array
+    {
+        foreach ([
+            data_get($response, 'data.statements'),
+            data_get($response, 'response.statements'),
+            data_get($response, 'statements'),
+        ] as $rows) {
+            if (is_array($rows)) {
+                return array_values(array_filter($rows, 'is_array'));
+            }
+        }
+
+        return [];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function extractStatementTransactions(array $response): array
+    {
+        foreach ([
+            data_get($response, 'data.transactions'),
+            data_get($response, 'response.transactions'),
+            data_get($response, 'transactions'),
+        ] as $rows) {
+            if (is_array($rows)) {
+                return array_values(array_filter($rows, 'is_array'));
+            }
+        }
+
+        return [];
+    }
+
+    private function nextPageToken(array $response): string
+    {
+        return trim((string) (
+            data_get($response, 'data.next_page_token')
+            ?? data_get($response, 'response.next_page_token')
+            ?? data_get($response, 'next_page_token')
+            ?? ''
+        ));
+    }
+
+    /** @return array{label:string,badge:string} */
+    private function statementTypeMeta(string $type): array
+    {
+        return match ($type) {
+            'ORDER' => ['label' => 'Order Settlement', 'badge' => 'success'],
+            'RESERVE' => ['label' => 'Reserve', 'badge' => 'warning'],
+            'PLATFORM_REIMBURSEMENT', 'PLATFORM_COMPENSATION', 'LOGISTICS_REIMBURSEMENT' => [
+                'label' => 'Kompensasi Platform',
+                'badge' => 'info',
+            ],
+            'GMV_PAYMENT_FOR_ADS' => ['label' => 'Pembayaran Iklan dari GMV', 'badge' => 'danger'],
+            default => [
+                'label' => ucwords(strtolower(str_replace('_', ' ', $type))),
+                'badge' => 'secondary',
+            ],
+        };
     }
 
     private function numericAmount(mixed $value): ?float

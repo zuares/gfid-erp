@@ -145,6 +145,105 @@ class TikTokFinancialTransactionTest extends TestCase
         $service->fetchTransactions($shopeeStore, $from, $to);
     }
 
+    public function test_statement_source_fetches_statements_and_persists_final_breakdown(): void
+    {
+        $store = $this->createStore();
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'statements' => [[
+                        'id' => 'STATEMENT-1',
+                        'create_time' => 1787220000,
+                        'status' => 'SETTLED',
+                        'currency' => 'IDR',
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ], 200),
+            'https://open-api.tiktokglobalshop.com/finance/202501/statements/STATEMENT-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'id' => 'STATEMENT-1',
+                    'next_page_token' => '',
+                    'transactions' => [
+                        [
+                            'id' => 'STMT-TX-1',
+                            'type' => 'ORDER',
+                            'order_id' => 'ORDER-1',
+                            'order_create_time' => 1787223600,
+                            'settlement_amount' => '130000',
+                            'revenue_amount' => '200000',
+                            'shipping_cost_amount' => '-40000',
+                            'fee_tax_amount' => '-30000',
+                        ],
+                        [
+                            'id' => 'STMT-TX-2',
+                            'type' => 'PLATFORM_PENALTY',
+                            'adjustment_id' => 'ADJUSTMENT-1',
+                            'adjustment_amount' => '-10000',
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $result = app(TikTokFinancialTransactionService::class)->fetchStatementTransactions(
+            $store,
+            now()->subDays(3)->startOfDay(),
+            now()->endOfDay(),
+        );
+
+        $this->assertCount(2, $result['items']);
+        $this->assertSame('statement_transactions', $result['items'][0]['source']);
+        $this->assertSame('STATEMENT-1', $result['items'][0]['statement_id']);
+        $this->assertSame('ORDER-1', $result['items'][0]['order_id']);
+        $this->assertSame(130000.0, $result['items'][0]['amount']);
+        $this->assertSame('MONEY_IN', $result['items'][0]['money_flow']);
+        $this->assertSame('MONEY_OUT', $result['items'][1]['money_flow']);
+        $this->assertSame(130000.0, $result['summary']['total_money_in']);
+        $this->assertSame(10000.0, $result['summary']['total_money_out']);
+        $this->assertDatabaseHas('marketplace_tiktok_financial_transactions', [
+            'store_id' => $store->id,
+            'source' => 'statement_transactions',
+            'external_transaction_id' => 'STMT-TX-1',
+            'statement_id' => 'STATEMENT-1',
+            'order_id' => 'ORDER-1',
+            'settlement_amount' => 130000,
+        ]);
+        $this->assertSame(1, $result['pagination']['statements_fetched']);
+        $this->assertSame(1, $result['pagination']['transaction_pages_fetched']);
+
+        Http::assertSent(function ($request): bool {
+            return str_contains($request->url(), '/finance/202501/statements/STATEMENT-1/statement_transactions')
+                && ($request->data()['sort_field'] ?? null) === 'order_create_time'
+                && ! empty($request->data()['sign']);
+        });
+    }
+
+    public function test_controller_can_select_statement_source(): void
+    {
+        $store = $this->createStore();
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => ['statements' => [], 'next_page_token' => ''],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($this->user())->getJson(route('marketplace.api.tiktok-financial-transactions', [
+            'store' => $store->id,
+            'source' => 'statements',
+            'date_from' => now()->subDays(3)->toDateString(),
+            'date_to' => now()->toDateString(),
+        ]));
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data_source', 'statements')
+            ->assertJsonPath('data.items', []);
+    }
+
     public function test_controller_page_and_json_endpoint_are_available(): void
     {
         $store = $this->createStore();

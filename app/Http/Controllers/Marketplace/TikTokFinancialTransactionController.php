@@ -29,7 +29,8 @@ class TikTokFinancialTransactionController extends Controller
         return view('marketplace.tiktok.financial-transactions', [
             'stores' => $stores,
             'transactionTypes' => $this->service->getTransactionTypes(),
-            'statuses' => ['PROCESSING', 'COMPLETED', 'SUCCESS', 'FAILED', 'REVERSED', 'UNKNOWN'],
+            'dataSources' => $this->service->getDataSources(),
+            'statuses' => ['PROCESSING', 'COMPLETED', 'SUCCESS', 'FAILED', 'REVERSED', 'SETTLED', 'UNKNOWN'],
         ]);
     }
 
@@ -40,6 +41,7 @@ class TikTokFinancialTransactionController extends Controller
             'date_to' => ['required', 'date_format:Y-m-d'],
             'types' => ['nullable', 'string', 'max:200'],
             'status' => ['nullable', 'string', 'max:40'],
+            'source' => ['nullable', 'in:account,statements'],
             'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page_token' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -50,16 +52,23 @@ class TikTokFinancialTransactionController extends Controller
         }
 
         try {
-            $result = $this->service->fetchTransactions($store, $from, $to, [
-                'types' => $validated['types'] ?? '',
-                'status' => $validated['status'] ?? '',
-                'page_size' => $validated['page_size'] ?? 100,
-                'page_token' => $validated['page_token'] ?? '',
-            ]);
+            $source = $validated['source'] ?? 'account';
+            $result = $source === 'statements'
+                ? $this->service->fetchStatementTransactions($store, $from, $to, [
+                    'status' => $validated['status'] ?? '',
+                    'page_size' => $validated['page_size'] ?? 100,
+                ])
+                : $this->service->fetchTransactions($store, $from, $to, [
+                    'types' => $validated['types'] ?? '',
+                    'status' => $validated['status'] ?? '',
+                    'page_size' => $validated['page_size'] ?? 100,
+                    'page_token' => $validated['page_token'] ?? '',
+                ]);
 
             return response()->json([
                 'success' => true,
                 'source' => 'tiktok_financial_transactions',
+                'data_source' => $source,
                 'data' => $result,
             ]);
         } catch (RuntimeException $e) {
@@ -92,6 +101,7 @@ class TikTokFinancialTransactionController extends Controller
             'date_to' => ['required', 'date_format:Y-m-d'],
             'types' => ['nullable', 'string', 'max:200'],
             'status' => ['nullable', 'string', 'max:40'],
+            'source' => ['nullable', 'in:account,statements'],
         ]);
 
         [$from, $to, $error] = $this->parseDateWindow($validated['date_from'], $validated['date_to']);
@@ -100,12 +110,18 @@ class TikTokFinancialTransactionController extends Controller
         }
 
         try {
-            $result = $this->service->fetchAllTransactions($store, $from, $to, [
-                'types' => $validated['types'] ?? '',
-                'status' => $validated['status'] ?? '',
-            ]);
+            $source = $validated['source'] ?? 'account';
+            $result = $source === 'statements'
+                ? $this->service->fetchStatementTransactions($store, $from, $to, [
+                    'status' => $validated['status'] ?? '',
+                ])
+                : $this->service->fetchAllTransactions($store, $from, $to, [
+                    'types' => $validated['types'] ?? '',
+                    'status' => $validated['status'] ?? '',
+                ]);
             $filename = sprintf(
-                'tiktok_financial_transactions_%s_%s_%s.csv',
+                'tiktok_%s_%s_%s_%s.csv',
+                $source,
                 preg_replace('/[^a-zA-Z0-9_-]/', '_', $store->name),
                 $from->format('Ymd'),
                 $to->format('Ymd'),
@@ -114,11 +130,14 @@ class TikTokFinancialTransactionController extends Controller
             return response()->streamDownload(function () use ($result): void {
                 $handle = fopen('php://output', 'w');
                 fputs($handle, "\xEF\xBB\xBF");
-                fputcsv($handle, ['Waktu', 'ID Transaksi', 'Tipe', 'Arah Dana', 'Nominal', 'Mata Uang', 'Status', 'Keterangan']);
+                fputcsv($handle, ['Sumber', 'Waktu', 'ID Transaksi', 'Statement ID', 'Order ID', 'Tipe', 'Arah Dana', 'Nominal', 'Mata Uang', 'Status', 'Keterangan']);
                 foreach ($result['items'] as $item) {
                     fputcsv($handle, [
+                        $item['source'],
                         $item['date_formatted'],
                         $item['transaction_id'],
+                        $item['statement_id'] ?? '',
+                        $item['order_id'] ?? '',
                         $item['transaction_type_label'],
                         $item['money_flow'],
                         $item['amount'],

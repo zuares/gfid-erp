@@ -12,7 +12,7 @@
     .tt-finance-badge { display:inline-flex; align-items:center; gap:.45rem; padding:.38rem .72rem; border:1px solid rgba(255,255,255,.25); border-radius:999px; color:#ccfbf1; background:rgba(0,0,0,.18); font-size:.72rem; font-weight:800; white-space:nowrap; }
     .tt-finance-badge i { width:8px; height:8px; border-radius:50%; background:#4ade80; box-shadow:0 0 0 4px rgba(74,222,128,.2); }
     .tt-finance-card { border:1px solid var(--border-color, #e5e7eb); border-radius:14px; background:var(--card, #fff); }
-    .tt-finance-filters { display:grid; grid-template-columns:1.3fr .8fr .8fr .8fr; gap:.75rem; align-items:end; padding:1rem; margin-bottom:.9rem; }
+    .tt-finance-filters { display:grid; grid-template-columns:1.25fr 1.25fr .8fr .8fr .8fr; gap:.75rem; align-items:end; padding:1rem; margin-bottom:.9rem; }
     .tt-finance-field label { display:block; margin-bottom:.3rem; color:#64748b; font-size:.68rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
     .tt-finance-field .form-control, .tt-finance-field .form-select { font-size:.82rem; border-radius:9px; }
     .tt-finance-types { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:.45rem .8rem; padding-top:.2rem; }
@@ -56,14 +56,22 @@
     <section class="tt-finance-hero">
         <div>
             <h1>Transaksi Finansial TikTok Shop</h1>
-            <p>Mutasi finansial level akun seller dari TikTok Shop Partner API. Data disinkronkan secara idempotent ke database; rincian fee dan settlement per order tetap tersedia di modul Finance.</p>
+            <p>Gabungkan mutasi akun seller dengan detail settlement statement TikTok Shop. Data disinkronkan secara idempotent; rincian revenue, ongkir, fee, pajak, reserve, dan adjustment tersedia dari sumber statement.</p>
         </div>
-        <span class="tt-finance-badge"><i aria-hidden="true"></i> TikTok Finance · API 202309</span>
+        <span class="tt-finance-badge"><i aria-hidden="true"></i> TikTok Finance · API 202309 + 202501</span>
     </section>
 
     <div id="ttAlert" class="tt-finance-alert" role="alert"></div>
 
     <section class="tt-finance-card tt-finance-filters" aria-label="Filter transaksi finansial TikTok">
+        <div class="tt-finance-field">
+            <label for="ttSource">Sumber data</label>
+            <select id="ttSource" class="form-select">
+                @foreach ($dataSources as $source)
+                    <option value="{{ $source['code'] }}">{{ $source['label'] }}</option>
+                @endforeach
+            </select>
+        </div>
         <div class="tt-finance-field">
             <label for="ttStore">Toko TikTok</label>
             <select id="ttStore" class="form-select">
@@ -78,13 +86,14 @@
         <div class="tt-finance-field"><label for="ttTo">Tanggal sampai</label><input id="ttTo" type="date" class="form-control"></div>
         <div class="tt-finance-field"><label for="ttStatus">Status</label><select id="ttStatus" class="form-select"><option value="">Semua status</option>@foreach ($statuses as $status)<option value="{{ $status }}">{{ $status }}</option>@endforeach</select></div>
 
-        <div class="tt-finance-field" style="grid-column:1 / -1">
+        <div id="ttTypesField" class="tt-finance-field" style="grid-column:1 / -1">
             <label>Tipe transaksi yang diminta ke TikTok</label>
             <div class="tt-finance-types">
                 @foreach ($transactionTypes as $type)
                     <label class="tt-finance-type"><input type="checkbox" class="form-check-input tt-type" value="{{ $type['code'] }}" checked> {{ $type['label'] }} <code>{{ $type['code'] }}</code></label>
                 @endforeach
             </div>
+            <small id="ttSourceHint" class="text-muted d-block mt-2">Pagination memakai cursor TikTok untuk transaksi level akun.</small>
         </div>
 
         <div class="tt-finance-actions">
@@ -137,13 +146,13 @@
         if ($('ttFrom').value > $('ttTo').value) return 'Tanggal mulai tidak boleh melewati tanggal akhir.';
         const days = Math.round((new Date(`${$('ttTo').value}T00:00:00`) - new Date(`${$('ttFrom').value}T00:00:00`)) / 86400000) + 1;
         if (days > 60) return `Rentang ${days} hari terlalu panjang. Maksimal 60 hari.`;
-        if (!selectedTypes().length) return 'Pilih minimal satu tipe transaksi.';
+        if ($('ttSource').value === 'account' && !selectedTypes().length) return 'Pilih minimal satu tipe transaksi.';
         return null;
     };
 
     const buildUrl = (exportMode = false) => {
         const path = `/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/tiktok-financial-transactions${exportMode ? '/export' : ''}`;
-        const query = new URLSearchParams({ date_from: $('ttFrom').value, date_to: $('ttTo').value, types: selectedTypes().join(',') });
+        const query = new URLSearchParams({ date_from: $('ttFrom').value, date_to: $('ttTo').value, source: $('ttSource').value, types: selectedTypes().join(',') });
         if ($('ttStatus').value) query.set('status', $('ttStatus').value);
         if (!exportMode && state.token) query.set('page_token', state.token);
         return `${path}?${query.toString()}`;
@@ -154,10 +163,14 @@
             $('ttTableWrap').innerHTML = '<div class="tt-finance-empty"><i class="bi bi-inbox"></i>Tidak ada transaksi pada filter ini.</div>';
             return;
         }
-        $('ttTableWrap').innerHTML = `<table class="tt-finance-table"><thead><tr><th>Waktu</th><th>ID</th><th>Tipe</th><th>Arah</th><th>Nominal</th><th>Status</th><th>Detail</th></tr></thead><tbody>${items.map((item) => {
+        $('ttTableWrap').innerHTML = `<table class="tt-finance-table"><thead><tr><th>Sumber</th><th>Waktu</th><th>ID</th><th>Statement / Order</th><th>Tipe</th><th>Arah</th><th>Nominal</th><th>Status</th><th>Detail</th></tr></thead><tbody>${items.map((item) => {
             const flowClass = item.money_flow === 'MONEY_IN' ? 'tt-finance-flow-in' : (item.money_flow === 'MONEY_OUT' ? 'tt-finance-flow-out' : 'tt-finance-flow-unknown');
             const flowLabel = item.money_flow === 'MONEY_IN' ? 'Dana masuk' : (item.money_flow === 'MONEY_OUT' ? 'Dana keluar' : 'Belum ditentukan');
-            return `<tr><td>${escapeHtml(item.date_formatted)}</td><td><code>${escapeHtml(item.transaction_id)}</code></td><td><span class="tt-finance-pill ${escapeHtml(item.badge || 'secondary')}">${escapeHtml(item.transaction_type_label)}<br><small>${escapeHtml(item.transaction_type)}</small></span></td><td class="${flowClass}">${flowLabel}</td><td class="${flowClass}">${escapeHtml(item.signed_formatted_amount || item.formatted_amount)}</td><td><span class="tt-finance-pill secondary">${escapeHtml(item.status)}</span></td><td>${escapeHtml(item.reason || 'Tidak ada deskripsi')}<details><summary>Raw JSON</summary><pre class="tt-finance-raw">${escapeHtml(JSON.stringify(item.raw_payload || item, null, 2))}</pre></details></td></tr>`;
+            const sourceLabel = item.source === 'statement_transactions' ? 'Statement' : 'Akun';
+            const statementOrder = [item.statement_id ? `S: ${escapeHtml(item.statement_id)}` : '', item.order_id ? `O: ${escapeHtml(item.order_id)}` : ''].filter(Boolean).join('<br>') || '—';
+            const detailAmounts = item.source === 'statement_transactions' && item.settlement_amount !== null && item.settlement_amount !== undefined
+                ? `<small class="d-block text-muted">Settlement: ${escapeHtml(money(item.settlement_amount, item.currency))}</small>` : '';
+            return `<tr><td><span class="tt-finance-pill ${item.source === 'statement_transactions' ? 'success' : 'primary'}">${sourceLabel}</span></td><td>${escapeHtml(item.date_formatted)}</td><td><code>${escapeHtml(item.transaction_id)}</code></td><td><code>${statementOrder}</code></td><td><span class="tt-finance-pill ${escapeHtml(item.badge || 'secondary')}">${escapeHtml(item.transaction_type_label)}<br><small>${escapeHtml(item.transaction_type)}</small></span></td><td class="${flowClass}">${flowLabel}</td><td class="${flowClass}">${escapeHtml(item.signed_formatted_amount || item.formatted_amount)}${detailAmounts}</td><td><span class="tt-finance-pill secondary">${escapeHtml(item.status)}</span></td><td>${escapeHtml(item.reason || 'Tidak ada deskripsi')}<details><summary>Raw JSON</summary><pre class="tt-finance-raw">${escapeHtml(JSON.stringify(item.raw_payload || item, null, 2))}</pre></details></td></tr>`;
         }).join('')}</tbody></table>`;
     };
 
@@ -175,7 +188,9 @@
             state.items = data.items || []; state.token = pagination.next_page_token || ''; state.hasMore = Boolean(pagination.has_more); state.pages++;
             $('ttCount').textContent = Number(summary.total_count || 0).toLocaleString('id-ID');
             $('ttIn').textContent = money(summary.total_money_in); $('ttOut').textContent = money(summary.total_money_out); $('ttNet').textContent = money(summary.net_amount); $('ttUnknown').textContent = Number(summary.unknown_flow_count || 0).toLocaleString('id-ID');
-            render(state.items); $('ttNext').disabled = !state.hasMore; $('ttPrev').disabled = state.pages <= 1; $('ttPageInfo').textContent = `Halaman ${state.pages} · ${state.items.length} transaksi${state.hasMore ? ' · tersedia halaman berikutnya' : ''}`;
+            render(state.items); $('ttNext').disabled = !state.hasMore; $('ttPrev').disabled = state.pages <= 1; $('ttPageInfo').textContent = $('ttSource').value === 'statements'
+                ? `${pagination.statements_fetched || 0} statement · ${state.items.length} detail transaksi`
+                : `Halaman ${state.pages} · ${state.items.length} transaksi${state.hasMore ? ' · tersedia halaman berikutnya' : ''}`;
         } catch (error) {
             showError(error.message); $('ttTableWrap').innerHTML = `<div class="tt-finance-empty text-danger"><i class="bi bi-exclamation-triangle"></i>${escapeHtml(error.message)}</div>`; $('ttPageInfo').textContent = 'Gagal mengambil data';
         } finally { state.loading = false; $('ttLoad').disabled = false; }
@@ -187,7 +202,16 @@
     $('ttPrev').addEventListener('click', reset);
     $('ttReset').addEventListener('click', reset);
     $('ttExport').addEventListener('click', () => { const error = validate(); if (error) { showError(error); return; } window.location.href = buildUrl(true); });
-    ['ttStore', 'ttFrom', 'ttTo', 'ttStatus'].forEach((id) => $(id).addEventListener('change', () => { state.token = ''; state.pages = 0; }));
+    const updateSourceControls = () => {
+        const accountSource = $('ttSource').value === 'account';
+        $('ttTypesField').style.opacity = accountSource ? '1' : '.62';
+        document.querySelectorAll('.tt-type').forEach((input) => { input.disabled = !accountSource; });
+        $('ttSourceHint').textContent = accountSource
+            ? 'Pagination memakai cursor TikTok untuk transaksi level akun.'
+            : 'TikTok akan mengambil daftar statement dalam periode ini lalu detail transaksi setiap statement. Nilai statement adalah settlement final.';
+    };
+    ['ttStore', 'ttFrom', 'ttTo', 'ttStatus', 'ttSource'].forEach((id) => $(id).addEventListener('change', () => { state.token = ''; state.pages = 0; if (id === 'ttSource') updateSourceControls(); }));
+    updateSourceControls();
 })();
 </script>
 @endsection
