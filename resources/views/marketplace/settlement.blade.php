@@ -382,6 +382,23 @@
         .settlement-filter-field input.flatpickr-input:focus{
             background:var(--card,#fff);
         }
+        .settlement-range-calendar .flatpickr-day.inRange{
+            background:rgba(37,99,235,.12);
+            border-color:transparent;
+            box-shadow:none;
+            color:var(--shp-text);
+        }
+        .settlement-range-calendar .flatpickr-day.startRange,
+        .settlement-range-calendar .flatpickr-day.endRange{
+            background:var(--shp-accent,#2563eb);
+            border-color:var(--shp-accent,#2563eb);
+            color:#fff;
+        }
+        .settlement-range-calendar .flatpickr-day.startRange{ border-radius:9px 3px 3px 9px; }
+        .settlement-range-calendar .flatpickr-day.endRange{ border-radius:3px 9px 9px 3px; }
+        .settlement-range-calendar .flatpickr-day.startRange.endRange{ border-radius:9px; }
+        .settlement-range-calendar .flatpickr-months{ padding:.2rem .25rem; }
+        .settlement-range-calendar .flatpickr-weekdays{ padding:0 .25rem; }
         .settlement-filter-icon{
             position:absolute;
             left:.68rem;
@@ -928,7 +945,7 @@
             state = null;
         }
 
-        if (!state) return;
+        if (!state) return null;
 
         if ($('filterStore')) $('filterStore').value = state.store_id || '';
         if ($('filterPlatform')) $('filterPlatform').value = state.platform || '';
@@ -941,9 +958,9 @@
         if ($('filterSearch')) $('filterSearch').value = state.search || '';
 
         if (fpOrderDate) {
-            if (state.order_date_from) {
+            if (state.order_date_from && state.order_date_to) {
                 fpOrderDate.setDate(
-                    state.order_date_to ? [state.order_date_from, state.order_date_to] : [state.order_date_from],
+                    [state.order_date_from, state.order_date_to],
                     false,
                 );
             } else {
@@ -952,9 +969,9 @@
         }
 
         if (fpSettlementDate) {
-            if (state.settlement_date_from) {
+            if (state.settlement_date_from && state.settlement_date_to) {
                 fpSettlementDate.setDate(
-                    state.settlement_date_to ? [state.settlement_date_from, state.settlement_date_to] : [state.settlement_date_from],
+                    [state.settlement_date_from, state.settlement_date_to],
                     false,
                 );
             } else {
@@ -966,6 +983,8 @@
         if (syncStore && syncStore.dataset.manual !== '1') {
             syncStore.value = state.store_id || '';
         }
+
+        return state;
     }
 
     function fmtDateTime(value) {
@@ -1114,6 +1133,21 @@
         return String(store?.channel?.code || '').trim().toLowerCase();
     }
 
+    function getSettlementSyncReadyStores() {
+        return stores.filter(store => isSettlementSyncReadyStore(store));
+    }
+
+    function getSettlementSyncReadyPlatforms() {
+        const platforms = new Map();
+        getSettlementSyncReadyStores().forEach(store => {
+            const code = storePlatformCode(store);
+            const name = String(store.channel?.name || code || 'Platform').trim();
+            if (code && !platforms.has(code)) platforms.set(code, name);
+        });
+
+        return platforms;
+    }
+
     function populateSyncStoreSelect(preferredStoreId = '') {
         const platformSel = $('syncPlatform');
         const storeSel = $('syncStore');
@@ -1121,8 +1155,8 @@
 
         const selectedPlatform = String(platformSel?.value || '').trim().toLowerCase();
         const currentStoreId = String(preferredStoreId || storeSel.value || '');
-        const candidates = stores.filter(store => isSettlementSyncReadyStore(store)
-            && (!selectedPlatform || storePlatformCode(store) === selectedPlatform));
+        const candidates = getSettlementSyncReadyStores().filter(store =>
+            !selectedPlatform || storePlatformCode(store) === selectedPlatform);
 
         storeSel.innerHTML = '<option value="">Pilih Toko siap sync</option>';
         candidates.forEach(store => {
@@ -1471,13 +1505,8 @@
         }
 
         if (syncPlatformSel) {
-            const readyStores = stores.filter(store => isSettlementSyncReadyStore(store));
-            const readyPlatforms = new Map();
-            readyStores.forEach(store => {
-                const code = storePlatformCode(store);
-                const name = String(store.channel?.name || code || 'Platform').trim();
-                if (code && !readyPlatforms.has(code)) readyPlatforms.set(code, name);
-            });
+            const readyStores = getSettlementSyncReadyStores();
+            const readyPlatforms = getSettlementSyncReadyPlatforms();
             syncPlatformSel.innerHTML = '<option value="">Platform siap sync</option>';
             readyPlatforms.forEach((name, code) => {
                 const option = document.createElement('option');
@@ -1700,8 +1729,24 @@
         populateStoreSelects();
 
         if (window.GFID && window.GFID.initDateRange) {
+            const updateDatePickerState = function(instance, selectedDates, type) {
+                const visibleInput = instance.altInput || instance.input;
+                const complete = selectedDates.length === 2;
+                const label = type === 'order' ? 'rentang tanggal order' : 'rentang tanggal cair/estimasi';
+                visibleInput.placeholder = complete
+                    ? 'Rentang terpilih'
+                    : (selectedDates.length === 1 ? 'Pilih tanggal akhir' : 'Pilih rentang tanggal');
+                visibleInput.setAttribute('aria-label', complete ? `Filter ${label} terpilih` : `Pilih ${label}`);
+                visibleInput.classList.toggle('is-range-complete', complete);
+            };
+            const onDateChange = function(selectedDates, dateStr, instance) {
+                updateDatePickerState(instance, selectedDates, instance.input.id === 'filterOrderDate' ? 'order' : 'settlement');
+                if (selectedDates.length === 2) {
+                    instance.close();
+                }
+            };
             const onDateClose = function(selectedDates) {
-                if (selectedDates.length >= 1 || selectedDates.length === 0) {
+                if (selectedDates.length === 2 || selectedDates.length === 0) {
                     currentPage = 1;
                     loadSettlements();
                 }
@@ -1716,10 +1761,18 @@
             const datePickerOptions = {
                 allowInput: false,
                 clickOpens: true,
-                closeOnSelect: true,
+                closeOnSelect: false,
+                showMonths: window.innerWidth >= 1024 ? 2 : 1,
+                position: 'auto center',
                 rangeSeparator: ' – ',
+                onChange: onDateChange,
                 onOpen: onDateOpen,
                 onClose: onDateClose,
+                onReady: function(selectedDates, dateStr, instance) {
+                    instance.input.classList.add('gf-date-input');
+                    instance.calendarContainer.classList.add('gf-date-calendar', 'settlement-range-calendar');
+                    updateDatePickerState(instance, selectedDates, instance.input.id === 'filterOrderDate' ? 'order' : 'settlement');
+                },
             };
             fpOrderDate = window.GFID.initDateRange('#filterOrderDate', datePickerOptions);
             fpSettlementDate = window.GFID.initDateRange('#filterSettlementDate', datePickerOptions);
@@ -1776,8 +1829,8 @@
             });
         }
 
-        restoreSettlementFilterState();
-        populateFilterStoreSelect($('filterStore')?.value || '');
+        const restoredFilters = restoreSettlementFilterState();
+        populateFilterStoreSelect(restoredFilters?.store_id || $('filterStore')?.value || '');
         const restoredStore = stores.find(store => String(store.id) === String(syncStore?.value || ''));
         if (syncPlatform && restoredStore) {
             syncPlatform.value = storePlatformCode(restoredStore);
@@ -1884,20 +1937,16 @@
         params.append('page', currentPage);
         params.append('per_page', 50);
 
-        if (fpOrderDate && fpOrderDate.selectedDates && fpOrderDate.selectedDates.length >= 1) {
+        if (fpOrderDate && fpOrderDate.selectedDates && fpOrderDate.selectedDates.length === 2) {
             const orderFrom = fpOrderDate.formatDate(fpOrderDate.selectedDates[0], 'Y-m-d');
-            const orderTo = fpOrderDate.selectedDates[1]
-                ? fpOrderDate.formatDate(fpOrderDate.selectedDates[1], 'Y-m-d')
-                : orderFrom;
+            const orderTo = fpOrderDate.formatDate(fpOrderDate.selectedDates[1], 'Y-m-d');
             params.append('order_date_from', orderFrom);
             params.append('order_date_to', orderTo);
         }
 
-        if (fpSettlementDate && fpSettlementDate.selectedDates && fpSettlementDate.selectedDates.length >= 1) {
+        if (fpSettlementDate && fpSettlementDate.selectedDates && fpSettlementDate.selectedDates.length === 2) {
             const settlementFrom = fpSettlementDate.formatDate(fpSettlementDate.selectedDates[0], 'Y-m-d');
-            const settlementTo = fpSettlementDate.selectedDates[1]
-                ? fpSettlementDate.formatDate(fpSettlementDate.selectedDates[1], 'Y-m-d')
-                : settlementFrom;
+            const settlementTo = fpSettlementDate.formatDate(fpSettlementDate.selectedDates[1], 'Y-m-d');
             params.append('settlement_date_from', settlementFrom);
             params.append('settlement_date_to', settlementTo);
         }
