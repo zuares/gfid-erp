@@ -887,9 +887,46 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
             return true;
         }
 
-        $sku = $sourceSku($sourceItem);
-        return preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches) === 1
-            && strtoupper(trim((string) ($shipmentLine->item?->code ?? ''))) === $matches[1];
+        $shipmentItemCode = strtoupper(trim((string) ($shipmentLine->item?->code ?? '')));
+        if ($shipmentItemCode === '') {
+            return false;
+        }
+
+        // Older Shopee imports can have a missing item_id/internal_item_id,
+        // while item_sku still contains the exact warehouse code. Use that
+        // explicit SKU as a safe fallback so the confirm UI can pair the row
+        // and show the marketplace SKU instead of "Lihat SKU order".
+        $sourceSkus = is_array($sourceItem)
+            ? [
+                $sourceItem['sku'] ?? null,
+                $sourceItem['model_sku'] ?? null,
+                $sourceItem['marketplace_sku'] ?? null,
+                $sourceItem['item_sku'] ?? null,
+                $sourceItem['item_code_snapshot'] ?? null,
+            ]
+            : [
+                $sourceItem->model_sku ?? null,
+                $sourceItem->marketplace_sku ?? null,
+                $sourceItem->item_sku ?? null,
+                $sourceItem->item_code_snapshot ?? null,
+                $sourceItem->internalItem?->code ?? null,
+            ];
+
+        foreach ($sourceSkus as $candidateSku) {
+            $sku = strtoupper(trim((string) $candidateSku));
+            if ($sku === '') {
+                continue;
+            }
+            if ($sku === $shipmentItemCode) {
+                return true;
+            }
+            if (preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches) === 1
+                && $shipmentItemCode === $matches[1]) {
+                return true;
+            }
+        }
+
+        return false;
     };
     $compareOrderShipment = static function ($shipmentLines, $sourceItems) use ($sourceItemId, $sourceQty): array {
         $shipmentLines = collect($shipmentLines);

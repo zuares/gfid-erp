@@ -1517,6 +1517,59 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_confirmation_pairs_marketplace_sku_when_import_has_no_internal_item_id(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-UI-SKU-FALLBACK-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID-UI-SKU-FALLBACK-001';
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-UI-SKU-FALLBACK-001',
+            'channel_order_id' => 'ORDER-UI-SKU-FALLBACK-001',
+            'shipping_awb_no' => $awb,
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_id' => null,
+            'internal_item_id' => null,
+            'item_name' => 'Marketplace item without imported mapping',
+            'model_sku' => 'ITEM-FIRST-001',
+            'item_sku' => 'ITEM-FIRST-001',
+            'qty' => 1,
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('class="sd-marketplace-sku-value" title="SKU marketplace: ITEM-FIRST-001">ITEM-FIRST-001</span>', false)
+            ->assertDontSee('Lihat SKU order');
+    }
+
     public function test_spx_confirmation_shows_order_sku_and_flags_a_different_scanned_item(): void
     {
         [$user, $store, $scannedItem] = $this->shipmentContext();
