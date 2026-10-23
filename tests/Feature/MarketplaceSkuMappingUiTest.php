@@ -674,4 +674,71 @@ class MarketplaceSkuMappingUiTest extends TestCase
             'financial_issue_reason' => null,
         ]);
     }
+
+    public function test_mapping_backfills_existing_order_item_that_has_no_marketplace_sku(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-SKU-EMPTY-BACKFILL-'.uniqid(),
+        ]);
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'code' => 'STORE-SKU-EMPTY-BACKFILL-'.uniqid(),
+            'name' => 'Store SKU Empty Backfill',
+            'channel_id' => $channel->id,
+            'is_active' => true,
+        ]);
+        $internalItem = Item::create([
+            'code' => 'ITEM-EMPTY-BACKFILL',
+            'name' => 'Item Empty Backfill',
+            'unit' => 'pcs',
+            'type' => 'finished',
+            'base_unit_cost' => 100,
+            'hpp' => 100,
+            'active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-EMPTY-BACKFILL-'.uniqid(),
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'status' => 'new',
+            'order_status' => 'READY_TO_SHIP',
+        ]);
+        $orderItem = MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'line_no' => 1,
+            'external_item_id' => 'ITEM-EMPTY-BACKFILL-1',
+            'item_name' => 'Marketplace Product Without Seller SKU',
+            'variant_name' => 'Abu, L',
+            'qty' => 1,
+            'price' => 100,
+            'internal_item_id' => $internalItem->id,
+            'mapping_status' => 'marketplace_sku_empty',
+            'data_status' => 'incomplete',
+        ]);
+        $mapping = SkuMapping::create([
+            'marketplace_sku' => 'SKU-EMPTY-BACKFILL',
+            'channel_code' => 'shopee',
+            'item_id' => $internalItem->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->putJson('/api/sku-mappings/'.$mapping->id, [
+                'marketplace_sku' => 'SKU-EMPTY-BACKFILL',
+                'channel_code' => 'shopee',
+                'item_id' => $internalItem->id,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('marketplace_order_items', [
+            'id' => $orderItem->id,
+            'marketplace_sku' => 'SKU-EMPTY-BACKFILL',
+            'model_sku' => 'SKU-EMPTY-BACKFILL',
+            'mapping_status' => 'mapped',
+            'internal_item_id' => $internalItem->id,
+            'data_status' => 'valid',
+        ]);
+    }
 }

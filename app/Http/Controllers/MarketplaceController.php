@@ -6937,7 +6937,13 @@ class MarketplaceController extends Controller
             $mappingStatus = $i->mapping_status;
             $issueReason = $i->issue_reason;
 
-            if ($mappingStatus === 'marketplace_sku_empty' && ! empty($sku)) {
+            // Legacy rows may have stale mapping_status/issue_reason after a
+            // mapping mutation. The rendered action must follow the actual
+            // source SKU value so an empty SKU always exposes "Isi SKU".
+            if (blank($sku)) {
+                $mappingStatus = MarketplaceIssueService::MAPPING_SKU_EMPTY;
+                $issueReason = MarketplaceIssueService::MAPPING_SKU_EMPTY;
+            } elseif ($mappingStatus === 'marketplace_sku_empty') {
                 $mappingStatus = 'mapping_not_found';
                 $issueReason = 'mapping_not_found';
             }

@@ -341,6 +341,16 @@ class MarketplaceIssueService
             ['item_id' => $internalItemId]
         );
 
+        // Simpan juga relasi nama+varian agar order lama/berikutnya yang
+        // datang tanpa marketplace SKU tetap bisa diperkaya saat re-map.
+        ProductNameSkuMapping::remember(
+            $item->item_name,
+            $item->variant_name,
+            $channelCode,
+            $sku,
+            'Mapping dari Data Perlu Diperbaiki'
+        );
+
         $this->resolveItem($item->fresh(), $channelCode);
 
         $affected = 1;

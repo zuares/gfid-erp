@@ -7,6 +7,7 @@ use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\OrderFulfillment;
 use App\Models\OrderFulfillmentLine;
+use App\Models\ProductNameSkuMapping;
 use App\Models\SkuMapping;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use Illuminate\Support\Collection;
@@ -99,7 +100,135 @@ class SkuMappingPropagationService
             Log::warning('Propagasi SKU mapping ke order items gagal: '.$e->getMessage());
         }
 
+        // Order lama yang dibuat saat marketplace tidak mengirim Seller SKU
+        // tidak bisa ditemukan melalui sku_values di atas. Jika mapping sudah
+        // menunjuk ke item internal yang sama, isi SKU hanya ketika kombinasi
+        // item+channel memiliki satu kandidat SKU yang tidak ambigu.
+        $resolved = $resolved->merge($this->resolveEmptyOrderItems($keys));
+
         return $resolved;
+    }
+
+    private function resolveEmptyOrderItems(Collection $keys): Collection
+    {
+        $skuValues = $keys->pluck('marketplace_sku')->unique()->values();
+        $mappedItemIds = collect();
+
+        foreach ($keys as $key) {
+            $sku = (string) $key['marketplace_sku'];
+            $itemId = SkuMapping::resolve($sku, $key['channel_code'] ?? null);
+
+            if (! $itemId) {
+                continue;
+            }
+
+            $mappedItemIds->push($itemId);
+        }
+
+        $skuCandidates = [];
+        SkuMapping::query()
+            ->whereIn('item_id', $mappedItemIds->unique()->all())
+            ->get(['marketplace_sku', 'channel_code', 'item_id'])
+            ->each(function (SkuMapping $mapping) use (&$skuCandidates): void {
+                $compound = ($this->normalizeChannel($mapping->channel_code) ?? '*').'|'.$mapping->item_id;
+                $skuCandidates[$compound] ??= [];
+                $skuCandidates[$compound][] = (string) $mapping->marketplace_sku;
+            });
+
+        $skuCandidates = collect($skuCandidates)->map(
+            fn (array $skus): array => array_values(array_unique($skus))
+        );
+
+        $itemIds = $skuCandidates->keys()
+            ->map(fn (string $key): int => (int) last(explode('|', $key)))
+            ->unique()
+            ->values();
+
+        $nameVariantMappings = ProductNameSkuMapping::query()
+            ->whereIn('marketplace_sku', $skuValues)
+            ->get();
+        $byNameVariant = $nameVariantMappings
+            ->groupBy(fn (ProductNameSkuMapping $mapping): string =>
+                $this->nameVariantKey($mapping->item_name, $mapping->variant_name, $mapping->channel_code)
+            )
+            ->map(function (Collection $mappings): ?string {
+                $skus = $mappings->pluck('marketplace_sku')->filter()->unique()->values();
+
+                return $skus->count() === 1 ? (string) $skus->first() : null;
+            });
+
+        if ($itemIds->isEmpty() && $byNameVariant->isEmpty()) {
+            return collect();
+        }
+
+        $resolved = collect();
+        $query = MarketplaceOrderItem::query()
+            ->with(['order.store.channel', 'legacyOrder.store.channel'])
+            ->where(function ($query) use ($itemIds, $byNameVariant, $nameVariantMappings): void {
+                if ($itemIds->isNotEmpty()) {
+                    $query->whereIn('internal_item_id', $itemIds->all());
+                }
+
+                if ($byNameVariant->isNotEmpty()) {
+                    $query->orWhereIn('item_name', $nameVariantMappings->pluck('item_name')->unique()->all());
+                }
+            })
+            ->where(function ($query): void {
+                foreach (['marketplace_sku', 'model_sku', 'item_sku', 'external_sku'] as $column) {
+                    $query->where(function ($empty) use ($column): void {
+                        $empty->whereNull($column)->orWhere($column, '');
+                    });
+                }
+            });
+
+        $query->chunkById(300, function ($items) use (&$resolved, $skuCandidates, $byNameVariant): void {
+            foreach ($items as $item) {
+                $order = $item->order ?: $item->legacyOrder;
+                $channel = $this->normalizeChannel($order?->store?->channel?->code);
+                $sku = null;
+
+                if ($item->internal_item_id) {
+                    $sku = $this->uniqueCandidateSku(
+                        $skuCandidates->get(($channel ?: '*').'|'.$item->internal_item_id)
+                            ?? $skuCandidates->get('*|'.$item->internal_item_id)
+                    );
+                }
+
+                if (! $sku) {
+                    $sku = $byNameVariant->get(
+                        $this->nameVariantKey($item->item_name, $item->variant_name, $channel)
+                    ) ?? $byNameVariant->get(
+                        $this->nameVariantKey($item->item_name, $item->variant_name, null)
+                    );
+                }
+
+                if (! $sku) {
+                    continue;
+                }
+
+                $item->update([
+                    'model_sku' => $sku,
+                    'marketplace_sku' => $sku,
+                ]);
+                $this->issueService->resolveItem($item->fresh(), $channel);
+                $resolved->push($item->fresh(['order.store.channel', 'legacyOrder.store.channel']));
+            }
+        });
+
+        return $resolved;
+    }
+
+    private function uniqueCandidateSku(?array $skus): ?string
+    {
+        $skus = array_values(array_unique(array_filter($skus ?? [])));
+
+        return count($skus) === 1 ? $skus[0] : null;
+    }
+
+    private function nameVariantKey(?string $itemName, ?string $variantName, ?string $channelCode): string
+    {
+        return ProductNameSkuMapping::makeHash($itemName, $variantName)
+            .'|'.($this->normalizeChannel($channelCode) ?? '*');
     }
 
     /**
