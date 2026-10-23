@@ -152,6 +152,82 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
         $this->assertSame(1, $result['summary']['reason_counts']['income_pending']);
     }
 
+    public function test_order_reconciliation_marks_cancelled_order_without_financial_activity_not_applicable(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-CANCELLED-001',
+            'channel_order_id' => 'ORDER-CANCELLED-001',
+            'order_date' => '2026-10-10',
+            'ordered_at' => '2026-10-10 09:00:00',
+            'order_status' => 'CANCELLED',
+            'status' => 'cancelled',
+            'financial_data_status' => 'not_applicable',
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel' => 'shopee',
+            'order_sn' => $order->channel_order_id,
+            'currency' => 'IDR',
+            'gross_amount' => 100000,
+            'net_amount' => 0,
+            'escrow_status' => EscrowStatus::SYNCED,
+            'income_status' => IncomeStatus::PENDING,
+        ]);
+
+        $result = app(MarketplaceFinanceReconciliationService::class)->reconcile([
+            'store_id' => $store->id,
+            'scope' => 'order',
+        ]);
+
+        $this->assertSame('not_applicable', $result['transactions'][0]['status']);
+        $this->assertSame(['order_cancelled'], $result['transactions'][0]['reasons']);
+        $this->assertSame(1, $result['summary']['not_applicable']);
+        $this->assertSame(0, $result['summary']['pending']);
+    }
+
+    public function test_cancelled_order_with_financial_activity_remains_an_exception(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-CANCELLED-WITH-INCOME-001',
+            'channel_order_id' => 'ORDER-CANCELLED-WITH-INCOME-001',
+            'order_date' => '2026-10-10',
+            'ordered_at' => '2026-10-10 09:00:00',
+            'order_status' => 'CANCELLED',
+            'status' => 'cancelled',
+            'financial_data_status' => 'not_applicable',
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel' => 'shopee',
+            'order_sn' => $order->channel_order_id,
+            'currency' => 'IDR',
+            'gross_amount' => 100000,
+            'net_amount' => 95000,
+            'escrow_status' => EscrowStatus::FINALIZED,
+            'income_status' => IncomeStatus::RELEASED,
+        ]);
+
+        $result = app(MarketplaceFinanceReconciliationService::class)->reconcile([
+            'store_id' => $store->id,
+            'scope' => 'order',
+        ]);
+
+        $this->assertSame('mismatch', $result['transactions'][0]['status']);
+        $this->assertContains('cancelled_order_has_financial_activity', $result['transactions'][0]['reasons']);
+        $this->assertSame(1, $result['summary']['mismatch']);
+        $this->assertSame(0, $result['summary']['not_applicable']);
+    }
+
     public function test_one_posted_payout_allocated_to_two_orders_does_not_create_false_amount_mismatch(): void
     {
         $store = $this->store();

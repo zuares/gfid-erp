@@ -27,6 +27,8 @@ class MarketplaceFinanceReconciliationService
 
     private const ORDER_REASON_KEYS = [
         'order_unmatched',
+        'order_cancelled',
+        'cancelled_order_has_financial_activity',
         'missing_escrow',
         'missing_income',
         'income_pending',
@@ -62,7 +64,7 @@ class MarketplaceFinanceReconciliationService
             });
         }
 
-        $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
+        $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending', 'not_applicable'], 0);
         $reasonCounts = array_fill_keys($orderOnly
             ? self::ORDER_REASON_KEYS
             : ['missing_settlement', 'bank_unverified', 'journal_missing', 'amount_mismatch', 'fee_mismatch'], 0);
@@ -89,6 +91,7 @@ class MarketplaceFinanceReconciliationService
                 'mismatch' => $counts['mismatch'],
                 'unmatched' => $counts['unmatched'],
                 'pending' => $counts['pending'],
+                'not_applicable' => $counts['not_applicable'],
                 'reason_counts' => $reasonCounts,
                 'unreconciled_amount' => round(array_sum(array_map(
                     fn (array $item): float => $this->unreconciledAmount($item, $orderOnly),
@@ -119,7 +122,7 @@ class MarketplaceFinanceReconciliationService
     public function overview(array $filters = []): array
     {
         $filters = $this->filters($filters);
-        $summary = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
+        $summary = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending', 'not_applicable'], 0);
         $metrics = [
             'gross_sales' => 0.0,
             'total_escrow_fee' => 0.0,
@@ -227,7 +230,7 @@ class MarketplaceFinanceReconciliationService
     public function summary(array $filters = []): array
     {
         $filters = $this->filters($filters);
-        $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending'], 0);
+        $counts = array_fill_keys(['matched', 'mismatch', 'unmatched', 'pending', 'not_applicable'], 0);
         $orderOnly = $filters['scope'] === 'order';
         $reasonCounts = array_fill_keys($orderOnly
             ? self::ORDER_REASON_KEYS
@@ -273,6 +276,7 @@ class MarketplaceFinanceReconciliationService
             'mismatch' => $counts['mismatch'],
             'unmatched' => $counts['unmatched'],
             'pending' => $counts['pending'],
+            'not_applicable' => $counts['not_applicable'],
             'reason_counts' => $reasonCounts,
             'unreconciled_amount' => round($unreconciledAmount, 2),
         ];
@@ -415,6 +419,12 @@ class MarketplaceFinanceReconciliationService
             'salesInvoice:id,grand_total',
             'components:id,financial_transaction_id,component_code,amount,source_hash',
         ];
+        if ($filters['scope'] === 'order') {
+            $relations = array_merge($relations, [
+                'marketplaceOrder:id,order_status,status,financial_data_status',
+                'allocations:id,financial_transaction_id',
+            ]);
+        }
         if ($filters['scope'] !== 'order') {
             $relations = array_merge($relations, [
                 'allocations:id,settlement_id,financial_transaction_id,allocated_amount',
@@ -538,6 +548,15 @@ class MarketplaceFinanceReconciliationService
     {
         $reasons = [];
         $pending = false;
+        $cancelledOrder = $orderOnly && $transaction->marketplaceOrder?->isCancelledOrder();
+        $cancelledHasFinancialActivity = $cancelledOrder && (
+            abs((float) $transaction->net_amount) > self::TOLERANCE
+            || $transaction->income_status === IncomeStatus::RELEASED
+            || $transaction->components->isNotEmpty()
+            || $transaction->sale_journal_id !== null
+            || $transaction->escrow_journal_id !== null
+            || $transaction->allocations->isNotEmpty()
+        );
         if (! $transaction->marketplace_order_id) {
             $reasons[] = 'order_unmatched';
         }
@@ -607,8 +626,17 @@ class MarketplaceFinanceReconciliationService
             }
         }
 
-        $reasons = array_values(array_unique($reasons));
-        $status = $this->status($reasons, $pending);
+        if ($cancelledOrder && ! $cancelledHasFinancialActivity) {
+            $reasons = ['order_cancelled'];
+            $pending = false;
+            $status = 'not_applicable';
+        } else {
+            if ($cancelledHasFinancialActivity) {
+                $reasons[] = 'cancelled_order_has_financial_activity';
+            }
+            $reasons = array_values(array_unique($reasons));
+            $status = $this->status($reasons, $pending);
+        }
 
         return [
             'transaction_id' => $transaction->id,
@@ -757,7 +785,7 @@ class MarketplaceFinanceReconciliationService
 
     private function status(array $reasons, bool $pending): string
     {
-        if (array_intersect($reasons, ['amount_mismatch', 'fee_mismatch', 'journal_missing', 'journal_duplicate'])) {
+        if (array_intersect($reasons, ['amount_mismatch', 'fee_mismatch', 'journal_missing', 'journal_duplicate', 'cancelled_order_has_financial_activity'])) {
             return 'mismatch';
         }
         if ($reasons !== []) {

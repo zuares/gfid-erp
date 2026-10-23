@@ -9,9 +9,12 @@
             'mismatch' => ['label' => 'Net berbeda', 'icon' => 'bi-exclamation-octagon', 'tone' => 'danger', 'hint' => 'Nominal perlu diperiksa'],
             'unmatched' => ['label' => 'Belum terhubung', 'icon' => 'bi-link-45deg', 'tone' => 'muted', 'hint' => 'Order atau sumber belum cocok'],
             'pending' => ['label' => 'Menunggu income', 'icon' => 'bi-hourglass-split', 'tone' => 'warning', 'hint' => 'Income belum final'],
+            'not_applicable' => ['label' => 'Tidak berlaku', 'icon' => 'bi-slash-circle', 'tone' => 'muted', 'hint' => 'Order batal, tidak ada income'],
         ];
         $reasonLabels = [
             'order_unmatched' => 'Order belum terhubung',
+            'order_cancelled' => 'Order dibatalkan; income tidak berlaku',
+            'cancelled_order_has_financial_activity' => 'Order batal memiliki aktivitas finansial',
             'missing_escrow' => 'Escrow belum tersedia',
             'missing_income' => 'Income belum tersedia',
             'income_pending' => 'Income belum dirilis',
@@ -33,7 +36,7 @@
 
         <div class="row g-3 mb-3">
             @foreach ($statusMeta as $key => $meta)
-                <div class="col-6 col-xl-3">
+                <div class="col-6 col-lg-4 col-xl">
                     <div class="finance-card finance-kpi finance-kpi--{{ $meta['tone'] }} h-100">
                         <div class="card-body position-relative">
                             <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
@@ -72,7 +75,7 @@
             <i class="bi bi-list-check" aria-hidden="true"></i>
             <div>
                 <strong>Alasan yang perlu ditindaklanjuti</strong>
-                <span>Income belum dirilis: {{ number_format($summary['reason_counts']['income_pending'] ?? 0) }} · Escrow belum tersedia: {{ number_format($summary['reason_counts']['missing_escrow'] ?? 0) }} · Order belum terhubung: {{ number_format($summary['reason_counts']['order_unmatched'] ?? 0) }} · Gross berbeda: {{ number_format($summary['reason_counts']['amount_mismatch'] ?? 0) }} · Expected net berbeda: {{ number_format($summary['reason_counts']['fee_mismatch'] ?? 0) }}. Satu order dapat memiliki lebih dari satu alasan.</span>
+                <span>Income belum dirilis: {{ number_format($summary['reason_counts']['income_pending'] ?? 0) }} · Order batal/tidak berlaku: {{ number_format($summary['reason_counts']['order_cancelled'] ?? 0) }} · Order batal dengan aktivitas finansial: {{ number_format($summary['reason_counts']['cancelled_order_has_financial_activity'] ?? 0) }} · Escrow belum tersedia: {{ number_format($summary['reason_counts']['missing_escrow'] ?? 0) }} · Order belum terhubung: {{ number_format($summary['reason_counts']['order_unmatched'] ?? 0) }} · Gross berbeda: {{ number_format($summary['reason_counts']['amount_mismatch'] ?? 0) }} · Expected net berbeda: {{ number_format($summary['reason_counts']['fee_mismatch'] ?? 0) }}. Satu order dapat memiliki lebih dari satu alasan.</span>
             </div>
         </div>
 

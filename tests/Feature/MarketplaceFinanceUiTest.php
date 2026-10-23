@@ -102,6 +102,45 @@ class MarketplaceFinanceUiTest extends TestCase
             ->assertSee('UI-ORDER-001');
     }
 
+    public function test_cancelled_order_is_filterable_as_not_applicable_in_order_reconciliation(): void
+    {
+        $store = Store::create([
+            'code' => 'UI-CANCELLED-STORE',
+            'name' => 'UI Cancelled Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-CANCELLED-ORDER-001',
+            'channel_order_id' => 'UI-CANCELLED-ORDER-001',
+            'order_date' => '2026-10-10',
+            'ordered_at' => '2026-10-10 09:00:00',
+            'order_status' => 'CANCELLED',
+            'status' => 'cancelled',
+            'financial_data_status' => 'not_applicable',
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel' => 'shopee',
+            'order_sn' => $order->channel_order_id,
+            'currency' => 'IDR',
+            'gross_amount' => 100000,
+            'net_amount' => 0,
+            'escrow_status' => EscrowStatus::SYNCED,
+            'income_status' => IncomeStatus::PENDING,
+        ]);
+
+        $this->get('/marketplace/finance/reconciliation?store_id='.$store->id.'&status=not_applicable')
+            ->assertOk()
+            ->assertSee('UI-CANCELLED-ORDER-001')
+            ->assertSee('Tidak berlaku')
+            ->assertSee('Order dibatalkan; income tidak berlaku');
+    }
+
     public function test_finance_date_filter_defaults_to_marketplace_order_date(): void
     {
         $store = Store::create([

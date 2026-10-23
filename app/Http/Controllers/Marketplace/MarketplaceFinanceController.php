@@ -228,7 +228,7 @@ class MarketplaceFinanceController extends Controller
             'date_basis' => ['nullable', 'in:ordered_at,created_at,released_at'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'status' => ['nullable', 'in:matched,mismatch,unmatched,pending'],
+            'status' => ['nullable', 'in:matched,mismatch,unmatched,pending,not_applicable'],
             'order_sn' => ['nullable', 'string', 'max:120'],
         ]) + [
             'store_id' => $request->input('store_id'),

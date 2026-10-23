@@ -68,7 +68,7 @@
                         <label class="form-label" for="finance-status">Status</label>
                         <select id="finance-status" name="status" class="form-select">
                             <option value="">Semua status</option>
-                            @foreach (['matched' => 'Matched', 'mismatch' => 'Mismatch', 'unmatched' => 'Unmatched', 'pending' => 'Pending'] as $value => $label)
+                            @foreach (['matched' => 'Matched', 'mismatch' => 'Mismatch', 'unmatched' => 'Unmatched', 'pending' => 'Pending', 'not_applicable' => 'Tidak berlaku'] as $value => $label)
                                 <option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
