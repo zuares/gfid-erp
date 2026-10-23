@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 
 class MarketplaceOrder extends Model
 {
@@ -134,6 +135,28 @@ class MarketplaceOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(MarketplaceOrderItem::class);
+    }
+
+    /**
+     * Legacy order-item rows may still use order_id as their foreign key.
+     * Keep them available to quality/audit workflows while the canonical
+     * relation continues to use marketplace_order_id.
+     */
+    public function legacyItems(): HasMany
+    {
+        return $this->hasMany(MarketplaceOrderItem::class, 'order_id');
+    }
+
+    /**
+     * Return canonical and legacy item rows without duplicating rows that
+     * contain both foreign keys.
+     */
+    public function allItems(): Collection
+    {
+        $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
+        $legacyItems = $this->relationLoaded('legacyItems') ? $this->legacyItems : $this->legacyItems()->get();
+
+        return $items->merge($legacyItems)->unique('id')->values();
     }
 
     public function shipmentOrderScanLinks(): HasMany

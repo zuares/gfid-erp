@@ -5,9 +5,15 @@ namespace App\Services\Marketplace;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceOrderItem;
+use App\Services\MarketplaceIssueService;
+use Illuminate\Support\Collection;
 
 class MarketplaceFinancialDataQualityService
 {
+    public function __construct(
+        private readonly ?MarketplaceIssueService $issueService = null,
+    ) {}
+
     public const SETTLEMENT_UNKNOWN = 'unknown';
     public const SETTLEMENT_INCOMPLETE = 'incomplete';
     public const SETTLEMENT_COMPLETE = 'complete';
@@ -275,7 +281,15 @@ class MarketplaceFinancialDataQualityService
 
     public function refreshOrder(MarketplaceOrder $order): array
     {
-        $order->loadMissing(['settlement', 'items']);
+        $order->loadMissing(['settlement', 'items', 'legacyItems', 'store.channel']);
+
+        // API snapshots from older sync paths can contain item_list while the
+        // normalized order-item rows were never persisted. Recreate those
+        // rows before evaluating HPP/mapping so the report and mapping screen
+        // use the same source of truth.
+        if ($order->allItems()->isEmpty()) {
+            $this->hydrateItemsFromRawSnapshot($order);
+        }
 
         if ($order->settlement) {
             $this->refreshSettlement($order->settlement);
@@ -292,7 +306,7 @@ class MarketplaceFinancialDataQualityService
      */
     public function assessOrder(MarketplaceOrder $order): array
     {
-        $order->loadMissing(['settlement', 'items']);
+        $order->loadMissing(['settlement', 'items', 'legacyItems']);
 
         if (in_array(strtoupper((string) $order->order_status), self::NON_APPLICABLE_ORDER_STATUSES, true)) {
             return ['status' => self::ORDER_NOT_APPLICABLE, 'reason' => null];
@@ -322,8 +336,12 @@ class MarketplaceFinancialDataQualityService
             return ['status' => self::ORDER_INCOMPLETE, 'reason' => 'settlement_data_incomplete'];
         }
 
-        $items = $order->items;
+        $items = $order->allItems();
         if ($items->isEmpty()) {
+            if ($this->rawItemList($order) !== []) {
+                return ['status' => self::ORDER_INCOMPLETE, 'reason' => 'item_mapping_or_hpp_incomplete'];
+            }
+
             return ['status' => self::ORDER_INCOMPLETE, 'reason' => 'order_items_missing'];
         }
 
@@ -337,6 +355,80 @@ class MarketplaceFinancialDataQualityService
         }
 
         return ['status' => self::ORDER_READY, 'reason' => null];
+    }
+
+    private function hydrateItemsFromRawSnapshot(MarketplaceOrder $order): Collection
+    {
+        $rawItems = $this->rawItemList($order);
+        if ($rawItems === []) {
+            return $order->allItems();
+        }
+
+        $issueService = $this->issueService ?: app(MarketplaceIssueService::class);
+        $channelCode = $order->store?->channel?->code;
+
+        foreach ($rawItems as $lineNo => $item) {
+            $externalItemId = filled($item['item_id'] ?? null) ? (string) $item['item_id'] : null;
+            $externalModelId = filled($item['model_id'] ?? null) ? (string) $item['model_id'] : null;
+            $modelSku = $item['model_sku'] ?? null;
+            $itemSku = $item['item_sku'] ?? null;
+            $itemName = $item['item_name'] ?? null;
+            $variantName = $item['model_name'] ?? $item['variant_name'] ?? null;
+            $mapping = $issueService->buildMappingAttributes(
+                modelSku: $modelSku,
+                itemSku: $itemSku,
+                externalSku: $item['external_sku'] ?? null,
+                channelCode: $channelCode,
+                itemName: $itemName,
+                variantName: $variantName,
+            );
+            $qty = max(1, (int) ($item['model_quantity_purchased'] ?? $item['quantity_purchased'] ?? $item['quantity'] ?? 1));
+            $originalPrice = (float) ($item['model_original_price'] ?? $item['original_price'] ?? $item['price'] ?? 0);
+            $discountedPrice = (float) ($item['model_discounted_price'] ?? $item['discounted_price'] ?? $originalPrice);
+
+            MarketplaceOrderItem::updateOrCreate(
+                [
+                    'marketplace_order_id' => $order->id,
+                    'external_item_id' => $externalItemId,
+                    'external_model_id' => $externalModelId,
+                    'line_no' => $lineNo + 1,
+                ],
+                array_merge([
+                    'order_id' => $order->id,
+                    'item_name' => $itemName ?: '-',
+                    'item_sku' => $itemSku,
+                    'model_sku' => $modelSku,
+                    'variant_name' => $variantName,
+                    'qty' => $qty,
+                    'price' => $originalPrice,
+                    'price_after_discount' => $discountedPrice,
+                    'line_gross_amount' => $originalPrice * $qty,
+                    'line_net_amount' => $discountedPrice * $qty,
+                    'image_url' => data_get($item, 'image_info.image_url'),
+                    'raw_json' => null,
+                ], $mapping),
+            );
+        }
+
+        $order->load(['items', 'legacyItems']);
+
+        return $order->allItems();
+    }
+
+    private function rawItemList(MarketplaceOrder $order): array
+    {
+        $raw = is_array($order->raw_json)
+            ? $order->raw_json
+            : (json_decode((string) $order->raw_json, true) ?: []);
+        $items = $raw['item_list']
+            ?? $raw['line_items']
+            ?? data_get($raw, 'response.order_list.0.item_list')
+            ?? data_get($raw, 'order_list.0.item_list')
+            ?? [];
+
+        return is_array($items)
+            ? array_values(array_filter($items, static fn ($item): bool => is_array($item)))
+            : [];
     }
 
     private function saveOrderQuality(MarketplaceOrder $order, string $status, ?string $reason): array

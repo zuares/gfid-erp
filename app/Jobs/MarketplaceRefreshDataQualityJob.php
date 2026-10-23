@@ -37,7 +37,7 @@ class MarketplaceRefreshDataQualityJob implements ShouldQueue
         $cacheKey = self::cacheKey($this->storeId);
 
         $query = MarketplaceOrder::query()
-            ->with(['settlement', 'items'])
+            ->with(['settlement', 'items', 'legacyItems', 'store.channel'])
             ->when($this->storeId !== 'all', fn ($query) => $query->where('store_id', (int) $this->storeId));
 
         $totalOrders = (clone $query)->count();

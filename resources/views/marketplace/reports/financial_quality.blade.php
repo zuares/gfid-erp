@@ -670,11 +670,22 @@ document.addEventListener('DOMContentLoaded', function () {
                             $qualityStatus = $order->financial_data_status ?: 'unknown';
                             $flags = $order->settlement?->data_quality_flags ?? [];
                             $missing = $flags['blocking_missing_fields'] ?? $flags['missing_financial_fields'] ?? [];
-                            $itemCount = $order->items->count();
+                            $rawSnapshot = is_array($order->raw_json)
+                                ? $order->raw_json
+                                : (json_decode((string) $order->raw_json, true) ?: []);
+                            $rawItems = $rawSnapshot['item_list']
+                                ?? $rawSnapshot['line_items']
+                                ?? data_get($rawSnapshot, 'response.order_list.0.item_list')
+                                ?? data_get($rawSnapshot, 'order_list.0.item_list')
+                                ?? [];
+                            $itemCount = $order->items->count() ?: (is_array($rawItems) ? count($rawItems) : 0);
                             $validItems = $order->items->filter(fn ($item) => ($item->data_status ?? null) === 'valid' && (float) ($item->hpp_snapshot ?? 0) > 0)->count();
                             $settlementStatusRow = $order->settlement?->data_status ?: ($order->settlement ? 'unknown' : 'missing');
                             $orderStatusKey = strtoupper((string) $order->order_status);
                             $issueReason = $order->financial_issue_reason ?: ($settlementStatusRow === 'missing' ? 'settlement_missing' : null);
+                            if ($itemCount > 0 && $issueReason === 'order_items_missing') {
+                                $issueReason = 'item_mapping_or_hpp_incomplete';
+                            }
                             $issueText = $issueLabels[$issueReason] ?? ($issueReason ? str_replace('_', ' ', $issueReason) : null);
                             $missingText = collect(is_array($missing) ? $missing : [])->map(fn ($field) => $fieldLabels[$field] ?? str_replace('_', ' ', $field))->take(2)->implode(', ');
                             $missingCount = is_array($missing) ? count($missing) : 0;

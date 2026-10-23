@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Jobs\MarketplaceRefreshDataQualityJob;
 use App\Models\Channel;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderItem;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -302,6 +304,105 @@ class MarketplaceFinancialQualityUiTest extends TestCase
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
+    }
+
+    public function test_quality_refresh_hydrates_raw_order_items_when_normalized_rows_are_missing(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-RAW-ITEM-001',
+            'channel_order_id' => 'UI-RAW-ITEM-001',
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'order_status' => 'COMPLETED',
+            'raw_json' => [
+                'item_list' => [[
+                    'item_id' => 'RAW-ITEM-1',
+                    'model_id' => 'RAW-MODEL-1',
+                    'item_name' => 'Raw marketplace item',
+                    'item_sku' => 'RAW-SKU-1',
+                    'model_sku' => 'RAW-SKU-1',
+                    'model_name' => 'Black, M',
+                    'model_quantity_purchased' => 1,
+                    'model_original_price' => 75000,
+                    'model_discounted_price' => 70000,
+                ]],
+            ],
+        ]);
+
+        app(MarketplaceFinancialDataQualityService::class)->refreshOrder($order->fresh());
+
+        $this->assertDatabaseHas('marketplace_order_items', [
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'item_name' => 'Raw marketplace item',
+            'model_sku' => 'RAW-SKU-1',
+            'variant_name' => 'Black, M',
+        ]);
+    }
+
+    public function test_quality_report_counts_raw_items_before_the_audit_hydrates_them(): void
+    {
+        $store = $this->store();
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-RAW-ITEM-VIEW-001',
+            'channel_order_id' => 'UI-RAW-ITEM-VIEW-001',
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'order_status' => 'COMPLETED',
+            'financial_data_status' => 'incomplete',
+            'financial_issue_reason' => 'order_items_missing',
+            'raw_json' => [
+                'item_list' => [[
+                    'item_name' => 'Raw item visible in snapshot',
+                ]],
+            ],
+        ]);
+
+        $this->actingAs($this->owner())
+            ->get(route('marketplace.reports.financial-quality', [
+                'store_id' => $store->id,
+                'status' => 'incomplete',
+            ]))
+            ->assertOk()
+            ->assertSee('UI-RAW-ITEM-VIEW-001')
+            ->assertSee('0/1 siap')
+            ->assertDontSee('Belum ada item');
+    }
+
+    public function test_quality_report_counts_legacy_order_items_linked_by_order_id(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-LEGACY-ITEM-001',
+            'channel_order_id' => 'UI-LEGACY-ITEM-001',
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'order_status' => 'COMPLETED',
+            'financial_data_status' => 'incomplete',
+            'financial_issue_reason' => 'item_mapping_or_hpp_incomplete',
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => null,
+            'line_no' => 1,
+            'item_name' => 'Legacy marketplace item',
+            'qty' => 1,
+            'data_status' => 'incomplete',
+        ]);
+
+        $this->actingAs($this->owner())
+            ->get(route('marketplace.reports.financial-quality', [
+                'store_id' => $store->id,
+                'status' => 'incomplete',
+            ]))
+            ->assertOk()
+            ->assertSee('UI-LEGACY-ITEM-001')
+            ->assertSee('0/1 siap')
+            ->assertDontSee('Belum ada item');
     }
 
     private function owner()

@@ -20,7 +20,7 @@ class MarketplaceRefreshDataQualityCommand extends Command
         $dryRun = (bool) $this->option('dry-run');
 
         $query = MarketplaceOrder::query()
-            ->with(['settlement', 'items'])
+            ->with(['settlement', 'items', 'legacyItems', 'store.channel'])
             ->when($storeId !== 'all', fn ($q) => $q->where('store_id', (int) $storeId))
             ->orderBy('id');
 

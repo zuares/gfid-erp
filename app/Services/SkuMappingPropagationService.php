@@ -251,7 +251,7 @@ class SkuMappingPropagationService
         try {
             MarketplaceOrder::query()
                 ->whereIn('id', $orderIds)
-                ->with(['settlement', 'items'])
+                ->with(['settlement', 'items', 'legacyItems'])
                 ->chunkById(100, function ($orders): void {
                     foreach ($orders as $order) {
                         try {

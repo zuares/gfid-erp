@@ -144,7 +144,7 @@ class MarketplaceFinancialQualityController extends Controller
             ->get();
 
         $orders = $orderQuery()
-            ->with(['store.channel', 'settlement', 'items.internalItem'])
+            ->with(['store.channel', 'settlement', 'items.internalItem', 'legacyItems.internalItem'])
             ->when($defaultIssueQueue, fn ($query) => $query->where(function ($issueQuery) {
                 $issueQuery->whereIn(
                     'order_status',
@@ -177,6 +177,12 @@ class MarketplaceFinancialQualityController extends Controller
             ->latest('id')
             ->paginate(25)
             ->withQueryString();
+
+        // Include legacy rows linked by order_id so the report matches the
+        // item detail and does not render a false "Belum ada item" state.
+        $orders->getCollection()->each(function (MarketplaceOrder $order): void {
+            $order->setRelation('items', $order->allItems());
+        });
 
         $lastCheckedAt = collect([
             $orderQuery()->max('financial_checked_at'),
@@ -329,11 +335,11 @@ class MarketplaceFinancialQualityController extends Controller
         set_time_limit(180);
 
         try {
-            $order->load(['store.channel', 'items']);
+            $order->load(['store.channel', 'items', 'legacyItems']);
             abort_unless($order->store, 404, 'Toko order tidak ditemukan.');
 
             $resolvedItems = 0;
-            foreach ($order->items as $item) {
+            foreach ($order->allItems() as $item) {
                 $issues->resolveItem($item, $order->store->channel?->code);
                 $resolvedItems++;
             }
