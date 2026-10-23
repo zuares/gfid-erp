@@ -28,7 +28,6 @@ class MarketplaceFinanceReconciliationService
     private const ORDER_REASON_KEYS = [
         'order_unmatched',
         'order_cancelled',
-        'cancelled_order_has_financial_activity',
         'missing_escrow',
         'missing_income',
         'income_pending',
@@ -631,9 +630,6 @@ class MarketplaceFinanceReconciliationService
             $pending = false;
             $status = 'not_applicable';
         } else {
-            if ($cancelledHasFinancialActivity) {
-                $reasons[] = 'cancelled_order_has_financial_activity';
-            }
             $reasons = array_values(array_unique($reasons));
             $status = $this->status($reasons, $pending);
         }
@@ -785,7 +781,7 @@ class MarketplaceFinanceReconciliationService
 
     private function status(array $reasons, bool $pending): string
     {
-        if (array_intersect($reasons, ['amount_mismatch', 'fee_mismatch', 'journal_missing', 'journal_duplicate', 'cancelled_order_has_financial_activity'])) {
+        if (array_intersect($reasons, ['amount_mismatch', 'fee_mismatch', 'journal_missing', 'journal_duplicate'])) {
             return 'mismatch';
         }
         if ($reasons !== []) {

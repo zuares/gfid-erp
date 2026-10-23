@@ -190,7 +190,7 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
         $this->assertSame(0, $result['summary']['pending']);
     }
 
-    public function test_cancelled_order_with_financial_activity_remains_an_exception(): void
+    public function test_cancelled_order_with_balanced_financial_activity_is_reconciled_normally(): void
     {
         $store = $this->store();
         $order = MarketplaceOrder::create([
@@ -205,7 +205,7 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
             'total_amount' => 100000,
             'currency' => 'IDR',
         ]);
-        MarketplaceFinancialTransaction::create([
+        $transaction = MarketplaceFinancialTransaction::create([
             'store_id' => $store->id,
             'marketplace_order_id' => $order->id,
             'channel' => 'shopee',
@@ -216,15 +216,23 @@ class MarketplaceFinanceReconciliationServiceTest extends TestCase
             'escrow_status' => EscrowStatus::FINALIZED,
             'income_status' => IncomeStatus::RELEASED,
         ]);
+        MarketplaceFinancialComponent::create([
+            'financial_transaction_id' => $transaction->id,
+            'component_code' => 'admin_fee',
+            'component_name' => 'Admin Fee',
+            'amount' => 5000,
+            'direction' => ComponentDirection::DEBIT,
+            'dedupe_key' => str_repeat('c', 64),
+        ]);
 
         $result = app(MarketplaceFinanceReconciliationService::class)->reconcile([
             'store_id' => $store->id,
             'scope' => 'order',
         ]);
 
-        $this->assertSame('mismatch', $result['transactions'][0]['status']);
-        $this->assertContains('cancelled_order_has_financial_activity', $result['transactions'][0]['reasons']);
-        $this->assertSame(1, $result['summary']['mismatch']);
+        $this->assertSame('matched', $result['transactions'][0]['status']);
+        $this->assertSame([], $result['transactions'][0]['reasons']);
+        $this->assertSame(1, $result['summary']['matched']);
         $this->assertSame(0, $result['summary']['not_applicable']);
     }
 

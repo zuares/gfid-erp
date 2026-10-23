@@ -14,7 +14,6 @@
         $reasonLabels = [
             'order_unmatched' => 'Order belum terhubung',
             'order_cancelled' => 'Order dibatalkan; income tidak berlaku',
-            'cancelled_order_has_financial_activity' => 'Order batal memiliki aktivitas finansial',
             'missing_escrow' => 'Escrow belum tersedia',
             'missing_income' => 'Income belum tersedia',
             'income_pending' => 'Income belum dirilis',
@@ -75,7 +74,7 @@
             <i class="bi bi-list-check" aria-hidden="true"></i>
             <div>
                 <strong>Alasan yang perlu ditindaklanjuti</strong>
-                <span>Income belum dirilis: {{ number_format($summary['reason_counts']['income_pending'] ?? 0) }} · Order batal/tidak berlaku: {{ number_format($summary['reason_counts']['order_cancelled'] ?? 0) }} · Order batal dengan aktivitas finansial: {{ number_format($summary['reason_counts']['cancelled_order_has_financial_activity'] ?? 0) }} · Escrow belum tersedia: {{ number_format($summary['reason_counts']['missing_escrow'] ?? 0) }} · Order belum terhubung: {{ number_format($summary['reason_counts']['order_unmatched'] ?? 0) }} · Gross berbeda: {{ number_format($summary['reason_counts']['amount_mismatch'] ?? 0) }} · Expected net berbeda: {{ number_format($summary['reason_counts']['fee_mismatch'] ?? 0) }}. Satu order dapat memiliki lebih dari satu alasan.</span>
+                <span>Income belum dirilis: {{ number_format($summary['reason_counts']['income_pending'] ?? 0) }} · Order batal/tidak berlaku: {{ number_format($summary['reason_counts']['order_cancelled'] ?? 0) }} · Escrow belum tersedia: {{ number_format($summary['reason_counts']['missing_escrow'] ?? 0) }} · Order belum terhubung: {{ number_format($summary['reason_counts']['order_unmatched'] ?? 0) }} · Gross berbeda: {{ number_format($summary['reason_counts']['amount_mismatch'] ?? 0) }} · Expected net berbeda: {{ number_format($summary['reason_counts']['fee_mismatch'] ?? 0) }}. Order batal yang memiliki income tetap diuji normal berdasarkan gross, fee, dan net.</span>
             </div>
         </div>
 
