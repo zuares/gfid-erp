@@ -16,6 +16,7 @@ class MarketplaceOrder extends Model
         'channel_order_id',
         'purchase_channel',
         'booking_sn',
+        'group_shipment_id',
         'order_status',
         'buyer_username',
         'payment_method',
@@ -133,6 +134,11 @@ class MarketplaceOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(MarketplaceOrderItem::class);
+    }
+
+    public function shipmentOrderScanLinks(): HasMany
+    {
+        return $this->hasMany(ShipmentOrderScanMarketplaceOrder::class, 'marketplace_order_id');
     }
 
     public function shipments(): HasMany

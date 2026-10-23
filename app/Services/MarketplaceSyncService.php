@@ -3610,6 +3610,7 @@ class MarketplaceSyncService
                 $order->update([
                     'processed_api_checked_at' => now(),
                     'raw_json' => $detail,
+                    'group_shipment_id' => $this->groupShipmentIdFromDetail($detail),
                     'synced_at' => now(),
                 ]);
                 continue;
@@ -3620,6 +3621,7 @@ class MarketplaceSyncService
                 'order_status' => $status,
                 'status' => $this->legacyStatusForProcessedApi($status, $order->status),
                 'raw_json' => $detail,
+                'group_shipment_id' => $this->groupShipmentIdFromDetail($detail),
                 'synced_at' => now(),
                 'processed_api_checked_at' => now(),
             ]);
@@ -3760,6 +3762,7 @@ class MarketplaceSyncService
                 // ── Kurir & resi (dari package_list) ─────────────────────────
                 $packages  = $detail['package_list'] ?? [];
                 $firstPkg  = $packages[0] ?? [];
+                $groupShipmentId = $this->groupShipmentIdFromDetail($detail);
                 $trackingNo      = $firstPkg['tracking_no'] ?? $firstPkg['tracking_number'] ?? null;
                 if (!$trackingNo && !empty($firstPkg['package_number']) && !str_starts_with(strtoupper($firstPkg['package_number']), 'OFG')) {
                     $trackingNo = $firstPkg['package_number'];
@@ -3923,6 +3926,7 @@ class MarketplaceSyncService
                         'external_order_id' => $detail['order_sn'],
                         ...($purchaseChannel !== null ? ['purchase_channel' => $purchaseChannel] : []),
                         'booking_sn'        => $detail['booking_sn'] ?? null,
+                        'group_shipment_id' => $groupShipmentId,
                         'order_date'        => $orderDate,
                         'ordered_at'        => $orderedAt,
                         ...$eventDates,
@@ -4207,6 +4211,13 @@ class MarketplaceSyncService
         }
 
         return $outerStats;
+    }
+
+    private function groupShipmentIdFromDetail(array $detail): ?string
+    {
+        return collect($detail['package_list'] ?? [])
+            ->map(fn ($package) => trim((string) ($package['group_shipment_id'] ?? '')))
+            ->first(fn ($value) => $value !== '');
     }
 
     private function normalizeOrderEventTimestamp(mixed $value): ?Carbon

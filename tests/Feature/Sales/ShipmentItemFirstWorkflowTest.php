@@ -1416,6 +1416,107 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->assertSame($order->id, $scan->fresh()->fulfillment?->marketplace_order_id);
     }
 
+    public function test_combined_order_awb_links_all_orders_and_shows_all_marketplace_skus(): void
+    {
+        [$user, $store, $firstItem] = $this->shipmentContext();
+        $secondItem = Item::create([
+            'code' => 'K3MST',
+            'name' => 'K3 Mster Test',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-COMBINED-AWB-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $awb = 'SPXID06683582420A';
+        $groupId = 'GROUP-SHOPEE-001';
+
+        $orderA = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-COMBINED-A',
+            'channel_order_id' => 'ORDER-COMBINED-A',
+            'group_shipment_id' => $groupId,
+            'shipping_awb_no' => $awb,
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        $orderB = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-COMBINED-B',
+            'channel_order_id' => 'ORDER-COMBINED-B',
+            'group_shipment_id' => $groupId,
+            'shipping_awb_no' => $awb,
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $orderA->id,
+            'marketplace_order_id' => $orderA->id,
+            'item_id' => $secondItem->id,
+            'internal_item_id' => $secondItem->id,
+            'item_name' => $secondItem->name,
+            'model_sku' => 'K3MST-1',
+            'item_sku' => 'K3MST',
+            'qty' => 1,
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $orderB->id,
+            'marketplace_order_id' => $orderB->id,
+            'item_id' => $firstItem->id,
+            'internal_item_id' => $firstItem->id,
+            'item_name' => $firstItem->name,
+            'model_sku' => 'B3BLK',
+            'item_sku' => 'B3BLK',
+            'qty' => 2,
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $awb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $firstItem->id,
+            'qty_scanned' => 2,
+            'allocated_qty' => 2,
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $secondItem->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('K3MST-1')
+            ->assertSee('B3BLK')
+            ->assertDontSee('Lihat SKU order');
+
+        $this->assertDatabaseCount('shipment_order_scan_marketplace_orders', 2);
+        $this->assertDatabaseHas('shipment_order_scan_marketplace_orders', [
+            'shipment_order_scan_id' => $scan->id,
+            'marketplace_order_id' => $orderA->id,
+        ]);
+        $this->assertDatabaseHas('shipment_order_scan_marketplace_orders', [
+            'shipment_order_scan_id' => $scan->id,
+            'marketplace_order_id' => $orderB->id,
+        ]);
+    }
+
     public function test_spx_confirmation_shows_order_sku_and_flags_a_different_scanned_item(): void
     {
         [$user, $store, $scannedItem] = $this->shipmentContext();

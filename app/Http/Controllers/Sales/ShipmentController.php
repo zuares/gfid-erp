@@ -70,6 +70,59 @@ class ShipmentController extends Controller
         return $status !== '' ? $status : null;
     }
 
+    /**
+     * Shopee combined orders share group_shipment_id and are packed under one
+     * parcel/AWB. Keep the primary order first for backward-compatible UI and
+     * payload behavior, then expose every sibling order to the shipment flow.
+     */
+    protected function combinedMarketplaceOrders(\App\Models\MarketplaceOrder $order)
+    {
+        $groupId = trim((string) $order->group_shipment_id);
+        if ($groupId === '') {
+            $groupId = collect(data_get($order->raw_json, 'package_list', []))
+                ->map(fn ($package) => trim((string) ($package['group_shipment_id'] ?? '')))
+                ->first(fn ($value) => $value !== '') ?? '';
+        }
+        if ($groupId === '') {
+            return collect([$order]);
+        }
+
+        return \App\Models\MarketplaceOrder::query()
+            ->where('store_id', $order->store_id)
+            ->where('group_shipment_id', $groupId)
+            ->with(['items.internalItem', 'store.channel'])
+            ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$order->id])
+            ->orderBy('id')
+            ->get();
+    }
+
+    protected function linkMarketplaceOrderGroup(
+        ShipmentOrderScan $scan,
+        \App\Models\MarketplaceOrder $order,
+        ?string $matchMethod = null,
+        ?string $inputCode = null,
+    ) {
+        return $this->shipmentMarketplaceLinker->linkMany(
+            $scan,
+            $this->combinedMarketplaceOrders($order),
+            $matchMethod,
+            $inputCode,
+        );
+    }
+
+    protected function scanFulfillmentIds(ShipmentOrderScan $scan): array
+    {
+        return $scan->marketplaceOrderLinks()
+            ->whereNotNull('fulfillment_id')
+            ->pluck('fulfillment_id')
+            ->push($scan->fulfillment_id)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     private function isShipmentNextCommand(?string $code): bool
     {
         $code = mb_strtoupper(trim((string) $code));
@@ -1599,7 +1652,7 @@ class ShipmentController extends Controller
         });
 
         if ($marketplaceOrder && $fulfillment) {
-            $this->shipmentMarketplaceLinker->link(
+            $this->linkMarketplaceOrderGroup(
                 $scan->fresh(),
                 $marketplaceOrder,
                 $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
@@ -2679,7 +2732,7 @@ class ShipmentController extends Controller
             }
 
             try {
-                $this->shipmentMarketplaceLinker->link(
+                $this->linkMarketplaceOrderGroup(
                     $scan,
                     $marketplaceOrder,
                     $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
@@ -2805,7 +2858,7 @@ class ShipmentController extends Controller
 
                 return ($payload['mode'] ?? null) === 'record_only';
             });
-            $hasLinkedScan = $scans->contains(fn ($scan) => !empty($scan->fulfillment_id));
+            $hasLinkedScan = $scans->contains(fn ($scan) => $this->scanFulfillmentIds($scan) !== []);
             // Tanpa scan order sama sekali, shipment single diperlakukan
             // sebagai batch item-only sementara. Mode gelombang tetap wajib
             // melewati validasi order di bawah.
@@ -2833,10 +2886,11 @@ class ShipmentController extends Controller
             
             $fulfillmentIds = [];
             foreach ($scans as $scan) {
-                if (empty($scan->fulfillment_id)) {
+                $scanFulfillmentIds = $this->scanFulfillmentIds($scan);
+                if ($scanFulfillmentIds === []) {
                     abort(422, "Shipment Marketplace tidak boleh memiliki order scan tanpa fulfillment_id.");
                 }
-                $fulfillmentIds[] = $scan->fulfillment_id;
+                $fulfillmentIds = array_merge($fulfillmentIds, $scanFulfillmentIds);
             }
             $fulfillmentIds = array_unique($fulfillmentIds);
 
@@ -2958,7 +3012,11 @@ class ShipmentController extends Controller
                 ->whereNotIn('status', ['skip'])
                 ->get();
 
-            $fulfillmentIds = $scans->pluck('fulfillment_id')->unique()->toArray();
+            $fulfillmentIds = $scans
+                ->flatMap(fn ($scan) => $this->scanFulfillmentIds($scan))
+                ->unique()
+                ->values()
+                ->all();
 
             if (!empty($fulfillmentIds)) {
                 \App\Models\OrderFulfillment::whereIn('id', $fulfillmentIds)
@@ -3159,7 +3217,11 @@ class ShipmentController extends Controller
                 $scans = $wave->orderScans
                     ->whereNotIn('status', ['skip'])
                     ->whereNotNull('fulfillment_id');
-                $fulfillmentIds = $scans->pluck('fulfillment_id')->unique()->values()->all();
+                $fulfillmentIds = $scans
+                    ->flatMap(fn ($scan) => $this->scanFulfillmentIds($scan))
+                    ->unique()
+                    ->values()
+                    ->all();
 
                 if (!empty($fulfillmentIds)) {
                     \App\Models\OrderFulfillment::whereIn('id', $fulfillmentIds)
@@ -3883,12 +3945,13 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            if (!$this->salesOperationalSetting('validate_order_items', false) || !$scan->fulfillment_id) {
+            $scanFulfillmentIds = $this->scanFulfillmentIds($scan);
+            if (!$this->salesOperationalSetting('validate_order_items', false) || $scanFulfillmentIds === []) {
                 continue;
             }
 
             $expected = \App\Models\OrderFulfillmentLine::query()
-                ->where('fulfillment_id', $scan->fulfillment_id)
+                ->whereIn('fulfillment_id', $scanFulfillmentIds)
                 ->whereNotNull('item_id')
                 ->where('qty_fulfilled', '>', 0)
                 ->selectRaw('item_id, SUM(qty_fulfilled) as total_expected')
@@ -4177,6 +4240,8 @@ class ShipmentController extends Controller
             'orderScans.lines.item',
             'orderScans.fulfillment.marketplaceOrder.items.internalItem',
             'orderScans.fulfillment.marketplaceOrder.store.channel',
+            'orderScans.marketplaceOrders.items.internalItem',
+            'orderScans.marketplaceOrders.store.channel',
             'waves',
         ]);
 
@@ -4195,6 +4260,18 @@ class ShipmentController extends Controller
             }
 
             if ($scan->fulfillment?->marketplaceOrder) {
+                try {
+                    $this->linkMarketplaceOrderGroup(
+                        $scan->fresh(),
+                        $scan->fulfillment->marketplaceOrder,
+                        $this->reconciliationMatchMethod($scan->order_no, $scan->fulfillment->marketplaceOrder),
+                        $scan->order_no
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning(
+                        "Shipment combined-order auto-link failed [{$scan->order_no}]: " . $e->getMessage()
+                    );
+                }
                 continue;
             }
 
@@ -4212,7 +4289,7 @@ class ShipmentController extends Controller
             }
 
             try {
-                $fulfillment = $this->shipmentMarketplaceLinker->link(
+                $fulfillments = $this->linkMarketplaceOrderGroup(
                     $scan->fresh(),
                     $marketplaceOrder,
                     $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
@@ -4225,7 +4302,8 @@ class ShipmentController extends Controller
                 continue;
             }
 
-            $fulfillment->setRelation('marketplaceOrder', $marketplaceOrder);
+            $fulfillment = $fulfillments->first();
+            $fulfillment?->setRelation('marketplaceOrder', $marketplaceOrder);
             $scan->setRelation('fulfillment', $fulfillment);
         }
 
@@ -4239,6 +4317,8 @@ class ShipmentController extends Controller
             'orderScans.lines.item',
             'orderScans.fulfillment.marketplaceOrder.items.internalItem',
             'orderScans.fulfillment.marketplaceOrder.store.channel',
+            'orderScans.marketplaceOrders.items.internalItem',
+            'orderScans.marketplaceOrders.store.channel',
             'waves',
         ]);
 
@@ -4247,7 +4327,8 @@ class ShipmentController extends Controller
         $bookingCandidates = $shipment->orderScans->filter(function ($scan) {
             // A stale SPX scan can retain source=marketplace without an order
             // relation. Check its booking so the confirm page shows the real state.
-            return !$scan->fulfillment?->marketplaceOrder
+            return $scan->marketplaceOrders->isEmpty()
+                && !$scan->fulfillment?->marketplaceOrder
                 && !($scan->source === 'marketplace'
                     && !str_starts_with(mb_strtoupper(trim((string) $scan->order_no)), 'SPX'));
         });
@@ -4692,7 +4773,7 @@ class ShipmentController extends Controller
             ]
         );
 
-        $this->shipmentMarketplaceLinker->link(
+        $this->linkMarketplaceOrderGroup(
             $matchedScan,
             $marketplaceOrder,
             $rawPayload['match_method'],
@@ -4843,7 +4924,7 @@ class ShipmentController extends Controller
                 }
 
                 if ($marketplaceOrder && $fulfillment) {
-                    $this->shipmentMarketplaceLinker->link(
+                    $this->linkMarketplaceOrderGroup(
                         $persistedScan,
                         $marketplaceOrder,
                         $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
@@ -5075,7 +5156,7 @@ class ShipmentController extends Controller
             'raw_payload' => $rawPayload,
         ]);
 
-        $this->shipmentMarketplaceLinker->link(
+        $this->linkMarketplaceOrderGroup(
             $scan->fresh(),
             $marketplaceOrder,
             $rawPayload['match_method'],

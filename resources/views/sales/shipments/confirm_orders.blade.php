@@ -812,7 +812,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
     $unmappedLines = $lines->filter(fn ($line) => empty($line->shipment_order_scan_id))->values();
     $mappedQty = (int) $mappedLines->sum('qty_scanned');
     $unmappedQty = (int) $unmappedLines->sum('qty_scanned');
-    $unlinkedOrderScans = $orderScans->filter(fn ($scan) => !$scan->fulfillment?->marketplaceOrder && $scan->source !== 'marketplace' && data_get($scan->raw_payload, 'linked_source') !== 'marketplace_order' && $scan->source !== 'sales_invoice')->values();
+    $unlinkedOrderScans = $orderScans->filter(fn ($scan) => ($scan->marketplaceOrders ?? collect())->isEmpty() && !$scan->fulfillment?->marketplaceOrder && $scan->source !== 'marketplace' && data_get($scan->raw_payload, 'linked_source') !== 'marketplace_order' && $scan->source !== 'sales_invoice')->values();
     $mappingErrors = $mappingErrors ?? [];
     $isItemOnlyMarketplace = !$isDaily
         && $shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE
@@ -933,7 +933,11 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
     $linkCounts = ['all' => (int) $orderScans->count(), 'linked' => 0, 'unlinked' => 0];
     foreach ($orderScans as $orderScan) {
         $orderScanLines = $orderScan->lines->merge($singleOrderFallbackLines);
-        $sourceItems = $orderScan->fulfillment?->marketplaceOrder?->items ?? collect();
+        $linkedMarketplaceOrders = $orderScan->marketplaceOrders ?? collect();
+        if ($linkedMarketplaceOrders->isEmpty() && $orderScan->fulfillment?->marketplaceOrder) {
+            $linkedMarketplaceOrders = collect([$orderScan->fulfillment->marketplaceOrder]);
+        }
+        $sourceItems = $linkedMarketplaceOrders->flatMap(fn ($order) => $order->items ?? collect());
         if ($sourceItems->isEmpty() && !empty($kilatMatches[$orderScan->id])) {
             $sourceItems = collect($bookingItemsByScan[$orderScan->id] ?? []);
         }
@@ -941,7 +945,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
         if ((int) data_get($orderScan->raw_payload, 'duplicate_count', 0) > 0 || $orderScanLines->isEmpty() || $orderComparison['needs_review']) {
             $marketplaceCounts['problem']++;
         }
-        $linkedStore = $orderScan->fulfillment?->marketplaceOrder?->store;
+        $linkedStore = $linkedMarketplaceOrders->first()?->store;
         $linkedChannel = $linkedStore?->channel;
         if ($linkedChannel?->code) {
             $platformKey = strtolower((string) $linkedChannel->code);
@@ -959,9 +963,9 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
             $sourceTabs['store'][$storeKey]['count']++;
         }
         $hasMarketplaceLink = str_starts_with(strtoupper(trim((string) $orderScan->order_no)), 'SPX')
-            ? (bool) ($orderScan->fulfillment?->marketplaceOrder || !empty($kilatMatches[$orderScan->id]))
+            ? (bool) ($linkedMarketplaceOrders->isNotEmpty() || !empty($kilatMatches[$orderScan->id]))
             : (bool) (
-                $orderScan->fulfillment?->marketplaceOrder
+                $linkedMarketplaceOrders->isNotEmpty()
                 || $orderScan->source === 'marketplace'
                 || data_get($orderScan->raw_payload, 'linked_source') === 'marketplace_order'
                 || !empty($kilatMatches[$orderScan->id])
@@ -1250,7 +1254,11 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 $scanStatus = $scan->status ?: 'pending';
                                 $orderCodeUpper = strtoupper(trim((string) $scan->order_no));
                                 $isSpxShopee = str_starts_with($orderCodeUpper, 'SPX');
-                                $hasMarketplaceOrder = (bool) $scan->fulfillment?->marketplaceOrder;
+                                $linkedMarketplaceOrders = $scan->marketplaceOrders ?? collect();
+                                if ($linkedMarketplaceOrders->isEmpty() && $scan->fulfillment?->marketplaceOrder) {
+                                    $linkedMarketplaceOrders = collect([$scan->fulfillment->marketplaceOrder]);
+                                }
+                                $hasMarketplaceOrder = $linkedMarketplaceOrders->isNotEmpty();
                                 $linkedOrder = $scan->fulfillment?->marketplaceOrder;
                                 $linkedPlatformCode = strtolower(trim((string) ($linkedOrder?->store?->channel?->code ?? '')));
                                 $platformHighlight = match ($linkedPlatformCode) {
@@ -1303,7 +1311,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 $orderQty = (int) $orderLines->sum('qty_scanned');
                                 $orderCogs = (float) $orderLines->sum(fn ($line) => $lineCogs($line));
                                 $hasNoItems = $orderLines->isEmpty();
-                                $sourceItems = $linkedOrder?->items ?? collect();
+                                $sourceItems = $linkedMarketplaceOrders->flatMap(fn ($order) => $order->items ?? collect());
                                 if ($sourceItems->isEmpty() && $hasBookingOnly) {
                                     $sourceItems = collect($bookingItemsByScan[$scan->id] ?? []);
                                 }
@@ -1400,7 +1408,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                         </div>
                                     </div>
                                 </div>
-                                @if(!$scan->fulfillment?->marketplaceOrder)
+                                @if(!$hasMarketplaceOrder)
                                     <div class="sd-order-items {{ $hasBookingOnly ? 'sd-order-items-breakdown' : '' }}">
                                         @if($orderLines->isNotEmpty())
                                             <div class="sd-items-head {{ $orderItemGridClass }} {{ $hasBookingOnly ? 'sd-qty-breakdown' : '' }}"><span>No</span><span>SKU Marketplace</span>@if($hasBookingOnly)<span>Order</span><span>Ship</span><span>Diff</span>@else<span>Qty</span>@endif<span>Scan Item Gudang</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
@@ -1457,10 +1465,10 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                         <div class="sd-sku-unmatched">{{ $bookingSkus === [] ? 'SKU booking belum tersedia.' : 'SKU booking: ' . implode(', ', $bookingSkus) }}</div>
                                     @endif
                                 @endif
-                                @if($scan->fulfillment?->marketplaceOrder)
+                                @if($hasMarketplaceOrder)
                                     @php
-                                        $marketplaceOrder = $scan->fulfillment->marketplaceOrder;
-                                        $marketplaceLines = $marketplaceOrder->items ?? collect();
+                                        $marketplaceOrder = $linkedOrder;
+                                        $marketplaceLines = $linkedMarketplaceOrders->flatMap(fn ($order) => $order->items ?? collect());
                                         $pickedByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (int) $itemLines->sum('qty_scanned'));
                                         $cogsByItem = $orderLines->groupBy('item_id')->map(fn ($itemLines) => (float) $itemLines->sum(fn ($line) => $lineCogs($line)));
                                         $marketplaceStatus = strtoupper(str_replace('_', ' ', (string) ($marketplaceOrder->order_status ?: $marketplaceOrder->status ?: '')));

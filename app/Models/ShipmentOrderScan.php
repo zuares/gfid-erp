@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ShipmentOrderScan extends Model
 {
@@ -43,6 +45,31 @@ class ShipmentOrderScan extends Model
     public function fulfillment()
     {
         return $this->belongsTo(OrderFulfillment::class, 'fulfillment_id');
+    }
+
+    public function marketplaceOrderLinks(): HasMany
+    {
+        return $this->hasMany(ShipmentOrderScanMarketplaceOrder::class, 'shipment_order_scan_id');
+    }
+
+    public function marketplaceOrders(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            MarketplaceOrder::class,
+            'shipment_order_scan_marketplace_orders',
+            'shipment_order_scan_id',
+            'marketplace_order_id'
+        )->withPivot('fulfillment_id');
+    }
+
+    public function combinedFulfillments(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            OrderFulfillment::class,
+            'shipment_order_scan_marketplace_orders',
+            'shipment_order_scan_id',
+            'fulfillment_id'
+        )->withPivot('marketplace_order_id');
     }
 
     public function lines()
