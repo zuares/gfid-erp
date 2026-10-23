@@ -210,7 +210,13 @@ class MarketplaceFinancialDataQualityService
         }
 
         $skuTransactions = $raw['sku_transactions'] ?? null;
-        if (! is_array($skuTransactions) || $skuTransactions === []) {
+        $hasStatementTransactions = is_array($skuTransactions) && $skuTransactions !== [];
+        // Statement-level sync stores one authoritative transaction row and
+        // deliberately does not pretend it is SKU detail. It is still a
+        // valid final statement for settlement quality purposes.
+        $hasStatementTransactions = $hasStatementTransactions
+            || filled(data_get($raw, 'tiktok_statement.statement_id'));
+        if (! $hasStatementTransactions) {
             $missing[] = 'settlement_statement';
         }
 
@@ -231,7 +237,7 @@ class MarketplaceFinancialDataQualityService
                 'invalid_financial_fields' => $invalid,
                 'blocking_missing_fields' => array_values(array_unique(array_merge($blockingMissing, $blockingInvalid))),
                 'has_raw_payload' => ! empty($raw),
-                'has_statement_transactions' => is_array($skuTransactions) && $skuTransactions !== [],
+                'has_statement_transactions' => $hasStatementTransactions,
             ],
         ];
     }

@@ -342,7 +342,6 @@
         .settlement-filter-field.store{ grid-column:span 3; }
         .settlement-filter-field.status{ grid-column:span 2; }
         .settlement-filter-field.fund{ grid-column:span 2; }
-        .settlement-filter-field.ads{ grid-column:span 2; }
         .settlement-filter-field.date{ grid-column:span 2; }
         .settlement-filter-field.search{ grid-column:span 3; }
         .settlement-filter-label{
@@ -507,7 +506,6 @@
             .settlement-filter-field.store,
             .settlement-filter-field.status,
             .settlement-filter-field.fund,
-            .settlement-filter-field.ads,
             .settlement-filter-field.date,
             .settlement-filter-field.search{ grid-column:span 3; }
         }
@@ -524,7 +522,6 @@
             .settlement-filter-field.store,
             .settlement-filter-field.status,
             .settlement-filter-field.fund,
-            .settlement-filter-field.ads,
             .settlement-filter-field.date,
             .settlement-filter-field.search{ grid-column:span 1; }
             .settlement-filter-field.search{ grid-column:1 / -1; }
@@ -638,16 +635,6 @@
                         <i class="bi bi-wallet2 settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
-                    <div class="settlement-filter-field ads">
-                        <label class="settlement-filter-label" for="filterAdCost">Iklan</label>
-                        <select class="form-select form-select-sm filter-select settlement-filter-control w-100" id="filterAdCost" aria-label="Filter biaya iklan">
-                            <option value="">Semua Biaya Iklan</option>
-                            <option value="with">Ada Biaya Iklan</option>
-                            <option value="without">Tanpa Biaya Iklan</option>
-                        </select>
-                        <i class="bi bi-megaphone settlement-filter-icon" aria-hidden="true"></i>
-                    </div>
-
                     <div class="settlement-filter-field date">
                         <label class="settlement-filter-label" for="filterOrderDate">Tanggal order</label>
                         <input type="text" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterOrderDate" placeholder="Pilih tanggal" aria-label="Filter tanggal order">
@@ -656,7 +643,7 @@
 
                     <div class="settlement-filter-field date">
                         <label class="settlement-filter-label" for="filterSettlementDate">Tanggal cair</label>
-                        <input type="text" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterSettlementDate" placeholder="Pilih tanggal" title="Tanggal pencairan final" aria-label="Filter tanggal cair">
+                        <input type="text" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterSettlementDate" placeholder="Pilih rentang" title="Tanggal pencairan final" aria-label="Filter tanggal cair atau estimasi pencairan">
                         <i class="bi bi-calendar3 settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
@@ -890,7 +877,6 @@
             platform: $('filterPlatform')?.value || '',
             status: $('filterStatus')?.value || '',
             settlement_status: $('filterSettlementStatus')?.value || '',
-            ad_cost_filter: $('filterAdCost')?.value || '',
             search: $('filterSearch')?.value || '',
             order_date_from: orderDates[0] ? fpOrderDate.formatDate(orderDates[0], 'Y-m-d') : '',
             order_date_to: orderDates[1] ? fpOrderDate.formatDate(orderDates[1], 'Y-m-d') : '',
@@ -923,7 +909,6 @@
                 ? state.settlement_status
                 : 'cair';
         }
-        if ($('filterAdCost')) $('filterAdCost').value = state.ad_cost_filter || '';
         if ($('filterSearch')) $('filterSearch').value = state.search || '';
 
         if (fpOrderDate) {
@@ -994,10 +979,16 @@
             $('kpiNetPayout').style.color = isPending ? '#d97706' : (isFinal ? '#16a34a' : '#2563eb');
         }
         if (dateInput) {
-            dateInput.placeholder = isPending ? 'Est. Tgl Cair...' : 'Tgl Cair Final...';
+            const dateLabel = document.querySelector('label[for="filterSettlementDate"]');
+            dateInput.placeholder = isPending ? 'Estimasi cair...' : (isFinal ? 'Cair final...' : 'Cair / estimasi...');
             dateInput.title = isPending
-                ? 'Memfilter estimasi tanggal cair dari data escrow'
-                : 'Memfilter tanggal pencairan final';
+                ? 'Memfilter estimasi tanggal payout untuk order belum cair'
+                : (isFinal
+                    ? 'Memfilter tanggal pencairan final'
+                    : 'Memfilter tanggal pencairan final atau estimasi payout');
+            if (dateLabel) {
+                dateLabel.textContent = isPending ? 'Estimasi cair' : (isFinal ? 'Tanggal cair' : 'Cair / estimasi');
+            }
         }
 
         const freshness = $('kpiEstimateFreshness');
@@ -1076,6 +1067,12 @@
                 ? 'Tarik statement final dari TikTok Finance API'
                 : 'Tarik nominal breakdown settlement order';
         }
+
+        ['runSettlementBackfill1Btn', 'runSettlementBackfill2Btn', 'runSettlementBackfill3Btn', 'runSettlementBackfillBtn', 'syncBackfillMonths']
+            .forEach(id => {
+                const control = $(id);
+                if (control) control.disabled = !selectedStore;
+            });
     }
 
     function storePlatformCode(store) {
@@ -1232,6 +1229,7 @@
             STORE_NOT_CONNECTED: { level: 'warn', title: 'Toko belum terhubung', message: fallback },
             SHOPEE_AUTH_REQUIRED: { level: 'warn', title: 'Login ulang diperlukan', message: fallback },
             SETTLEMENT_CHANNEL_UNSUPPORTED: { level: 'warn', title: 'Channel belum didukung', message: fallback },
+            SETTLEMENT_SYNC_BUSY: { level: 'warn', title: 'Sync sedang berjalan', message: fallback },
             SETTLEMENT_QUEUE_ERROR: { level: 'error', title: 'Queue tidak tersedia', message: 'Sync belum masuk antrian. Pastikan queue worker berjalan, lalu coba lagi.' },
             SETTLEMENT_SYNC_ERROR: { level: 'error', title: 'Sync settlement gagal', message: fallback },
             INCOME_DETAIL_SYNC_BUSY: { level: 'warn', title: 'Sync lain sedang berjalan', message: fallback },
@@ -1550,23 +1548,31 @@
         if (lastCheck) lastCheck.textContent = fmtDateTime(new Date().toISOString());
 
         try {
-            const storeId = getSyncStoreId() || $('filterStore').value;
+            const storeId = getSyncStoreId();
             if (!storeId) {
                 syncLogs = [];
+                renderSettlementProgress(null);
+                hideSyncFeedback();
                 setSyncState('warn', 'Pilih toko');
                 updateSyncDot(false);
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = '—';
                 renderSyncConsole();
                 renderSyncLogs();
                 return syncLogs;
             }
 
-            const logParams = new URLSearchParams({ action: 'sync_settlements', store_id: String(storeId) });
-            const [logs, progress] = await Promise.all([
-                api('/api/marketplace/sync-logs?' + logParams.toString()).catch(() => []),
-                storeId ? api('/api/marketplace/stores/' + storeId + '/sync-settlements-progress').catch(() => null) : Promise.resolve(null),
+            const logRequests = ['sync_settlements', 'sync_finance'].map(action => {
+                const params = new URLSearchParams({ action, store_id: String(storeId) });
+                return api('/api/marketplace/sync-logs?' + params.toString()).catch(() => []);
+            });
+            const [settlementLogs, financeLogs, progress] = await Promise.all([
+                ...logRequests,
+                api('/api/marketplace/stores/' + storeId + '/sync-settlements-progress').catch(() => null),
             ]);
 
-            syncLogs = (logs || []).filter(log => log.action === 'sync_settlements');
+            syncLogs = [...(settlementLogs || []), ...(financeLogs || [])]
+                .filter(log => ['sync_settlements', 'sync_finance'].includes(log.action))
+                .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
             const latest = syncLogs[0] || null;
             const lastSuccess = syncLogs.find(log => log.status === 'success') || null;
@@ -1695,6 +1701,7 @@
                     syncPlatform.value = storePlatformCode(selectedStore);
                 }
                 updateSyncPlatformActions();
+                refreshSettlementSyncLogs();
             });
         }
         if (syncPlatform) {
@@ -1702,6 +1709,7 @@
                 if (syncStore) syncStore.dataset.manual = '0';
                 populateSyncStoreSelect();
                 updateSyncPlatformActions();
+                refreshSettlementSyncLogs();
             });
         }
         if (filterStore && syncStore) {
@@ -1713,6 +1721,7 @@
                         syncPlatform.value = storePlatformCode(selectedStore);
                     }
                     updateSyncPlatformActions();
+                    refreshSettlementSyncLogs();
                 }
             });
         }
@@ -1821,7 +1830,6 @@
         if ($('filterPlatform').value) params.append('platform', $('filterPlatform').value);
         if ($('filterStatus').value) params.append('status', $('filterStatus').value);
         if ($('filterSettlementStatus').value) params.append('settlement_status', $('filterSettlementStatus').value);
-        if ($('filterAdCost').value) params.append('ad_cost_filter', $('filterAdCost').value);
         if ($('filterSearch').value) params.append('search', $('filterSearch').value);
         params.append('page', currentPage);
         params.append('per_page', 50);
@@ -2175,13 +2183,18 @@
     }
 
     async function queueSettlementSyncRequest({ btnId, payload, busyText, idleText, confirmText = null, confirmTitle = 'Konfirmasi', ackTitle = 'Dikirim ke antrian' }) {
-        const storeId = getSyncStoreId() || $('filterStore').value;
-        if (!storeId) {
+        const storeId = getSyncStoreId();
+        const selectedStore = stores.find(store => String(store.id) === String(storeId));
+        if (!storeId || !selectedStore) {
             alert('Pilih toko dulu di tab Sync sebelum memulai settlement sync.');
             return;
         }
+        if (!isSettlementSyncReadyStore(selectedStore)) {
+            alert('Toko belum siap sync. Periksa status credential dan scope Finance pada Kesiapan toko.');
+            return;
+        }
 
-        const storeName = $('syncStore')?.selectedOptions[0]?.textContent || $('filterStore').selectedOptions[0]?.textContent || 'toko ini';
+        const storeName = $('syncStore')?.selectedOptions[0]?.textContent || 'toko ini';
         if (confirmText && !confirm(confirmText.split('{store}').join(storeName))) {
             return;
         }
@@ -2263,7 +2276,7 @@
     }
 
     window.runSettlementSync = async function () {
-        const storeId = getSyncStoreId() || $('filterStore').value;
+        const storeId = getSyncStoreId();
         if (!storeId) {
             alert('Pilih toko Shopee atau TikTok dulu di tab Sync sebelum memulai sinkronisasi finance.');
             return;
@@ -2327,7 +2340,7 @@
     };
 
     window.runIncomeEstimateSync = async function () {
-        const storeId = getSyncStoreId() || $('filterStore').value;
+        const storeId = getSyncStoreId();
         if (!storeId) {
             alert('Pilih satu toko Shopee di tab Sync sebelum memperbarui estimasi income.');
             return;
@@ -2424,6 +2437,10 @@
     };
 
     window.runSettlementBackfill = async function (months, btnId = 'runSettlementBackfillBtn') {
+        if (!getSyncStoreId()) {
+            alert('Pilih toko siap sync dulu sebelum menjalankan backfill.');
+            return;
+        }
         const selectedMonths = Number(months || $('syncBackfillMonths')?.value || 3);
         if (![1,2,3].includes(selectedMonths)) {
             alert('Backfill hanya tersedia untuk 1, 2, atau 3 bulan.');

@@ -44,6 +44,17 @@ return [
             'after_commit' => false,
         ],
 
+        // Settlement/Finance dapat memproses ratusan order per toko. Pisahkan
+        // connection agar timeout/retry job berat tidak mengikuti default 90s.
+        'heavy' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => env('DB_HEAVY_QUEUE', 'heavy'),
+            'retry_after' => (int) env('DB_HEAVY_QUEUE_RETRY_AFTER', 3300),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

@@ -3347,6 +3347,30 @@ class MarketplaceController extends Controller
         }
 
         $progressKey = "marketplace:settlement_sync_progress:{$store->id}";
+        $activeKey = "marketplace:settlement_sync_active:{$store->id}";
+        $runId = (string) Str::uuid();
+        $activeTtl = max(300, (int) config('marketplace.settlement_lock_ttl', 3600));
+
+        // Guard di boundary request mencegah klik ulang/retry browser membuat
+        // dua command untuk toko yang sama sebelum worker sempat mengambil job.
+        // Command juga mempertahankan marker ini sampai proses selesai, sehingga
+        // scheduler dan manual queue memakai identitas run yang sama.
+        if (! Cache::add($activeKey, [
+            'run_id' => $runId,
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+            'started_at' => now()->toISOString(),
+        ], $activeTtl)) {
+            $activeProgress = Cache::get($progressKey);
+
+            return response()->json([
+                'success' => false,
+                'code' => 'SETTLEMENT_SYNC_BUSY',
+                'message' => "Sync settlement untuk toko {$store->name} sedang berjalan atau masih antre.",
+                'progress' => $activeProgress,
+            ], 429);
+        }
+
         $fromDate = $isBackfill ? now()->subMonthsNoOverflow($backfillMonths)->startOfDay()->toDateString() : null;
         $toDate = $isBackfill ? now()->endOfDay()->toDateString() : null;
 
@@ -3363,14 +3387,15 @@ class MarketplaceController extends Controller
             'store_name' => $store->name,
             'mode' => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
             'backfill_months' => $backfillMonths ?: null,
+            'run_id' => $runId,
             'from' => $fromDate,
             'to' => $toDate,
             'updated_at' => now()->toISOString(),
         ], 1800);
 
         $options = $isTikTokFinance
-            ? ['--store_id' => $store->id, '--channel' => 'tiktok', '--mode' => $isBackfill ? 'full' : 'missing']
-            : ['--store' => $store->id];
+            ? ['--store_id' => $store->id, '--channel' => 'tiktok', '--mode' => $isBackfill ? 'full' : 'missing', '--run_id' => $runId]
+            : ['--store' => $store->id, '--run_id' => $runId];
 
         if ($isBackfill) {
             if ($isTikTokFinance) {
@@ -3397,7 +3422,7 @@ class MarketplaceController extends Controller
                 $options
             );
             if ($isTikTokFinance || $isBackfill || $isAll) {
-                $pending->onQueue('heavy'); // Finance TikTok/ backfill per order = lama → jangan sumbat queue default
+                $pending->onConnection('heavy')->onQueue('heavy'); // Finance TikTok/backfill per order = lama
             }
         } catch (\Throwable $e) {
             Cache::put($progressKey, [
@@ -3407,9 +3432,11 @@ class MarketplaceController extends Controller
                 'label' => 'Gagal memasukkan settlement sync ke queue.',
                 'store_id' => $store->id,
                 'store_name' => $store->name,
+                'run_id' => $runId,
                 'mode' => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
                 'updated_at' => now()->toISOString(),
             ], 1800);
+            Cache::forget($activeKey);
             Log::error('Settlement background sync gagal di-queue', [
                 'store_id' => $store->id,
                 'error' => $e->getMessage(),
@@ -3434,6 +3461,7 @@ class MarketplaceController extends Controller
             'mode' => $isBackfill ? 'backfill' : ($isAll ? 'all' : 'regular'),
             'message' => $queuedMessage,
             'progress_key' => $progressKey,
+            'run_id' => $runId,
         ]);
     }
 
@@ -3608,7 +3636,7 @@ class MarketplaceController extends Controller
         $query = MarketplaceOrderSettlement::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
-            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,subtotal_items,total_paid_customer',
+            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,order_date,subtotal_items,total_paid_customer',
             'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
         ]);
@@ -3629,10 +3657,63 @@ class MarketplaceController extends Controller
             $settlementQuery->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
                 ->whereHas('store.channel', $isTikTokFinanceChannel);
         };
+        $applyOrderDateRange = static function ($orderQuery, ?string $from, ?string $to): void {
+            if ($from !== null && $from !== '') {
+                $orderQuery->where(function ($dateQuery) use ($from) {
+                    $dateQuery->whereDate('ordered_at', '>=', $from)
+                        ->orWhere(function ($fallbackQuery) use ($from) {
+                            $fallbackQuery->whereNull('ordered_at')
+                                ->whereDate('order_date', '>=', $from);
+                        });
+                });
+            }
+
+            if ($to !== null && $to !== '') {
+                $orderQuery->where(function ($dateQuery) use ($to) {
+                    $dateQuery->whereDate('ordered_at', '<=', $to)
+                        ->orWhere(function ($fallbackQuery) use ($to) {
+                            $fallbackQuery->whereNull('ordered_at')
+                                ->whereDate('order_date', '<=', $to);
+                        });
+                });
+            }
+        };
+        $applyFinalSettlementDateRange = function ($settlementQuery, ?string $from, ?string $to) use ($isTikTokFinanceFinal, $applyOrderDateRange): void {
+            $settlementQuery->where(function ($dateQuery) use ($from, $to, $isTikTokFinanceFinal, $applyOrderDateRange) {
+                $dateQuery->where(function ($finalQuery) use ($from, $to) {
+                    $finalQuery->whereNotNull('settlement_time');
+                    if ($from !== null && $from !== '') {
+                        $finalQuery->whereDate('settlement_time', '>=', $from);
+                    }
+                    if ($to !== null && $to !== '') {
+                        $finalQuery->whereDate('settlement_time', '<=', $to);
+                    }
+                })->orWhere(function ($legacyTikTokQuery) use ($from, $to, $isTikTokFinanceFinal, $applyOrderDateRange) {
+                    // Data TikTok lama dapat berstatus final tanpa settlement_time.
+                    // Fallback tanggal order hanya boleh berlaku untuk baris legacy
+                    // tersebut, bukan untuk settlement pending biasa.
+                    $isTikTokFinanceFinal($legacyTikTokQuery);
+                    $legacyTikTokQuery->whereNull('settlement_time')
+                        ->whereHas('order', function ($orderQuery) use ($from, $to, $applyOrderDateRange) {
+                            $applyOrderDateRange($orderQuery, $from, $to);
+                        });
+                });
+            });
+        };
+        $applyEstimatedSettlementDateRange = static function ($settlementQuery, ?string $from, ?string $to): void {
+            $settlementQuery->whereHas('order.incomeEstimate', function ($estimateQuery) use ($from, $to) {
+                if ($from !== null && $from !== '') {
+                    $estimateQuery->whereDate('estimated_payout_at', '>=', $from);
+                }
+                if ($to !== null && $to !== '') {
+                    $estimateQuery->whereDate('estimated_payout_at', '<=', $to);
+                }
+            });
+        };
 
         if ($sortBy === 'ordered_at') {
             $query->orderBy(
-                \App\Models\MarketplaceOrder::select('ordered_at')
+                \App\Models\MarketplaceOrder::selectRaw('COALESCE(ordered_at, order_date)')
                     ->whereColumn('marketplace_orders.id', 'marketplace_order_settlements.order_id')
                     ->limit(1),
                 $sortDir
@@ -3680,90 +3761,39 @@ class MarketplaceController extends Controller
             });
         }
 
-        if ($request->filled('order_date_from')) {
-            $query->whereHas('order', function ($q) use ($request) {
-                $q->whereDate('ordered_at', '>=', $request->order_date_from);
-            });
-        }
-
-        if ($request->filled('order_date_to')) {
-            $query->whereHas('order', function ($q) use ($request) {
-                $q->whereDate('ordered_at', '<=', $request->order_date_to);
+        if ($request->filled('order_date_from') || $request->filled('order_date_to')) {
+            $query->whereHas('order', function ($q) use ($request, $applyOrderDateRange) {
+                $applyOrderDateRange(
+                    $q,
+                    $request->input('order_date_from'),
+                    $request->input('order_date_to'),
+                );
             });
         }
 
         $isUnsettledFilter = $request->input('tab') === 'belum_cair' || $includeMissingPending;
 
-        if ($request->tab === 'semua') {
-            if ($request->filled('settlement_date_from')) {
-                $from = $request->settlement_date_from;
-                $query->where(function ($q) use ($from) {
-                    $q->whereDate('settlement_time', '>=', $from)
-                        ->orWhere(function ($q2) use ($from) {
-                            $q2->whereNull('settlement_time')
-                                ->whereHas('order', function ($oq) use ($from) {
-                                    $oq->whereDate('ordered_at', '>=', $from);
-                                });
-                        });
-                });
-            }
+        $cashDateMode = $settlementStatus !== ''
+            ? $settlementStatus
+            : (string) $request->input('tab', '');
+        if ($request->filled('settlement_date_from') || $request->filled('settlement_date_to')) {
+            $from = $request->input('settlement_date_from');
+            $to = $request->input('settlement_date_to');
 
-            if ($request->filled('settlement_date_to')) {
-                $to = $request->settlement_date_to;
-                $query->where(function ($q) use ($to) {
-                    $q->whereDate('settlement_time', '<=', $to)
-                        ->orWhere(function ($q2) use ($to) {
-                            $q2->whereNull('settlement_time')
-                                ->whereHas('order', function ($oq) use ($to) {
-                                    $oq->whereDate('ordered_at', '<=', $to);
-                                });
-                        });
-                });
-            }
-        } elseif (! $isUnsettledFilter) {
-            if ($request->filled('settlement_date_from')) {
-                $from = $request->settlement_date_from;
-                $query->where(function ($q) use ($from, $isTikTokFinanceFinal) {
-                    $q->whereDate('settlement_time', '>=', $from)
-                        ->orWhere(function ($q2) use ($from, $isTikTokFinanceFinal) {
-                            // TikTok Finance final tidak selalu mengisi
-                            // settlement_time. Untuk filter Tgl Cair, pakai
-                            // tanggal order sebagai fallback khusus TikTok.
-                            $isTikTokFinanceFinal($q2);
-                            $q2->whereHas('order', function ($oq) use ($from) {
-                                $oq->whereDate('ordered_at', '>=', $from);
-                            });
-                        });
-                });
-            }
-
-            if ($request->filled('settlement_date_to')) {
-                $to = $request->settlement_date_to;
-                $query->where(function ($q) use ($to, $isTikTokFinanceFinal) {
-                    $q->whereDate('settlement_time', '<=', $to)
-                        ->orWhere(function ($q2) use ($to, $isTikTokFinanceFinal) {
-                            // Fallback pasangan untuk batas akhir tanggal.
-                            $isTikTokFinanceFinal($q2);
-                            $q2->whereHas('order', function ($oq) use ($to) {
-                                $oq->whereDate('ordered_at', '<=', $to);
-                            });
-                        });
-                });
-            }
-        }
-
-        // Pada mode belum cair, filter tanggal berarti tanggal payout estimasi
-        // dari get_income_detail, bukan settlement_time yang memang masih null.
-        if ($isUnsettledFilter) {
-            if ($request->filled('settlement_date_from')) {
-                $query->whereHas('order.incomeEstimate', function ($estimateQuery) use ($request) {
-                    $estimateQuery->whereDate('estimated_payout_at', '>=', $request->settlement_date_from);
-                });
-            }
-
-            if ($request->filled('settlement_date_to')) {
-                $query->whereHas('order.incomeEstimate', function ($estimateQuery) use ($request) {
-                    $estimateQuery->whereDate('estimated_payout_at', '<=', $request->settlement_date_to);
+            if ($cashDateMode === 'belum_cair' || $isUnsettledFilter) {
+                // Pending memakai tanggal payout estimasi, bukan order date.
+                $applyEstimatedSettlementDateRange($query, $from, $to);
+            } elseif ($cashDateMode === 'cair') {
+                $applyFinalSettlementDateRange($query, $from, $to);
+            } else {
+                // Semua dana: gabungkan tanggal cair final dan tanggal payout
+                // estimasi pending. Tidak lagi memakai tanggal order sebagai
+                // pengganti tanggal cair untuk baris pending.
+                $query->where(function ($dateQuery) use ($from, $to, $applyFinalSettlementDateRange, $applyEstimatedSettlementDateRange) {
+                    $applyFinalSettlementDateRange($dateQuery, $from, $to);
+                    $dateQuery->orWhere(function ($pendingDateQuery) use ($from, $to, $applyEstimatedSettlementDateRange) {
+                        $applyEstimatedSettlementDateRange($pendingDateQuery, $from, $to);
+                    });
                 });
             }
         }
@@ -3918,11 +3948,12 @@ class MarketplaceController extends Controller
                     });
                 });
             }
-            if ($request->filled('order_date_from')) {
-                $pendingOrdersQuery->whereDate('ordered_at', '>=', $request->order_date_from);
-            }
-            if ($request->filled('order_date_to')) {
-                $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->order_date_to);
+            if ($request->filled('order_date_from') || $request->filled('order_date_to')) {
+                $applyOrderDateRange(
+                    $pendingOrdersQuery,
+                    $request->input('order_date_from'),
+                    $request->input('order_date_to'),
+                );
             }
             if ($isUnsettledFilter && $request->filled('settlement_date_from')) {
                 $pendingOrdersQuery->whereHas('incomeEstimate', function ($estimateQuery) use ($request) {
@@ -3934,14 +3965,7 @@ class MarketplaceController extends Controller
                     $estimateQuery->whereDate('estimated_payout_at', '<=', $request->settlement_date_to);
                 });
             }
-            if ($request->input('tab') === 'semua') {
-                if ($request->filled('settlement_date_from')) {
-                    $pendingOrdersQuery->whereDate('ordered_at', '>=', $request->settlement_date_from);
-                }
-                if ($request->filled('settlement_date_to')) {
-                    $pendingOrdersQuery->whereDate('ordered_at', '<=', $request->settlement_date_to);
-                }
-            } elseif ($request->input('tab') === 'belum_cair' && $request->filled('sub_tab')) {
+            if ($request->input('tab') === 'belum_cair' && $request->filled('sub_tab')) {
                 if ($request->sub_tab === 'packed') {
                     $pendingOrdersQuery->whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED', 'MATCHED']);
                 } elseif ($request->sub_tab === 'shipped') {

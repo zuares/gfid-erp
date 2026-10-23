@@ -819,6 +819,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->once()
             ->andReturn(new class
             {
+                public function onConnection($connection)
+                {
+                    return $this;
+                }
+
                 public function onQueue($queue)
                 {
                     return $this;
@@ -837,6 +842,23 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $progress = Cache::get('marketplace:settlement_sync_progress:'.$store->id);
         $this->assertSame('queued', $progress['status'] ?? null);
         $this->assertSame('regular', $progress['mode'] ?? null);
+    }
+
+    public function test_background_sync_menolak_run_ganda_sebelum_membuat_job_baru()
+    {
+        $store = $this->createStore();
+        Cache::put('marketplace:settlement_sync_active:'.$store->id, [
+            'run_id' => 'existing-run',
+            'store_id' => $store->id,
+        ], 3600);
+
+        Artisan::shouldReceive('queue')->never();
+
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements-background', 'POST');
+        $response = app(MarketplaceController::class)->syncSettlementsBackground($request, $store);
+
+        $this->assertSame(429, $response->getStatusCode());
+        $this->assertSame('SETTLEMENT_SYNC_BUSY', $response->getData(true)['code']);
     }
 
     public function test_settlement_sync_mendukung_channel_tiktok_finance()
@@ -861,6 +883,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             }))
             ->andReturn(new class
             {
+                public function onConnection($connection)
+                {
+                    return $this;
+                }
+
                 public function onQueue($queue)
                 {
                     return $this;
@@ -897,6 +924,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             }))
             ->andReturn(new class
             {
+                public function onConnection($connection)
+                {
+                    return $this;
+                }
+
                 public function onQueue($queue)
                 {
                     return $this;
@@ -934,6 +966,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             }))
             ->andReturn(new class
             {
+                public function onConnection($connection)
+                {
+                    return $this;
+                }
+
                 public function onQueue($queue)
                 {
                     return $this;
@@ -1034,6 +1071,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->once()
             ->andReturn(new class
             {
+                public function onConnection($connection)
+                {
+                    return $this;
+                }
+
                 public function onQueue($queue)
                 {
                     return $this;
@@ -1073,6 +1115,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->once()
             ->andReturn(new class
             {
+                public function onConnection($connection)
+                {
+                    return $this;
+                }
+
                 public function onQueue($queue)
                 {
                     return $this;
@@ -1991,6 +2038,135 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(['ORDER-TTK-DATE-IN'], $ids);
         $this->assertTrue($payload['paginator']['data'][0]['is_finance_final']);
         $this->assertNull($payload['paginator']['data'][0]['settlement_time']);
+    }
+
+    public function test_filter_tanggal_order_memakai_order_date_sebagai_fallback(): void
+    {
+        $store = $this->createStore();
+        $inside = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-ORDER-DATE-FALLBACK-IN',
+            'channel_order_id' => 'ORDER-DATE-FALLBACK-IN',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => null,
+            'order_date' => Carbon::parse('2026-09-15 10:00:00'),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        $outside = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-ORDER-DATE-FALLBACK-OUT',
+            'channel_order_id' => 'ORDER-DATE-FALLBACK-OUT',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => null,
+            'order_date' => Carbon::parse('2026-10-15 10:00:00'),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+
+        foreach ([$inside, $outside] as $order) {
+            MarketplaceOrderSettlement::create([
+                'store_id' => $store->id,
+                'order_id' => $order->id,
+                'channel_order_id' => $order->channel_order_id,
+                'buyer_payment_amount' => 100000,
+                'final_income' => 80000,
+                'settlement_time' => Carbon::parse('2026-10-20 10:00:00'),
+            ]);
+        }
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            [
+                'store_id' => $store->id,
+                'settlement_status' => 'cair',
+                'order_date_from' => '2026-09-01',
+                'order_date_to' => '2026-09-30',
+                'page' => 1,
+                'per_page' => 50,
+            ],
+        ))->getData(true);
+
+        $this->assertSame(['ORDER-DATE-FALLBACK-IN'], collect($payload['paginator']['data'])->pluck('channel_order_id')->all());
+    }
+
+    public function test_filter_tanggal_cair_semua_dana_memakai_tanggal_final_atau_estimasi(): void
+    {
+        $store = $this->createStore();
+        $finalOutside = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-CASH-DATE-FINAL-OUT',
+            'channel_order_id' => 'ORDER-CASH-DATE-FINAL-OUT',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => Carbon::parse('2026-09-20 10:00:00'),
+            'order_date' => Carbon::parse('2026-09-20 10:00:00'),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        $pendingInside = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-CASH-DATE-PENDING-IN',
+            'channel_order_id' => 'ORDER-CASH-DATE-PENDING-IN',
+            'order_status' => 'SHIPPED',
+            'ordered_at' => Carbon::parse('2026-09-20 10:00:00'),
+            'order_date' => Carbon::parse('2026-09-20 10:00:00'),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        $pendingWithoutEstimate = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'EXT-CASH-DATE-PENDING-NO-EST',
+            'channel_order_id' => 'ORDER-CASH-DATE-PENDING-NO-EST',
+            'order_status' => 'SHIPPED',
+            'ordered_at' => Carbon::parse('2026-09-20 10:00:00'),
+            'order_date' => Carbon::parse('2026-09-20 10:00:00'),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $finalOutside->id,
+            'channel_order_id' => $finalOutside->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 80000,
+            'settlement_time' => Carbon::parse('2026-10-05 10:00:00'),
+        ]);
+        foreach ([$pendingInside, $pendingWithoutEstimate] as $order) {
+            MarketplaceOrderSettlement::create([
+                'store_id' => $store->id,
+                'order_id' => $order->id,
+                'channel_order_id' => $order->channel_order_id,
+                'buyer_payment_amount' => 100000,
+                'final_income' => 0,
+                'settlement_time' => null,
+                'data_status' => 'incomplete',
+            ]);
+        }
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $pendingInside->id,
+            'channel_order_id' => $pendingInside->channel_order_id,
+            'income_status' => 2,
+            'estimated_escrow_amount' => 76000,
+            'estimated_payout_at' => Carbon::parse('2026-09-25 12:00:00'),
+            'synced_at' => Carbon::parse('2026-09-20 09:00:00'),
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            [
+                'store_id' => $store->id,
+                'settlement_date_from' => '2026-09-24',
+                'settlement_date_to' => '2026-09-26',
+                'page' => 1,
+                'per_page' => 50,
+            ],
+        ))->getData(true);
+
+        $this->assertSame(['ORDER-CASH-DATE-PENDING-IN'], collect($payload['paginator']['data'])->pluck('channel_order_id')->all());
     }
 
     public function test_filter_biaya_iklan_hanya_mengembalikan_settlement_yang_memiliki_ad_cost(): void

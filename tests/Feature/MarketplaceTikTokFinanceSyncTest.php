@@ -173,6 +173,111 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame(766.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.taxes.vat'));
     }
 
+    public function test_batched_sync_uses_statement_transactions_for_final_order_settlement(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-STATEMENT-BATCH',
+            'name' => 'TikTok Statement Batch Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-STATEMENT-BATCH-1',
+            'external_order_id' => 'TT-ORDER-STATEMENT-BATCH-1',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202507/orders/unsettled*' => Http::response([
+                'code' => 0,
+                'data' => ['transactions' => [], 'next_page_token' => ''],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202501/orders/*/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'order_id' => 'TT-ORDER-STATEMENT-BATCH-1',
+                    'sku_transactions' => [],
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'statements' => [[
+                        'id' => 'STATEMENT-BATCH-1',
+                        'statement_time' => now()->timestamp,
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202501/statements/STATEMENT-BATCH-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'next_page_token' => '',
+                    'transactions' => [
+                        [
+                            'id' => 'TX-ORDER-BATCH-1',
+                            'type' => 'ORDER',
+                            'order_id' => 'TT-ORDER-STATEMENT-BATCH-1',
+                            'currency' => 'IDR',
+                            'revenue_amount' => '100000',
+                            'fee_tax_amount' => '6000',
+                            'shipping_cost_amount' => '0',
+                            'settlement_amount' => '94000',
+                            'fee_tax_breakdown' => [
+                                'fee' => ['platform_commission_amount' => '-5000'],
+                                'tax' => ['vat' => '-1000'],
+                            ],
+                        ],
+                        [
+                            'id' => 'TX-ADJUSTMENT-1',
+                            'type' => 'PLATFORM_PENALTY',
+                            'adjustment_amount' => '-500',
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $result = app(MarketplaceSyncService::class)->syncTikTokFinanceBatched(
+            $store,
+            now()->subDays(2)->timestamp,
+            now()->timestamp,
+            false,
+            null,
+            200,
+        );
+
+        $this->assertSame(1, $result['statement_settlements_synced']);
+        $this->assertSame(1, $result['synced']);
+        $this->assertSame(0, $result['statement_settlement_errors']);
+        $this->assertDatabaseHas('marketplace_order_settlements', [
+            'order_id' => $order->id,
+            'channel_order_id' => 'TT-ORDER-STATEMENT-BATCH-1',
+            'final_income' => '94000.00',
+            'data_status' => 'complete',
+        ]);
+        $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('STATEMENT-BATCH-1', data_get($settlement->raw_json, 'tiktok_statement.statement_id'));
+        $this->assertSame('TX-ORDER-BATCH-1', data_get($settlement->raw_json, 'tiktok_statement.statement_transaction_id'));
+    }
+
     public function test_statement_transactions_supply_gmv_max_cost_from_settlement(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');

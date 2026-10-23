@@ -296,6 +296,23 @@ Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'heavy', '--st
     ->name('queue-work-heavy')
     ->withoutOverlapping(10);
 
+// Settlement/Finance memakai connection khusus dengan retry_after panjang agar
+// job ratusan order tidak diambil ulang setelah 90 detik dan tidak dibunuh oleh
+// timeout worker default. Worker legacy di atas tetap dipertahankan untuk job
+// heavy lama yang masih berada pada connection database default.
+Schedule::call(fn () => Artisan::call('queue:work', [
+    '--connection' => 'heavy',
+    '--queue' => 'heavy',
+    '--stop-when-empty' => true,
+    '--max-time' => 280,
+    '--timeout' => 3000,
+    '--tries' => 1,
+    '--sleep' => 2,
+]))
+    ->everyFiveMinutes()
+    ->name('queue-work-settlement-heavy')
+    ->withoutOverlapping(10);
+
 // Audit alokasi inventory harian
 // (dipindahkan dari app/Console/Kernel.php yang tidak dipakai Laravel 12)
 Schedule::call(fn () => Artisan::call('inventory:audit-allocated'))

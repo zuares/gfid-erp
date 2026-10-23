@@ -3,11 +3,13 @@
 namespace App\Console\Commands;
 
 use App\Models\Store;
+use App\Models\MarketplaceSyncLog;
 use App\Services\MarketplaceSyncService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class MarketplaceSyncFinanceCommand extends Command
 {
@@ -27,6 +29,7 @@ class MarketplaceSyncFinanceCommand extends Command
                             {--mode=full : full = tarik ulang semua; missing = cek DB dulu, ambil yang belum ada saja}
                             {--store_id=all : ID Store spesifik atau all}
                             {--channel=all : Filter channel (shopee/tiktok/all)}
+                            {--run_id= : Identitas run dari UI/queue untuk idempotensi dan audit trail}
                             {--dry-run : Hanya tes, tidak menyimpan ke DB}';
 
     /**
@@ -102,6 +105,7 @@ class MarketplaceSyncFinanceCommand extends Command
         $storeId = $this->option('store_id');
         $channel = strtolower($this->option('channel'));
         $dryRun = $this->option('dry-run');
+        $runId = (string) ($this->option('run_id') ?: Str::uuid());
 
         $query = Store::where('status', 'active')
             ->where('is_active', true); // toko nonaktif dilewati
@@ -147,6 +151,37 @@ class MarketplaceSyncFinanceCommand extends Command
             $this->info("Memproses Toko: {$store->name} (Channel: {$store->channel->name})");
             $this->info("--------------------------------------------------");
 
+            $activeKey = "marketplace:settlement_sync_active:{$store->id}";
+            $activeRun = Cache::get($activeKey);
+            if ($activeRun && ($activeRun['run_id'] ?? null) !== $runId) {
+                $this->warn("Toko {$store->name} sedang diproses run lain. Dilewati untuk mencegah sync ganda.");
+                $failureCount++;
+                continue;
+            }
+            if (! $activeRun && ! Cache::add($activeKey, [
+                'run_id' => $runId,
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+                'started_at' => now()->toISOString(),
+            ], max(300, (int) config('marketplace.settlement_lock_ttl', 3600)))) {
+                $this->warn("Toko {$store->name} baru saja diklaim proses lain. Dilewati untuk mencegah sync ganda.");
+                $failureCount++;
+                continue;
+            }
+
+            $storePulledBefore = $totalPulled;
+            $storeSyncedBefore = $totalSyncedToFinance;
+            $storeFailureBefore = $failureCount;
+            $storeFinanceSummary = [];
+            $this->logFinanceRun($store, $runId, 'processing', "Finance sync {$mode} dimulai untuk {$rangeLabel}.", [
+                'run_id' => $runId,
+                'mode' => $mode,
+                'range' => $rangeLabel,
+                'date_from' => date('Y-m-d', $targetDate),
+                'date_to' => date('Y-m-d', $syncEndTimestamp),
+                'dry_run' => $dryRun,
+            ]);
+
             if ($store->connection_status === 'TOKEN_EXPIRED') {
                 if (!$dryRun) {
                     try {
@@ -176,6 +211,22 @@ class MarketplaceSyncFinanceCommand extends Command
             if ($store->connection_status !== 'CONNECTED') {
                 $this->warn("Toko {$store->name} perlu login ulang / tidak terhubung. Dilewati.");
                 $failureCount++;
+                Cache::put("marketplace:settlement_sync_progress:{$store->id}", [
+                    'status' => 'error',
+                    'phase' => 'preflight',
+                    'percent' => 100,
+                    'label' => 'Koneksi toko belum siap.',
+                    'run_id' => $runId,
+                    'store_id' => $store->id,
+                    'store_name' => $store->name,
+                    'updated_at' => now()->toISOString(),
+                ], 1800);
+                $this->logFinanceRun($store, $runId, 'failed', 'Koneksi toko belum siap; sync dilewati.', [
+                    'run_id' => $runId,
+                    'mode' => $mode,
+                    'reason' => 'connection_not_ready',
+                ]);
+                Cache::forget($activeKey);
                 continue;
             }
 
@@ -238,14 +289,16 @@ class MarketplaceSyncFinanceCommand extends Command
                     $targetDate,
                     $syncEndTimestamp,
                     $missingOnly,
-                    function (array $progress) use ($tiktokProgressKey, $store): void {
+                    function (array $progress) use ($tiktokProgressKey, $store, $runId): void {
                         Cache::put($tiktokProgressKey, array_merge($progress, [
                             'store_id' => $store->id,
                             'store_name' => $store->name,
+                            'run_id' => $runId,
                         ]), 1800);
                     },
                     self::SETTLEMENT_BATCH_LIMIT,
                 );
+                $storeFinanceSummary = $tiktokResult;
 
                 $tiktokSynced = (int) ($tiktokResult['synced'] ?? 0);
                 $tiktokPending = (int) ($tiktokResult['pending'] ?? 0);
@@ -284,6 +337,7 @@ class MarketplaceSyncFinanceCommand extends Command
                     'updated_at' => now()->toISOString(),
                     'store_id' => $store->id,
                     'store_name' => $store->name,
+                    'run_id' => $runId,
                 ], 1800);
             } elseif ($tiktokFinanceSupported) {
                 $this->info("   [DRY-RUN] Simulasi sinkronisasi finance TikTok dilewati.");
@@ -405,6 +459,35 @@ class MarketplaceSyncFinanceCommand extends Command
             }
 
             $this->info("--------------------------------------------------");
+
+            $storeErrors = $failureCount - $storeFailureBefore;
+            $storePayload = [
+                'run_id' => $runId,
+                'mode' => $mode,
+                'range' => $rangeLabel,
+                'date_from' => date('Y-m-d', $targetDate),
+                'date_to' => date('Y-m-d', $syncEndTimestamp),
+                'dry_run' => $dryRun,
+                'orders_pulled' => $totalPulled - $storePulledBefore,
+                'settlements_synced' => $totalSyncedToFinance - $storeSyncedBefore,
+                'errors' => $storeErrors,
+            ];
+            foreach ([
+                'found', 'processed', 'synced', 'pending', 'estimates_updated',
+                'estimate_errors', 'statement_ad_costs_updated', 'statement_ad_cost_errors',
+            ] as $key) {
+                if (array_key_exists($key, $storeFinanceSummary)) {
+                    $storePayload[$key] = (int) $storeFinanceSummary[$key];
+                }
+            }
+            $this->logFinanceRun(
+                $store,
+                $runId,
+                $storeErrors > 0 ? (($storePayload['settlements_synced'] ?? 0) > 0 ? 'partial_success' : 'failed') : 'success',
+                $storeErrors > 0 ? 'Finance sync selesai dengan catatan.' : 'Finance sync selesai.',
+                $storePayload,
+            );
+            Cache::forget($activeKey);
         }
 
         $this->info("Semua proses selesai.");
@@ -415,5 +498,16 @@ class MarketplaceSyncFinanceCommand extends Command
         }
 
         return $failureCount > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    private function logFinanceRun(Store $store, string $runId, string $status, string $message, array $payload = []): void
+    {
+        MarketplaceSyncLog::create([
+            'store_id' => $store->id,
+            'action' => 'sync_finance',
+            'status' => $status,
+            'message' => $message,
+            'payload' => array_merge(['run_id' => $runId], $payload),
+        ]);
     }
 }

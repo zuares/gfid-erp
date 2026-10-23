@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Fase 1 — sinkronisasi settlement/escrow Shopee.
@@ -53,6 +54,7 @@ class SyncSettlementsCommand extends Command
     private const ALL_MAX_BATCHES = 20;
     private const ALL_MAX_RUNTIME_SECONDS = 12 * 60; // 12 menit
     private const PROGRESS_CACHE_TTL_SECONDS = 1800;
+    private ?string $runId = null;
 
     protected $signature = 'marketplace:sync-settlements
         {--store= : ID toko spesifik (stores.id)}
@@ -63,6 +65,7 @@ class SyncSettlementsCommand extends Command
         {--resync : Ambil ulang meski sudah ada settlement tersimpan (tanpa membuat histori)}
         {--newest-first : Prioritaskan order terbaru (satu batch, tidak dapat bersama --all)}
         {--all : Ulangi batch berbasis cursor id sampai tidak ada order tersisa, tidak ada kemajuan, atau batas pengaman tercapai}
+        {--run_id= : Identitas run dari UI/queue untuk idempotensi dan audit trail}
         {--inspect : Tampilkan struktur field raw response (masked) — hanya valid bersama --order}';
 
     protected $description = 'Sinkronisasi settlement/escrow Shopee (get_escrow_detail). Tidak membuat jurnal accounting. Bisa dijalankan scheduler atau manual.';
@@ -77,6 +80,7 @@ class SyncSettlementsCommand extends Command
         Cache::put($this->progressKey($store), array_merge([
             'store_id'    => $store->id,
             'store_name'  => $store->name,
+            'run_id'      => $this->runId,
             'updated_at'  => now()->toISOString(),
         ], $payload), self::PROGRESS_CACHE_TTL_SECONDS);
     }
@@ -85,6 +89,7 @@ class SyncSettlementsCommand extends Command
     {
         @set_time_limit(0);
         $commandStartedAt = hrtime(true);
+        $this->runId = (string) ($this->option('run_id') ?: Str::uuid());
 
         // ── Validasi opsi (sebelum proses apa pun) ─────────────────────────────
         $validation = $this->validateOptions();
@@ -191,11 +196,34 @@ class SyncSettlementsCommand extends Command
         foreach ($stores as $index => $store) {
             $this->info(sprintf('[%d/%d] %s', $index + 1, $stores->count(), $store->name));
 
+            $activeKey = "marketplace:settlement_sync_active:{$store->id}";
+            $activeRun = Cache::get($activeKey);
+            if ($activeRun && ($activeRun['run_id'] ?? null) !== $this->runId) {
+                $this->warn('Hasil: Dilewati (toko sedang diproses run lain)');
+                continue;
+            }
+            if (! $activeRun && ! Cache::add($activeKey, [
+                'run_id' => $this->runId,
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+                'started_at' => now()->toISOString(),
+            ], max(300, (int) config('marketplace.settlement_lock_ttl', 3600)))) {
+                $this->warn('Hasil: Dilewati (toko baru saja diklaim run lain)');
+                continue;
+            }
+
             $lockKey = "sync_settlements_store_{$store->id}";
             $lock = Cache::lock($lockKey, $lockTtlSeconds);
 
             if (! $lock->get()) {
                 $this->warn('Hasil: Dilewati (toko sedang disinkronkan proses lain)');
+                $this->writeProgress($store, [
+                    'status' => 'warn',
+                    'phase' => 'busy',
+                    'percent' => 100,
+                    'label' => 'Sync settlement dilewati karena toko sedang diproses run lain.',
+                ]);
+                Cache::forget($activeKey);
                 continue;
             }
 
@@ -216,6 +244,7 @@ class SyncSettlementsCommand extends Command
                 Log::error("[marketplace:sync-settlements] Store #{$store->id} DecryptException (preflight): " . $e->getMessage());
                 $storesFailed++;
                 $lock->release();
+                Cache::forget($activeKey);
                 continue;
             }
 
@@ -298,6 +327,7 @@ class SyncSettlementsCommand extends Command
                     ]);
                 }
                 $lock->release();
+                Cache::forget($activeKey);
             }
         }
 

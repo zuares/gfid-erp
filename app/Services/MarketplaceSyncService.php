@@ -1003,12 +1003,34 @@ class MarketplaceSyncService
             return ['status' => 'error', 'message' => $message, 'response' => $response];
         }
 
-        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
         $this->setTikTokFinanceScopeStatus($store, 'granted');
+
+        return $this->persistTikTokFinancePayload(
+            $store,
+            $order,
+            $response,
+            is_array($response['data'] ?? null) ? $response['data'] : [],
+            'tiktok_finance_202501_order_statement_transactions',
+        );
+    }
+
+    /**
+     * Persist a normalized TikTok finance payload. Both the order endpoint and
+     * the statement endpoint use the same accounting mapping so a backfill can
+     * safely switch to the batch source without changing journal semantics.
+     */
+    private function persistTikTokFinancePayload(
+        Store $store,
+        MarketplaceOrder $order,
+        array $response,
+        array $data,
+        string $source,
+    ): array {
+        $orderId = trim((string) ($data['order_id'] ?? $order->channel_order_id));
         $skuTransactions = is_array($data['sku_transactions'] ?? null)
             ? array_values($data['sku_transactions'])
             : [];
-        $hasStatement = $skuTransactions !== [];
+        $hasStatement = $skuTransactions !== [] || (bool) ($data['_is_statement_transaction'] ?? false);
 
         $amount = static fn (mixed $value): float => is_numeric($value) ? (float) $value : 0.0;
         $collectBreakdown = static function (array $rows, array &$target, string $prefix = '') use (&$collectBreakdown, $amount): void {
@@ -1018,56 +1040,39 @@ class MarketplaceSyncService
                     $collectBreakdown($value, $target, $label);
                     continue;
                 }
-
-                if (! is_numeric($value)) {
-                    continue;
+                if (is_numeric($value)) {
+                    $target[$label] = round(($target[$label] ?? 0) + abs($amount($value)), 2);
                 }
-
-                $target[$label] = round(($target[$label] ?? 0) + abs($amount($value)), 2);
             }
         };
 
-        $feeTotal = 0.0;
-        $taxTotal = 0.0;
-        $tiktokFeeBreakdown = [
-            'fees' => [],
-            'taxes' => [],
-        ];
-        foreach ($skuTransactions as $transaction) {
+        $tiktokFeeBreakdown = ['fees' => [], 'taxes' => []];
+        $feeSources = $skuTransactions !== [] ? $skuTransactions : [$data];
+        foreach ($feeSources as $transaction) {
             $breakdown = is_array($transaction['fee_tax_breakdown'] ?? null)
                 ? $transaction['fee_tax_breakdown']
                 : [];
-            $fees = is_array($breakdown['fee'] ?? null) ? $breakdown['fee'] : [];
-            $taxes = is_array($breakdown['tax'] ?? null) ? $breakdown['tax'] : [];
-            $collectBreakdown($fees, $tiktokFeeBreakdown['fees']);
-            $collectBreakdown($taxes, $tiktokFeeBreakdown['taxes']);
+            $collectBreakdown(is_array($breakdown['fee'] ?? null) ? $breakdown['fee'] : [], $tiktokFeeBreakdown['fees']);
+            $collectBreakdown(is_array($breakdown['tax'] ?? null) ? $breakdown['tax'] : [], $tiktokFeeBreakdown['taxes']);
         }
+
         $feeTotal = round(array_sum($tiktokFeeBreakdown['fees']), 2);
         $taxTotal = round(array_sum($tiktokFeeBreakdown['taxes']), 2);
         if ($feeTotal <= 0 && $taxTotal <= 0) {
-            $feeTotal = abs($amount($data['fee_and_tax_amount'] ?? 0));
+            $feeTotal = abs($amount($data['fee_and_tax_amount'] ?? $data['fee_tax_amount'] ?? 0));
         }
 
-        // TikTok membukukan GMV Max sebagai fee per order. Pisahkan dari fee
-        // marketplace umum agar ad_cost tidak ikut terhitung dua kali ketika
-        // profit dihitung dari payout yang sudah net settlement.
-        $gmvMaxAdFee = round(
-            abs($amount(data_get($tiktokFeeBreakdown, 'fees.gmv_max_ad_fee_amount'))),
-            2,
-        );
-        $gmvMaxCouponFee = round(
-            abs($amount(data_get($tiktokFeeBreakdown, 'fees.gmv_max_coupon_fee'))),
-            2,
-        );
+        $gmvMaxAdFee = round(abs($amount(data_get($tiktokFeeBreakdown, 'fees.gmv_max_ad_fee_amount'))), 2);
+        $gmvMaxCouponFee = round(abs($amount(data_get($tiktokFeeBreakdown, 'fees.gmv_max_coupon_fee'))), 2);
         $gmvMaxAdTax = round(
             abs($amount(data_get($tiktokFeeBreakdown, 'fees.cps_shop_ads_commission_tax_amount')))
                 ?: abs($amount(data_get($tiktokFeeBreakdown, 'taxes.cps_shop_ads_commission_tax_amount'))),
             2,
         );
         $gmvMaxAdCost = round($gmvMaxAdFee + $gmvMaxCouponFee + $gmvMaxAdTax, 2);
-
         $commission = round(max(0, $feeTotal - $gmvMaxAdFee - $gmvMaxCouponFee), 2);
         $tax = round(max(0, $taxTotal - $gmvMaxAdTax), 2);
+
         $tiktokFeeBreakdown['fee_total'] = $feeTotal;
         $tiktokFeeBreakdown['tax_total'] = $taxTotal;
         $tiktokFeeBreakdown['non_ad_fee_total'] = $commission;
@@ -1082,21 +1087,25 @@ class MarketplaceSyncService
 
         $settlementAmount = $amount($data['settlement_amount'] ?? 0);
         $raw = array_merge((array) $order->settlement?->raw_json, [
-            'source' => 'tiktok_finance_202501_order_statement_transactions',
-            'order_id' => $data['order_id'] ?? $orderId,
+            'source' => $source,
+            'order_id' => $orderId,
             'currency' => $data['currency'] ?? $order->currency ?? 'IDR',
             'revenue_amount' => $data['revenue_amount'] ?? null,
-            'fee_and_tax_amount' => $data['fee_and_tax_amount'] ?? null,
+            'fee_and_tax_amount' => $data['fee_and_tax_amount'] ?? $data['fee_tax_amount'] ?? null,
             'shipping_cost_amount' => $data['shipping_cost_amount'] ?? null,
             'settlement_amount' => $data['settlement_amount'] ?? null,
+            'adjustment_amount' => $data['adjustment_amount'] ?? null,
             'ad_cost' => $gmvMaxAdCost,
-            // Alias domain internal agar halaman Orders dan Settlement dapat
-            // membaca nominal escrow/net settlement dengan aturan yang sama.
             'escrow_amount' => $hasStatement ? ($data['settlement_amount'] ?? null) : null,
             'fee_tax_amount' => $tax,
             'tiktok_fee_breakdown' => $tiktokFeeBreakdown,
             'sku_transactions' => $skuTransactions,
         ]);
+        foreach (['statement_id', 'statement_transaction_id', 'statement_time'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $raw['tiktok_statement'][$key] = $data[$key];
+            }
+        }
 
         $statementTime = $this->normalizeOrderEventTimestamp(
             $data['statement_time'] ?? $data['settlement_time'] ?? $data['paid_time'] ?? null
@@ -1106,10 +1115,7 @@ class MarketplaceSyncService
                 data_get($skuTransactions, '0.statement_time')
                 ?? data_get($skuTransactions, '0.paid_time')
                 ?? data_get($skuTransactions, '0.settlement_time')
-            );
-        }
-        if (! $statementTime && $hasStatement) {
-            $statementTime = now();
+            ) ?? now();
         }
 
         $settlement = MarketplaceOrderSettlement::firstOrNew([
@@ -1134,7 +1140,7 @@ class MarketplaceSyncService
                 ? MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
                 : MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE,
             'data_quality_flags' => [
-                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'source' => $source,
                 'has_sku_transactions' => $hasStatement,
                 'reason' => $hasStatement ? null : 'tiktok_order_not_settled',
             ],
@@ -1160,6 +1166,7 @@ class MarketplaceSyncService
             'status' => $hasStatement ? 'synced' : 'pending',
             'order_id' => $orderId,
             'settlement_amount' => $settlementAmount,
+            'ad_cost' => $gmvMaxAdCost,
             'has_statement' => $hasStatement,
             'response' => $response,
         ];
@@ -1194,6 +1201,200 @@ class MarketplaceSyncService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Sync final TikTok settlements from daily statements in batch.
+     *
+     * The statement API is the authoritative source for final payout rows.
+     * Only ORDER transactions are applied to marketplace order settlements;
+     * adjustments and reserve movements remain available in the raw API audit
+     * response but must not be mistaken for order revenue.
+     *
+     * @return array{synced:int,skipped:int,errors:int,statements:int,transactions:int}
+     */
+    private function syncTikTokStatementSettlements(Store $store, int $timeFrom, int $timeTo): array
+    {
+        $summary = [
+            'synced' => 0,
+            'ad_costs_updated' => 0,
+            'ad_costs_total' => 0.0,
+            'skipped' => 0,
+            'errors' => 0,
+            'statements' => 0,
+            'transactions' => 0,
+        ];
+        $statementToken = '';
+        $maxPages = 100;
+        $orders = [];
+
+        try {
+            for ($statementPage = 0; $statementPage < $maxPages; $statementPage++) {
+                $statementResponse = $this->gateway->getStatements(
+                    $store,
+                    $timeFrom,
+                    $timeTo,
+                    $statementToken,
+                    100,
+                );
+
+                if (! empty($statementResponse['error'])
+                    || (($statementResponse['code'] ?? null) !== null && (string) $statementResponse['code'] !== '0')) {
+                    $summary['errors']++;
+                    $this->setTikTokFinanceScopeStatus(
+                        $store,
+                        $this->isTikTokFinanceScopeError($statementResponse) ? 'missing' : 'unknown',
+                    );
+                    Log::warning('[TikTok Finance] Get statements untuk final settlement gagal', [
+                        'store_id' => $store->id,
+                        'code' => $statementResponse['code'] ?? null,
+                        'message' => $statementResponse['message'] ?? $statementResponse['error'] ?? null,
+                    ]);
+                    break;
+                }
+
+                $this->setTikTokFinanceScopeStatus($store, 'granted');
+
+                $statements = data_get($statementResponse, 'data.statements', []);
+                if (! is_array($statements)) {
+                    $statements = [];
+                }
+
+                foreach ($statements as $statement) {
+                    if (! is_array($statement)) {
+                        continue;
+                    }
+
+                    $statementId = trim((string) ($statement['id'] ?? ''));
+                    if ($statementId === '') {
+                        continue;
+                    }
+                    $summary['statements']++;
+                    $transactionToken = '';
+
+                    for ($transactionPage = 0; $transactionPage < $maxPages; $transactionPage++) {
+                        $transactionResponse = $this->gateway->getTransactionsByStatement(
+                            $store,
+                            $statementId,
+                            $transactionToken,
+                            100,
+                        );
+
+                        if (! empty($transactionResponse['error'])
+                            || (($transactionResponse['code'] ?? null) !== null && (string) $transactionResponse['code'] !== '0')) {
+                            $summary['errors']++;
+                            $this->setTikTokFinanceScopeStatus(
+                                $store,
+                                $this->isTikTokFinanceScopeError($transactionResponse) ? 'missing' : 'unknown',
+                            );
+                            Log::warning('[TikTok Finance] Get statement transactions untuk final settlement gagal', [
+                                'store_id' => $store->id,
+                                'statement_id' => $statementId,
+                                'code' => $transactionResponse['code'] ?? null,
+                                'message' => $transactionResponse['message'] ?? $transactionResponse['error'] ?? null,
+                            ]);
+                            break;
+                        }
+
+                        $transactionData = is_array($transactionResponse['data'] ?? null)
+                            ? $transactionResponse['data']
+                            : [];
+                        $transactions = is_array($transactionData['transactions'] ?? null)
+                            ? $transactionData['transactions']
+                            : [];
+
+                        foreach ($transactions as $transaction) {
+                            if (! is_array($transaction)) {
+                                continue;
+                            }
+                            $summary['transactions']++;
+
+                            // ORDER is the only statement row that can safely
+                            // be posted into an order settlement. Adjustment,
+                            // reserve, and ad-payment rows need their own
+                            // ledger allocation and are intentionally skipped.
+                            if (strtoupper(trim((string) ($transaction['type'] ?? ''))) !== 'ORDER') {
+                                $summary['skipped']++;
+                                continue;
+                            }
+
+                            $orderId = trim((string) ($transaction['order_id'] ?? ''));
+                            if ($orderId === '') {
+                                $summary['skipped']++;
+                                continue;
+                            }
+
+                            if (! array_key_exists($orderId, $orders)) {
+                                $orders[$orderId] = MarketplaceOrder::query()
+                                    ->where('store_id', $store->id)
+                                    ->where('channel_order_id', $orderId)
+                                    ->first();
+                            }
+                            $order = $orders[$orderId];
+                            if (! $order) {
+                                $summary['skipped']++;
+                                continue;
+                            }
+
+                            $payload = array_merge($transaction, [
+                                'order_id' => $orderId,
+                                'statement_id' => $statementId,
+                                'statement_transaction_id' => $transaction['id'] ?? null,
+                                'statement_time' => $statement['statement_time']
+                                    ?? $statement['create_time']
+                                    ?? $transactionData['create_time']
+                                    ?? null,
+                                '_is_statement_transaction' => true,
+                            ]);
+                            $wasFinal = (bool) ($order->settlement?->settlement_time)
+                                || $order->settlement?->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
+                            $previousAdCost = round((float) ($order->settlement?->ad_cost ?? 0), 2);
+                            $result = $this->persistTikTokFinancePayload(
+                                $store,
+                                $order,
+                                $transactionResponse,
+                                $payload,
+                                'tiktok_finance_202501_statement_transactions',
+                            );
+                            if (($result['status'] ?? null) === 'synced') {
+                                if (! $wasFinal) {
+                                    $summary['synced']++;
+                                }
+                                $adCost = round((float) ($result['ad_cost'] ?? 0), 2);
+                                if ($adCost > 0) {
+                                    $summary['ad_costs_total'] += $adCost;
+                                    if ($previousAdCost !== $adCost) {
+                                        $summary['ad_costs_updated']++;
+                                    }
+                                }
+                            } else {
+                                $summary['skipped']++;
+                            }
+                        }
+
+                        $nextTransactionToken = trim((string) ($transactionData['next_page_token'] ?? ''));
+                        if ($nextTransactionToken === '' || $nextTransactionToken === $transactionToken) {
+                            break;
+                        }
+                        $transactionToken = $nextTransactionToken;
+                    }
+                }
+
+                $nextStatementToken = trim((string) data_get($statementResponse, 'data.next_page_token', ''));
+                if ($nextStatementToken === '' || $nextStatementToken === $statementToken) {
+                    break;
+                }
+                $statementToken = $nextStatementToken;
+            }
+        } catch (\Throwable $e) {
+            $summary['errors']++;
+            Log::warning('[TikTok Finance] Exception saat mengambil final settlement dari statement', [
+                'store_id' => $store->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $summary;
     }
 
     /**
@@ -1576,10 +1777,32 @@ class MarketplaceSyncService
             'statement_ad_costs_updated' => 0,
             'statement_ad_costs_total' => 0.0,
             'statement_ad_cost_errors' => 0,
+            'statement_settlements_synced' => 0,
+            'statement_settlement_errors' => 0,
             'last_processed_id' => null,
         ];
         $beforeId = null;
         $batchNumber = 0;
+        $statementBatch = null;
+        $effectiveMissingOnly = $missingOnly;
+
+        // Pull authoritative final rows first. Once the statement request
+        // succeeds, per-order Finance calls are limited to local incomplete
+        // rows and remain a fallback for orders not yet included in a payout.
+        if ($timeFrom !== null && $timeTo !== null) {
+            // The UI range is primarily an order range. A completed order can
+            // enter a statement after that range, so scan statements through
+            // today and match them back to local order IDs.
+            $statementTimeTo = max($timeTo, now()->timestamp);
+            $statementBatch = $this->syncTikTokStatementSettlements($store, $timeFrom, $statementTimeTo);
+            $totals['statement_settlements_synced'] = (int) ($statementBatch['synced'] ?? 0);
+            $totals['statement_settlement_errors'] = (int) ($statementBatch['errors'] ?? 0);
+            $totals['statement_ad_costs_updated'] = (int) ($statementBatch['ad_costs_updated'] ?? 0);
+            $totals['statement_ad_costs_total'] = (float) ($statementBatch['ad_costs_total'] ?? 0);
+            $totals['statement_ad_cost_errors'] = (int) ($statementBatch['errors'] ?? 0);
+            $totals['synced'] += $totals['statement_settlements_synced'];
+            $effectiveMissingOnly = (int) ($statementBatch['errors'] ?? 0) === 0;
+        }
 
         while (true) {
             $batchNumber++;
@@ -1609,7 +1832,7 @@ class MarketplaceSyncService
                 $store,
                 $timeFrom,
                 $timeTo,
-                $missingOnly,
+                $effectiveMissingOnly,
                 $batchProgress,
                 $limit,
                 $beforeId,
@@ -1643,19 +1866,6 @@ class MarketplaceSyncService
             }
 
             $beforeId = $nextBeforeId;
-        }
-
-        // Statement query dilakukan sekali setelah seluruh order batch selesai;
-        // kalau diletakkan di dalam syncTikTokFinance, rentang statement yang
-        // sama akan ditarik ulang untuk setiap batch cursor order.
-        if ($timeFrom !== null && $timeTo !== null) {
-            $statementAdCosts = $this->syncTikTokStatementAdCosts($store, $timeFrom, $timeTo);
-            $totals['statement_ad_costs_updated'] += (int) ($statementAdCosts['updated'] ?? 0);
-            $totals['statement_ad_costs_total'] = round(
-                (float) $totals['statement_ad_costs_total'] + (float) ($statementAdCosts['total'] ?? 0),
-                2,
-            );
-            $totals['statement_ad_cost_errors'] += (int) ($statementAdCosts['errors'] ?? 0);
         }
 
         $totals['batches'] = $batchNumber;
