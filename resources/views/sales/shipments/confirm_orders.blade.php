@@ -294,6 +294,69 @@ body[data-theme="dark"] .sd-order-item-review{background:rgba(245,158,11,.09);bo
   font-size: .82rem;
   font-variant-numeric: tabular-nums;
 }
+.sd-order-qty-breakdown {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: .3rem;
+}
+.sd-order-qty-breakdown .sd-order-qty {
+  min-width: 64px;
+}
+.sd-order-qty-breakdown .sd-order-qty strong {
+  color: #0f172a;
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+}
+.sd-order-qty-breakdown .sd-order-qty.is-ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.sd-order-qty-breakdown .sd-order-qty.is-ok strong { color: #15803d; }
+.sd-order-qty-breakdown .sd-order-qty.is-short {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.sd-order-qty-breakdown .sd-order-qty.is-short strong { color: #b91c1c; }
+.sd-order-qty-breakdown .sd-order-qty.is-over {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+.sd-order-qty-breakdown .sd-order-qty.is-over strong { color: #c2410c; }
+.sd-order-qty-breakdown .sd-order-qty.is-unknown {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty {
+  border-color: rgba(148,163,184,.35);
+  background: rgba(15,23,42,.45);
+}
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty-label { color: #94a3b8; }
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty strong { color: #e2e8f0; }
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty.is-ok {
+  border-color: rgba(74,222,128,.4);
+  background: rgba(20,83,45,.3);
+}
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty.is-ok strong { color: #86efac; }
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty.is-short {
+  border-color: rgba(248,113,113,.4);
+  background: rgba(127,29,29,.3);
+}
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty.is-short strong { color: #fca5a5; }
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty.is-over {
+  border-color: rgba(251,146,60,.4);
+  background: rgba(124,45,18,.3);
+}
+body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty.is-over strong { color: #fdba74; }
+@media(max-width:600px){
+  .sd-order-qty-breakdown {
+    justify-content: flex-start;
+  }
+  .sd-order-qty-breakdown .sd-order-qty {
+    flex: 1 1 0;
+  }
+}
 .sd-order-cogs {
   display: inline-flex;
   align-items: baseline;
@@ -1352,6 +1415,13 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 if ($sourceItems->isEmpty() && $hasBookingOnly) {
                                     $sourceItems = collect($bookingItemsByScan[$scan->id] ?? []);
                                 }
+                                $sourceQtyTotal = $sourceItems->isEmpty()
+                                    ? null
+                                    : (int) $sourceItems->sum(fn ($item) => $sourceQty($item, $orderLines));
+                                $orderQtyDifference = $sourceQtyTotal === null ? null : $orderQty - $sourceQtyTotal;
+                                $orderQtyDifferenceClass = $orderQtyDifference === null
+                                    ? 'is-unknown'
+                                    : ($orderQtyDifference === 0 ? 'is-ok' : ($orderQtyDifference < 0 ? 'is-short' : 'is-over'));
                                 $orderComparison = $compareOrderShipment($orderLines, $sourceItems);
                                 $orderNeedsReview = $duplicateCount > 0 || $hasNoItems || $orderComparison['needs_review'];
                                 $reviewReasons = array_values(array_filter([
@@ -1442,6 +1512,34 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                             @if($canSeeCogs)
                                                 <span class="sd-order-summary-item" aria-label="COGS"><strong>Rp{{ number_format($orderCogs, 0, ',', '.') }}</strong></span>
                                             @endif
+                                        </div>
+                                        <div
+                                            class="sd-order-qty-breakdown"
+                                            aria-label="Ringkasan qty order"
+                                            data-order-qty="{{ $sourceQtyTotal ?? '' }}"
+                                            data-scanned-qty="{{ $orderQty }}"
+                                            data-qty-difference="{{ $orderQtyDifference ?? '' }}"
+                                        >
+                                            <span class="sd-order-qty" title="Total qty dari order marketplace">
+                                                <span class="sd-order-qty-label">Order</span>
+                                                <strong class="sd-order-qty-value">{{ $sourceQtyTotal === null ? '—' : number_format($sourceQtyTotal, 0, ',', '.') }}</strong>
+                                            </span>
+                                            <span class="sd-order-qty" title="Total qty hasil scan">
+                                                <span class="sd-order-qty-label">Scan</span>
+                                                <strong class="sd-order-qty-value">{{ number_format($orderQty, 0, ',', '.') }}</strong>
+                                            </span>
+                                            <span class="sd-order-qty {{ $orderQtyDifferenceClass }}" title="Selisih = Scan - Order">
+                                                <span class="sd-order-qty-label">Selisih</span>
+                                                <strong class="sd-order-qty-value">
+                                                    @if($orderQtyDifference === null)
+                                                        —
+                                                    @elseif($orderQtyDifference > 0)
+                                                        +{{ number_format($orderQtyDifference, 0, ',', '.') }}
+                                                    @else
+                                                        {{ number_format($orderQtyDifference, 0, ',', '.') }}
+                                                    @endif
+                                                </strong>
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
