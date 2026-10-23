@@ -36,9 +36,15 @@
     .sif-input { width: 100%; min-height: 54px; border: 1.5px solid rgba(148,163,184,.35); border-radius: 8px; padding: .5rem .7rem; color: #0f172a; background: #fff; font-size: 1.25rem; font-weight: 850; letter-spacing: .03em; text-transform: uppercase; }
     .sif-input:focus { outline: 0; border-color: #2563eb; box-shadow: 0 0 0 .2rem rgba(37,99,235,.14); }
     .sif-hint { margin-top: .35rem; color: #64748b; font-size: .72rem; }
-    .sif-list { display: grid; gap: .4rem; }
     .sif-order { display: flex; align-items: center; gap: .55rem; padding: .6rem .65rem; border: 1px solid rgba(148,163,184,.17); border-radius: 8px; background: #fff; }
     .sif-order-no { flex: 1; min-width: 0; overflow: hidden; color: #0f172a; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: .86rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
+    .sif-platform-badge {
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: .18rem .5rem; border-radius: 6px; font-size: .67rem; font-weight: 850; letter-spacing: .02em;
+    }
+    .sif-platform-shopee { background: #fff7ed; color: #c2410c; border: 1px solid rgba(234,88,12,.25); }
+    .sif-platform-tiktok { background: #0f172a; color: #f8fafc; border: 1px solid #0f172a; }
+    .sif-platform-other { background: #f1f5f9; color: #475569; border: 1px solid rgba(148,163,184,.22); }
     .sif-order-status { color: #166534; font-size: .7rem; font-weight: 800; }
     .sif-order-status-unlinked { color: #b45309; }
     .sif-empty { padding: 1rem; color: #64748b; text-align: center; font-size: .78rem; }
@@ -99,21 +105,63 @@
 
 @section('content')
 @php
-  $lines = $shipment->lines ?? collect();
+    $lines = $shipment->lines ?? collect();
     $orders = ($shipment->orderScans ?? collect())->sortBy('id')->values();
     $isItemOnlyAllowed = $shipment->shipment_type === \App\Models\Shipment::TYPE_MARKETPLACE
         && ($shipment->dispatch_mode ?? \App\Models\Shipment::DISPATCH_SINGLE) !== \App\Models\Shipment::DISPATCH_DAILY
         && $lines->isNotEmpty();
     $totalQty = (int) $lines->sum('qty_scanned');
     $totalLines = (int) $lines->count();
-    $orderGroup = static function ($orderNo): string {
-        $value = strtoupper(trim((string) $orderNo));
-        if (str_starts_with($value, 'SPX')) return 'SPX';
-        if (str_starts_with($value, 'JY')) return 'JY';
-        return 'Lainnya';
+
+    $detectPlatform = static function ($order) use ($shipment): array {
+        $payload = is_object($order) && is_array($order->raw_payload) ? $order->raw_payload : [];
+        if (!empty($order->platform_key) && !empty($order->platform_label)) {
+            return ['key' => (string) $order->platform_key, 'label' => (string) $order->platform_label];
+        }
+        if (!empty($payload['platform_key']) && !empty($payload['platform_label'])) {
+            return ['key' => (string) $payload['platform_key'], 'label' => (string) $payload['platform_label']];
+        }
+        $upperNo = strtoupper(trim(is_object($order) ? (string) $order->order_no : (string) $order));
+        if (str_starts_with($upperNo, 'SPX') || str_starts_with($upperNo, 'JY')) {
+            return ['key' => 'shopee', 'label' => 'Shopee'];
+        }
+        if (preg_match('/^57\d{17}$/', $upperNo) || str_starts_with($upperNo, 'TTS') || str_starts_with($upperNo, 'TTK')) {
+            return ['key' => 'tiktok', 'label' => 'TikTok'];
+        }
+        $store = is_object($order) ? ($order->fulfillment?->marketplaceOrder?->store ?? $shipment->store) : null;
+        $channel = $store?->channel;
+        $cCode = strtolower((string) ($channel?->code ?? ''));
+        $cName = strtolower((string) ($channel?->name ?? ''));
+        if (str_contains($cCode, 'shp') || str_contains($cCode, 'shopee') || str_contains($cName, 'shopee')) {
+            return ['key' => 'shopee', 'label' => 'Shopee'];
+        }
+        if (str_contains($cCode, 'ttk') || str_contains($cCode, 'tiktok') || str_contains($cName, 'tiktok')) {
+            return ['key' => 'tiktok', 'label' => 'TikTok'];
+        }
+        return ['key' => 'other', 'label' => 'Lainnya'];
     };
-    $orderGroups = collect(['SPX', 'JY', 'Lainnya'])
-        ->mapWithKeys(fn ($group) => [$group => $orders->filter(fn ($order) => $orderGroup($order->order_no) === $group)->count()]);
+
+    $initialOrdersData = $orders->map(function ($order) use ($detectPlatform) {
+        $orderPayload = is_array($order->raw_payload) ? $order->raw_payload : [];
+        $isUnlinked = empty($order->fulfillment_id)
+            || ($orderPayload['mode'] ?? null) === 'record_only'
+            || ($orderPayload['lookup_status'] ?? null) !== null;
+        $plat = $detectPlatform($order);
+        return [
+            'id' => $order->id,
+            'code' => $order->order_no,
+            'platform' => $plat['key'],
+            'platform_label' => $plat['label'],
+            'is_unlinked' => $isUnlinked,
+        ];
+    });
+
+    $groupCounts = [
+        'all' => $initialOrdersData->count(),
+        'shopee' => $initialOrdersData->where('platform', 'shopee')->count(),
+        'tiktok' => $initialOrdersData->where('platform', 'tiktok')->count(),
+        'other' => $initialOrdersData->where('platform', 'other')->count(),
+    ];
 @endphp
 
 <div class="sif-page">
@@ -168,37 +216,31 @@
                 </div>
             </div>
             <div class="sif-body">
-                <div id="sifOrderFilters" class="sif-order-filters" role="group" aria-label="Filter grup order">
+                <div id="sifOrderFilters" class="sif-order-filters" role="group" aria-label="Filter platform order">
                     <button type="button" class="sif-order-filter is-active" data-group="all" aria-pressed="true">
-                        Semua <b data-filter-count="all">{{ $orders->count() }}</b>
+                        Semua <b data-filter-count="all">{{ $groupCounts['all'] }}</b>
                     </button>
-                    @foreach ($orderGroups as $group => $groupTotal)
-                        <button type="button" class="sif-order-filter" data-group="{{ $group }}" aria-pressed="false" @disabled($groupTotal === 0)>
-                            {{ $group }} <b data-filter-count="{{ $group }}">{{ $groupTotal }}</b>
-                        </button>
-                    @endforeach
+                    <button type="button" class="sif-order-filter" data-group="shopee" aria-pressed="false">
+                        Shopee <b data-filter-count="shopee">{{ $groupCounts['shopee'] }}</b>
+                    </button>
+                    <button type="button" class="sif-order-filter" data-group="tiktok" aria-pressed="false">
+                        TikTok <b data-filter-count="tiktok">{{ $groupCounts['tiktok'] }}</b>
+                    </button>
+                    <button type="button" class="sif-order-filter" data-group="other" aria-pressed="false" @if($groupCounts['other'] === 0) style="display: none;" @endif>
+                        Lainnya <b data-filter-count="other">{{ $groupCounts['other'] }}</b>
+                    </button>
                 </div>
                 <div id="sifOrderList" class="sif-list">
                     @php $orderNumber = 0; @endphp
-                    @forelse ($orderGroups->filter(fn ($total) => $total > 0) as $group => $groupTotal)
-                        <div class="sif-order-group-section">
-                            <div class="sif-order-group-heading"><span>{{ $group }}</span><b>{{ $groupTotal }}</b></div>
-                            @foreach ($orders->filter(fn ($order) => $orderGroup($order->order_no) === $group) as $order)
-                                @php $orderNumber++; @endphp
-                                @php
-                                    $orderPayload = is_array($order->raw_payload) ? $order->raw_payload : [];
-                                    $isUnlinked = empty($order->fulfillment_id)
-                                        || ($orderPayload['mode'] ?? null) === 'record_only'
-                                        || ($orderPayload['lookup_status'] ?? null) !== null;
-                                @endphp
-                                <div class="sif-order">
-                                    <span class="sif-order-index">{{ $orderNumber }}</span>
-                                    <span class="sif-order-no">{{ $order->order_no }}</span>
-                                    <span class="sif-order-status {{ $isUnlinked ? 'sif-order-status-unlinked' : '' }}">
-                                        {{ $isUnlinked ? 'Belum Tertaut' : 'Tertaut' }}
-                                    </span>
-                                </div>
-                            @endforeach
+                    @forelse ($initialOrdersData as $item)
+                        @php $orderNumber++; @endphp
+                        <div class="sif-order" data-platform="{{ $item['platform'] }}">
+                            <span class="sif-order-index">{{ $orderNumber }}</span>
+                            <span class="sif-platform-badge sif-platform-{{ $item['platform'] }}">{{ $item['platform_label'] }}</span>
+                            <span class="sif-order-no">{{ $item['code'] }}</span>
+                            <span class="sif-order-status {{ $item['is_unlinked'] ? 'sif-order-status-unlinked' : '' }}">
+                                {{ $item['is_unlinked'] ? 'Belum Tertaut' : 'Tertaut' }}
+                            </span>
                         </div>
                     @empty
                         <div class="sif-empty">{{ $isItemOnlyAllowed ? 'Belum ada nomor order. Shipment tetap dapat dilanjutkan sebagai item-only.' : 'Belum ada nomor order yang discan.' }}</div>
@@ -228,7 +270,7 @@
     const cameraStatus = document.getElementById('sifCameraStatus');
     const recordUrl = @json(route('sales.shipments.scan_order_store', $shipment));
     const csrf = @json(csrf_token());
-    let orders = @json($orders->map(fn ($order) => $order->order_no)->values());
+    let orders = @json($initialOrdersData->values());
     let camera = null;
     let cameraLoading = false;
     let submitting = false;
@@ -311,11 +353,14 @@
         });
     }
 
-    function getOrderGroup(orderNo) {
-        const value = String(orderNo ?? '').trim().toUpperCase();
-        if (value.startsWith('SPX')) return 'SPX';
-        if (value.startsWith('JY')) return 'JY';
-        return 'Lainnya';
+    function getOrderGroup(order) {
+        if (typeof order === 'object' && order?.platform) {
+            return order.platform;
+        }
+        const value = String(order?.code || order || '').trim().toUpperCase();
+        if (value.startsWith('SPX') || value.startsWith('JY')) return 'shopee';
+        if (/^57\d{17}$/.test(value) || value.startsWith('TTS') || value.startsWith('TTK')) return 'tiktok';
+        return 'other';
     }
 
     async function enableOrderAutoFocus(video = cameraReader?.querySelector('video')) {
@@ -326,14 +371,22 @@
     }
 
     function renderOrderFilters() {
-        const groups = { SPX: 0, JY: 0, Lainnya: 0 };
-        orders.forEach(order => { groups[getOrderGroup(order)] += 1; });
+        const counts = { all: orders.length, shopee: 0, tiktok: 0, other: 0 };
+        orders.forEach(order => {
+            const grp = getOrderGroup(order);
+            if (counts[grp] !== undefined) counts[grp] += 1;
+            else counts.other += 1;
+        });
+
         filterButtons.forEach(button => {
             const group = button.dataset.group;
-            const total = group === 'all' ? orders.length : groups[group] || 0;
+            const total = group === 'all' ? counts.all : counts[group] || 0;
             const badge = button.querySelector('[data-filter-count]');
             if (badge) badge.textContent = total;
-            button.disabled = group !== 'all' && total === 0;
+
+            if (group === 'other') {
+                button.style.display = total > 0 ? '' : 'none';
+            }
             button.classList.toggle('is-active', activeGroup === group);
             button.setAttribute('aria-pressed', activeGroup === group ? 'true' : 'false');
         });
@@ -346,28 +399,30 @@
             : orders.filter(order => getOrderGroup(order) === activeGroup);
 
         if (!visibleOrders.length) {
+            const groupNames = { shopee: 'Shopee', tiktok: 'TikTok', other: 'Lainnya' };
             list.innerHTML = activeGroup === 'all'
-                ? '<div class="sif-empty">Belum ada nomor order yang discan.</div>'
-                : `<div class="sif-empty">Belum ada order grup ${activeGroup}.</div>`;
+                ? `<div class="sif-empty">${allowItemOnly ? 'Belum ada nomor order. Shipment tetap dapat dilanjutkan sebagai item-only.' : 'Belum ada nomor order yang discan.'}</div>`
+                : `<div class="sif-empty">Belum ada order ${groupNames[activeGroup] || activeGroup} yang discan.</div>`;
         } else {
-            const groups = { SPX: [], JY: [], Lainnya: [] };
-            visibleOrders.forEach(order => { groups[getOrderGroup(order)].push(order); });
             let orderNumber = 0;
-            list.innerHTML = Object.entries(groups)
-                .filter(([, groupOrders]) => groupOrders.length > 0)
-                .map(([group, groupOrders]) => `
-                    <div class="sif-order-group-section">
-                        <div class="sif-order-group-heading"><span>${group}</span><b>${groupOrders.length}</b></div>
-                        ${groupOrders.map(order => {
-                            orderNumber += 1;
-                            return `
-                            <div class="sif-order">
-                                <span class="sif-order-index">${orderNumber}</span>
-                                <span class="sif-order-no">${String(order).replace(/[&<>"']/g, '')}</span>
-                                <span class="sif-order-status">Tercatat</span>
-                            </div>`;
-                        }).join('')}
-                    </div>`).join('');
+            list.innerHTML = visibleOrders.map(order => {
+                orderNumber += 1;
+                const safeCode = String(order.code || order).replace(/[&<>"']/g, '');
+                const platformKey = order.platform || getOrderGroup(order);
+                const platformLabel = order.platform_label || (platformKey === 'shopee' ? 'Shopee' : (platformKey === 'tiktok' ? 'TikTok' : 'Lainnya'));
+                const isUnlinked = Boolean(order.is_unlinked);
+                const statusClass = isUnlinked ? 'sif-order-status sif-order-status-unlinked' : 'sif-order-status';
+                const statusText = isUnlinked ? 'Belum Tertaut' : 'Tertaut';
+                const platformBadgeClass = `sif-platform-badge sif-platform-${platformKey}`;
+
+                return `
+                <div class="sif-order" data-platform="${platformKey}">
+                    <span class="sif-order-index">${orderNumber}</span>
+                    <span class="${platformBadgeClass}">${platformLabel}</span>
+                    <span class="sif-order-no">${safeCode}</span>
+                    <span class="${statusClass}">${statusText}</span>
+                </div>`;
+            }).join('');
         }
         if (count) count.textContent = orders.length;
         renderOrderFilters();
@@ -553,7 +608,34 @@
             const data = await response.json();
             if (!response.ok || data.status !== 'ok') throw new Error(data.message || 'Gagal mencatat order.');
             const isDuplicate = data.duplicate === true || data.created === false;
-            if (!orders.includes(normalizedOrderNo)) orders.push(normalizedOrderNo);
+
+            const existingIndex = orders.findIndex(o => (typeof o === 'object' ? o.code : o) === normalizedOrderNo);
+            const fallbackPlatform = (normalizedOrderNo.startsWith('SPX') || normalizedOrderNo.startsWith('JY'))
+                ? 'shopee'
+                : ((/^57\d{17}$/.test(normalizedOrderNo) || normalizedOrderNo.startsWith('TTS') || normalizedOrderNo.startsWith('TTK')) ? 'tiktok' : 'other');
+            const platformKey = data.order?.platform_key || fallbackPlatform;
+            const platformLabel = data.order?.platform_label || (platformKey === 'shopee' ? 'Shopee' : (platformKey === 'tiktok' ? 'TikTok' : 'Lainnya'));
+            const isUnlinked = data.order?.is_unlinked !== undefined
+                ? Boolean(data.order.is_unlinked)
+                : Boolean(data.order?.linked_source === null || (data.order?.label || '').includes('Belum tertaut'));
+
+            const orderObj = {
+                code: normalizedOrderNo,
+                platform: platformKey,
+                platform_label: platformLabel,
+                is_unlinked: isUnlinked,
+            };
+
+            if (existingIndex >= 0) {
+                orders[existingIndex] = { ...orders[existingIndex], ...orderObj };
+            } else {
+                orders.push(orderObj);
+            }
+
+            if (activeGroup !== 'all' && activeGroup !== platformKey) {
+                activeGroup = platformKey;
+            }
+
             renderOrders();
             input.value = '';
             if (isDuplicate) {
@@ -561,7 +643,7 @@
                 showToast(data.message || 'Order sudah tercatat.', true);
             } else {
                 orderSuccessSound();
-                showToast(data.message || 'Order berhasil dicatat.');
+                showToast(data.message || `Order ${normalizedOrderNo} dicatat (${platformLabel}).`);
             }
         } catch (error) {
             orderErrorSound();

@@ -1230,6 +1230,12 @@
                     <button type="button" class="sr-marketplace-tab active" data-order-marketplace-tab="all" role="tab" aria-selected="true">
                         <span>Semua</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="all">0</span>
                     </button>
+                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="shopee" role="tab" aria-selected="false">
+                        <span>Shopee</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="shopee">0</span>
+                    </button>
+                    <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="tiktok" role="tab" aria-selected="false">
+                        <span>TikTok</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="tiktok">0</span>
+                    </button>
                     <button type="button" class="sr-marketplace-tab" data-order-marketplace-tab="problem" role="tab" aria-selected="false">
                         <span>Perlu Diperiksa</span><span class="sr-marketplace-tab-count" data-order-marketplace-count="problem">0</span>
                     </button>
@@ -1326,7 +1332,14 @@
     }
 
     function selectMarketplaceForOrder(orderCode) {
-        state.marketplaceTab = 'all';
+        const order = findOrder(orderCode);
+        if (state.marketplaceTab === 'problem') {
+            state.marketplaceTab = 'all';
+        } else if (state.marketplaceTab === 'shopee' && order?.platformKey && order.platformKey !== 'shopee') {
+            state.marketplaceTab = order.platformKey;
+        } else if (state.marketplaceTab === 'tiktok' && order?.platformKey && order.platformKey !== 'tiktok') {
+            state.marketplaceTab = order.platformKey;
+        }
     }
 
     function isNextOrderCommand(code) {
@@ -1545,6 +1558,16 @@
         ['platformKey', 'platformLabel', 'storeId', 'storeLabel'].forEach(key => {
             if (meta[key]) order[key] = meta[key];
         });
+        if (!order.platformKey) {
+            const upper = normalize(code);
+            if (upper.startsWith('SPX') || upper.startsWith('JY')) {
+                order.platformKey = 'shopee';
+                order.platformLabel = 'Shopee';
+            } else if (/^57\d{17}$/.test(upper) || upper.startsWith('TTS') || upper.startsWith('TTK')) {
+                order.platformKey = 'tiktok';
+                order.platformLabel = 'TikTok';
+            }
+        }
 
         state.current = order.code;
         state.expanded = order.code;
@@ -1637,6 +1660,8 @@
         const query = normalize(state.search);
         return state.orders.filter(order => {
             if (state.marketplaceTab === 'problem' && Number(order.duplicateCount || 0) <= 0 && (order.items || []).length > 0) return false;
+            if (state.marketplaceTab === 'shopee' && order.platformKey !== 'shopee') return false;
+            if (state.marketplaceTab === 'tiktok' && order.platformKey !== 'tiktok') return false;
             if (state.platformKey && order.platformKey !== state.platformKey) return false;
             if (state.storeId && String(order.storeId) !== state.storeId) return false;
             if (!query) return true;
@@ -1648,9 +1673,11 @@
     }
 
     function updateMarketplaceTabs(visibleOrders) {
-        const counts = { all: state.orders.length, problem: 0 };
+        const counts = { all: state.orders.length, problem: 0, shopee: 0, tiktok: 0 };
         state.orders.forEach(order => {
             if (Number(order.duplicateCount || 0) > 0 || (order.items || []).length === 0) counts.problem += 1;
+            if (order.platformKey === 'shopee') counts.shopee += 1;
+            else if (order.platformKey === 'tiktok') counts.tiktok += 1;
         });
 
         const platformTabs = new Map();
@@ -1687,7 +1714,7 @@
             tab.classList.toggle('active', state.marketplaceTab === key);
             tab.setAttribute('aria-selected', state.marketplaceTab === key ? 'true' : 'false');
             const count = tab.querySelector('[data-order-marketplace-count]');
-            if (count) count.textContent = key === 'all' ? counts.all : key === 'problem' ? counts.problem : 0;
+            if (count) count.textContent = counts[key] !== undefined ? counts[key] : 0;
         });
 
         if (orderToolsCount) orderToolsCount.textContent = `${visibleOrders.length} order`;
@@ -2549,10 +2576,8 @@
         const storeTab = event.target.closest('[data-order-store-tab]');
         if (marketplaceTab) {
             state.marketplaceTab = marketplaceTab.dataset.orderMarketplaceTab || 'all';
-            if (state.marketplaceTab === 'all') {
-                state.platformKey = '';
-                state.storeId = '';
-            }
+            state.platformKey = '';
+            state.storeId = '';
             state.expanded = null;
             render();
         } else if (platformTab) {

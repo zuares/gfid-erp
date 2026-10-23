@@ -277,6 +277,83 @@ class ShipmentController extends Controller
             : $normalized;
     }
 
+    public function resolveOrderPlatformInfo(
+        string $orderNo,
+        ?\App\Models\Store $store = null,
+        ?\App\Models\ShipmentOrderScan $scan = null,
+        ?Shipment $shipment = null
+    ): array {
+        $channel = $store?->channel;
+        $channelCode = strtolower((string) ($channel?->code ?? ''));
+        $channelName = strtolower((string) ($channel?->name ?? ''));
+
+        if (str_contains($channelCode, 'shp') || str_contains($channelCode, 'shopee') || str_contains($channelName, 'shopee')) {
+            return ['key' => 'shopee', 'label' => 'Shopee'];
+        }
+        if (str_contains($channelCode, 'ttk') || str_contains($channelCode, 'tiktok') || str_contains($channelName, 'tiktok')) {
+            return ['key' => 'tiktok', 'label' => 'TikTok'];
+        }
+
+        // Cek payload jika scan sudah pernah menyimpan platform_key
+        if ($scan) {
+            $payload = is_array($scan->raw_payload) ? $scan->raw_payload : [];
+            $savedKey = strtolower((string) ($payload['platform_key'] ?? ''));
+            if (str_contains($savedKey, 'shp') || str_contains($savedKey, 'shopee')) {
+                return ['key' => 'shopee', 'label' => 'Shopee'];
+            }
+            if (str_contains($savedKey, 'ttk') || str_contains($savedKey, 'tiktok')) {
+                return ['key' => 'tiktok', 'label' => 'TikTok'];
+            }
+        }
+
+        // Cek booking kilat / marketplace bookings
+        $booking = \App\Models\MarketplaceBooking::query()
+            ->where(function ($q) use ($orderNo) {
+                $q->whereRaw('UPPER(TRIM(booking_sn)) = ?', [$orderNo])
+                    ->orWhereRaw('UPPER(TRIM(order_sn)) = ?', [$orderNo])
+                    ->orWhereRaw('UPPER(TRIM(tracking_number)) = ?', [$orderNo]);
+            })
+            ->with('store.channel')
+            ->first();
+
+        if ($booking?->store?->channel) {
+            $bChannelCode = strtolower((string) $booking->store->channel->code);
+            $bChannelName = strtolower((string) $booking->store->channel->name);
+            if (str_contains($bChannelCode, 'shp') || str_contains($bChannelCode, 'shopee') || str_contains($bChannelName, 'shopee')) {
+                return ['key' => 'shopee', 'label' => 'Shopee'];
+            }
+            if (str_contains($bChannelCode, 'ttk') || str_contains($bChannelCode, 'tiktok') || str_contains($bChannelName, 'tiktok')) {
+                return ['key' => 'tiktok', 'label' => 'TikTok'];
+            }
+        }
+
+        // Cek shipment store jika shipment terikat pada store tertentu
+        if ($shipment?->store?->channel) {
+            $sChannelCode = strtolower((string) $shipment->store->channel->code);
+            $sChannelName = strtolower((string) $shipment->store->channel->name);
+            if (str_contains($sChannelCode, 'shp') || str_contains($sChannelCode, 'shopee') || str_contains($sChannelName, 'shopee')) {
+                return ['key' => 'shopee', 'label' => 'Shopee'];
+            }
+            if (str_contains($sChannelCode, 'ttk') || str_contains($sChannelCode, 'tiktok') || str_contains($sChannelName, 'tiktok')) {
+                return ['key' => 'tiktok', 'label' => 'TikTok'];
+            }
+        }
+
+        // Fallback berdasarkan pola awalan nomor order / nomor resi
+        $upperNo = strtoupper(trim($orderNo));
+        if (str_starts_with($upperNo, 'SPX') || str_starts_with($upperNo, 'JY')) {
+            return ['key' => 'shopee', 'label' => 'Shopee'];
+        }
+        if (preg_match('/^57\d{17}$/', $upperNo) || str_starts_with($upperNo, 'TTS') || str_starts_with($upperNo, 'TTK')) {
+            return ['key' => 'tiktok', 'label' => 'TikTok'];
+        }
+
+        return [
+            'key' => $channel?->code ? strtolower((string) $channel->code) : 'other',
+            'label' => $channel?->name ?: ($channel?->code ?: 'Lainnya'),
+        ];
+    }
+
     /**
      * Ambil gelombang aktif untuk satu shipment harian. Shipment lama yang
      * belum punya wave diadopsi ke gelombang pertama agar tetap kompatibel.
@@ -1243,7 +1320,12 @@ class ShipmentController extends Controller
         $currentWave = $this->currentShipmentWave($shipment);
 
         if (($shipment->scan_mode ?? 'item_first') === 'item_first') {
-            $shipment->load(['lines.item', 'orderScans.lines.item']);
+            $shipment->load([
+                'store.channel',
+                'lines.item',
+                'orderScans.lines.item',
+                'orderScans.fulfillment.marketplaceOrder.store.channel',
+            ]);
             if ($currentWave) {
                 $shipment->setRelation(
                     'lines',
@@ -1261,6 +1343,13 @@ class ShipmentController extends Controller
                     ->with('status', 'error')
                     ->with('message', 'Scan item terlebih dahulu sebelum scan nomor order.');
             }
+
+            $shipment->orderScans->each(function ($scan) use ($shipment) {
+                $store = $scan->fulfillment?->marketplaceOrder?->store;
+                $platform = $this->resolveOrderPlatformInfo($scan->order_no, $store, $scan, $shipment);
+                $scan->platform_key = $platform['key'];
+                $scan->platform_label = $platform['label'];
+            });
 
             return view('sales.shipments.scan_order_item_first', compact('shipment'));
         }
@@ -1288,7 +1377,7 @@ class ShipmentController extends Controller
 
                 $marketplaceOrder = $scan->fulfillment?->marketplaceOrder;
                 $store = $marketplaceOrder?->store;
-                $channel = $store?->channel;
+                $platformInfo = $this->resolveOrderPlatformInfo($scan->order_no, $store, $scan, $shipment);
 
                 return [
                     'id' => $scan->id,
@@ -1297,8 +1386,8 @@ class ShipmentController extends Controller
                     'status' => $scan->status,
                     'label' => $payload['label'] ?? 'Pencatatan order',
                     'duplicate_count' => (int) ($payload['duplicate_count'] ?? 0),
-                    'platform_key' => $channel?->code ? strtolower((string) $channel->code) : null,
-                    'platform_label' => $channel?->name ?: $channel?->code,
+                    'platform_key' => $platformInfo['key'],
+                    'platform_label' => $platformInfo['label'],
                     'store_id' => $store?->id,
                     'store_label' => $store?->name ?: $store?->code,
                     'items' => $scanLines
@@ -1428,7 +1517,13 @@ class ShipmentController extends Controller
             }
         }
 
-        $scan = DB::transaction(function () use ($shipment, $currentWave, $orderNo, $lookupMode, $lookupFallbackStatus, $marketplaceOrder, $salesInvoice, $fulfillment) {
+        $linkedStore = $marketplaceOrder?->store ?? $salesInvoice?->store;
+        if ($linkedStore && !$linkedStore->relationLoaded('channel')) {
+            $linkedStore->load('channel');
+        }
+        $platformInfo = $this->resolveOrderPlatformInfo($orderNo, $linkedStore, null, $shipment);
+
+        $scan = DB::transaction(function () use ($shipment, $currentWave, $orderNo, $lookupMode, $lookupFallbackStatus, $marketplaceOrder, $salesInvoice, $fulfillment, $platformInfo) {
             Shipment::query()
                 ->lockForUpdate()
                 ->findOrFail($shipment->id);
@@ -1464,6 +1559,8 @@ class ShipmentController extends Controller
                         'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?: 'order_not_found'),
                         'sales_invoice_id' => $salesInvoice?->id,
                         'duplicate_count' => 0,
+                        'platform_key' => $platformInfo['key'],
+                        'platform_label' => $platformInfo['label'],
                     ],
                 ]);
             } else {
@@ -1484,6 +1581,8 @@ class ShipmentController extends Controller
                         'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?? ($payload['match_reason'] ?? 'order_not_found')),
                         'sales_invoice_id' => $salesInvoice?->id ?? ($payload['sales_invoice_id'] ?? null),
                         'duplicate_count' => $duplicateCount,
+                        'platform_key' => $platformInfo['key'],
+                        'platform_label' => $platformInfo['label'],
                         'order' => array_merge(
                             is_array($payload['order'] ?? null) ? $payload['order'] : [],
                             ['order_no' => $orderNo]
@@ -1514,7 +1613,7 @@ class ShipmentController extends Controller
         if ($linkedStore && !$linkedStore->relationLoaded('channel')) {
             $linkedStore->load('channel');
         }
-        $linkedChannel = $linkedStore?->channel;
+        $platformInfo = $this->resolveOrderPlatformInfo($orderNo, $linkedStore, $scan, $shipment);
 
         return response()->json([
             'status' => 'ok',
@@ -1534,8 +1633,11 @@ class ShipmentController extends Controller
                     : ($lookupFallbackStatus !== null ? 'Belum tertaut' : 'Pencatatan order'),
                 'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : null),
                 'duplicate_count' => (int) data_get($scan->raw_payload, 'duplicate_count', 0),
-                'platform_key' => $linkedChannel?->code ? strtolower((string) $linkedChannel->code) : null,
-                'platform_label' => $linkedChannel?->name ?: $linkedChannel?->code,
+                'platform_key' => $platformInfo['key'],
+                'platform_label' => $platformInfo['label'],
+                'is_unlinked' => empty($scan->fulfillment_id)
+                    || (data_get($scan->raw_payload, 'mode') === 'record_only')
+                    || (data_get($scan->raw_payload, 'lookup_status') !== null),
                 'store_id' => $linkedStore?->id,
                 'store_label' => $linkedStore?->name ?: $linkedStore?->code,
             ],
