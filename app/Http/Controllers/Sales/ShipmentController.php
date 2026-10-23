@@ -2367,6 +2367,51 @@ class ShipmentController extends Controller
                                 ->orWhereColumn('marketplace_bookings.booking_sn', 'marketplace_orders.booking_sn');
                         });
                 });
+
+                // Satu order Shopee bisa dipecah menjadi beberapa paket. AWB
+                // paket tambahan tidak dapat disimpan di shipping_awb_no yang
+                // hanya satu kolom, tetapi tetap tersedia di raw_json.package_list
+                // dari get_order_detail. Cari seluruh paket agar scan AWB kedua,
+                // misalnya SPXID..., tetap tertaut ke parent MarketplaceOrder.
+                $packageAwbFields = ['tracking_number', 'tracking_no', 'package_number'];
+                $driver = DB::connection()->getDriverName();
+
+                if ($driver === 'sqlite') {
+                    $query->orWhereExists(function ($packageQuery) use ($scanCode, $packageAwbFields) {
+                        $packageQuery
+                            ->selectRaw('1')
+                            ->fromRaw("json_each(CASE WHEN json_valid(marketplace_orders.raw_json) THEN COALESCE(json_extract(marketplace_orders.raw_json, '$.package_list'), '[]') ELSE '[]' END) AS marketplace_package")
+                            ->where(function ($fieldQuery) use ($scanCode, $packageAwbFields) {
+                                foreach ($packageAwbFields as $index => $field) {
+                                    $condition = "UPPER(TRIM(COALESCE(json_extract(marketplace_package.value, '$.{$field}'), ''))) = ?";
+                                    $index === 0
+                                        ? $fieldQuery->whereRaw($condition, [$scanCode])
+                                        : $fieldQuery->orWhereRaw($condition, [$scanCode]);
+                                }
+                            });
+                    });
+                } elseif (in_array($driver, ['mysql', 'mariadb'], true)) {
+                    $query->orWhere(function ($packageQuery) use ($scanCode, $packageAwbFields) {
+                        $packageQuery
+                            ->whereRaw('JSON_VALID(marketplace_orders.raw_json)')
+                            ->where(function ($fieldQuery) use ($scanCode, $packageAwbFields) {
+                                foreach ($packageAwbFields as $index => $field) {
+                                    $condition = "JSON_SEARCH(marketplace_orders.raw_json, 'one', ?, NULL, '$.package_list[*].{$field}') IS NOT NULL";
+                                    $index === 0
+                                        ? $fieldQuery->whereRaw($condition, [$scanCode])
+                                        : $fieldQuery->orWhereRaw($condition, [$scanCode]);
+                                }
+                            });
+                    });
+                } else {
+                    // Fallback untuk driver tanpa fungsi JSON path. Nilai tetap
+                    // di-bind sebagai parameter; hanya akurasinya yang lebih
+                    // rendah jika format JSON provider berubah.
+                    foreach ($packageAwbFields as $field) {
+                        $query->orWhere('marketplace_orders.raw_json', 'like', '%"' . $field . '":"' . $scanCode . '"%');
+                    }
+                }
+
                 $first = false;
             }
 

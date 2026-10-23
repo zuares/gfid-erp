@@ -1349,6 +1349,73 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertDontSee('>MARKETPLACE-A</div>', false);
     }
 
+    public function test_split_order_package_awb_finds_parent_order_and_shows_marketplace_sku(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-SPLIT-AWB-SKU-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        $firstPackageAwb = 'SPXID06683582419A';
+        $splitPackageAwb = 'SPXID06683582420A';
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-SPLIT-AWB-SKU-001',
+            'channel_order_id' => 'ORDER-SPLIT-AWB-SKU-001',
+            'shipping_awb_no' => $firstPackageAwb,
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'raw_json' => [
+                'order_sn' => 'ORDER-SPLIT-AWB-SKU-001',
+                'package_list' => [
+                    ['tracking_number' => $firstPackageAwb],
+                    ['tracking_number' => $splitPackageAwb],
+                ],
+            ],
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'model_sku' => 'K5BLK-M',
+            'item_sku' => 'K5BLK',
+            'qty' => 1,
+        ]);
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => $splitPackageAwb,
+            'status' => 'pending',
+            'source' => 'scanner',
+            'raw_payload' => ['mode' => 'record_only'],
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('sd-badge linked', false)
+            ->assertSee('sd-marketplace-detail', false)
+            ->assertSee('K5BLK-M')
+            ->assertDontSee('Belum ada item');
+
+        $this->assertNotNull($scan->fresh()->fulfillment_id);
+        $this->assertSame($order->id, $scan->fresh()->fulfillment?->marketplace_order_id);
+    }
+
     public function test_spx_confirmation_shows_order_sku_and_flags_a_different_scanned_item(): void
     {
         [$user, $store, $scannedItem] = $this->shipmentContext();
