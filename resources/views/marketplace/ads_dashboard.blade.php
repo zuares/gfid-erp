@@ -3117,6 +3117,18 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </form>
 
+    <div id="realtimeStatusContainer" class="d-flex align-items-center gap-3 my-3"></div>
+
+    @if($dateTo >= now()->toDateString() && ($kpi['current']->spend ?? 0) == 0)
+        <div class="dpanel dpanel-body d-flex align-items-center gap-2 mb-3" style="border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.08); font-size: 0.82rem; color: var(--text); border-radius: 8px; padding: 0.75rem 1rem;">
+            <i class="bi bi-info-circle-fill text-warning fs-5 flex-shrink-0"></i>
+            <div>
+                <strong>Informasi Pelaporan Hari Ini ({{ now()->format('d M Y') }}):</strong>
+                Shopee Open Platform API memiliki jeda pembaruan data (reporting latency) 1–3 jam untuk metrik hari berjalan. Saldo kredit iklan berkurang secara real-time dari lelang klik Shopee, namun agregasi metrik klik, biaya, dan GMV hari ini baru dirilis bertahap oleh server Shopee.
+            </div>
+        </div>
+    @endif
+
     @if(session('error'))
         <div class="dpanel dpanel-body" style="border-left: 4px solid #dc2626; color: #dc2626; font-size:.82rem; font-weight: 500;">
             <i class="bi bi-exclamation-circle me-1"></i> {{ session('error') }}

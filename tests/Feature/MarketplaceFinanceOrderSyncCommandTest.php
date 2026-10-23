@@ -10,7 +10,6 @@ use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplacePayout;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class MarketplaceFinanceOrderSyncCommandTest extends TestCase
@@ -74,16 +73,6 @@ class MarketplaceFinanceOrderSyncCommandTest extends TestCase
             ->assertExitCode(2);
 
         $this->assertDatabaseCount('marketplace_finance_sync_runs', 0);
-    }
-
-    public function test_order_only_sync_is_registered_in_scheduler(): void
-    {
-        Artisan::call('schedule:list');
-        $output = Artisan::output();
-
-        $this->assertStringContainsString('marketplace:finance-order-sync', $output);
-        $this->assertStringContainsString("--store='Greatfit.id'", $output);
-        $this->assertStringContainsString('*/15', $output);
     }
 
     private function storeWithOrder(): Store

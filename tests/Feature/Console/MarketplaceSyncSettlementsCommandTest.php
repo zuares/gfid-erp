@@ -3,6 +3,7 @@
 namespace Tests\Feature\Console;
 
 use App\Models\Channel;
+use App\Models\MarketplaceFinanceSyncRun;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
 use App\Services\MarketplaceSyncService;
@@ -293,6 +294,32 @@ class MarketplaceSyncSettlementsCommandTest extends TestCase
         $this->artisan('marketplace:sync-settlements', ['--store' => $store->id])
             ->expectsOutputToContain('Synced    : 4')
             ->assertSuccessful();
+    }
+
+    public function test_sinkronisasi_sukses_memicu_finance_order_only_dengan_cooldown()
+    {
+        config()->set('marketplace.finance_order_sync_enabled', true);
+        config()->set('marketplace.finance_order_sync_store_name', 'Greatfit.id');
+        config()->set('marketplace.finance_order_sync_interval_minutes', 15);
+        $store = $this->createStore('Greatfit.id');
+
+        $this->mock(MarketplaceSyncService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('syncSettlements')
+                ->twice()
+                ->andReturn($this->successResult());
+        });
+
+        $arguments = ['--store' => $store->id];
+        $this->artisan('marketplace:sync-settlements', $arguments)->assertSuccessful();
+        $this->artisan('marketplace:sync-settlements', $arguments)->assertSuccessful();
+
+        $this->assertSame(1, MarketplaceFinanceSyncRun::query()
+            ->where('trigger', 'order_schedule')
+            ->where('status', 'success')
+            ->count());
+        $this->assertDatabaseCount('marketplace_finance_settlements', 0);
+        $this->assertDatabaseCount('marketplace_finance_settlement_allocations', 0);
+        $this->assertDatabaseCount('journals', 0);
     }
 
     public function test_toko_gagal_total_exception_exit_code_failure()

@@ -61,8 +61,8 @@
         .supplier-modal-subtitle { margin: .2rem 0 0; color: var(--supplier-muted); font-size: .72rem; line-height: 1.45; }
         .supplier-modal .btn-close { width: 40px; height: 40px; margin: -.2rem -.25rem 0 0; border-radius: 10px; opacity: .7; }
         .supplier-modal .btn-close:hover, .supplier-modal .btn-close:focus { opacity: 1; background-color: color-mix(in srgb, var(--supplier-brand) 10%, transparent); box-shadow: none; }
-        .supplier-modal .modal-body { padding: 1.05rem 1.1rem; }
-        .supplier-modal-form { display: grid; gap: .9rem; }
+        .supplier-modal .modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1.05rem 1.1rem; }
+        .supplier-modal-form { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
         .supplier-modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
         .supplier-modal-field { display: grid; gap: .32rem; min-width: 0; }
         .supplier-modal-field-full { grid-column: 1 / -1; }
@@ -79,10 +79,14 @@
         .supplier-modal-checks { display: flex; flex-wrap: wrap; gap: .45rem; }
         .supplier-modal-check { display: inline-flex; align-items: center; gap: .42rem; min-height: 42px; padding: .45rem .65rem; border: 1px solid var(--supplier-line); border-radius: 10px; color: var(--supplier-text); background: var(--supplier-surface); font-size: .73rem; font-weight: 750; cursor: pointer; }
         .supplier-modal-check:has(input:checked) { border-color: color-mix(in srgb, var(--supplier-brand) 48%, var(--supplier-line)); color: var(--supplier-brand-strong); background: color-mix(in srgb, var(--supplier-brand) 9%, var(--supplier-surface)); }
-        .supplier-modal-check input { width: 17px; height: 17px; margin: 0; accent-color: var(--supplier-brand); }
-        .supplier-modal-errors { display: grid; gap: .3rem; padding: .7rem .8rem; border: 1px solid #fecdca; border-radius: 11px; color: #b42318; background: #fef3f2; font-size: .72rem; line-height: 1.4; }
-        .supplier-modal-errors:empty { display: none; }
-        .supplier-modal .modal-footer { display: flex; justify-content: flex-end; gap: .5rem; padding: .85rem 1.1rem; border-top: 1px solid var(--supplier-line); background: var(--supplier-surface); }
+        .supplier-modal-check input { display: grid; width: 17px; height: 17px; flex: 0 0 17px; place-content: center; margin: 0; appearance: none; -webkit-appearance: none; border: 1px solid #98a2b3; border-radius: 5px; color: #fff; background: var(--supplier-surface); cursor: pointer; }
+        .supplier-modal-check input::after { content: '✓'; font-size: .7rem; font-weight: 900; line-height: 1; transform: scale(0); transition: transform .12s ease; }
+        .supplier-modal-check input:checked { border-color: var(--supplier-brand); background: var(--supplier-brand); }
+        .supplier-modal-check input:checked::after { transform: scale(1); }
+        .supplier-modal-check:has(input:focus-visible) { outline: 3px solid color-mix(in srgb, var(--supplier-brand) 26%, transparent); outline-offset: 2px; }
+        .supplier-modal-errors { display: none; gap: .3rem; padding: .7rem .8rem; border: 1px solid #fecdca; border-radius: 11px; color: #b42318; background: #fef3f2; font-size: .72rem; line-height: 1.4; }
+        .supplier-modal-errors.is-visible { display: grid; }
+        .supplier-modal .modal-footer { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: .5rem; padding: .85rem 1.1rem; border-top: 1px solid var(--supplier-line); background: var(--supplier-surface); }
         .supplier-modal .modal-footer .supplier-btn { min-width: 112px; }
         .supplier-modal .modal-footer .supplier-btn-primary { color: #fff; }
         .supplier-modal .supplier-btn-primary[aria-busy="true"] { cursor: wait; }
@@ -368,7 +372,7 @@
                         <input type="hidden" name="supplier_modal_id" id="supplierModalId" value="{{ $modalSupplierId ?: '' }}">
                         <input type="hidden" name="_method" value="PUT" id="supplierFormMethod" disabled>
                         <div class="modal-body">
-                            <div class="supplier-modal-errors" id="supplierModalErrors" role="alert" aria-live="assertive">
+                            <div class="supplier-modal-errors{{ $modalShouldOpen && $errors->any() ? ' is-visible' : '' }}" id="supplierModalErrors" role="alert" aria-live="assertive">
                                 @if ($modalShouldOpen && $errors->any())
                                     @foreach ($errors->all() as $error)<div>{{ $error }}</div>@endforeach
                                 @endif

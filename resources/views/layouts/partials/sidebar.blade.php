@@ -109,6 +109,7 @@
     $hasMarketplaceIncomeDetail = $router->has('marketplace.income-detail');
     $hasMarketplaceEscrow = $router->has('marketplace.escrow');
     $hasMarketplacePayout = $router->has('marketplace.payout');
+    $hasMarketplaceShopeeTransactions = $router->has('marketplace.shopee.transactions');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
@@ -116,6 +117,7 @@
     $hasMarketplaceShopeePerformance = !$isAdmin && $router->has('marketplace.shopee-performance');
     $hasMarketplaceIssues      = $router->has('marketplace.issues');
     $hasMarketplaceShopeeApiLogs = $router->has('marketplace.shopee-api-logs');
+    $hasMarketplaceSyncQueueLogs = $router->has('marketplace.sync-queue-logs');
     $hasSocialMediaInstagram = $router->has('social-media.instagram');
 
     // Toko Online (UPDATED sesuai routes terbaru yang kamu kasih)
@@ -354,6 +356,7 @@
         $open('marketplace.income-detail') ||
         $open('marketplace.escrow') ||
         $open('marketplace.payout') ||
+        $open('marketplace.shopee.transactions') ||
         $open('marketplace.profit') ||
         $open('marketplace.reports.*') ||
         $open('marketplace.finance.*') ||
@@ -365,7 +368,8 @@
     $openMarketplaceDataGroup =
         $open('marketplace.sync') ||
         $open('marketplace.issues') ||
-        $open('marketplace.shopee-api-logs');
+        $open('marketplace.shopee-api-logs') ||
+        $open('marketplace.sync-queue-logs');
 
     $openMarketplaceImportGroup =
         $open('imports.marketplace.*') ||
@@ -389,6 +393,8 @@
         $open('marketplace.settlement') ||
         $open('marketplace.income-detail') ||
         $open('marketplace.escrow') ||
+        $open('marketplace.payout') ||
+        $open('marketplace.shopee.transactions') ||
         $open('marketplace.profit') ||
         $open('marketplace.ads') ||
         $open('marketplace.ads.dashboard') ||
@@ -401,7 +407,8 @@
         $open('marketplace.reconciliations.*') ||
         $open('imports.marketplace.*') ||
         $open('imports.marketplace_income.*') ||
-        $open('marketplace.shopee-api-logs');
+        $open('marketplace.shopee-api-logs') ||
+        $open('marketplace.sync-queue-logs');
 
     $openSales =
         $open('sales.invoices.*') ||
@@ -2106,6 +2113,7 @@
                 $hasMarketplaceIncomeDetail,
                 $hasMarketplaceEscrow,
                 $hasMarketplacePayout,
+                $hasMarketplaceShopeeTransactions,
                 $hasMarketplaceProfit,
                 $hasMarketplaceFinance,
                 $hasMarketplaceSalesReport,
@@ -2221,7 +2229,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs)
+                        @if ($hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs || $hasMarketplaceSyncQueueLogs)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceDataGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerData"
                                 aria-expanded="{{ $openMarketplaceDataGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerData">
@@ -2259,10 +2267,16 @@
                                 Log API Shopee
                             </x-sidebar.sub-link>
                         @endif
+                        @if ($hasMarketplaceSyncQueueLogs)
+                            <x-sidebar.sub-link href="{{ route('marketplace.sync-queue-logs') }}" icon="bi bi-journal-text"
+                                :active="request()->routeIs('marketplace.sync-queue-logs')">
+                                Log Sync & Queue
+                            </x-sidebar.sub-link>
+                        @endif
                             </div>
                         @endif
 
-                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
+                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceShopeeTransactions || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerFinance">
@@ -2328,6 +2342,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.payout') }}" icon="bi bi-wallet2"
                                 :active="request()->routeIs('marketplace.payout')">
                                 Payout Shopee
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceShopeeTransactions)
+                            <x-sidebar.sub-link href="{{ route('marketplace.shopee.transactions') }}" icon="bi bi-arrow-left-right"
+                                :active="request()->routeIs('marketplace.shopee.transactions')">
+                                Transaksi Shopee
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceProfit)

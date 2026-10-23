@@ -319,7 +319,47 @@ class SyncSettlementsCommand extends Command
         // seluruh batch yang diproses berakhir error tanpa satu pun sukses.
         $completeFailure = $totalProcessed > 0 && $totalSynced === 0 && $totalErrors > 0;
 
-        return ($storesFailed > 0 || $completeFailure) ? self::FAILURE : self::SUCCESS;
+        $exitCode = ($storesFailed > 0 || $completeFailure) ? self::FAILURE : self::SUCCESS;
+
+        if ($exitCode === self::SUCCESS && $this->syncFinanceOrdersIfDue($stores, $orderOpt) !== self::SUCCESS) {
+            return self::FAILURE;
+        }
+
+        return $exitCode;
+    }
+
+    /**
+     * Ikuti jalur cron settlement yang benar-benar dipanggil hosting. Cooldown
+     * mencegah sync Finance order-only berulang pada setiap cron lima menit.
+     */
+    private function syncFinanceOrdersIfDue($stores, ?string $orderSn): int
+    {
+        if (! config('marketplace.finance_order_sync_enabled') || $orderSn) {
+            return self::SUCCESS;
+        }
+
+        $storeName = (string) config('marketplace.finance_order_sync_store_name', 'Greatfit.id');
+        $store = $stores->first(fn (Store $candidate) => $candidate->name === $storeName);
+        if (! $store) {
+            return self::SUCCESS;
+        }
+
+        $intervalMinutes = max(5, (int) config('marketplace.finance_order_sync_interval_minutes', 15));
+        $cooldownKey = "marketplace_finance_order_sync_store_{$store->id}";
+        if (! Cache::add($cooldownKey, now()->toIso8601String(), now()->addMinutes($intervalMinutes))) {
+            return self::SUCCESS;
+        }
+
+        $exitCode = $this->call('marketplace:finance-order-sync', [
+            '--store' => $store->name,
+            '--apply' => true,
+            '--trigger' => 'schedule',
+        ]);
+        if ($exitCode !== self::SUCCESS) {
+            Cache::forget($cooldownKey);
+        }
+
+        return $exitCode;
     }
 
     /**

@@ -508,6 +508,52 @@ class AdsDashboardController extends Controller
             return response()->json(['error' => 'store_id is required'], 400);
         }
 
+        if ($storeId === 'all') {
+            $stores = Store::query()
+                ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+                ->where('status', 'active')
+                ->where('is_active', true)
+                ->where('token_expires_at', '>', now())
+                ->get();
+
+            if ($stores->isEmpty()) {
+                return response()->json(['error' => 'Store not found'], 404);
+            }
+
+            try {
+                $totalBalance = 0;
+                $autoTopUp = false;
+                foreach ($stores as $st) {
+                    $res = $actions->realtimeStatus($st, $adsApi);
+                    if (($res['status'] ?? '') === 'success') {
+                        $totalBalance += (int) ($res['data']['balance']['total_balance'] ?? 0);
+                        if (!empty($res['data']['toggle_info']['auto_top_up'])) {
+                            $autoTopUp = true;
+                        }
+                    }
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'data' => [
+                        'balance' => [
+                            'total_balance' => $totalBalance,
+                            'data_timestamp' => now()->timestamp,
+                        ],
+                        'toggle_info' => [
+                            'auto_top_up' => $autoTopUp,
+                        ],
+                        'facil_rate' => [],
+                    ],
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+        }
+
         $store = Store::find($storeId);
         if (!$store) {
             return response()->json(['error' => 'Store not found'], 404);
@@ -719,11 +765,20 @@ class AdsDashboardController extends Controller
         $campaignId = $request->input('campaign_id');
         $date = $request->input('date', now()->format('d-m-Y'));
 
-        if (!$storeId || !$campaignId) {
-            return response()->json(['error' => 'store_id dan campaign_id diperlukan'], 400);
+        if (!$campaignId) {
+            return response()->json(['error' => 'campaign_id diperlukan'], 400);
         }
 
-        $store = Store::find($storeId);
+        $store = null;
+        if ($storeId && $storeId !== 'all') {
+            $store = Store::find($storeId);
+        }
+
+        if (!$store) {
+            $campaign = MarketplaceAdCampaign::where('channel_campaign_id', (string) $campaignId)->first();
+            $store = $campaign?->store;
+        }
+
         if (!$store) {
             return response()->json(['error' => 'Store not found'], 404);
         }

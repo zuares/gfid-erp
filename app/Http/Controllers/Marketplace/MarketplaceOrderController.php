@@ -104,6 +104,9 @@ class MarketplaceOrderController extends Controller
     {
         $order->load(['store.channel', 'items.internalItem', 'settlement']);
 
+        $raw = is_array($order->raw_json) ? $order->raw_json : (json_decode((string) $order->raw_json, true) ?: []);
+        $liveData = $raw['order_list'][0] ?? $raw['response']['order_list'][0] ?? (isset($raw['order_sn']) ? $raw : []);
+
         // Coba tarik data terbaru dari API agar halaman terupdate otomatis
         if ($order->store && $order->store->channel?->code === 'shopee') {
             try {
@@ -111,16 +114,17 @@ class MarketplaceOrderController extends Controller
                 
                 // 1. Tarik Order Detail
                 $resDetail = $shopee->getOrderDetail($order->store, [$order->channel_order_id]);
-                $liveData = $resDetail['response']['order_list'][0] ?? null;
+                $freshLiveData = $resDetail['response']['order_list'][0] ?? null;
 
                 // 2. Tarik Escrow Detail (Income)
                 // Shopee kadang mengembalikan escrow_detail meski status masih READY_TO_SHIP (estimasi)
                 $resEscrow = [];
                 try {
                     $resEscrow = $shopee->getEscrowDetail($order->store, $order->channel_order_id);
-                } catch (\Exception $e) {}
+                } catch (\Throwable $e) {}
 
-                if ($liveData) {
+                if ($freshLiveData) {
+                    $liveData = $freshLiveData;
                     $incomeDetails = $resEscrow['response']['order_income'] ?? [];
                     if (!empty($incomeDetails)) {
                         $liveData['income_details'] = $incomeDetails;
@@ -134,12 +138,12 @@ class MarketplaceOrderController extends Controller
                     $order->raw_json = $liveData;
                     $order->save();
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 // Abaikan error koneksi/token agar halaman tetap terbuka
             }
         }
 
-        [$resolvedAwb, $awbSource, $internalPackageNo] = $this->resolveTrackingNumberForDetail($order, $liveData ?? []);
+        [$resolvedAwb, $awbSource, $internalPackageNo] = $this->resolveTrackingNumberForDetail($order, $liveData);
         if (!empty($resolvedAwb) && $order->shipping_awb_no !== $resolvedAwb) {
             try {
                 $order->forceFill(['shipping_awb_no' => $resolvedAwb])->save();

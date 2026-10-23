@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "ngrok-connect": "ngrok http --url=unframed-sprang-sequence.ngrok-free.dev --host-header=gfid-dev.test 80",
+        "ngrok": "ngrok http --url=unframed-sprang-sequence.ngrok-free.dev --host-header=gfid-dev.test 80"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

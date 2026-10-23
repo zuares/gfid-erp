@@ -19,6 +19,7 @@ return [
     // It only imports the three legacy order sources for one exact store name.
     'finance_order_sync_store_name' => env('MARKETPLACE_FINANCE_ORDER_SYNC_STORE_NAME', 'Greatfit.id'),
     'finance_order_sync_enabled' => (bool) env('MARKETPLACE_FINANCE_ORDER_SYNC_ENABLED', false),
+    'finance_order_sync_interval_minutes' => (int) env('MARKETPLACE_FINANCE_ORDER_SYNC_INTERVAL_MINUTES', 15),
 
     // Ads dashboard menyimpan spend sebelum pajak. Jadikan configurable agar
     // laporan profit tidak mengunci aturan pajak di source code.

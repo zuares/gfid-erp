@@ -682,7 +682,12 @@ class ShopeeChannel implements MarketplaceChannel
             $params['transaction_tab_type'] = $transactionTabType;
         }
 
-        return $this->post($store, '/api/v2/payment/get_wallet_transaction_list', $params);
+        $res = $this->post($store, '/api/v2/payment/get_wallet_transaction_list', $params);
+        if (($res['_meta']['http_status'] ?? null) === 405 || ($res['error'] ?? '') === 'method_not_allowed') {
+            $res = $this->get($store, '/api/v2/payment/get_wallet_transaction_list', $params);
+        }
+
+        return $res;
     }
 
     // ─── Affiliate Marketing Solutions (AMS) ────────────────────────────────

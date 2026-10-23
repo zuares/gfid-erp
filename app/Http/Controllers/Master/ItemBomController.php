@@ -20,8 +20,18 @@ class ItemBomController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $status = (string) $request->query('status', '');
+        $structure = (string) $request->query('structure', '');
 
-        $boms = ItemBom::query()
+        if (!in_array($status, ['active', 'inactive'], true)) {
+            $status = '';
+        }
+
+        if (!in_array($structure, ['main', 'sewing', 'packing', 'complete'], true)) {
+            $structure = '';
+        }
+
+        $bomQuery = ItemBom::query()
             ->with(['item:id,code,name'])
             ->withCount([
                 'lines',
@@ -40,7 +50,23 @@ class ItemBomController extends Controller
                     })->orWhere('item_boms.name', 'like', "%{$q}%");
                 });
             })
-            ->orderByDesc('id')
+            ->when($status !== '', fn ($qq) => $qq->where('active', $status === 'active'))
+            ->when($structure === 'main', fn ($qq) => $qq->whereHas('mainMaterialLines'))
+            ->when($structure === 'sewing', fn ($qq) => $qq->whereHas('sewingSupplyLines'))
+            ->when($structure === 'packing', fn ($qq) => $qq->whereHas('packingSupplyLines'))
+            ->when($structure === 'complete', fn ($qq) => $qq
+                ->whereHas('mainMaterialLines')
+                ->whereHas('sewingSupplyLines')
+                ->whereHas('packingSupplyLines'))
+            ->orderByDesc('id');
+
+        $bomSummary = [
+            'total' => (clone $bomQuery)->toBase()->getCountForPagination(),
+            'active' => (clone $bomQuery)->where('active', true)->toBase()->getCountForPagination(),
+            'inactive' => (clone $bomQuery)->where('active', false)->toBase()->getCountForPagination(),
+        ];
+
+        $boms = (clone $bomQuery)
             ->paginate(self::PAGINATE)
             ->withQueryString();
 
@@ -103,7 +129,11 @@ class ItemBomController extends Controller
             }
         }
 
-        return view('master.item_boms.index', compact('boms', 'q', 'bomUsageBadges'));
+        $hasFilters = $q !== '' || $status !== '' || $structure !== '';
+
+        return view('master.item_boms.index', compact(
+            'boms', 'q', 'status', 'structure', 'hasFilters', 'bomUsageBadges', 'bomSummary'
+        ));
     }
 
     public function create(Request $request)

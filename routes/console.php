@@ -70,13 +70,13 @@ Artisan::command('production:seed-boms {--force : Jalankan tanpa konfirmasi saat
 Schedule::call(fn () => Artisan::call('storefront:rank-products'))
     ->hourly()
     ->name('storefront-rank')
-    ->withoutOverlapping();
+    ->withoutOverlapping(30);
 
 // Order: tarik data order terbaru tiap 5 menit
 Schedule::call(fn () => Artisan::call('marketplace:sync-orders'))
     ->everyFiveMinutes()
     ->name('sync-orders')
-    ->withoutOverlapping();
+    ->withoutOverlapping(15);
 
 // Sambungkan income yang sudah tersimpan sebelum order tersedia. Hook pada
 // proses import/API menangani kasus real-time; scheduler ini menjadi safety-net
@@ -86,52 +86,42 @@ Schedule::call(fn () => Artisan::call('marketplace:reconcile-income', [
 ]))
     ->everyFiveMinutes()
     ->name('reconcile-marketplace-income')
-    ->withoutOverlapping();
+    ->withoutOverlapping(15);
 
 Schedule::command('marketplace:run-voucher-automations')
     ->everyMinute()
     ->name('run-voucher-automations')
-    ->withoutOverlapping();
+    ->withoutOverlapping(5);
 
 // Verifikasi status order yang masih aktif ke API setelah sync order. Sweep ini
 // juga mencakup SHIPPED/TO_CONFIRM_RECEIVE supaya COMPLETED tidak menunggu
 // histori sync besar, serta memakai guard agar response API yang stale tidak
 // menurunkan status lokal.
-Schedule::command('marketplace:verify-processed-orders', [
-    '--apply' => true,
-    '--limit' => 50,
-])
+Schedule::command('marketplace:verify-processed-orders --apply --limit=50')
     ->cron('2-59/5 * * * *')
     ->name('verify-processed-orders')
-    ->withoutOverlapping();
+    ->withoutOverlapping(15);
 
 // Tracking pengiriman diperiksa terpisah dari status order agar order gagal
 // kirim bisa terlihat lebih awal tanpa memanggil API saat halaman dibuka.
-Schedule::command('marketplace:sync-failed-deliveries', [
-    '--apply' => true,
-    '--limit' => 30,
-])
+Schedule::command('marketplace:sync-failed-deliveries --apply --limit=30')
     ->cron('11,41 * * * *')
     ->name('sync-failed-deliveries')
-    ->withoutOverlapping();
+    ->withoutOverlapping(30);
 
 // Repair data lokal yang rusak tanpa memajukan status order berdasarkan
 // fulfillment lokal saja. Pemindahan status ditangani verifier API di atas.
-Schedule::command('marketplace:repair-stuck-orders', [
-    '--apply' => true,
-    '--limit' => 500,
-    '--only-missing-fulfillment' => true,
-])
+Schedule::command('marketplace:repair-stuck-orders --apply --limit=500 --only-missing-fulfillment')
     ->cron('3-59/5 * * * *')
     ->name('repair-stuck-orders')
-    ->withoutOverlapping();
+    ->withoutOverlapping(15);
 
 // Pesanan Kilat (booking) + enrichment order_sn tiap jam
 // (dipindahkan dari app/Console/Kernel.php yang tidak dipakai Laravel 12)
 Schedule::call(fn () => Artisan::call('marketplace:sync-bookings'))
     ->hourlyAt(17) // digeser dari :00 agar tidak tabrakan dengan sync lain
     ->name('sync-bookings')
-    ->withoutOverlapping();
+    ->withoutOverlapping(30);
 
 // Periksa tahap perjalanan booking SHIPPED secara bertahap agar status tiba di
 // gudang dapat dibedakan tanpa memanggil API saat daftar pesanan dibuka.
@@ -141,12 +131,12 @@ Schedule::command('marketplace:sync-booking-tracking', [
 ])
     ->everyTenMinutes()
     ->name('sync-booking-tracking')
-    ->withoutOverlapping();
+    ->withoutOverlapping(15);
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-returns'))
     ->hourlyAt(37) // digeser dari :00 agar tidak tabrakan dengan sync lain
     ->name('sync-returns')
-    ->withoutOverlapping();
+    ->withoutOverlapping(30);
 
 // Jalur settlement terbaru mengikuti autosync order: cek ulang order 3 hari
 // terakhir setiap 5 menit. Mode resync diperlukan karena nilai final dari Shopee
@@ -162,7 +152,7 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
 ]))
     ->everyFiveMinutes()
     ->name('sync-recent-settlements')
-    ->withoutOverlapping();
+    ->withoutOverlapping(15);
 
 // TikTok tidak masuk ke sync-settlements karena tidak memiliki endpoint
 // escrow Shopee. Jalankan Finance v202501 + estimasi unsettled v202507 pada
@@ -176,14 +166,14 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-finance', [
 ]))
     ->everyFiveMinutes()
     ->name('sync-recent-tiktok-finance')
-    ->withoutOverlapping();
+    ->withoutOverlapping(15);
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
     '--all' => true,
 ]))
     ->cron('7 */4 * * *') // tiap 4 jam di menit :07 (sebelumnya :00, tabrakan dengan sync-finance)
     ->name('sync-settlements')
-    ->withoutOverlapping();
+    ->withoutOverlapping(60);
 
 // Ambil estimated_escrow_amount untuk order pending setelah sync settlement nominal.
 Schedule::call(fn () => Artisan::call('marketplace:sync-income-details'))
@@ -221,21 +211,6 @@ Schedule::call(fn () => Artisan::call('marketplace:finance-pilot-sync', [
     ->name('sync-greatfit-finance-ledger-pilot')
     ->withoutOverlapping();
 
-// Finance order-only: salin settlement/income per order yang sudah tersedia
-// secara lokal ke ledger Finance baru. Jalur ini sengaja tidak membaca payout,
-// tidak membuat settlement/alokasi bank, dan tidak mem-posting jurnal.
-Schedule::command('marketplace:finance-order-sync', [
-    '--store' => config('marketplace.finance_order_sync_store_name'),
-    '--apply' => true,
-    '--trigger' => 'schedule',
-])
-    // Cron hosting memanggil schedule:run tiap 5 menit, jadi event harus
-    // ditempatkan pada menit yang juga kelipatan lima.
-    ->cron('*/15 * * * *')
-    ->when(fn (): bool => (bool) config('marketplace.finance_order_sync_enabled'))
-    ->name('sync-greatfit-finance-orders')
-    ->withoutOverlapping(30);
-
 // Biaya iklan wallet Shopee adalah sumber subledger terpisah dari order,
 // settlement, dan HPP. Ambil rolling 15 hari agar koreksi transaksi terbaru
 // ikut tersinkron; service memecah rentang yang lebih panjang saat backfill.
@@ -250,32 +225,32 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-shopee-ad-wallet', [
 Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
     ->everyMinute()
     ->name('sync-chats')
-    ->withoutOverlapping();
+    ->withoutOverlapping(5);
 
 // Produk: sync dari Shopee + snapshot harian metrik (stok/harga/terjual)
 Schedule::call(fn () => Artisan::call('marketplace:snapshot-products', ['--sync' => true]))
     ->dailyAt('23:45')
     ->name('snapshot-products')
-    ->withoutOverlapping();
+    ->withoutOverlapping(60);
 
 // Shopee Brand Portal performance: tarik 7 hari terakhir agar metrik yang
 // terlambat final (refund/voucher/order) ikut diperbarui.
 Schedule::command('marketplace:sync-shopee-performance')
     ->dailyAt('02:30')
     ->name('sync-shopee-performance')
-    ->withoutOverlapping();
+    ->withoutOverlapping(60);
 
 // Naikkan Produk: mesin boost terjadwal (jam-tetap + rotasi otomatis, maks 5 / 4 jam)
 Schedule::call(fn () => Artisan::call('marketplace:run-boosts'))
     ->everyFiveMinutes()
     ->name('run-boosts')
-    ->withoutOverlapping();
+    ->withoutOverlapping(15);
 
 // Claim jadwal pause/resume Ads dan kirim eksekusinya ke queue ads.
 Schedule::command('marketplace:run-ads-campaign-schedules')
     ->everyMinute()
     ->name('run-ads-campaign-schedules')
-    ->withoutOverlapping();
+    ->withoutOverlapping(5);
 
 // Proses antrean job CEPAT (order webhook, download resi) lewat cron —
 // tanpa perlu queue worker daemon terpisah. Drain tiap menit sampai antrean kosong.
@@ -285,7 +260,7 @@ Schedule::command('marketplace:run-ads-campaign-schedules')
 Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'default,labels', '--stop-when-empty' => true, '--max-time' => 55, '--tries' => 3, '--sleep' => 1]))
     ->everyMinute()
     ->name('queue-work')
-    ->withoutOverlapping();
+    ->withoutOverlapping(5);
 
 // Antrean 'ads' khusus sinkronisasi Shopee Ads. Job ini sengaja dipisah dari
 // default/labels karena satu rentang tanggal dapat melakukan banyak panggilan
@@ -300,7 +275,7 @@ Schedule::call(fn () => Artisan::call('queue:work', [
 ]))
     ->everyMinute()
     ->name('queue-work-ads')
-    ->withoutOverlapping();
+    ->withoutOverlapping(10);
 
 // Antrean 'heavy' KHUSUS pekerjaan lama (backfill histori, sync rentang >7 hari).
 // Dipisah supaya job berat berjam-jam TIDAK menyumbat webhook/resi di queue default.
@@ -308,7 +283,7 @@ Schedule::call(fn () => Artisan::call('queue:work', [
 Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'heavy', '--stop-when-empty' => true, '--max-time' => 280, '--tries' => 1, '--sleep' => 2]))
     ->everyFiveMinutes()
     ->name('queue-work-heavy')
-    ->withoutOverlapping();
+    ->withoutOverlapping(10);
 
 // Audit alokasi inventory harian
 // (dipindahkan dari app/Console/Kernel.php yang tidak dipakai Laravel 12)
@@ -325,11 +300,7 @@ Schedule::call(fn () => Artisan::call('marketplace:cleanup-labels'))
 
 // Pertahankan log API Shopee hanya 14 hari agar payload metadata tidak
 // tumbuh tanpa batas. Command akan membatalkan cleanup jika SQLite korup.
-Schedule::command('shopee:cleanup-api-logs', [
-    '--days' => 14,
-    '--redact-days' => 1,
-    '--force' => true,
-])
+Schedule::command('shopee:cleanup-api-logs --days=14 --redact-days=1 --force')
     ->dailyAt('01:20')
     ->name('cleanup-shopee-api-logs')
     ->withoutOverlapping();

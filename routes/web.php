@@ -82,6 +82,7 @@ use App\Http\Controllers\Marketplace\PayoutController;
 use App\Http\Controllers\Marketplace\MarketplaceAnalyticsController;
 use App\Http\Controllers\Marketplace\MarketplaceSalesDashboardController;
 use App\Http\Controllers\Marketplace\ShopeeShopPerformanceController;
+use App\Http\Controllers\Marketplace\ShopeeTransactionController;
 
 // Marketplace — halaman
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -107,6 +108,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/penghasilan',  [MarketplaceFinanceController::class, 'incomeDetail'])->name('marketplace.income-detail');
     Route::get('/marketplace/escrow', [EscrowController::class, 'index'])->name('marketplace.escrow');
     Route::get('/marketplace/payout', [PayoutController::class, 'index'])->name('marketplace.payout');
+    Route::get('/marketplace/shopee-transactions', [ShopeeTransactionController::class, 'index'])->name('marketplace.shopee.transactions');
     Route::get('/marketplace/penghasilan/produk', [MarketplaceFinanceController::class, 'incomeProducts'])->name('marketplace.income-detail.products');
     Route::get('/marketplace/profit',      [MarketplaceFinanceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
@@ -135,6 +137,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/issues',      [MarketplaceSystemController::class, 'issueCenter'])->name('marketplace.issues');
     Route::get('/marketplace/returns',     [\App\Http\Controllers\MarketplaceReturnController::class, 'index'])->name('marketplace.returns');
     Route::get('/marketplace/kilat',       [\App\Http\Controllers\MarketplaceBookingController::class, 'index'])->name('marketplace.kilat');
+    Route::get('/marketplace/sync-queue-logs', [\App\Http\Controllers\MarketplaceSyncQueueLogController::class, 'index'])->name('marketplace.sync-queue-logs');
 });
 
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -163,6 +166,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/escrow-detail', [EscrowController::class, 'detail'])->name('marketplace.api.escrow-detail');
     Route::get('/stores/{store}/payout-info', [PayoutController::class, 'info'])->name('marketplace.api.payout-info');
     Route::get('/stores/{store}/payout-detail', [PayoutController::class, 'detail'])->name('marketplace.api.payout-detail');
+    Route::get('/stores/{store}/shopee-transactions', [ShopeeTransactionController::class, 'data'])->name('marketplace.api.shopee-transactions');
+    Route::get('/stores/{store}/shopee-transactions/export', [ShopeeTransactionController::class, 'export'])->name('marketplace.api.shopee-transactions.export');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/sync-orders-background', [MarketplaceController::class, 'syncOrdersBackground'])
@@ -320,6 +325,17 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::post('/chat/start-from-order',                     [\App\Http\Controllers\MarketplaceChatController::class, 'startFromOrder'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/sync-logs',                         [MarketplaceController::class, 'syncLogs']);
+    Route::get('/sync-queue-logs/syncs',             [\App\Http\Controllers\MarketplaceSyncQueueLogController::class, 'getSyncLogs']);
+    Route::get('/sync-queue-logs/queues',            [\App\Http\Controllers\MarketplaceSyncQueueLogController::class, 'getQueueStatus']);
+    Route::get('/sync-queue-logs/streams',           [\App\Http\Controllers\MarketplaceSyncQueueLogController::class, 'getStreamLogs']);
+    Route::post('/sync-queue-logs/queues/retry-all', [\App\Http\Controllers\MarketplaceSyncQueueLogController::class, 'retryAllFailedJobs'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::delete('/sync-queue-logs/queues/flush-all', [\App\Http\Controllers\MarketplaceSyncQueueLogController::class, 'flushFailedJobs'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/sync-queue-logs/queues/{uuid}/retry', [\App\Http\Controllers\MarketplaceSyncQueueLogController::class, 'retryFailedJob'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::delete('/sync-queue-logs/queues/{uuid}',  [\App\Http\Controllers\MarketplaceSyncQueueLogController::class, 'deleteFailedJob'])
+        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::get('/settlements',                       [MarketplaceController::class, 'settlements']);
     Route::get('/stores/{store}/sync-settlements-progress', [MarketplaceController::class, 'syncSettlementsProgress']);
     Route::post('/stores/{store}/sync-income-details', [MarketplaceController::class, 'syncIncomeDetails']);
