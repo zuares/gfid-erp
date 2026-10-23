@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Cache;
 
 class SyncWalletPayoutsCommand extends Command
 {
+    private const MAX_BACKFILL_DAYS = 366;
+
     protected $signature = 'marketplace:sync-wallet-payouts
         {--store= : ID toko Shopee spesifik}
         {--from= : Tanggal mulai (Y-m-d), default 14 hari terakhir}
@@ -44,8 +46,8 @@ class SyncWalletPayoutsCommand extends Command
             return self::FAILURE;
         }
 
-        if ($from->diffInDays($to) > 14) {
-            $this->error('Rentang payout maksimal 15 hari.');
+        if ($from->diffInDays($to) > self::MAX_BACKFILL_DAYS) {
+            $this->error('Rentang payout maksimal satu tahun per command.');
 
             return self::FAILURE;
         }
@@ -84,6 +86,10 @@ class SyncWalletPayoutsCommand extends Command
             'page_size' => $pageSize,
             'stores' => [],
         ];
+        $windows = $this->windows($from, $to);
+        if (count($windows) > 1) {
+            $this->info('Rentang payout dipecah menjadi '.count($windows).' window API, masing-masing maksimal 15 hari.');
+        }
         $failed = 0;
         foreach ($stores as $store) {
             if ($store->connection_status !== 'CONNECTED') {
@@ -100,9 +106,9 @@ class SyncWalletPayoutsCommand extends Command
             }
 
             try {
-                $result = $syncService->syncWalletPayouts($store, $from, $to, $pageSize);
+                $result = $this->syncStoreWindows($syncService, $store, $windows, $pageSize);
                 $this->line(sprintf(
-                    '%s: status=%s found=%d created=%d updated=%d invalid=%d pages=%d',
+                    '%s: status=%s found=%d created=%d updated=%d invalid=%d pages=%d chunks=%d',
                     $store->name,
                     $result['status'] ?? 'unknown',
                     $result['found'] ?? 0,
@@ -110,6 +116,7 @@ class SyncWalletPayoutsCommand extends Command
                     $result['updated'] ?? 0,
                     $result['invalid'] ?? 0,
                     $result['pages'] ?? 0,
+                    count($windows),
                 ));
                 $audit['stores'][] = [
                     'store_id' => $store->id,
@@ -119,6 +126,7 @@ class SyncWalletPayoutsCommand extends Command
                     'updated' => $result['updated'] ?? 0,
                     'invalid' => $result['invalid'] ?? 0,
                     'pages' => $result['pages'] ?? 0,
+                    'chunks' => count($windows),
                 ];
 
                 if (($result['status'] ?? null) !== 'synced') {
@@ -141,5 +149,62 @@ class SyncWalletPayoutsCommand extends Command
         ]);
 
         return $failed > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Shopee wallet endpoints accept a maximum 15-day window. Keep the
+     * scheduler/manual contract simple and split longer backfills here.
+     *
+     * @return array<int,array{from:Carbon,to:Carbon}>
+     */
+    private function windows(Carbon $from, Carbon $to): array
+    {
+        $windows = [];
+        $cursor = $from->copy()->startOfDay();
+
+        while ($cursor->lte($to)) {
+            $windowFrom = $cursor->copy()->startOfDay();
+            $windowTo = $cursor->copy()->addDays(14)->endOfDay();
+            if ($windowTo->gt($to)) {
+                $windowTo = $to->copy()->endOfDay();
+            }
+
+            $windows[] = ['from' => $windowFrom, 'to' => $windowTo];
+            $cursor = $windowTo->copy()->addSecond()->startOfDay();
+        }
+
+        return $windows;
+    }
+
+    /** @return array<string,mixed> */
+    private function syncStoreWindows(
+        MarketplaceSettlementSyncService $syncService,
+        Store $store,
+        array $windows,
+        int $pageSize,
+    ): array {
+        $totals = [
+            'status' => 'synced',
+            'found' => 0,
+            'synced' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'invalid' => 0,
+            'pages' => 0,
+            'results' => [],
+        ];
+
+        foreach ($windows as $window) {
+            $result = $syncService->syncWalletPayouts($store, $window['from'], $window['to'], $pageSize);
+            foreach (['found', 'synced', 'created', 'updated', 'invalid', 'pages'] as $key) {
+                $totals[$key] += (int) ($result[$key] ?? 0);
+            }
+            $totals['results'] = array_merge($totals['results'], $result['results'] ?? []);
+            if (($result['status'] ?? 'error') !== 'synced') {
+                $totals['status'] = 'partial';
+            }
+        }
+
+        return $totals;
     }
 }

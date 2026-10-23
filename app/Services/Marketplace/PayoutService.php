@@ -260,6 +260,7 @@ class PayoutService
         $transactionId = $row['transaction_id'] ?? $row['withdraw_id'] ?? $row['withdrawal_id'] ?? null;
 
         return [
+            'source' => 'shopee_live',
             'from_currency' => $row['currency'] ?? 'IDR',
             'payout_currency' => $row['currency'] ?? 'IDR',
             'from_amount' => $amount,
@@ -332,6 +333,7 @@ class PayoutService
         $transactionType = $raw['transaction_type'] ?? $raw['type'] ?? null;
 
         return [
+            'source' => 'database_snapshot',
             'finance_settlement_id' => $settlement->id,
             'from_currency' => $raw['currency'] ?? $settlement->currency ?? 'IDR',
             'payout_currency' => $raw['currency'] ?? $settlement->currency ?? 'IDR',

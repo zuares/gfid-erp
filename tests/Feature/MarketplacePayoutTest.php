@@ -93,6 +93,7 @@ class MarketplacePayoutTest extends TestCase
             ->assertJsonPath('data.items.0.payout_currency', 'IDR')
             ->assertJsonPath('data.items.0.payout_amount', 1600000)
             ->assertJsonPath('data.items.0.transaction_id', 'TX-1')
+            ->assertJsonPath('data.items.0.source', 'shopee_live')
             ->assertJsonPath('data.more', true)
             ->assertJsonPath('data.next_cursor', '100');
     }
@@ -170,6 +171,7 @@ class MarketplacePayoutTest extends TestCase
             ->assertJsonPath('data.items.0.finance_settlement_id', $settlement->id)
             ->assertJsonPath('data.items.0.transaction_id', 'TX-STORED-1')
             ->assertJsonPath('data.items.0.payout_amount', 1600000)
+            ->assertJsonPath('data.items.0.source', 'database_snapshot')
             ->assertJsonPath('data.items.0.reconciliation_status', 'bank_unverified');
     }
 

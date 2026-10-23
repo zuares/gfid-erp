@@ -41,12 +41,13 @@
     <div id="payoutAlert" class="payout-alert" role="alert"></div>
     <div class="payout-panel"><div class="payout-filters">
         <div class="payout-field payout-store-field"><label for="payoutStore">Toko Shopee</label><select id="payoutStore" class="form-select"><option value="">Memuat toko…</option></select></div>
+        <div class="payout-field"><label for="payoutSource">Sumber daftar</label><select id="payoutSource" class="form-select" aria-label="Pilih sumber daftar payout"><option value="stored">Tersimpan di database</option><option value="live">Live dari Shopee</option></select></div>
         <div class="payout-field"><label for="payoutFrom">Tanggal payout dari</label><input id="payoutFrom" type="date" class="form-control"></div>
         <div class="payout-field"><label for="payoutTo">Tanggal payout sampai</label><input id="payoutTo" type="date" class="form-control"></div>
         <div class="payout-filter-actions"><button id="payoutLoad" type="button" class="btn btn-ship-primary btn-pill"><span class="payout-load-label">Tampilkan tersimpan</span></button><button id="payoutSync" type="button" class="btn btn-ship-outline btn-pill"><span class="payout-sync-label">Sync dari Shopee</span></button></div>
-    </div><div class="payout-help"><i class="bi bi-info-circle"></i><span>Untuk seller lokal Shopee Indonesia. Data utama dibaca dari database. Sync menyimpan withdrawal sebagai <strong>Belum verifikasi bank</strong>; tidak membuat jurnal otomatis. Rentang waktu maksimal 15 hari.</span></div></div>
-    <div class="payout-kpis"><div class="payout-kpi"><div class="payout-kpi-label">Payout pada halaman</div><div id="payoutCount" class="payout-kpi-value">—</div><div class="payout-kpi-note">dari data tersimpan</div></div><div class="payout-kpi"><div class="payout-kpi-label">Total payout</div><div id="payoutTotal" class="payout-kpi-value">—</div><div class="payout-kpi-note">dihitung terpisah per currency</div></div><div class="payout-kpi"><div class="payout-kpi-label">Mata uang</div><div id="payoutCurrencies" class="payout-kpi-value">—</div><div class="payout-kpi-note">currency yang ditemukan</div></div><div class="payout-kpi"><div class="payout-kpi-label">Status data</div><div id="payoutStatus" class="payout-kpi-value">Memuat…</div><div id="payoutStatusNote" class="payout-kpi-note">Data tersimpan dimuat otomatis</div></div></div>
-    <section class="payout-results" aria-labelledby="payoutResultsTitle"><h2 id="payoutResultsTitle" class="visually-hidden">Daftar payout tersimpan</h2><div id="payoutTableWrap" class="payout-table-wrap"><div class="payout-empty"><span class="payout-spinner"></span> Membaca payout tersimpan…</div></div>
+    </div><div class="payout-help"><i class="bi bi-info-circle"></i><span>Untuk seller lokal Shopee Indonesia. Default membaca snapshot database; mode <strong>Live dari Shopee</strong> hanya untuk validasi langsung. Sync menyimpan withdrawal sebagai <strong>Belum verifikasi bank</strong>; tidak membuat jurnal otomatis. Rentang waktu maksimal 15 hari.</span></div></div>
+    <div class="payout-kpis"><div class="payout-kpi"><div class="payout-kpi-label">Payout pada halaman</div><div id="payoutCount" class="payout-kpi-value">—</div><div class="payout-kpi-note">mengikuti sumber daftar</div></div><div class="payout-kpi"><div class="payout-kpi-label">Total payout</div><div id="payoutTotal" class="payout-kpi-value">—</div><div class="payout-kpi-note">dihitung terpisah per currency</div></div><div class="payout-kpi"><div class="payout-kpi-label">Mata uang</div><div id="payoutCurrencies" class="payout-kpi-value">—</div><div class="payout-kpi-note">currency yang ditemukan</div></div><div class="payout-kpi"><div class="payout-kpi-label">Status data</div><div id="payoutStatus" class="payout-kpi-value">Memuat…</div><div id="payoutStatusNote" class="payout-kpi-note">Snapshot database dimuat otomatis</div></div></div>
+    <section class="payout-results" aria-labelledby="payoutResultsTitle"><h2 id="payoutResultsTitle" class="visually-hidden">Daftar payout</h2><div id="payoutTableWrap" class="payout-table-wrap"><div class="payout-empty"><span class="payout-spinner"></span> Membaca payout tersimpan…</div></div>
     <div id="payoutPagination" class="payout-actions" style="display:none"><button id="payoutPrev" type="button" class="btn btn-sm btn-ship-outline btn-pill">← Sebelumnya</button><span id="payoutPageInfo" class="payout-page-info"></span><button id="payoutNext" type="button" class="btn btn-sm btn-ship-outline btn-pill">Berikutnya →</button></div>
     </section>
     </div>
@@ -102,11 +103,14 @@
     const recordsUrl = (store, cursor = '') => {
         const params = new URLSearchParams({ date_from: $('payoutFrom').value, date_to: $('payoutTo').value, page_size: PAGE_SIZE });
         if (cursor) params.set('cursor', cursor);
-        return `/api/marketplace/stores/${encodeURIComponent(store.id)}/payout-records?${params}`;
+        const path = $('payoutSource').value === 'live' ? 'payout-info' : 'payout-records';
+        return `/api/marketplace/stores/${encodeURIComponent(store.id)}/${path}?${params}`;
     };
     const syncUrl = (store) => `/api/marketplace/stores/${encodeURIComponent(store.id)}/sync-payouts`;
 
-    const reconciliationLabel = (item) => item.status === 'void'
+    const reconciliationLabel = (item) => item.source === 'shopee_live'
+        ? '<span class="badge text-bg-info">Live Shopee</span>'
+        : item.status === 'void'
         ? '<span class="badge text-bg-danger">Dibatalkan</span>'
         : item.reconciliation_status === 'received'
             ? '<span class="badge text-bg-success">Diterima bank</span>'
@@ -114,7 +118,9 @@
 
     const renderRows = (items) => {
         if (!items.length) {
-            $('payoutTableWrap').innerHTML = '<div class="payout-empty">Belum ada payout tersimpan pada rentang yang dipilih. Klik <strong>Sync dari Shopee</strong> untuk mengambil data.</div>';
+            $('payoutTableWrap').innerHTML = $('payoutSource').value === 'live'
+                ? '<div class="payout-empty">Tidak ada payout pada rentang live yang dipilih.</div>'
+                : '<div class="payout-empty">Belum ada payout tersimpan pada rentang yang dipilih. Klik <strong>Sync dari Shopee</strong> untuk mengambil data.</div>';
             return;
         }
         const table = `<table class="table payout-table"><thead><tr><th>Toko</th><th>Waktu penarikan</th><th>Nominal wallet</th><th>Status rekonsiliasi</th><th>Transaction ID</th><th>Terakhir sync</th><th>Aksi</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${esc(storeLabel(item.store_id))}</td><td class="payout-muted">${esc(dateTime(item.payout_at))}</td><td class="payout-money">${money(item.payout_amount, item.payout_currency)} <span class="payout-muted">${esc(item.payout_currency || '')}</span></td><td>${reconciliationLabel(item)}</td><td class="payout-code">${esc(item.transaction_id || '—')}</td><td class="payout-muted">${esc(dateTime(item.stored_at))}</td><td class="text-end"><button type="button" class="btn btn-sm btn-ship-outline btn-pill payout-detail-btn" data-index="${index}"><i class="bi bi-eye me-1"></i>Detail</button></td></tr>`).join('')}</tbody></table>`;
@@ -144,7 +150,7 @@
         $('payoutLoad').disabled = true;
         $('payoutLoad').querySelector('.payout-load-label').innerHTML = '<span class="payout-spinner"></span> Memuat…';
         $('payoutStatus').textContent = 'Memuat…';
-        $('payoutTableWrap').innerHTML = '<div class="payout-empty"><span class="payout-spinner"></span> Membaca payout tersimpan…</div>';
+        $('payoutTableWrap').innerHTML = '<div class="payout-empty"><span class="payout-spinner"></span> ' + ($('payoutSource').value === 'live' ? 'Mengambil payout live dari Shopee…' : 'Membaca payout tersimpan…') + '</div>';
         try {
             const results = await Promise.all(stores.map(fetchStorePage));
             state.items = results.flatMap((result) => result.items).sort((a, b) => (b.payout_time || 0) - (a.payout_time || 0));
@@ -160,11 +166,14 @@
             $('payoutCount').textContent = state.items.length.toLocaleString('id-ID');
             $('payoutTotal').textContent = Object.entries(totalsByCurrency).map(([currency, total]) => money(total, currency)).join(' · ') || '—';
             $('payoutCurrencies').textContent = currencies.join(', ') || '—';
-            $('payoutStatus').textContent = 'Database';
+            $('payoutStatus').textContent = $('payoutSource').value === 'live' ? 'Live Shopee' : 'Database';
             const latestSync = results.map((result) => result.lastSyncedAt).filter(Boolean).sort().pop();
-            $('payoutStatusNote').textContent = `${$('payoutStore').value === 'all' ? `${stores.length} toko` : selectedStore()?.name || 'Toko'} · sync ${latestSync ? dateTime(latestSync) : 'belum pernah'}`;
+            const storeText = $('payoutStore').value === 'all' ? String(stores.length) + ' toko' : selectedStore()?.name || 'Toko';
+            $('payoutStatusNote').textContent = $('payoutSource').value === 'live'
+                ? storeText + ' · response langsung dari Shopee'
+                : storeText + ' · sync ' + (latestSync ? dateTime(latestSync) : 'belum pernah');
         } catch (error) {
-            $('payoutTableWrap').innerHTML = '<div class="payout-empty">Tidak dapat membaca data payout tersimpan.</div>';
+            $('payoutTableWrap').innerHTML = '<div class="payout-empty">Tidak dapat membaca data payout ' + ($('payoutSource').value === 'live' ? 'live dari Shopee.' : 'tersimpan.') + '</div>';
             $('payoutPagination').style.display = 'none';
             $('payoutStatus').textContent = 'Gagal';
             $('payoutStatusNote').textContent = 'Periksa koneksi database';
@@ -172,19 +181,19 @@
         } finally {
             state.loading = false;
             $('payoutLoad').disabled = false;
-            $('payoutLoad').querySelector('.payout-load-label').textContent = 'Tampilkan tersimpan';
+            $('payoutLoad').querySelector('.payout-load-label').textContent = $('payoutSource').value === 'live' ? 'Tampilkan live' : 'Tampilkan tersimpan';
         }
     };
     const renderDetail = (row) => {
         const raw = row.raw || {};
-        const status = row.status === 'void' ? 'Dibatalkan' : row.reconciliation_status === 'received' ? 'Diterima bank' : 'Belum verifikasi bank';
+        const status = row.source === 'shopee_live' ? 'Live Shopee' : row.status === 'void' ? 'Dibatalkan' : row.reconciliation_status === 'received' ? 'Diterima bank' : 'Belum verifikasi bank';
         $('payoutDetailBody').innerHTML = `<div class="payout-detail-grid">${[['Toko', storeLabel(row.store_id)],['Waktu penarikan', dateTime(row.payout_at)],['Nominal penarikan', money(row.payout_amount, row.payout_currency)],['Currency', row.payout_currency || 'IDR'],['Status rekonsiliasi', status],['Status Shopee', row.shopee_status || '—'],['Tipe transaksi', row.transaction_type || '—'],['Transaction ID', row.transaction_id || '—'],['Keterangan', row.reason || '—'],['Finance settlement ID', row.finance_settlement_id || '—']].map(([key, value]) => `<div class="payout-detail-card"><div class="payout-detail-label">${esc(key)}</div><div class="payout-detail-value">${esc(value)}</div></div>`).join('')}</div><div class="payout-detail-section"><h3>Raw response Shopee tersimpan</h3><pre class="payout-raw">${esc(JSON.stringify(raw, null, 2))}</pre></div>`;
     };
     const openDetail = (row) => {
         if (!row) return;
         $('payoutModalBackdrop').classList.add('show');
         $('payoutModalTitle').textContent = `Detail penarikan · ${row.payout_at ? dateTime(row.payout_at) : '—'}`;
-        $('payoutModalSub').textContent = `${storeLabel(row.store_id)} · data tersimpan`;
+        $('payoutModalSub').textContent = 'Toko ' + storeLabel(row.store_id) + ' · ' + (row.source === 'shopee_live' ? 'live dari Shopee' : 'snapshot database');
         renderDetail(row);
     };
     const syncFromShopee = async () => {
@@ -230,6 +239,7 @@
         }
     };
     $('payoutLoad').addEventListener('click', () => { state.page = 1; loadList(); });
+    $('payoutSource').addEventListener('change', () => { state.page = 1; loadList(); });
     $('payoutSync').addEventListener('click', syncFromShopee);
     $('payoutPrev').addEventListener('click', () => { if (state.page > 1) { state.page--; loadList(); } });
     $('payoutNext').addEventListener('click', () => { if (state.more) { state.page++; loadList(); } });
