@@ -91,6 +91,88 @@ class MarketplaceFinanceBackfillTest extends TestCase
         $this->assertSame(0, $after['summary']['created']);
     }
 
+    public function test_backfill_refreshes_stale_net_from_the_same_unposted_order_settlement(): void
+    {
+        $store = $this->store();
+        $settlement = MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'BF-REFRESH-NET-001',
+            'buyer_payment_amount' => 100000,
+            'commission_fee' => 10000,
+            'activity_fee' => 5000,
+            'final_income' => 85000,
+            'settlement_time' => '2026-09-12 12:00:00',
+            'raw_json' => ['order_discounted_price' => 100000, 'activity_fee' => 5000],
+        ]);
+        MarketplaceFinancialTransaction::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'order_sn' => $settlement->channel_order_id,
+            'currency' => 'IDR',
+            'gross_amount' => 100000,
+            'net_amount' => 90000,
+            'escrow_status' => EscrowStatus::FINALIZED,
+            'income_status' => IncomeStatus::RELEASED,
+            'source_hash' => str_repeat('a', 64),
+            'raw_payload' => [
+                'legacy_source' => 'marketplace_order_settlements',
+                'legacy_id' => $settlement->id,
+                'raw' => ['order_discounted_price' => 100000],
+            ],
+        ]);
+
+        $service = app(\App\Services\Marketplace\Finance\MarketplaceFinanceBackfillService::class);
+        $options = ['store_id' => $store->id, 'sources' => ['order_settlements']];
+        $result = $service->run($options + ['dry_run' => false]);
+
+        $this->assertSame(1, $result['summary']['updated']);
+        $this->assertSame('85000.00', MarketplaceFinancialTransaction::firstOrFail()->net_amount);
+        $this->assertSame(15000.0, (float) MarketplaceFinancialComponent::sum('amount'));
+        $this->assertSame(0, $service->run($options + ['dry_run' => true])['summary']['updated']);
+        $this->assertDatabaseCount('journals', 0);
+    }
+
+    public function test_positive_final_income_without_settlement_time_still_balances_order_components(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'BF-NO-SETTLEMENT-TIME-001',
+            'channel_order_id' => 'BF-NO-SETTLEMENT-TIME-001',
+            'order_date' => '2026-10-07',
+            'ordered_at' => '2026-10-07 09:00:00',
+            'order_status' => 'COMPLETED',
+            'total_amount' => 63243,
+            'currency' => 'IDR',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 48891,
+            'commission_fee' => 5272,
+            'service_fee' => 7349,
+            'transaction_fee' => 1250,
+            'final_income' => 50038,
+            'raw_json' => ['order_discounted_price' => 63243],
+        ]);
+
+        app(\App\Services\Marketplace\Finance\MarketplaceFinanceBackfillService::class)->run([
+            'dry_run' => false,
+            'store_id' => $store->id,
+            'sources' => ['order_settlements'],
+        ]);
+
+        $residual = MarketplaceFinancialComponent::where('component_code', 'unmapped_adjustment')->firstOrFail();
+        $this->assertSame('-666.00', $residual->amount);
+        $result = app(\App\Services\Marketplace\Finance\MarketplaceFinanceReconciliationService::class)->reconcile([
+            'store_id' => $store->id,
+            'scope' => 'order',
+        ]);
+        $this->assertSame('matched', $result['transactions'][0]['status']);
+        $this->assertSame(0.0, $result['transactions'][0]['net_difference']);
+    }
+
     public function test_dry_run_reports_unmatched_payout_without_creating_anything(): void
     {
         $store = $this->store();

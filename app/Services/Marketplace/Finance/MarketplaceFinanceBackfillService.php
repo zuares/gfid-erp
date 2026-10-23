@@ -463,6 +463,31 @@ class MarketplaceFinanceBackfillService
         if ($transaction && (float) $transaction->net_amount === 0.0 && ($values['net_amount'] ?? null) !== null && abs((float) $values['net_amount']) > 0.01) {
             $changes['net_amount'] = $values['net_amount'];
         }
+        $currentPayload = is_array($transaction?->raw_payload) ? $transaction->raw_payload : [];
+        $incomingPayload = is_array($values['raw_payload'] ?? null) ? $values['raw_payload'] : [];
+        $sameLegacySource = $transaction
+            && ($incomingPayload['legacy_source'] ?? null) !== null
+            && ($incomingPayload['legacy_source'] ?? null) === ($currentPayload['legacy_source'] ?? null)
+            && (string) ($incomingPayload['legacy_id'] ?? '') === (string) ($currentPayload['legacy_id'] ?? '')
+            && ! $transaction->sale_journal_id
+            && ! $transaction->escrow_journal_id
+            && ! MarketplaceFinanceSettlementAllocation::query()->where('financial_transaction_id', $transaction->id)->exists();
+        if ($sameLegacySource) {
+            foreach (['gross_amount', 'net_amount'] as $field) {
+                if (($values[$field] ?? null) !== null
+                    && $this->differentAmount($transaction->{$field}, $values[$field])) {
+                    $changes[$field] = $values[$field];
+                }
+            }
+            if (($values['source_hash'] ?? null) !== null
+                && $transaction->source_hash !== $values['source_hash']) {
+                foreach (['source_hash', 'raw_payload', 'synced_at', 'released_at'] as $field) {
+                    if (array_key_exists($field, $values) && $values[$field] !== null) {
+                        $changes[$field] = $values[$field];
+                    }
+                }
+            }
+        }
         if ($transaction) {
             $changes = array_merge($changes, $this->forwardStatuses($transaction, $values));
             foreach (['released_at', 'synced_at', 'income_synced_at', 'income_source_hash', 'income_raw_payload', 'source_hash', 'raw_payload'] as $field) {
@@ -725,6 +750,11 @@ class MarketplaceFinanceBackfillService
         return number_format((float) str_replace(',', '', (string) $value), 2, '.', '');
     }
 
+    private function differentAmount(mixed $left, mixed $right): bool
+    {
+        return abs(round((float) $left - (float) $right, 2)) > 0.01;
+    }
+
     private function sourceHash(string $source, int $id, mixed $raw): string
     {
         return hash('sha256', $source.'|'.$id.'|'.json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -781,7 +811,7 @@ class MarketplaceFinanceBackfillService
     {
         if ($gross === null
             || $net === null
-            || ! $row->settlement_time) {
+            || (! $row->settlement_time && (float) $net <= 0.0)) {
             return;
         }
 
