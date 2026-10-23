@@ -330,7 +330,14 @@
         }
         .settlement-filter-grid{
             display:grid;
-            grid-template-columns:repeat(12,minmax(0,1fr));
+            grid-template-columns:
+                minmax(120px,1.05fr)
+                minmax(165px,1.4fr)
+                minmax(125px,1.05fr)
+                minmax(120px,.95fr)
+                minmax(145px,1.2fr)
+                minmax(145px,1.2fr)
+                minmax(190px,1.55fr);
             gap:.65rem;
             align-items:end;
         }
@@ -338,12 +345,12 @@
             min-width:0;
             position:relative;
         }
-        .settlement-filter-field.platform{ grid-column:span 2; }
-        .settlement-filter-field.store{ grid-column:span 3; }
-        .settlement-filter-field.status{ grid-column:span 2; }
-        .settlement-filter-field.fund{ grid-column:span 2; }
-        .settlement-filter-field.date{ grid-column:span 2; }
-        .settlement-filter-field.search{ grid-column:span 3; }
+        .settlement-filter-field.platform,
+        .settlement-filter-field.store,
+        .settlement-filter-field.status,
+        .settlement-filter-field.fund,
+        .settlement-filter-field.date,
+        .settlement-filter-field.search{ grid-column:auto; }
         .settlement-filter-label{
             display:block;
             margin:0 0 .28rem .1rem;
@@ -502,12 +509,13 @@
         }
 
         @media (max-width: 1100px) {
+            .settlement-filter-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); }
             .settlement-filter-field.platform,
             .settlement-filter-field.store,
             .settlement-filter-field.status,
             .settlement-filter-field.fund,
-            .settlement-filter-field.date,
-            .settlement-filter-field.search{ grid-column:span 3; }
+            .settlement-filter-field.date{ grid-column:span 1; }
+            .settlement-filter-field.search{ grid-column:span 2; }
         }
 
         @media (max-width: 768px) {
