@@ -342,27 +342,38 @@ class MarketplaceFinancialQualityController extends Controller
             $channelCode = strtolower((string) $order->store->channel?->code);
             if (
                 strtoupper((string) $order->order_status) === 'COMPLETED'
-                && in_array($channelCode, ['shopee', 'shp'], true)
+                && in_array($channelCode, ['shopee', 'shp', 'tiktok', 'ttk', 'tkt'], true)
                 && $order->store->is_active
                 && $order->store->status === 'active'
                 && $order->store->connection_status === 'CONNECTED'
             ) {
-                $settlementResult = $sync->syncSettlements(
-                    store: $order->store,
-                    orderSn: $order->channel_order_id,
-                    resync: true,
-                    limit: 1,
-                );
+                $settlementResult = in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true)
+                    ? $sync->syncTikTokOrderFinance($order->store, $order)
+                    : $sync->syncSettlements(
+                        store: $order->store,
+                        orderSn: $order->channel_order_id,
+                        resync: true,
+                        limit: 1,
+                    );
             }
 
             $assessment = $quality->refreshOrder($order->fresh());
-            $syncMessage = $settlementResult === null
-                ? 'Payout tidak ditarik ulang karena order belum COMPLETED atau toko belum CONNECTED.'
-                : sprintf(
+            if ($settlementResult === null) {
+                $syncMessage = 'Payout tidak ditarik ulang karena order belum COMPLETED atau toko belum CONNECTED.';
+            } elseif (in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true)) {
+                $syncMessage = match ($settlementResult['status'] ?? null) {
+                    'synced' => 'Finance TikTok berhasil disinkronkan.',
+                    'pending' => 'Finance TikTok belum memiliki statement final.',
+                    'error' => 'Finance TikTok gagal disinkronkan.',
+                    default => 'Finance TikTok tidak disinkronkan.',
+                };
+            } else {
+                $syncMessage = sprintf(
                     'Payout: %d berhasil, %d error.',
                     (int) ($settlementResult['synced'] ?? 0),
                     (int) ($settlementResult['errors'] ?? 0),
                 );
+            }
 
             $message = sprintf(
                 'Perbaikan order %s selesai. %d item di-resolve ulang. Status kualitas: %s. %s',

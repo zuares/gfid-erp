@@ -93,6 +93,44 @@ class MarketplaceFinancialDataQualityServiceTest extends TestCase
         $this->assertSame([], $assessment['flags']['missing_financial_fields']);
     }
 
+    public function test_tiktok_finance_payload_uses_tiktok_statement_fields(): void
+    {
+        $service = new MarketplaceFinancialDataQualityService();
+
+        $assessment = $service->assessSettlement([
+            'source' => 'tiktok_finance_202501_order_statement_transactions',
+            'revenue_amount' => '100000',
+            'fee_and_tax_amount' => '-5000',
+            'settlement_amount' => '95000',
+            'sku_transactions' => [[
+                'fee_tax_breakdown' => [
+                    'fee' => ['platform_commission_amount' => '-5000'],
+                    'tax' => [],
+                ],
+            ]],
+        ]);
+
+        $this->assertSame(MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE, $assessment['status']);
+        $this->assertSame([], $assessment['flags']['blocking_missing_fields']);
+        $this->assertSame('tiktok_finance_payload', $assessment['flags']['assessment_source']);
+    }
+
+    public function test_tiktok_finance_without_statement_stays_incomplete(): void
+    {
+        $service = new MarketplaceFinancialDataQualityService();
+
+        $assessment = $service->assessSettlement([
+            'source' => 'tiktok_finance_202501_order_statement_transactions',
+            'revenue_amount' => '100000',
+            'fee_and_tax_amount' => '-5000',
+            'settlement_amount' => '95000',
+            'sku_transactions' => [],
+        ]);
+
+        $this->assertSame(MarketplaceFinancialDataQualityService::SETTLEMENT_INCOMPLETE, $assessment['status']);
+        $this->assertSame(['settlement_statement'], $assessment['flags']['blocking_missing_fields']);
+    }
+
     public function test_non_numeric_financial_values_are_blocking(): void
     {
         $service = new MarketplaceFinancialDataQualityService();

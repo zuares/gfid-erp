@@ -4133,6 +4133,11 @@ class MarketplaceController extends Controller
                 'income_estimation_source' => $incomeEstimationSource,
                 'is_finance_final' => $isTikTokFinanceFinal,
                 'fee_is_final' => $isFinalSettlement,
+                'data_status' => $s->data_status,
+                'finance_source' => data_get($s->raw_json, 'source'),
+                'finance_reason' => data_get($s->data_quality_flags, 'reason'),
+                'has_statement_transactions' => is_array(data_get($s->raw_json, 'sku_transactions'))
+                    && data_get($s->raw_json, 'sku_transactions') !== [],
                 'cogs' => (float) $cogs,
                 'gross_profit' => (float) $grossProfit,
                 'gross_after_voucher' => $grossAfterVoucherTotal,

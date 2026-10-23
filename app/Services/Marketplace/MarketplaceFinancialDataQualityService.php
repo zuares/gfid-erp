@@ -99,6 +99,14 @@ class MarketplaceFinancialDataQualityService
     public function assessSettlement(?array $raw): array
     {
         $raw = is_array($raw) ? $raw : [];
+
+        // TikTok Finance API memiliki kontrak payload sendiri. Jangan
+        // memaksakan field alias Shopee/legacy ke response TikTok karena hal
+        // itu membuat statement yang valid terbaca sebagai incomplete.
+        if ($this->isTikTokFinancePayload($raw)) {
+            return $this->assessTikTokSettlement($raw);
+        }
+
         $payload = is_array($raw['income'] ?? null) ? $raw['income'] : $raw;
         $missing = [];
         $invalid = [];
@@ -144,6 +152,86 @@ class MarketplaceFinancialDataQualityService
                 'invalid_financial_fields' => $invalid,
                 'blocking_missing_fields' => $blockingMissing,
                 'has_raw_payload' => ! empty($payload),
+            ],
+        ];
+    }
+
+    private function isTikTokFinancePayload(array $raw): bool
+    {
+        $source = strtolower(trim((string) ($raw['source'] ?? '')));
+
+        return str_starts_with($source, 'tiktok_finance_')
+            || array_key_exists('sku_transactions', $raw)
+            || (array_key_exists('settlement_amount', $raw) && array_key_exists('fee_and_tax_amount', $raw));
+    }
+
+    /**
+     * TikTok Finance v202501 mengembalikan statement per order, bukan field
+     * canonical Shopee. Statement dianggap siap untuk laporan bila nominal
+     * utama valid dan TikTok mengembalikan minimal satu transaksi SKU.
+     */
+    private function assessTikTokSettlement(array $raw): array
+    {
+        $missing = [];
+        $invalid = [];
+
+        $required = [
+            'buyer_payment_amount' => ['revenue_amount'],
+            'commission_fee' => ['fee_and_tax_amount', 'tiktok_fee_breakdown.fee_total'],
+            'final_income' => ['settlement_amount'],
+        ];
+
+        foreach ($required as $field => $aliases) {
+            $hasValue = false;
+            $valid = false;
+
+            foreach ($aliases as $alias) {
+                $value = data_get($raw, $alias);
+                if ($value === null || $value === '') {
+                    continue;
+                }
+
+                $hasValue = true;
+                if ($this->isNumericValue($value)) {
+                    $valid = true;
+                    break;
+                }
+            }
+
+            if ($valid) {
+                continue;
+            }
+
+            if ($hasValue) {
+                $invalid[] = $field;
+            } else {
+                $missing[] = $field;
+            }
+        }
+
+        $skuTransactions = $raw['sku_transactions'] ?? null;
+        if (! is_array($skuTransactions) || $skuTransactions === []) {
+            $missing[] = 'settlement_statement';
+        }
+
+        $blockingMissing = array_values(array_unique($missing));
+        $blockingInvalid = array_values(array_unique($invalid));
+        $source = (string) ($raw['source'] ?? 'tiktok_finance');
+
+        return [
+            'status' => $blockingMissing === [] && $blockingInvalid === []
+                ? self::SETTLEMENT_COMPLETE
+                : self::SETTLEMENT_INCOMPLETE,
+            'missing_fields' => $missing,
+            'invalid_fields' => $invalid,
+            'flags' => [
+                'source' => $source,
+                'assessment_source' => 'tiktok_finance_payload',
+                'missing_financial_fields' => $missing,
+                'invalid_financial_fields' => $invalid,
+                'blocking_missing_fields' => array_values(array_unique(array_merge($blockingMissing, $blockingInvalid))),
+                'has_raw_payload' => ! empty($raw),
+                'has_statement_transactions' => is_array($skuTransactions) && $skuTransactions !== [],
             ],
         ];
     }

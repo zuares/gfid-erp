@@ -323,6 +323,189 @@
         .settlement-sync-log-error{ color:#f87171; }
         .settlement-sync-log-muted{ color:#94a3b8; }
 
+        .settlement-filter-shell{
+            padding:.85rem;
+            background:rgba(148,163,184,.035);
+            border-bottom:1px solid var(--shp-border);
+        }
+        .settlement-filter-grid{
+            display:grid;
+            grid-template-columns:repeat(12,minmax(0,1fr));
+            gap:.65rem;
+            align-items:end;
+        }
+        .settlement-filter-field{
+            min-width:0;
+            position:relative;
+        }
+        .settlement-filter-field.platform{ grid-column:span 2; }
+        .settlement-filter-field.store{ grid-column:span 3; }
+        .settlement-filter-field.status{ grid-column:span 2; }
+        .settlement-filter-field.fund{ grid-column:span 2; }
+        .settlement-filter-field.ads{ grid-column:span 2; }
+        .settlement-filter-field.date{ grid-column:span 2; }
+        .settlement-filter-field.search{ grid-column:span 3; }
+        .settlement-filter-label{
+            display:block;
+            margin:0 0 .28rem .1rem;
+            color:var(--shp-muted);
+            font-size:.64rem;
+            font-weight:850;
+            letter-spacing:.035em;
+            text-transform:uppercase;
+        }
+        .settlement-filter-control{
+            min-height:34px;
+            border-color:var(--shp-border);
+            background:var(--card,#fff);
+            color:var(--shp-text);
+            padding-left:2rem;
+        }
+        .settlement-filter-control:focus{
+            border-color:var(--shp-accent,#2563eb);
+            box-shadow:0 0 0 .18rem rgba(37,99,235,.12);
+        }
+        .settlement-filter-control:disabled{
+            cursor:not-allowed;
+            opacity:.62;
+            background:rgba(148,163,184,.08);
+        }
+        .settlement-filter-icon{
+            position:absolute;
+            left:.68rem;
+            bottom:.58rem;
+            z-index:1;
+            color:#94a3b8;
+            font-size:.75rem;
+            pointer-events:none;
+        }
+        body[data-theme="dark"] .settlement-filter-shell{ background:rgba(15,23,42,.58); }
+        body[data-theme="dark"] .settlement-filter-control{ background:rgba(15,23,42,.88); }
+
+        .settlement-page-header{
+            align-items:center;
+            padding:.9rem 1rem;
+            margin-bottom:.8rem;
+            border:1px solid var(--shp-border);
+            border-radius:var(--gf-radius-card,16px);
+            box-shadow:var(--gf-shadow-sm,0 1px 2px rgba(16,24,40,.04));
+        }
+        .settlement-heading{ min-width:0; }
+        .settlement-eyebrow{
+            display:flex;
+            align-items:center;
+            gap:.4rem;
+            margin-bottom:.22rem;
+            color:var(--shp-accent);
+            font-size:.66rem;
+            font-weight:900;
+            letter-spacing:.08em;
+            text-transform:uppercase;
+        }
+        .settlement-eyebrow-dot{ width:6px; height:6px; border-radius:50%; background:#22c55e; }
+        .settlement-page-title{ margin:0; color:var(--shp-text); font-size:1.25rem; font-weight:850; letter-spacing:-.025em; }
+        .settlement-page-sub{ margin-top:.22rem; color:var(--shp-muted); font-size:.76rem; }
+        .settlement-header-actions{ display:flex; align-items:center; justify-content:flex-end; gap:.45rem; flex-wrap:wrap; }
+        .settlement-header-secondary{ display:flex; align-items:center; gap:.35rem; }
+        .settlement-icon-button{ width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+        .settlement-page-header .btn{ min-height:34px; }
+        body[data-theme="dark"] .settlement-page-header{ box-shadow:none; }
+
+        .settlement-filter-head{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:.75rem;
+            margin-bottom:.7rem;
+        }
+        .settlement-filter-title{ color:var(--shp-text); font-size:.78rem; font-weight:850; }
+        .settlement-filter-caption{ color:var(--shp-muted); font-size:.7rem; margin-left:.35rem; }
+        .settlement-filter-reset{ border:0; background:transparent; color:var(--shp-accent); font-size:.7rem; font-weight:800; padding:.2rem .3rem; }
+        .settlement-filter-reset:hover{ text-decoration:underline; }
+
+        .settlement-kpi-grid{
+            display:grid;
+            grid-template-columns:repeat(5,minmax(0,1fr));
+            gap:.65rem;
+            margin-bottom:1rem;
+        }
+        .settlement-kpi-grid .oc-kpi-card{
+            min-width:0;
+            margin:0!important;
+            padding:.75rem .8rem!important;
+            overflow:hidden;
+        }
+        .settlement-kpi-grid .oc-kpi-label,
+        .settlement-kpi-grid .oc-kpi-value,
+        .settlement-kpi-grid [id^="kpi"]{
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+
+        .settlement-ledger-card{ overflow:hidden; }
+        .settlement-ledger-head{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:.75rem;
+            padding:.8rem 1rem;
+            border-bottom:1px solid var(--shp-border);
+        }
+        .settlement-ledger-title{ color:var(--shp-text); font-size:.86rem; font-weight:850; }
+        .settlement-ledger-meta{ color:var(--shp-muted); font-size:.7rem; }
+        .settlement-ledger-status{ display:inline-flex; align-items:center; gap:.3rem; color:#15803d; font-size:.68rem; font-weight:850; }
+        .settlement-ledger-status::before{ content:""; width:6px; height:6px; border-radius:50%; background:#22c55e; }
+        .settlement-table-scroll{ max-height:65vh; overflow:auto; }
+        .settlement-ledger-table{ min-width:0; table-layout:fixed; }
+        .settlement-ledger-table thead th{ padding:.65rem .8rem; background:var(--card,#fff); }
+        .settlement-ledger-table thead th:nth-child(1){ width:22%; }
+        .settlement-ledger-table thead th:nth-child(2){ width:20%; }
+        .settlement-ledger-table thead th:nth-child(3){ width:15%; }
+        .settlement-ledger-table thead th:nth-child(4){ width:24%; }
+        .settlement-ledger-table thead th:nth-child(5){ width:19%; }
+        .settlement-ledger-table tbody tr{ transition:background .15s ease; }
+        .settlement-ledger-table tbody tr:hover{ background:rgba(91,92,226,.035); }
+        .settlement-ledger-table tbody td{ padding:.72rem .8rem; border-top-color:var(--shp-border); }
+        .settlement-order-id{ display:block; font-size:.78rem; font-weight:850; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .settlement-order-store{ margin-top:.35rem; color:var(--shp-muted); font-size:.7rem; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .settlement-order-source{ margin-top:.28rem; color:#2563eb; font-size:.6rem; font-weight:850; letter-spacing:.035em; text-transform:uppercase; }
+        .settlement-timeline{ display:grid; gap:.5rem; }
+        .settlement-timeline-item{ display:grid; gap:.12rem; }
+        .settlement-timeline-label{ color:var(--shp-muted); font-size:.59rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+        .settlement-timeline-value{ color:var(--shp-text); font-size:.72rem; font-weight:700; }
+        .settlement-timeline-value.muted{ color:var(--shp-muted); }
+        .settlement-money-stack{ display:grid; gap:.35rem; text-align:right; }
+        .settlement-money-item{ display:grid; gap:.08rem; }
+        .settlement-money-label{ color:var(--shp-muted); font-size:.59rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+        .settlement-money-value{ color:var(--shp-text); font-size:.82rem; font-weight:800; }
+        .settlement-money-value.net{ color:#16a34a; font-size:.9rem; }
+        .settlement-money-value.pending{ color:#d97706; }
+        .settlement-money-source{ color:var(--shp-muted); font-size:.6rem; font-weight:800; }
+        .settlement-breakdown{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.55rem; }
+        .settlement-breakdown-block{ min-width:0; }
+        .settlement-breakdown-title{ margin-bottom:.25rem; color:var(--shp-muted); font-size:.59rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+        .settlement-breakdown .fee-list{ font-size:.68rem; }
+        .settlement-breakdown .fee-list li{ margin-bottom:.16rem; }
+        .settlement-pending-note{ padding:.5rem .6rem; border:1px dashed rgba(217,119,6,.38); border-radius:9px; background:rgba(245,158,11,.07); color:#92400e; font-size:.68rem; line-height:1.35; }
+        .settlement-pagination{ display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.7rem .9rem; border-top:1px solid var(--shp-border); color:var(--shp-muted); font-size:.72rem; }
+
+        @media (max-width: 980px) {
+            .settlement-kpi-grid{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+            .settlement-page-header{ align-items:flex-start; }
+            .settlement-header-actions{ justify-content:flex-start; }
+        }
+
+        @media (max-width: 1100px) {
+            .settlement-filter-field.platform,
+            .settlement-filter-field.store,
+            .settlement-filter-field.status,
+            .settlement-filter-field.fund,
+            .settlement-filter-field.ads,
+            .settlement-filter-field.date,
+            .settlement-filter-field.search{ grid-column:span 3; }
+        }
+
         @media (max-width: 768px) {
             .settlement-sync-status-grid{ grid-template-columns:1fr; }
             .settlement-sync-header{ align-items:stretch; }
@@ -330,31 +513,67 @@
             .settlement-sync-field,
             .settlement-sync-field[style]{ max-width:none !important; min-width:0 !important; flex:1 1 100%; }
             .settlement-sync-action-strip{ padding:.85rem; }
+            .settlement-filter-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; }
+            .settlement-filter-field.platform,
+            .settlement-filter-field.store,
+            .settlement-filter-field.status,
+            .settlement-filter-field.fund,
+            .settlement-filter-field.ads,
+            .settlement-filter-field.date,
+            .settlement-filter-field.search{ grid-column:span 1; }
+            .settlement-filter-field.search{ grid-column:1 / -1; }
+            .settlement-filter-shell{ padding:.7rem; }
+            .settlement-page-header{ margin-inline:-.7rem; border-radius:0; border-inline:0; }
+            .settlement-page-title{ font-size:1.1rem; }
+            .settlement-page-sub{ max-width:34rem; }
+            .settlement-kpi-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
+            .settlement-ledger-head{ align-items:flex-start; flex-direction:column; }
+            .settlement-table-scroll{ overflow:visible; max-height:none; }
+            .settlement-ledger-table{ display:block; }
+            .settlement-ledger-table thead{ display:none; }
+            .settlement-ledger-table tbody,
+            .settlement-ledger-table tr{ display:block; }
+            .settlement-ledger-table tbody tr{ margin:.65rem; padding:.7rem; border:1px solid var(--shp-border); border-radius:12px; background:var(--card,#fff); }
+            .settlement-ledger-table tbody td{ display:block; width:100%!important; padding:.35rem 0; border:0; }
+            .settlement-ledger-table tbody td + td{ border-top:1px solid rgba(148,163,184,.16); padding-top:.6rem; margin-top:.2rem; }
+            .settlement-money-stack{ grid-template-columns:repeat(2,minmax(0,1fr)); text-align:left; }
+            .settlement-breakdown{ grid-template-columns:1fr; gap:.45rem; }
+            .settlement-pagination{ align-items:flex-start; flex-direction:column; }
         }
     </style>
 @endpush
 
 @section('content')
 <div class="page-wrap">
-    <div class="ship-topbar">
-        <div>
-            <h1 class="title">Payment & Settlement</h1>
-    <div class="sub">Dana cair per order — breakdown fee, voucher, subsidi ongkir, dan estimasi escrow dari marketplace.</div>
+    <div class="ship-topbar settlement-page-header">
+        <div class="settlement-heading">
+            <div class="settlement-eyebrow"><span class="settlement-eyebrow-dot"></span> Marketplace Finance</div>
+            <h1 class="settlement-page-title">Settlement</h1>
+            <div class="settlement-page-sub">Pantau dana final, potongan marketplace, dan estimasi pencairan per order.</div>
         </div>
-        <div class="controls">
-            <a href="{{ route('marketplace.income-detail') }}" class="btn btn-sm btn-ship-outline btn-pill">
-                <i class="bi bi-journal-text"></i> Rincian Penghasilan
+        <div class="settlement-header-actions">
+            <a href="{{ route('marketplace.reports.financial-quality') }}" class="btn btn-sm btn-ship-primary btn-pill">
+                <i class="bi bi-shield-check me-1"></i> Audit Data
             </a>
-            <button class="btn btn-sm btn-ship-outline btn-pill" onclick="switchSettlementTab('sync')" title="Buka tab sync settlement">
-                <i class="bi bi-arrow-repeat"></i> Tab Sync
+            <button class="btn btn-sm btn-ship-primary btn-pill" onclick="switchSettlementTab('sync')" title="Buka tab sync settlement">
+                <i class="bi bi-arrow-repeat me-1"></i> Sync Settlement
             </button>
-            <button class="btn btn-sm btn-ship-outline btn-pill" onclick="resetFilters()">Reset Filter</button>
-            <button class="btn btn-sm btn-ship-outline btn-pill" onclick="loadSettlements()">Refresh</button>
-            @if(auth()->user()?->role === 'owner')
-                <button class="btn btn-sm btn-outline-danger btn-pill" onclick="purgeAllMarketplaceData()" title="Hapus semua data marketplace untuk toko ini">
-                    <i class="bi bi-trash3"></i> Hapus Semua Data Marketplace
+            <div class="settlement-header-secondary">
+                <a href="{{ route('marketplace.income-detail') }}" class="btn btn-sm btn-ship-outline btn-pill" title="Buka rincian penghasilan" aria-label="Buka rincian penghasilan">
+                    <i class="bi bi-journal-text"></i><span class="d-none d-lg-inline ms-1">Penghasilan</span>
+                </a>
+                <button class="btn btn-sm btn-ship-outline btn-pill settlement-icon-button" onclick="resetFilters()" title="Reset semua filter" aria-label="Reset semua filter">
+                    <i class="bi bi-arrow-counterclockwise"></i>
                 </button>
-            @endif
+                <button class="btn btn-sm btn-ship-outline btn-pill settlement-icon-button" onclick="loadSettlements()" title="Refresh data settlement" aria-label="Refresh data settlement">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                @if(auth()->user()?->role === 'owner')
+                    <button class="btn btn-sm btn-outline-danger btn-pill settlement-icon-button" onclick="purgeAllMarketplaceData()" title="Hapus semua data marketplace untuk toko ini" aria-label="Hapus semua data marketplace untuk toko ini">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -370,94 +589,106 @@
 
     <div id="settlementTabData" role="tabpanel" aria-labelledby="settlementTabDataBtn" tabindex="0">
         <div class="card-main mb-3">
-            <div style="padding:.75rem; background:rgba(148,163,184,.03);">
-                <div class="controls" style="flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; gap: .4rem;">
-                    <div style="position:relative; min-width:125px; width:125px;">
-                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterStore" onchange="loadSettlements()">
-                            <option value="">Semua Toko</option>
-                        </select>
-                        <i class="bi bi-shop" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
-                    </div>
-
-                    <div style="position:relative; min-width:130px; width:130px;">
-                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterPlatform">
+            <div class="settlement-filter-shell">
+                <div class="settlement-filter-head">
+                    <div><span class="settlement-filter-title">Filter settlement</span><span class="settlement-filter-caption">Platform dan toko saling mengikuti</span></div>
+                    <button type="button" class="settlement-filter-reset" onclick="resetFilters()">Reset</button>
+                </div>
+                <div class="settlement-filter-grid" aria-label="Filter settlement">
+                    <div class="settlement-filter-field platform">
+                        <label class="settlement-filter-label" for="filterPlatform">Platform</label>
+                        <select class="form-select form-select-sm filter-select settlement-filter-control w-100" id="filterPlatform" aria-label="Filter platform">
                             <option value="">Semua Platform</option>
                         </select>
-                        <i class="bi bi-globe2" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                        <i class="bi bi-globe2 settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
-                    <div style="position:relative; min-width:125px; width:125px;">
-                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterStatus" onchange="loadSettlements()">
+                    <div class="settlement-filter-field store">
+                        <label class="settlement-filter-label" for="filterStore">Toko</label>
+                        <select class="form-select form-select-sm filter-select settlement-filter-control w-100" id="filterStore" onchange="loadSettlements()" aria-label="Filter toko">
+                            <option value="">Semua Toko</option>
+                        </select>
+                        <i class="bi bi-shop settlement-filter-icon" aria-hidden="true"></i>
+                    </div>
+
+                    <div class="settlement-filter-field status">
+                        <label class="settlement-filter-label" for="filterStatus">Status order</label>
+                        <select class="form-select form-select-sm filter-select settlement-filter-control w-100" id="filterStatus" onchange="loadSettlements()" aria-label="Filter status order">
                             <option value="">Semua Status</option>
                             <option value="COMPLETED">Selesai</option>
                             <option value="SHIPPED">Dikirim</option>
                             <option value="CANCELLED">Batal</option>
                         </select>
-                        <i class="bi bi-box-seam" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                        <i class="bi bi-box-seam settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
-                    <div style="position:relative; min-width:125px; width:125px;">
-                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterSettlementStatus" onchange="onSettlementStatusChange()">
+                    <div class="settlement-filter-field fund">
+                        <label class="settlement-filter-label" for="filterSettlementStatus">Dana</label>
+                        <select class="form-select form-select-sm filter-select settlement-filter-control w-100" id="filterSettlementStatus" onchange="onSettlementStatusChange()" aria-label="Filter status dana">
                             <option value="">Semua Dana</option>
                             <option value="cair" selected>Sudah Cair</option>
                             <option value="belum_cair">Belum Cair</option>
                         </select>
-                        <i class="bi bi-wallet2" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                        <i class="bi bi-wallet2 settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
-                    <div style="position:relative; min-width:145px; width:145px;">
-                        <select class="form-select form-select-sm filter-select w-100" style="padding-left:26px; cursor:pointer;" id="filterAdCost">
+                    <div class="settlement-filter-field ads">
+                        <label class="settlement-filter-label" for="filterAdCost">Iklan</label>
+                        <select class="form-select form-select-sm filter-select settlement-filter-control w-100" id="filterAdCost" aria-label="Filter biaya iklan">
                             <option value="">Semua Biaya Iklan</option>
                             <option value="with">Ada Biaya Iklan</option>
                             <option value="without">Tanpa Biaya Iklan</option>
                         </select>
-                        <i class="bi bi-megaphone" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                        <i class="bi bi-megaphone settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
-                    <div style="position:relative; min-width:135px; width:135px;">
-                        <input type="text" class="form-control form-control-sm filter-select w-100" style="background:#fff;cursor:pointer;padding-left:26px" id="filterOrderDate" placeholder="Tgl Order...">
-                        <i class="bi bi-calendar3" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                    <div class="settlement-filter-field date">
+                        <label class="settlement-filter-label" for="filterOrderDate">Tanggal order</label>
+                        <input type="text" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterOrderDate" placeholder="Pilih tanggal" aria-label="Filter tanggal order">
+                        <i class="bi bi-calendar3 settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
-                    <div style="position:relative; min-width:135px; width:135px;">
-                        <input type="text" class="form-control form-control-sm filter-select w-100" style="background:#fff;cursor:pointer;padding-left:26px" id="filterSettlementDate" placeholder="Tgl Cair..." title="Tanggal pencairan final">
-                        <i class="bi bi-calendar3" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                    <div class="settlement-filter-field date">
+                        <label class="settlement-filter-label" for="filterSettlementDate">Tanggal cair</label>
+                        <input type="text" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterSettlementDate" placeholder="Pilih tanggal" title="Tanggal pencairan final" aria-label="Filter tanggal cair">
+                        <i class="bi bi-calendar3 settlement-filter-icon" aria-hidden="true"></i>
                     </div>
 
-                    <div style="position:relative; min-width:135px; width:135px;">
-                        <input type="text" class="form-control form-control-sm filter-select w-100" style="padding-left:26px" id="filterSearch" placeholder="Cari Order..." onkeyup="if(event.key==='Enter')loadSettlements()">
-                        <i class="bi bi-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.75rem"></i>
+                    <div class="settlement-filter-field search">
+                        <label class="settlement-filter-label" for="filterSearch">Cari</label>
+                        <input type="search" class="form-control form-control-sm filter-select settlement-filter-control w-100" id="filterSearch" placeholder="Order / produk / SKU" onkeyup="if(event.key==='Enter')loadSettlements()" aria-label="Cari order produk atau SKU">
+                        <i class="bi bi-search settlement-filter-icon" aria-hidden="true"></i>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div style="display:flex; flex-wrap: nowrap; gap: .65rem; margin-bottom: 1rem;">
-            <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-                <div class="oc-kpi-label" id="kpiCountLabel" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Order Cair">Order Cair</div>
-                <div class="oc-kpi-value" id="kpiCount" style="font-size: 1.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+        <div class="settlement-kpi-grid">
+            <div class="oc-kpi-card">
+                <div class="oc-kpi-label" id="kpiCountLabel" title="Order Cair">Order Cair</div>
+                <div class="oc-kpi-value" id="kpiCount">—</div>
             </div>
-            <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-                <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Gross Sales">Gross Sales</div>
-                <div class="oc-kpi-value" id="kpiBuyerTotal" style="font-size: 1.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+            <div class="oc-kpi-card">
+                <div class="oc-kpi-label" title="Gross Sales">Gross Sales</div>
+                <div class="oc-kpi-value" id="kpiBuyerTotal">—</div>
             </div>
-            <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-                <div class="oc-kpi-label" id="kpiFeeLabel" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Fee Marketplace">Fee Marketplace</div>
-                <div class="oc-kpi-value" id="kpiFeeTotal" style="font-size: 1.05rem; color:#b91c1c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
-                <div id="kpiFeePercent" style="font-size:.72rem; color:var(--shp-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+            <div class="oc-kpi-card">
+                <div class="oc-kpi-label" id="kpiFeeLabel" title="Total Fee Marketplace">Fee Marketplace</div>
+                <div class="oc-kpi-value" id="kpiFeeTotal">—</div>
+                <div id="kpiFeePercent" class="oc-kpi-note">—</div>
             </div>
-            <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-                <div class="oc-kpi-label" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Total Biaya Iklan">Biaya Iklan</div>
-                <div class="oc-kpi-value" id="kpiAdCost" style="font-size: 1.05rem; color:#dc2626; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+            <div class="oc-kpi-card">
+                <div class="oc-kpi-label" title="Total Biaya Iklan">Biaya Iklan</div>
+                <div class="oc-kpi-value" id="kpiAdCost">—</div>
             </div>
-            <div class="oc-kpi-card" style="flex: 1 1 0; min-width: 0; margin: 0; padding: .65rem .75rem; overflow:hidden;">
-                <div class="oc-kpi-label" id="kpiNetPayoutLabel" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Dana Cair Final">Dana Cair (Final)</div>
-                <div class="oc-kpi-value" id="kpiNetPayout" style="font-size: 1.05rem; color:#16a34a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
-                <div id="kpiEstimateFreshness" style="font-size:.68rem; color:var(--shp-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+            <div class="oc-kpi-card">
+                <div class="oc-kpi-label" id="kpiNetPayoutLabel" title="Dana Cair Final">Dana Cair (Final)</div>
+                <div class="oc-kpi-value" id="kpiNetPayout">—</div>
+                <div id="kpiEstimateFreshness" class="oc-kpi-note"></div>
             </div>
         </div>
 
-        <div class="card-main">
+        <div class="card-main settlement-ledger-card">
             <div id="settlementBody">
                 <div style="padding:2rem;text-align:center;color:var(--shp-muted);font-size:.85rem;">
                     <span class="spinner-border spinner-border-sm"></span> Memuat data...
@@ -806,6 +1037,31 @@
         return store?.status === 'active' && store?.is_active === true;
     }
 
+    function updateSyncPlatformActions() {
+        const selectedStore = stores.find(store => String(store.id) === String($('syncStore')?.value || ''));
+        const isTikTok = selectedStore && isTikTokStore(selectedStore);
+        const isShopee = selectedStore && isShopeeStore(selectedStore);
+
+        [
+            ['runSyncReleasedBtn', isShopee, 'Tarik tanggal dana cair dari Shopee Escrow List'],
+            ['runIncomeEstimateBtn', isShopee, 'Perbarui estimasi payout Shopee yang belum cair'],
+        ].forEach(([id, supported, title]) => {
+            const button = $(id);
+            if (!button) return;
+            button.style.display = supported || !selectedStore ? '' : 'none';
+            button.disabled = !selectedStore;
+            button.title = supported ? title : (isTikTok ? 'Tidak berlaku untuk TikTok Finance' : title);
+        });
+
+        const settlementButton = $('runSettlementBtn');
+        if (settlementButton) {
+            settlementButton.disabled = !selectedStore;
+            settlementButton.title = isTikTok
+                ? 'Tarik statement final dari TikTok Finance API'
+                : 'Tarik nominal breakdown settlement order';
+        }
+    }
+
     function storePlatformCode(store) {
         return String(store?.channel?.code || '').trim().toLowerCase();
     }
@@ -828,6 +1084,18 @@
             option.textContent = `${store.name} (${store.channel?.name || '?'})`;
             storeSel.appendChild(option);
         });
+
+        const hasPlatformFilter = Boolean(selectedPlatform);
+        const hasCandidates = candidates.length > 0;
+        storeSel.disabled = hasPlatformFilter && !hasCandidates;
+        if (hasPlatformFilter && !hasCandidates) {
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = 'Tidak ada toko terkait';
+            emptyOption.disabled = true;
+            storeSel.appendChild(emptyOption);
+            storeSel.value = '';
+        }
 
         if (candidates.some(store => String(store.id) === currentStoreId)) {
             storeSel.value = currentStoreId;
@@ -1357,12 +1625,14 @@
                 if (syncPlatform && selectedStore) {
                     syncPlatform.value = storePlatformCode(selectedStore);
                 }
+                updateSyncPlatformActions();
             });
         }
         if (syncPlatform) {
             syncPlatform.addEventListener('change', () => {
                 if (syncStore) syncStore.dataset.manual = '0';
                 populateSyncStoreSelect();
+                updateSyncPlatformActions();
             });
         }
         if (filterStore && syncStore) {
@@ -1373,6 +1643,7 @@
                     if (syncPlatform && selectedStore) {
                         syncPlatform.value = storePlatformCode(selectedStore);
                     }
+                    updateSyncPlatformActions();
                 }
             });
         }
@@ -1384,6 +1655,7 @@
             syncPlatform.value = storePlatformCode(restoredStore);
         }
         populateSyncStoreSelect(syncStore?.value || '');
+        updateSyncPlatformActions();
         updateSettlementModeLabels();
 
         const filterSearch = $('filterSearch');
@@ -1532,67 +1804,77 @@
         const selectedFundMode = $('filterSettlementStatus')?.value || '';
         const pendingView = selectedFundMode === 'belum_cair';
         const dateHeading = pendingView ? 'Est. Tgl Cair' : (selectedFundMode === 'cair' ? 'Tgl Cair Final' : 'Cair / Estimasi');
-        const payoutHeading = pendingView ? 'Gross & Estimasi Escrow' : 'Gross & Net Settlement';
         const feeHeading = pendingView ? 'Status Rincian Fee' : 'Biaya Marketplace';
 
         let html = `
-        <div class="table-responsive" style="margin:0; border:none; max-height:65vh; overflow-y:auto;">
-        <table class="table table-list w-100" style="margin-bottom:0">
+        <div class="settlement-ledger-head">
+            <div><div class="settlement-ledger-title">Ledger settlement</div><div class="settlement-ledger-meta">${paginationData?.total || 0} order dalam filter aktif</div></div>
+            <div class="settlement-ledger-status">Data tersimpan</div>
+        </div>
+        <div class="settlement-table-scroll">
+        <table class="table table-list settlement-ledger-table w-100" style="margin-bottom:0">
             <thead>
                 <tr>
-                    <th style="min-width:130px">Order & Toko</th>
-                    <th style="min-width:90px">Tgl Dibuat</th>
-                    <th style="min-width:90px">${dateHeading}</th>
-                    <th class="text-end" style="min-width:110px">${payoutHeading}</th>
-                    <th style="min-width:145px">${feeHeading}</th>
-                    <th style="min-width:110px">Promosi Seller</th>
-                    <th style="min-width:140px">Logistik & Ongkir</th>
-                    <th class="text-end" style="min-width:90px">Penyesuaian (DRC)</th>
+                    <th>Order & Toko</th>
+                    <th>Timeline</th>
+                    <th class="text-end">Gross / Net</th>
+                    <th>${feeHeading}</th>
+                    <th>Potongan & Penyesuaian</th>
                 </tr>
             </thead>
             <tbody>
             ${settlements.map(s => {
                 const isPending = !s.settlement_time && !s.is_finance_final;
+                const isTikTokFinance = ['tiktok', 'ttk', 'tkt'].includes(String(s.store?.channel?.code || '').toLowerCase())
+                    || String(s.finance_source || '').toLowerCase().includes('tiktok_finance');
                 const estimateSource = String(s.income_estimation_source || '');
                 const estimateSourceLabel = estimateSource === 'payout'
                     ? 'PAYOUT AKTUAL'
                     : (estimateSource === 'estimated_escrow'
                         ? 'EST. ESCROW'
                         : (estimateSource === 'manual_24' ? 'EST. MANUAL 24%' : 'ESTIMASI BELUM TERSEDIA'));
-                const estimateSourceColor = estimateSource === 'payout'
-                    ? '#15803d'
-                    : (estimateSource === 'estimated_escrow' ? '#b45309' : '#64748b');
-                const estimateSyncText = s.income_estimate_synced_at
-                    ? `Diperbarui ${fmtRelativeTime(s.income_estimate_synced_at)}`
-                    : (estimateSource === 'payout'
-                        ? 'Diambil dari payout aktual'
-                        : (estimateSource === 'manual_24' ? 'Fallback lokal berdasarkan escrow' : 'Menunggu data escrow marketplace'));
-                const pendingDetailPlaceholder = `
-                    <div style="padding:.45rem .55rem; border:1px dashed rgba(217,119,6,.38); border-radius:9px; background:rgba(245,158,11,.07); color:#92400e; font-size:.68rem; line-height:1.35;">
+                const pendingDetailPlaceholder = isTikTokFinance ? `
+                    <div class="settlement-pending-note">
+                        <strong>Belum final</strong><br>Menunggu statement Finance TikTok.
+                    </div>` : `
+                    <div class="settlement-pending-note">
                         <strong>Belum final</strong><br>Rincian tersedia setelah settlement.
                     </div>`;
+                const finalSourceLabel = isTikTokFinance ? 'TIKTOK FINANCE API' : 'CAIR • FINAL';
                 return `<tr>
-                    <td>
-                        <a href="/marketplace/orders/${s.order?.id || ''}" class="code-link">${esc(s.channel_order_id)}</a>
-                        <div style="margin-top:3px">${s.order?.order_status ? `<span class="oc-badge oc-badge-muted" style="font-size:.65rem">${esc(s.order.order_status)}</span>` : ''}</div>
-                        <div style="font-size:.75rem; font-weight:600; margin-top:4px; color:var(--shp-muted);">${esc(s.store?.name || '—')}</div>
+                    <td class="settlement-order-cell">
+                        <a href="/marketplace/orders/${s.order?.id || ''}" class="code-link settlement-order-id">${esc(s.channel_order_id)}</a>
+                        <div style="margin-top:4px">${s.order?.order_status ? `<span class="oc-badge oc-badge-muted" style="font-size:.63rem">${esc(s.order.order_status)}</span>` : ''}</div>
+                        <div class="settlement-order-store">${esc(s.store?.name || '—')}</div>
+                        ${isTikTokFinance ? '<div class="settlement-order-source">TikTok Finance</div>' : ''}
                     </td>
-                    <td style="font-size:.78rem;">
-                        ${s.order?.ordered_at ? fmtDateTime(s.order.ordered_at) : '<span style="color:#94a3b8">—</span>'}
-                    </td>
-
-                    <td style="font-size:.75rem;color:var(--shp-muted);">
-                        ${isPending
-                            ? `<span class="oc-badge oc-badge-amber" style="font-size:.65rem">${s.estimated_payout_at ? 'Est. ' + fmtDateTime(s.estimated_payout_at) : 'Tanggal belum tersedia'}</span>
-                               <div style="font-size:.62rem;color:${estimateSourceColor};font-weight:800;margin-top:5px;">${estimateSourceLabel}</div>
-                               <div style="font-size:.6rem;color:#94a3b8;margin-top:2px;" title="${s.income_estimate_synced_at ? esc(fmtDateTime(s.income_estimate_synced_at)) : ''}">${estimateSyncText}</div>`
-                            : `${s.settlement_time ? fmtDateTime(s.settlement_time) : 'Finance API'}<div style="font-size:.62rem;color:#15803d;font-weight:800;margin-top:4px;">CAIR • FINAL${s.is_finance_final ? ' • TIKTOK' : ''}</div>`}
+                    <td class="settlement-timeline">
+                        <div class="settlement-timeline-item">
+                            <span class="settlement-timeline-label">Order dibuat</span>
+                            <strong class="settlement-timeline-value">${s.order?.ordered_at ? fmtDateTime(s.order.ordered_at) : '—'}</strong>
+                        </div>
+                        <div class="settlement-timeline-item">
+                            <span class="settlement-timeline-label">${dateHeading}</span>
+                            ${isPending
+                                ? `<strong class="settlement-timeline-value muted">${s.estimated_payout_at ? 'Est. ' + fmtDateTime(s.estimated_payout_at) : 'Belum tersedia'}</strong>
+                                   <span class="oc-badge oc-badge-amber" style="width:max-content;font-size:.6rem">${isTikTokFinance ? 'Menunggu statement' : estimateSourceLabel}</span>`
+                                : `<strong class="settlement-timeline-value">${s.settlement_time ? fmtDateTime(s.settlement_time) : 'Finance API'}</strong>
+                                   <span class="oc-badge oc-badge-green" style="width:max-content;font-size:.6rem">${finalSourceLabel}</span>`}
+                        </div>
                     </td>
 
                     <td class="text-end">
-                        <div class="fw-bold" style="font-size:.82rem; color:var(--shp-text);">${fmtRp(s.gross_amount || 0)}</div>
-                        <div class="fw-black" style="font-size:.9rem; color:${isPending ? '#d97706' : '#16a34a'}; margin-top:2px;">${fmtRp(s.final_income)}</div>
-                        <div style="font-size:.62rem; color:${isPending ? estimateSourceColor : '#15803d'}; margin-top:2px; font-weight:800;">${isPending ? estimateSourceLabel : 'CAIR • FINAL'}</div>
+                        <div class="settlement-money-stack">
+                            <div class="settlement-money-item">
+                                <span class="settlement-money-label">Gross sales</span>
+                                <strong class="settlement-money-value">${fmtRp(s.gross_amount || 0)}</strong>
+                            </div>
+                            <div class="settlement-money-item">
+                                <span class="settlement-money-label">${isPending ? 'Estimasi net' : 'Net settlement'}</span>
+                                <strong class="settlement-money-value ${isPending ? 'pending' : 'net'}">${fmtRp(s.final_income)}</strong>
+                                <span class="settlement-money-source">${isPending ? (isTikTokFinance ? 'Menunggu statement' : estimateSourceLabel) : finalSourceLabel}</span>
+                            </div>
+                        </div>
                     </td>
 
                     <td>
@@ -1755,25 +2037,30 @@
 
                     <td>
                         ${isPending ? pendingDetailPlaceholder : `
-                        <ul class="fee-list">
-                            <li><span>Voucher:</span> <span class="fee-val">${s.seller_voucher ? '−'+fmtRp(s.seller_voucher) : '-'}</span></li>
-                            <li><span>Koin CB:</span> <span class="fee-val">${s.seller_coin_cash_back ? '−'+fmtRp(s.seller_coin_cash_back) : '-'}</span></li>
-                        </ul>
+                        <div class="settlement-breakdown">
+                            <div class="settlement-breakdown-block">
+                                <div class="settlement-breakdown-title">Promosi</div>
+                                <ul class="fee-list">
+                                    <li><span>Voucher</span> <span class="fee-val">${s.seller_voucher ? '−'+fmtRp(s.seller_voucher) : '-'}</span></li>
+                                    <li><span>Koin CB</span> <span class="fee-val">${s.seller_coin_cash_back ? '−'+fmtRp(s.seller_coin_cash_back) : '-'}</span></li>
+                                </ul>
+                            </div>
+                            <div class="settlement-breakdown-block">
+                                <div class="settlement-breakdown-title">Logistik</div>
+                                <ul class="fee-list">
+                                    <li><span>Ongkir aktual</span> <span class="fee-val">${s.actual_shipping_fee ? '−'+fmtRp(s.actual_shipping_fee) : '-'}</span></li>
+                                    <li><span>Ongkir balik</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
+                                    <li><span>Subsidi</span> <span class="subsidy-val">${s.shipping_fee_subsidy ? '+'+fmtRp(s.shipping_fee_subsidy) : '-'}</span></li>
+                                </ul>
+                            </div>
+                            <div class="settlement-breakdown-block">
+                                <div class="settlement-breakdown-title">Penyesuaian</div>
+                                <ul class="fee-list">
+                                    <li><span>DRC refund</span> <span class="drc-val">${s.drc_adjustable_refund ? (s.drc_adjustable_refund > 0 ? '+' : '') + fmtRp(s.drc_adjustable_refund) : '-'}</span></li>
+                                </ul>
+                            </div>
+                        </div>
                         `}
-                    </td>
-
-                    <td>
-                        ${isPending ? pendingDetailPlaceholder : `
-                        <ul class="fee-list">
-                            <li><span>Ongkir Aktual:</span> <span class="fee-val">${s.actual_shipping_fee ? '−'+fmtRp(s.actual_shipping_fee) : '-'}</span></li>
-                            <li><span>Ongkir Balik:</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
-                            <li><span>Subsidi (Plaftorm):</span> <span class="subsidy-val">${s.shipping_fee_subsidy ? '+'+fmtRp(s.shipping_fee_subsidy) : '-'}</span></li>
-                        </ul>
-                        `}
-                    </td>
-
-                    <td class="text-end">
-                        ${isPending ? '<span style="font-size:.68rem;color:#92400e;">Belum final</span>' : `<span class="drc-val" style="font-size:.82rem">${s.drc_adjustable_refund ? (s.drc_adjustable_refund > 0 ? '+' : '') + fmtRp(s.drc_adjustable_refund) : '-'}</span>`}
                     </td>
                 </tr>`;
             }).join('')}
@@ -1810,7 +2097,7 @@
         }
 
         html += `
-        <div style="padding:.5rem .75rem; border-top:1px solid var(--shp-border); display:flex; justify-content:space-between; align-items:center; font-size:.75rem; color:var(--shp-muted);">
+        <div class="settlement-pagination">
             <div>Menampilkan baris ${paginationData.from || 0} - ${paginationData.to || 0} dari total ${paginationData.total || 0}</div>
             <div>${linksHtml}</div>
         </div>`;

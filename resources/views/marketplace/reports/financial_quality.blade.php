@@ -38,6 +38,7 @@
         'drc_adjustable_refund' => 'Refund atau penyesuaian',
         'escrow_tax' => 'Pajak payout',
         'final_income' => 'Dana cair',
+        'settlement_statement' => 'Statement settlement TikTok',
     ];
     $orderStatusLabels = [
         'COMPLETED' => 'Selesai',
