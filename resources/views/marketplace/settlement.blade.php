@@ -926,7 +926,9 @@
     let paginationData = null;
     let activeTab = sessionStorage.getItem('settlementActiveTab') || 'data';
     let syncPollTimer = null;
-    let lastSettlementProgressStatus = 'idle';
+    let lastSettlementProgressKey = 'idle:idle';
+    let settlementSyncViewVersion = 0;
+    let settlementSyncRunId = null;
     let settlementSyncLastPercent = 0;
     let settlementSyncRefreshInFlight = false;
     const settlementFiltersStorageKey = 'marketplace:settlement_filters:v2';
@@ -1663,6 +1665,8 @@
     async function refreshSettlementSyncLogs() {
         if (settlementSyncRefreshInFlight) return syncLogs;
         settlementSyncRefreshInFlight = true;
+        const refreshVersion = settlementSyncViewVersion;
+        const expectedRunId = settlementSyncRunId;
 
         const lastCheck = $('settlementSyncLastCheck');
         if (lastCheck) lastCheck.textContent = fmtDateTime(new Date().toISOString());
@@ -1673,6 +1677,8 @@
                 syncLogs = [];
                 renderSettlementProgress(null);
                 hideSyncFeedback();
+                settlementSyncRunId = null;
+                lastSettlementProgressKey = 'idle:idle';
                 setSyncState('warn', 'Pilih toko');
                 updateSyncDot(false);
                 if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = '—';
@@ -1690,6 +1696,16 @@
                 api('/api/marketplace/stores/' + storeId + '/sync-settlements-progress').catch(() => null),
             ]);
 
+            // Polling lama dapat selesai setelah user memulai run baru. Jangan
+            // izinkan response lama mengembalikan feedback/status run sebelumnya.
+            if (refreshVersion !== settlementSyncViewVersion) {
+                return syncLogs;
+            }
+
+            if (expectedRunId && progress?.run_id && String(progress.run_id) !== String(expectedRunId)) {
+                return syncLogs;
+            }
+
             syncLogs = [...(settlementLogs || []), ...(financeLogs || [])]
                 .filter(log => ['sync_settlements', 'sync_finance'].includes(log.action))
                 .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
@@ -1699,6 +1715,8 @@
             const progressState = renderSettlementProgress(progress);
             const progressStatus = String(progress?.status || 'idle').toLowerCase();
             const progressActive = ['queued', 'running'].includes(progressStatus);
+            const progressRunId = String(progress?.run_id || settlementSyncRunId || 'legacy');
+            const progressKey = `${progressRunId}:${progressStatus}`;
 
             const completion = progressState?.terminal ? getSettlementCompletionPresentation(progress) : null;
             const lastSyncAt = progressState?.terminal && progress?.updated_at
@@ -1731,12 +1749,12 @@
                 if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSyncAt ? fmtDateTime(lastSyncAt) : '—';
             }
 
-            if (progressState && progressState.terminal && lastSettlementProgressStatus !== progressStatus) {
+            if (progressState && progressState.terminal && lastSettlementProgressKey !== progressKey) {
                 loadSettlements();
                 showSyncFeedback(completion.level, completion.title, completion.message, completion.meta || []);
             }
 
-            lastSettlementProgressStatus = progressStatus;
+            lastSettlementProgressKey = progressKey;
 
             renderSyncConsole();
             renderSyncLogs();
@@ -2365,6 +2383,9 @@
         if (!btn || btn.disabled) return;
 
         const oldHtml = btn.innerHTML;
+        settlementSyncViewVersion++;
+        settlementSyncRunId = null;
+        lastSettlementProgressKey = 'new:queued';
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> ' + busyText;
 
@@ -2398,6 +2419,11 @@
                 body: JSON.stringify(payload || {}),
             });
 
+            settlementSyncRunId = d.run_id ? String(d.run_id) : null;
+            lastSettlementProgressKey = settlementSyncRunId
+                ? `${settlementSyncRunId}:queued`
+                : 'new:queued';
+
             const meta = [
                 d.mode ? `Mode: ${d.mode}` : null,
                 d.progress_key ? `Progress key: ${d.progress_key}` : null,
@@ -2406,6 +2432,10 @@
             showSyncFeedback('info', ackTitle, d.message || 'Sinkronisasi dikirim ke latar belakang.', meta);
             await refreshSettlementSyncLogs();
         } catch (e) {
+            settlementSyncRunId = e?.data?.progress?.run_id ? String(e.data.progress.run_id) : null;
+            if (settlementSyncRunId) {
+                lastSettlementProgressKey = `${settlementSyncRunId}:${String(e.data.progress.status || 'queued').toLowerCase()}`;
+            }
             const canRecover = String(e?.message || '').toLowerCase().includes('response tidak valid')
                 || [502, 503, 504, 522].includes(Number(e?.status || 0));
             if (canRecover) {
