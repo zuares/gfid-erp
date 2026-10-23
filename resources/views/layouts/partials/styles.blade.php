@@ -202,7 +202,13 @@
     color:var(--text);
     margin-bottom:.35rem;
   }
-  p,span,label,small,.form-label{ color:var(--text); }
+  /*
+   * Keep generic typography rules off inline descendants. A direct color on
+   * span/small can override a component's inherited action color, e.g. white
+   * text inside a brand button. Components own the color of their controls;
+   * plain text elements inherit it unless they opt into a scoped token.
+   */
+  p,label,.form-label{ color:var(--text); }
   .text-muted,.muted{ color:var(--muted)!important; }
 
   .mono{
