@@ -166,6 +166,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/escrow-detail', [EscrowController::class, 'detail'])->name('marketplace.api.escrow-detail');
     Route::get('/stores/{store}/payout-info', [PayoutController::class, 'info'])->name('marketplace.api.payout-info');
     Route::get('/stores/{store}/payout-detail', [PayoutController::class, 'detail'])->name('marketplace.api.payout-detail');
+    Route::get('/stores/{store}/payout-records', [PayoutController::class, 'records'])->name('marketplace.api.payout-records');
+    Route::post('/stores/{store}/sync-payouts', [PayoutController::class, 'sync'])->name('marketplace.api.sync-payouts');
     Route::get('/stores/{store}/shopee-transactions', [ShopeeTransactionController::class, 'data'])->name('marketplace.api.shopee-transactions');
     Route::get('/stores/{store}/shopee-transactions/export', [ShopeeTransactionController::class, 'export'])->name('marketplace.api.shopee-transactions.export');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])

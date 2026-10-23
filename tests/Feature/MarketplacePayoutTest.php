@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\EnsureModuleAccess;
+use App\Domain\Marketplace\Finance\Enums\SettlementStatus;
 use App\Models\Channel;
+use App\Models\MarketplaceFinanceSettlement;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use Carbon\Carbon;
@@ -43,10 +45,11 @@ class MarketplacePayoutTest extends TestCase
     {
         $this->get(route('marketplace.payout'))
             ->assertOk()
-            ->assertSee('Payout Shopee')
+            ->assertSee('Penarikan Saldo Shopee')
             ->assertSee('get_wallet_transaction_list')
             ->assertSee('seller lokal Shopee Indonesia')
-            ->assertSee('tanpa cache database');
+            ->assertSee('DB-first')
+            ->assertSee('Sync dari Shopee');
     }
 
     public function test_info_forwards_cursor_date_window_and_normalizes_payout(): void
@@ -132,6 +135,88 @@ class MarketplacePayoutTest extends TestCase
             ->assertJsonPath('data.items.0.escrow_list', [])
             ->assertJsonPath('data.items.0.offline_adjustment_list', [])
             ->assertJsonMissingPath('data.raw_response._meta');
+    }
+
+    public function test_records_reads_stored_wallet_withdrawal_without_calling_shopee(): void
+    {
+        $store = $this->store();
+        $settlement = MarketplaceFinanceSettlement::create([
+            'store_id' => $store->id,
+            'channel' => 'shopee',
+            'external_settlement_id' => 'TX-STORED-1',
+            'settlement_date' => '2026-08-10',
+            'amount' => 1600000,
+            'currency' => 'IDR',
+            'status' => SettlementStatus::WITHDRAWN,
+            'raw_payload' => [
+                'source_kind' => 'wallet_withdrawal',
+                'transaction_id' => 'TX-STORED-1',
+                'transaction_type' => 'withdrawal_created',
+                'amount' => -1600000,
+                'create_time' => 1754395200,
+                'status' => 'COMPLETED',
+                'reason' => 'Withdrawal to bank',
+            ],
+        ]);
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('getWalletTransactionList');
+        });
+
+        $this->getJson("/api/marketplace/stores/{$store->id}/payout-records?date_from=2026-08-01&date_to=2026-08-10")
+            ->assertOk()
+            ->assertJsonPath('source', 'database')
+            ->assertJsonPath('data.items.0.finance_settlement_id', $settlement->id)
+            ->assertJsonPath('data.items.0.transaction_id', 'TX-STORED-1')
+            ->assertJsonPath('data.items.0.payout_amount', 1600000)
+            ->assertJsonPath('data.items.0.reconciliation_status', 'bank_unverified');
+    }
+
+    public function test_sync_persists_wallet_withdrawal_without_posting_journal(): void
+    {
+        $store = $this->store();
+
+        $this->mock(MarketplaceApiGateway::class, function (MockInterface $mock) use ($store): void {
+            $mock->shouldReceive('getWalletTransactionList')
+                ->once()
+                ->withArgs(fn (Store $actual, int $pageNo, int $pageSize, int $from, int $to, string $moneyFlow, string $transactionType, ?string $walletType, string $transactionTabType): bool => $actual->is($store)
+                    && $pageNo === 0
+                    && $pageSize === 100
+                    && $from === Carbon::createFromFormat('Y-m-d', '2026-08-01', config('app.timezone'))->startOfDay()->timestamp
+                    && $to === Carbon::createFromFormat('Y-m-d', '2026-08-10', config('app.timezone'))->endOfDay()->timestamp
+                    && $moneyFlow === 'MONEY_OUT'
+                    && $transactionType === '201'
+                    && $walletType === null
+                    && $transactionTabType === 'wallet_withdrawals')
+                ->andReturn([
+                    'response' => [
+                        'transaction_list' => [[
+                            'transaction_id' => 'TX-SYNC-1',
+                            'transaction_type' => 'withdrawal_created',
+                            'amount' => -1600000,
+                            'create_time' => 1754395200,
+                            'status' => 'COMPLETED',
+                        ]],
+                        'more' => false,
+                    ],
+                ]);
+        });
+
+        $this->postJson("/api/marketplace/stores/{$store->id}/sync-payouts", [
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-10',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.created', 1)
+            ->assertJsonPath('data.synced', 1);
+
+        $this->assertDatabaseHas('marketplace_finance_settlements', [
+            'store_id' => $store->id,
+            'external_settlement_id' => 'TX-SYNC-1',
+            'status' => SettlementStatus::WITHDRAWN->value,
+        ]);
+        $this->assertDatabaseCount('journals', 0);
     }
 
     public function test_payout_rejects_window_longer_than_fifteen_days(): void

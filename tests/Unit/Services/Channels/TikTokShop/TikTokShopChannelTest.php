@@ -378,4 +378,97 @@ class TikTokShopChannelTest extends TestCase
                 && str_contains($request->url(), 'sign=');
         });
     }
+
+    public function test_completed_order_and_dispute_line_item_are_normalized(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-DISPUTE-TEST',
+            'name' => 'TikTok Dispute Test Store',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        $order = [
+            'id' => 'tts-order-completed',
+            'status' => 'COMPLETED',
+            'create_time' => 1700000000,
+            'update_time' => 1700050000,
+            'delivery_time' => 1700040000,
+            'rts_time' => 1700010000,
+            'payment' => [
+                'total_amount' => '120000',
+            ],
+            'line_items' => [[
+                'id' => 'line-dispute',
+                'product_id' => 'prod-1',
+                'product_name' => 'Produk Dispute',
+                'cancel_reason' => 'Did not receive parcel',
+                'cancel_user' => 'BUYER',
+                'original_price' => '120000',
+                'sale_price' => '120000',
+            ]],
+        ];
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/order/202309/orders*' => Http::response([
+                'code' => 0,
+                'data' => ['orders' => [$order]],
+            ]),
+        ]);
+
+        $driver = app(TikTokShopChannel::class);
+        $res = $driver->getOrderDetail($store, ['tts-order-completed']);
+        $normalized = $res['response']['order_list'][0];
+
+        $this->assertSame('COMPLETED', $normalized['order_status']);
+        $this->assertTrue($normalized['has_return_request']);
+        $this->assertSame('Did not receive parcel (BUYER)', $normalized['dispute_reason']);
+        $this->assertSame('Did not receive parcel', $normalized['item_list'][0]['cancel_reason']);
+        $this->assertSame('BUYER', $normalized['item_list'][0]['cancel_user']);
+    }
+
+    public function test_get_return_list_handles_missing_scope_gracefully(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-RETURN-SCOPE',
+            'name' => 'TikTok Return Scope Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/return_refund/202309/returns/search*' => Http::response([
+                'code' => 105005,
+                'message' => 'Access denied. You have no permission to call this API.',
+            ]),
+        ]);
+
+        $driver = app(TikTokShopChannel::class);
+        $res = $driver->getReturnList($store, 1, 20);
+
+        $this->assertSame('scope_missing', $res['error']);
+        $this->assertStringContainsString('seller.return_refund.basic', $res['message']);
+        $this->assertSame([], $res['response']['return']);
+    }
 }
+

@@ -203,13 +203,20 @@ class VerifyProcessedOrdersCommand extends Command
                 $this->line($this->formatLine($order, 'MOVE', "API status={$apiStatus} → lokal={$apiStatus}"));
 
                 if ($apply) {
-                    $order->update([
+                    $updatePayload = [
                         'order_status' => $apiStatus,
                         'status' => $this->legacyStatus($apiStatus, $order->status),
                         'raw_json' => $detail,
                         'synced_at' => now(),
                         'processed_api_checked_at' => now(),
-                    ]);
+                    ];
+
+                    if ($apiStatus === 'COMPLETED' && empty($order->completed_at)) {
+                        $ts = $detail['completed_time'] ?? $detail['update_time'] ?? null;
+                        $updatePayload['completed_at'] = $ts ? \Carbon\Carbon::createFromTimestamp((int) $ts) : now();
+                    }
+
+                    $order->update($updatePayload);
                 }
             }
         }

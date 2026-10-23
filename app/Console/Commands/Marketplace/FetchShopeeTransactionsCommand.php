@@ -15,6 +15,7 @@ class FetchShopeeTransactionsCommand extends Command
         {--to= : Tanggal selesai (Y-m-d, default: hari ini)}
         {--flow= : Filter arah dana (MONEY_IN, MONEY_OUT, ALL)}
         {--type= : Filter tipe transaksi (misal: 101, 201, 450, ESCROW_VERIFIED_ADD, dll)}
+        {--search= : Cari Order SN, ID transaksi, keterangan, atau pembeli}
         {--limit=50 : Batas data per request (1-100)}
         {--raw : Tampilkan format raw JSON response}';
 
@@ -40,8 +41,8 @@ class FetchShopeeTransactionsCommand extends Command
             return self::FAILURE;
         }
 
-        if ($from->diffInSeconds($to) >= 15 * 86400) {
-            $this->error('Rentang waktu maksimal 15 hari sesuai batas Shopee API get_wallet_transaction_list.');
+        if ($from->diffInDays($to) > 60) {
+            $this->error('Rentang waktu maksimal 60 hari.');
             return self::FAILURE;
         }
 
@@ -78,6 +79,7 @@ class FetchShopeeTransactionsCommand extends Command
                 'page_size'        => $limit,
                 'money_flow'       => $flow,
                 'transaction_type' => $type,
+                'search'           => $this->option('search'),
             ]);
 
             if ($this->option('raw')) {

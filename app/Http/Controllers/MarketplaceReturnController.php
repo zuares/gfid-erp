@@ -21,11 +21,10 @@ class MarketplaceReturnController extends Controller
 
     public function index(Request $request)
     {
-        // Hanya toko Shopee aktif yang sudah terkoneksi (punya access_token).
-        // Menghindari loop sync/list ke toko non-Shopee / nonaktif / tanpa token.
+        // Toko aktif yang sudah terkoneksi (punya access_token) untuk Shopee & TikTok.
         $stores = Store::with('channel')
             ->where('is_active', true)
-            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee', 'TIKTOK', 'ttk', 'tkt', 'tiktok']))
             ->get()
             ->filter(fn ($s) => ! blank($s->credential('access_token')))
             ->values();
@@ -43,7 +42,7 @@ class MarketplaceReturnController extends Controller
      *   date_to   = Y-m-d
      *   search    = filter opsional (return_sn / order_sn)
      *
-     * Loop semua toko Shopee aktif & terkoneksi, agregasi hasilnya.
+     * Loop semua toko Shopee & TikTok aktif & terkoneksi, agregasi hasilnya.
      */
     public function live(Request $request)
     {
@@ -56,10 +55,12 @@ class MarketplaceReturnController extends Controller
         $from = $dateFrom ? strtotime($dateFrom . ' 00:00:00') : strtotime('-7 days');
         $to   = $dateTo   ? strtotime($dateTo . ' 23:59:59')   : time();
 
-        // Toko Shopee aktif & sudah terkoneksi (punya access_token)
+        // Toko aktif & sudah terkoneksi (punya access_token)
+        $selectedStoreId = $request->query('store_id');
         $stores = Store::with('channel')
             ->where('is_active', true)
-            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee', 'TIKTOK', 'ttk', 'tkt', 'tiktok']))
+            ->when($selectedStoreId, fn ($q) => $q->where('id', $selectedStoreId))
             ->get()
             ->filter(fn ($s) => ! blank($s->credential('access_token')))
             ->values();
@@ -73,7 +74,7 @@ class MarketplaceReturnController extends Controller
 
         foreach ($stores as $store) {
             try {
-                
+                $driver = $this->manager->driver($store);
                 if ($type === 'cancel') {
                     // Order dibatalkan → get_order_list status CANCELLED lalu ambil detail item
                     if (! method_exists($driver, 'getOrderList')) {
@@ -267,7 +268,9 @@ class MarketplaceReturnController extends Controller
         $from = $dateFrom ? strtotime($dateFrom . ' 00:00:00') : null;
         $to   = $dateTo   ? strtotime($dateTo . ' 23:59:59')   : null;
 
-        $storeIds = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+        $selectedStoreId = $request->query('store_id');
+        $storeIds = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee', 'TIKTOK', 'ttk', 'tkt', 'tiktok']))
+            ->when($selectedStoreId, fn ($q) => $q->where('id', $selectedStoreId))
             ->pluck('id');
 
         $data = [];
@@ -315,7 +318,7 @@ class MarketplaceReturnController extends Controller
         } else {
             $q = MarketplaceReturn::with(['items', 'store'])->whereIn('store_id', $storeIds);
 
-            // Shopee: return_solution 1 = REFUND (refund saja), 0/2 = RETURN_REFUND (retur).
+            // Shopee & TikTok: return_solution 1 = REFUND (refund saja), 0/2 = RETURN_REFUND (retur).
             if ($type === 'refund') {
                 $q->where('return_solution', 1);
             } else {
@@ -360,6 +363,53 @@ class MarketplaceReturnController extends Controller
                     'items'           => $items,
                 ];
             }
+
+            // Sertakan juga pesanan aktif yang memiliki permintaan retur/dispute di level pesanan (misal TikTok)
+            if ($type === 'return') {
+                $existingOrderSns = array_flip(array_column($data, 'order_sn'));
+                $disputedOrders = \App\Models\MarketplaceOrder::with(['items', 'store'])
+                    ->whereIn('store_id', $storeIds)
+                    ->whereJsonContains('meta->has_return_request', true)
+                    ->when($from && $to, function ($q) use ($from, $to) {
+                        $q->whereBetween('ordered_at', [date('Y-m-d H:i:s', $from), date('Y-m-d H:i:s', $to)]);
+                    })
+                    ->when($search !== '', function ($q) use ($search) {
+                        $q->where(fn ($w) => $w->where('channel_order_id', 'like', "%{$search}%")
+                            ->orWhere('shipping_awb_no', 'like', "%{$search}%"));
+                    })
+                    ->get();
+
+                foreach ($disputedOrders as $do) {
+                    if (isset($existingOrderSns[$do->channel_order_id])) {
+                        continue;
+                    }
+                    $items = $do->items->map(fn ($it) => [
+                        'item_sku'       => $it->item_sku,
+                        'variation_sku'  => $it->model_sku,
+                        'item_name'      => $it->item_name,
+                        'variation_name' => $it->variant_name,
+                        'quantity'       => $it->qty,
+                        'images'         => $it->image_url ? [$it->image_url] : [],
+                    ])->toArray();
+
+                    $data[] = [
+                        'store_id'        => $do->store_id,
+                        'store_name'      => optional($do->store)->name,
+                        'kind'            => 'return',
+                        'order_sn'        => $do->channel_order_id,
+                        'return_sn'       => 'DISPUTE-' . $do->channel_order_id,
+                        'status'          => 'DISPUTE_REQUESTED',
+                        'reason'          => $do->meta['buyer_dispute_reason'] ?? 'Permintaan Retur / Komplain Pembeli',
+                        'return_solution' => 0,
+                        'amount'          => (float) $do->total_amount,
+                        'tracking_number' => $do->shipping_awb_no,
+                        'needs_logistics' => false,
+                        'create_time'     => $do->delivered_at ? $do->delivered_at->timestamp : ($do->ordered_at ? $do->ordered_at->timestamp : time()),
+                        'update_time'     => $do->updated_at?->timestamp,
+                        'items'           => $items,
+                    ];
+                }
+            }
         }
 
         return response()->json([
@@ -372,7 +422,7 @@ class MarketplaceReturnController extends Controller
     }
 
     /**
-     * Tarik & simpan retur/refund dari Shopee untuk SEMUA toko aktif (anti-duplikat via upsert).
+     * Tarik & simpan retur/refund dari marketplace untuk SEMUA toko aktif (anti-duplikat via upsert).
      * full=true → riwayat penuh (dipecah 15 harian di dalam job).
      */
     public function syncAllReturns(Request $request)
@@ -383,7 +433,7 @@ class MarketplaceReturnController extends Controller
         $from = $request->query('create_time_from');
         $to   = $request->query('create_time_to');
 
-        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee', 'TIKTOK', 'ttk', 'tkt', 'tiktok']))
             ->where('is_active', true)
             ->get()
             ->filter(fn ($s) => ! blank($s->credential('access_token')));
@@ -593,7 +643,8 @@ class MarketplaceReturnController extends Controller
     public function getReturnDetail(Store $store, string $returnSn)
     {
         try {
-                        if (!method_exists($driver, 'getReturnDetail')) {
+            $driver = $this->manager->driver($store);
+            if (!method_exists($driver, 'getReturnDetail')) {
                 return response()->json(['error' => 'Not supported'], 400);
             }
 
@@ -611,7 +662,8 @@ class MarketplaceReturnController extends Controller
     public function getTracking(Store $store, $returnSn, Request $request)
     {
         try {
-                        if (!method_exists($driver, 'getReverseTrackingInfo')) {
+            $driver = $this->manager->driver($store);
+            if (!method_exists($driver, 'getReverseTrackingInfo')) {
                 return response()->json(['error' => 'Not supported'], 400);
             }
 
@@ -637,7 +689,8 @@ class MarketplaceReturnController extends Controller
     public function confirmAndRestock(Store $store, string $returnSn)
     {
         try {
-                        if (!method_exists($driver, 'confirmReturn')) {
+            $driver = $this->manager->driver($store);
+            if (!method_exists($driver, 'confirmReturn')) {
                 return response()->json(['error' => 'Not supported on this channel'], 400);
             }
 

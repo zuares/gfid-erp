@@ -1098,6 +1098,20 @@ class MarketplaceSyncService
             'sku_transactions' => $skuTransactions,
         ]);
 
+        $statementTime = $this->normalizeOrderEventTimestamp(
+            $data['statement_time'] ?? $data['settlement_time'] ?? $data['paid_time'] ?? null
+        );
+        if (! $statementTime && $hasStatement) {
+            $statementTime = $this->normalizeOrderEventTimestamp(
+                data_get($skuTransactions, '0.statement_time')
+                ?? data_get($skuTransactions, '0.paid_time')
+                ?? data_get($skuTransactions, '0.settlement_time')
+            );
+        }
+        if (! $statementTime && $hasStatement) {
+            $statementTime = now();
+        }
+
         $settlement = MarketplaceOrderSettlement::firstOrNew([
             'store_id' => $store->id,
             'channel_order_id' => $orderId,
@@ -1113,6 +1127,7 @@ class MarketplaceSyncService
             'ad_cost' => $this->nn($this->decimalValue($gmvMaxAdCost)),
             'actual_shipping_fee' => $this->nn($this->decimalValue(abs($amount($data['shipping_cost_amount'] ?? 0)))),
             'final_income' => $this->nn($this->decimalValue($settlementAmount)),
+            'settlement_time' => $hasStatement ? $statementTime : null,
             'raw_json' => $raw,
             'synced_at' => now(),
             'data_status' => $hasStatement
@@ -1126,7 +1141,7 @@ class MarketplaceSyncService
             'data_checked_at' => now(),
         ])->save();
 
-        $order->update([
+        $orderUpdate = [
             'settlement_sync_error_code' => null,
             'settlement_sync_failed_at' => null,
             'settlement_sync_last_attempt_at' => null,
@@ -1135,7 +1150,11 @@ class MarketplaceSyncService
                 : MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE,
             'financial_issue_reason' => $hasStatement ? null : 'tiktok_order_not_settled',
             'financial_checked_at' => now(),
-        ]);
+        ];
+        if ($hasStatement && $statementTime && empty($order->settlement_time)) {
+            $orderUpdate['settlement_time'] = $statementTime;
+        }
+        $order->update($orderUpdate);
 
         return [
             'status' => $hasStatement ? 'synced' : 'pending',
@@ -3765,13 +3784,13 @@ class MarketplaceSyncService
                         $detail['pay_time'] ?? $detail['payment_time'] ?? $detail['paid_time'] ?? null
                     ),
                     'shipped_at' => $this->normalizeOrderEventTimestamp(
-                        $detail['ship_time'] ?? $firstPkg['ship_time'] ?? $firstPkg['shipping_time'] ?? null
+                        $detail['ship_time'] ?? $detail['rts_time'] ?? $firstPkg['ship_time'] ?? $firstPkg['shipping_time'] ?? $firstPkg['rts_time'] ?? null
                     ),
                     'delivered_at' => $this->normalizeOrderEventTimestamp(
-                        $detail['delivered_time'] ?? $firstPkg['delivered_time'] ?? null
+                        $detail['delivered_time'] ?? $detail['delivery_time'] ?? $firstPkg['delivered_time'] ?? $firstPkg['delivery_time'] ?? null
                     ),
                     'completed_at' => $this->normalizeOrderEventTimestamp(
-                        $detail['completed_time'] ?? null
+                        $detail['completed_time'] ?? ($orderStatus === 'COMPLETED' ? ($detail['update_time'] ?? null) : null)
                     ),
                 ], static fn ($value) => $value !== null);
                 
@@ -3950,6 +3969,16 @@ class MarketplaceSyncService
                     ]);
                 }
 
+                $disputeReason = $detail['dispute_reason'] ?? null;
+                if (! empty($disputeReason) || ! empty($detail['has_return_request'])) {
+                    $orderMeta = is_array($order->meta) ? $order->meta : [];
+                    $orderMeta['has_return_request'] = true;
+                    if (! empty($disputeReason)) {
+                        $orderMeta['buyer_dispute_reason'] = $disputeReason;
+                    }
+                    $order->update(['meta' => $orderMeta]);
+                }
+
                 // Error order_not_found yang tercatat saat order masih terlalu
                 // dini (READY_TO_SHIP/PROCESSED) tidak boleh mengunci settlement
                 // selamanya. Begitu sync order melihat status yang sudah eligible,
@@ -4084,6 +4113,16 @@ class MarketplaceSyncService
                     if ($existingItem && $existingItem->hpp_snapshot > 0) {
                         $mappingAttrs['hpp_snapshot'] = $existingItem->hpp_snapshot;
                         $mappingAttrs['cost_status'] = $existingItem->cost_status;
+                    }
+
+                    // Deteksi dispute / cancel request dari buyer pada level item (mis. TikTok cancel_reason)
+                    $itemCancelReason = trim((string) ($item['cancel_reason'] ?? ''));
+                    $itemCancelUser = trim((string) ($item['cancel_user'] ?? ''));
+                    if ($itemCancelReason !== '') {
+                        $reasonTag = "Dispute: {$itemCancelReason}" . ($itemCancelUser !== '' ? " ({$itemCancelUser})" : '');
+                        $mappingAttrs['issue_reason'] = ! empty($mappingAttrs['issue_reason'])
+                            ? ($mappingAttrs['issue_reason'] . ' | ' . $reasonTag)
+                            : $reasonTag;
                     }
 
                     // Track item-level stats

@@ -533,6 +533,167 @@ class TikTokShopChannel implements MarketplaceChannel
     }
 
     /**
+     * Ambil daftar retur dan refund dari TikTok Shop.
+     * Menggunakan endpoint resmi v202309 /return_refund/202309/returns/search
+     * dan dinormalisasi agar kompatibel dengan modul retur & SyncMarketplaceReturns.
+     */
+    public function getReturnList(Store $store, int $pageNo = 0, int $pageSize = 40, ?int $createTimeFrom = null, ?int $createTimeTo = null): array
+    {
+        $pageSize = max(1, min($pageSize, 100));
+        $body = [
+            'page_size' => $pageSize,
+        ];
+
+        // Filter waktu jika disediakan (TikTok format: unix timestamp seconds)
+        if ($createTimeFrom !== null && $createTimeTo !== null) {
+            $body['create_time_from'] = $createTimeFrom;
+            $body['create_time_to'] = $createTimeTo;
+        }
+
+        $result = $this->post($store, '/return_refund/202309/returns/search', $body);
+
+        // Tangani error izin/scope (105005) atau error API lainnya secara anggun
+        if (! empty($result['error']) || ((int) ($result['code'] ?? 0) !== 0)) {
+            $code = $result['code'] ?? -1;
+            $isScopeError = (string) $code === '105005'
+                || str_contains(strtolower((string) ($result['message'] ?? '')), 'access denied')
+                || str_contains(strtolower((string) ($result['message'] ?? '')), 'scope');
+
+            $message = $isScopeError
+                ? 'Akses Return & Refund belum diaktifkan di Partner Center (Scope seller.return_refund.basic diperlukan).'
+                : (string) ($result['message'] ?? $result['error'] ?? 'Gagal mengambil retur TikTok Shop.');
+
+            Log::warning("[TikTokShopChannel] getReturnList: {$message}", [
+                'store_id' => $store->id,
+                'code' => $code,
+            ]);
+
+            return [
+                'error' => $isScopeError ? 'scope_missing' : true,
+                'code' => $code,
+                'message' => $message,
+                'response' => [
+                    'return' => [],
+                    'more' => false,
+                ],
+            ];
+        }
+
+        $returnsData = data_get($result, 'data.returns', []);
+        if (! is_array($returnsData)) {
+            $returnsData = [];
+        }
+
+        $normalizedReturns = array_map(function (array $r): array {
+            $returnType = strtoupper((string) ($r['return_type'] ?? ''));
+            $isRefundOnly = $returnType === 'REFUND_ONLY'
+                || (str_contains($returnType, 'REFUND') && ! str_contains($returnType, 'RETURN'));
+
+            $rawItems = is_array($r['sku_list'] ?? null)
+                ? $r['sku_list']
+                : (is_array($r['items'] ?? null) ? $r['items'] : []);
+
+            $items = array_map(function (array $it): array {
+                return [
+                    'item_sku' => $it['seller_sku'] ?? $it['sku_id'] ?? null,
+                    'variation_sku' => $it['sku_id'] ?? null,
+                    'item_name' => $it['product_name'] ?? null,
+                    'variation_name' => $it['sku_name'] ?? null,
+                    'return_item_quantity' => (int) ($it['return_quantity'] ?? $it['quantity'] ?? 1),
+                    'images' => ! empty($it['sku_image']) ? [$it['sku_image']] : [],
+                ];
+            }, $rawItems);
+
+            return [
+                'return_sn' => (string) ($r['return_id'] ?? $r['id'] ?? ''),
+                'order_sn' => (string) ($r['order_id'] ?? ''),
+                'status' => (string) ($r['return_status'] ?? $r['status'] ?? ''),
+                'reason' => $r['return_reason_text'] ?? $r['return_reason'] ?? $r['reason'] ?? null,
+                'reason_text_code' => $r['return_reason'] ?? null,
+                'return_solution' => $isRefundOnly ? 1 : 0,
+                'amount_before_discount' => (float) ($r['refund_total'] ?? $r['refund_amount'] ?? 0),
+                'needs_logistics' => ! $isRefundOnly,
+                'tracking_number' => $r['tracking_number'] ?? null,
+                'create_time' => $r['create_time'] ?? null,
+                'update_time' => $r['update_time'] ?? null,
+                'item' => $items,
+                'raw' => $r,
+            ];
+        }, $returnsData);
+
+        return [
+            'code' => 0,
+            'message' => 'Success',
+            'response' => [
+                'return' => $normalizedReturns,
+                'more' => (bool) data_get($result, 'data.next_page_token') || (bool) data_get($result, 'data.has_more'),
+                'next_cursor' => (string) data_get($result, 'data.next_page_token', ''),
+            ],
+        ];
+    }
+
+    /**
+     * Ambil detail satu retur dari TikTok Shop.
+     */
+    public function getReturnDetail(Store $store, string $returnSn): array
+    {
+        $returnSn = trim($returnSn);
+        if ($returnSn === '') {
+            return ['error' => 'return_sn_missing', 'message' => 'Return ID wajib diisi.'];
+        }
+
+        $result = $this->get($store, '/return_refund/202309/returns/' . rawurlencode($returnSn));
+
+        if (! empty($result['error']) || ((int) ($result['code'] ?? 0) !== 0)) {
+            return [
+                'error' => true,
+                'code' => $result['code'] ?? -1,
+                'message' => $result['message'] ?? 'Gagal mengambil detail retur TikTok Shop.',
+            ];
+        }
+
+        $r = data_get($result, 'data', []);
+        $returnType = strtoupper((string) ($r['return_type'] ?? ''));
+        $isRefundOnly = $returnType === 'REFUND_ONLY'
+            || (str_contains($returnType, 'REFUND') && ! str_contains($returnType, 'RETURN'));
+
+        $rawItems = is_array($r['sku_list'] ?? null)
+            ? $r['sku_list']
+            : (is_array($r['items'] ?? null) ? $r['items'] : []);
+
+        $items = array_map(function (array $it): array {
+            return [
+                'item_sku' => $it['seller_sku'] ?? $it['sku_id'] ?? null,
+                'variation_sku' => $it['sku_id'] ?? null,
+                'item_name' => $it['product_name'] ?? null,
+                'variation_name' => $it['sku_name'] ?? null,
+                'return_item_quantity' => (int) ($it['return_quantity'] ?? $it['quantity'] ?? 1),
+                'images' => ! empty($it['sku_image']) ? [$it['sku_image']] : [],
+            ];
+        }, $rawItems);
+
+        return [
+            'code' => 0,
+            'message' => 'Success',
+            'response' => [
+                'return_sn' => (string) ($r['return_id'] ?? $r['id'] ?? $returnSn),
+                'order_sn' => (string) ($r['order_id'] ?? ''),
+                'status' => (string) ($r['return_status'] ?? $r['status'] ?? ''),
+                'reason' => $r['return_reason_text'] ?? $r['return_reason'] ?? $r['reason'] ?? null,
+                'reason_text_code' => $r['return_reason'] ?? null,
+                'return_solution' => $isRefundOnly ? 1 : 0,
+                'amount_before_discount' => (float) ($r['refund_total'] ?? $r['refund_amount'] ?? 0),
+                'needs_logistics' => ! $isRefundOnly,
+                'tracking_number' => $r['tracking_number'] ?? null,
+                'create_time' => $r['create_time'] ?? null,
+                'update_time' => $r['update_time'] ?? null,
+                'item' => $items,
+                'raw' => $r,
+            ],
+        ];
+    }
+
+    /**
      * Ambil rincian transaksi keuangan per order dari TikTok Shop.
      *
      * Endpoint v202501 menggantikan versi v202309 dan mengembalikan
@@ -918,6 +1079,9 @@ class TikTokShopChannel implements MarketplaceChannel
             'AWAITING_COLLECTION' => 'PROCESSED',
             'IN_TRANSIT'         => 'SHIPPED',
             'DELIVERED'          => 'TO_CONFIRM_RECEIVE',
+            'COMPLETED'          => 'COMPLETED',
+            'CANCELLED'          => 'CANCELLED',
+            'IN_CANCEL'          => 'IN_CANCEL',
         ];
         $canonicalStatus = $statusMap[$status] ?? ($status !== '' ? $status : null);
 
@@ -968,7 +1132,8 @@ class TikTokShopChannel implements MarketplaceChannel
         }
 
         $lineItems = is_array($order['line_items'] ?? null) ? $order['line_items'] : [];
-        $itemList = array_map(static function (array $item): array {
+        $disputeReasons = [];
+        $itemList = array_map(static function (array $item) use (&$disputeReasons): array {
             $quantity = (int) ($item['quantity']
                 ?? $item['quantity_purchased']
                 ?? $item['model_quantity_purchased']
@@ -980,6 +1145,13 @@ class TikTokShopChannel implements MarketplaceChannel
                 ?? $item['model_discounted_price']
                 ?? $originalPrice;
 
+            $cancelReason = trim((string) ($item['cancel_reason'] ?? ''));
+            $cancelUser = trim((string) ($item['cancel_user'] ?? ''));
+            $displayStatus = strtoupper(trim((string) ($item['display_status'] ?? '')));
+            if ($cancelReason !== '') {
+                $disputeReasons[] = $cancelReason . ($cancelUser !== '' ? " ({$cancelUser})" : '');
+            }
+
             return array_merge($item, [
                 'item_id' => $item['product_id'] ?? $item['item_id'] ?? null,
                 'model_id' => $item['sku_id'] ?? $item['model_id'] ?? null,
@@ -990,6 +1162,9 @@ class TikTokShopChannel implements MarketplaceChannel
                 'model_quantity_purchased' => max(1, $quantity),
                 'model_original_price' => $originalPrice,
                 'model_discounted_price' => $salePrice,
+                'cancel_reason' => $cancelReason !== '' ? $cancelReason : null,
+                'cancel_user' => $cancelUser !== '' ? $cancelUser : null,
+                'display_status' => $displayStatus !== '' ? $displayStatus : null,
                 'image_info' => [
                     'image_url' => $item['sku_image'] ?? data_get($item, 'image_info.image_url'),
                 ],
@@ -1011,6 +1186,8 @@ class TikTokShopChannel implements MarketplaceChannel
             'actual_shipping_fee' => $payment['shipping_fee'] ?? $order['shipping_fee'] ?? 0,
             'buyer_paid_shipping_fee' => $payment['shipping_fee'] ?? $order['shipping_fee'] ?? 0,
             'currency' => $payment['currency'] ?? data_get($itemList, '0.currency', 'IDR'),
+            'has_return_request' => $disputeReasons !== [],
+            'dispute_reason' => $disputeReasons !== [] ? implode('; ', array_unique($disputeReasons)) : null,
         ]);
     }
 

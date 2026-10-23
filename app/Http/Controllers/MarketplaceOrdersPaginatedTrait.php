@@ -66,12 +66,16 @@ trait MarketplaceOrdersPaginatedTrait
             ->whereJsonDoesntContain('raw_json->order_status', 'UNPAID');
         $pendingCount = (clone $readyQuery)->shippingPending()->count();
         $processCount = (clone $readyQuery)->shippingPending(false)->count();
-
         $failedDeliveryQuery = MarketplaceOrder::query();
         $applyScope($failedDeliveryQuery);
         $this->applyFailedDeliveryScope($failedDeliveryQuery);
 
-        $counts = $baseQuery->select('order_status', \DB::raw('count(*) as total'))
+        $rrcCount = (clone $baseQuery)->where(function ($q) {
+            $q->whereIn('order_status', ['TO_RETURN', 'RETURNED'])
+              ->orWhereJsonContains('meta->has_return_request', true);
+        })->count();
+
+        $counts = (clone $baseQuery)->select('order_status', \DB::raw('count(*) as total'))
             ->groupBy('order_status')
             ->pluck('total', 'order_status')
             ->all();
@@ -102,7 +106,7 @@ trait MarketplaceOrdersPaginatedTrait
             'failed_delivery' => $failedDeliveryQuery->count(),
             'unpaid' => $unpaidCount,
             'cancel' => ($counts['CANCELLED'] ?? 0) + ($counts['IN_CANCEL'] ?? 0) + ($counts['CANCELLED_BEFORE_SHIPPING'] ?? 0),
-            'rrc' => ($counts['TO_RETURN'] ?? 0) + ($counts['RETURNED'] ?? 0),
+            'rrc' => $rrcCount,
             'issues' => $issuesCount
         ]);
     }
@@ -230,7 +234,10 @@ trait MarketplaceOrdersPaginatedTrait
         } elseif ($tab === 'completed') {
             $query->where('order_status', 'COMPLETED');
         } elseif ($tab === 'rrc') {
-            $query->whereIn('order_status', ['TO_RETURN', 'RETURNED']);
+            $query->where(function ($q) {
+                $q->whereIn('order_status', ['TO_RETURN', 'RETURNED'])
+                  ->orWhereJsonContains('meta->has_return_request', true);
+            });
         }
 
         $paginator = $query->latest('ordered_at')->paginate($limit);

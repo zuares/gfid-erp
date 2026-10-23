@@ -60,10 +60,10 @@
         padding: 1rem;
         margin-bottom: .85rem;
     }
-    .shopee-tx-filters {
+    .shopee-tx-filters-grid {
         display: grid;
-        grid-template-columns: minmax(180px, 1.2fr) repeat(2, minmax(140px, .8fr)) minmax(140px, .9fr) minmax(160px, 1fr) auto auto;
-        gap: .65rem;
+        grid-template-columns: minmax(180px, 1.2fr) minmax(135px, 0.9fr) minmax(135px, 0.9fr) minmax(140px, 1fr) minmax(160px, 1.2fr);
+        gap: .75rem;
         align-items: end;
     }
     .shopee-tx-field label {
@@ -73,41 +73,166 @@
         text-transform: uppercase;
         letter-spacing: .04em;
         color: var(--shp-muted);
-        margin-bottom: .25rem;
+        margin-bottom: .28rem;
     }
     .shopee-tx-field .form-control, .shopee-tx-field .form-select {
         font-size: .82rem;
         border-radius: 8px;
     }
-    .shopee-tx-quick-dates {
+
+    /* Quick Date Presets Row */
+    .shopee-tx-preset-row {
         display: flex;
-        gap: .35rem;
-        margin-top: .4rem;
+        align-items: center;
+        justify-content: space-between;
+        gap: .65rem;
+        flex-wrap: wrap;
+        margin-top: .75rem;
+        padding-top: .75rem;
+        border-top: 1px dashed var(--shp-border);
+    }
+    .shopee-tx-quick-presets {
+        display: flex;
+        align-items: center;
+        gap: .3rem;
+        flex-wrap: wrap;
+    }
+    .shopee-tx-quick-label {
+        font-size: .67rem;
+        font-weight: 850;
+        text-transform: uppercase;
+        color: var(--shp-muted);
+        letter-spacing: .04em;
+        margin-right: .2rem;
     }
     .shopee-tx-quick-btn {
-        padding: .18rem .45rem;
-        font-size: .67rem;
-        border-radius: 6px;
+        padding: .22rem .55rem;
+        font-size: .7rem;
+        border-radius: 999px;
         border: 1px solid var(--shp-border);
         background: transparent;
         color: var(--shp-muted);
         cursor: pointer;
-        transition: all .15s;
+        transition: all .15s ease-in-out;
+        font-weight: 650;
+        line-height: 1.2;
     }
     .shopee-tx-quick-btn:hover {
-        background: rgba(234, 88, 12, .1);
+        background: rgba(234, 88, 12, .08);
         color: #ea580c;
-        border-color: #ea580c;
+        border-color: #fdba74;
     }
+    .shopee-tx-quick-btn.active {
+        background: #ea580c;
+        color: #fff;
+        border-color: #ea580c;
+        box-shadow: 0 2px 6px rgba(234, 88, 12, .25);
+    }
+
+    /* Search Bar & Action Buttons */
+    .shopee-tx-search-bar {
+        display: flex;
+        align-items: center;
+        gap: .65rem;
+        flex-wrap: wrap;
+        margin-top: .75rem;
+    }
+    .shopee-tx-search-wrap {
+        position: relative;
+        flex: 1 1 280px;
+    }
+    .shopee-tx-search-wrap .search-icon {
+        position: absolute;
+        left: .75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--shp-muted);
+        font-size: .85rem;
+        pointer-events: none;
+    }
+    .shopee-tx-search-wrap input {
+        padding-left: 2.15rem;
+        padding-right: 2.15rem;
+        font-size: .82rem;
+        border-radius: 8px;
+    }
+    .shopee-tx-search-clear {
+        position: absolute;
+        right: .55rem;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: var(--shp-muted);
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 .25rem;
+        display: none;
+    }
+    .shopee-tx-search-clear.show {
+        display: block;
+    }
+    .shopee-tx-actions-group {
+        display: flex;
+        gap: .45rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
     .shopee-tx-help {
         display: flex;
         align-items: center;
         gap: .4rem;
         color: var(--shp-muted);
         font-size: .73rem;
-        margin-top: .75rem;
-        padding-top: .65rem;
-        border-top: 1px dashed var(--shp-border);
+        margin-top: .65rem;
+    }
+
+    /* Type Breakdown Pills */
+    .shopee-tx-breakdown {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        flex-wrap: wrap;
+        margin-bottom: .85rem;
+        padding: .5rem .75rem;
+        background: var(--card);
+        border: 1px solid var(--shp-border);
+        border-radius: 10px;
+    }
+    .shopee-tx-breakdown-label {
+        font-size: .68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--shp-muted);
+        letter-spacing: .04em;
+    }
+    .shopee-tx-breakdown-pills {
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+        flex-wrap: wrap;
+    }
+    .shopee-tx-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .2rem .55rem;
+        border-radius: 999px;
+        font-size: .7rem;
+        font-weight: 700;
+        cursor: pointer;
+        border: 1px solid transparent;
+        background: transparent;
+        transition: all .15s;
+    }
+    .shopee-tx-pill:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(0,0,0,.08);
+    }
+    .shopee-tx-pill.active {
+        box-shadow: 0 0 0 2px #ea580c;
     }
     .shopee-tx-kpis {
         display: grid;
@@ -346,8 +471,8 @@
         margin: 0;
     }
 
-    @media (max-width: 900px) {
-        .shopee-tx-filters {
+    @media (max-width: 992px) {
+        .shopee-tx-filters-grid {
             grid-template-columns: 1fr 1fr;
         }
         .shopee-tx-kpis {
@@ -381,7 +506,8 @@
 
     {{-- Filter Panel --}}
     <div class="shopee-tx-panel">
-        <div class="shopee-tx-filters">
+        {{-- Row 1: Primary Dropdown & Date Filters --}}
+        <div class="shopee-tx-filters-grid">
             <div class="shopee-tx-field">
                 <label for="txStore">Toko Shopee</label>
                 <select id="txStore" class="form-select">
@@ -397,11 +523,6 @@
             <div class="shopee-tx-field">
                 <label for="txFrom">Tanggal dari</label>
                 <input id="txFrom" type="date" class="form-control">
-                <div class="shopee-tx-quick-dates">
-                    <button type="button" class="shopee-tx-quick-btn" data-days="0">Hari ini</button>
-                    <button type="button" class="shopee-tx-quick-btn" data-days="6">7 Hari</button>
-                    <button type="button" class="shopee-tx-quick-btn" data-days="14">15 Hari</button>
-                </div>
             </div>
             <div class="shopee-tx-field">
                 <label for="txTo">Tanggal sampai</label>
@@ -411,8 +532,8 @@
                 <label for="txFlow">Arah Dana</label>
                 <select id="txFlow" class="form-select">
                     <option value="ALL">Semua Arah Dana</option>
-                    <option value="MONEY_IN">Dana Masuk (In)</option>
-                    <option value="MONEY_OUT">Dana Keluar (Out)</option>
+                    <option value="MONEY_IN">Dana Masuk (+)</option>
+                    <option value="MONEY_OUT">Dana Keluar (-)</option>
                 </select>
             </div>
             <div class="shopee-tx-field">
@@ -424,20 +545,45 @@
                     @endforeach
                 </select>
             </div>
-            <div>
-                <button id="txLoadBtn" type="button" class="btn btn-warning text-white fw-bold btn-pill w-100" style="background:#ea580c; border-color:#ea580c;">
+        </div>
+
+        {{-- Row 2: Quick Date Presets --}}
+        <div class="shopee-tx-preset-row">
+            <div class="shopee-tx-quick-presets">
+                <span class="shopee-tx-quick-label">Rentang Cepat:</span>
+                <button type="button" class="shopee-tx-quick-btn" data-preset="today">Hari ini</button>
+                <button type="button" class="shopee-tx-quick-btn" data-preset="yesterday">Kemarin</button>
+                <button type="button" class="shopee-tx-quick-btn" data-preset="7days">7 Hari</button>
+                <button type="button" class="shopee-tx-quick-btn active" data-preset="15days">15 Hari</button>
+                <button type="button" class="shopee-tx-quick-btn" data-preset="30days">30 Hari</button>
+                <button type="button" class="shopee-tx-quick-btn" data-preset="thisMonth">Bulan Ini</button>
+                <button type="button" class="shopee-tx-quick-btn" data-preset="lastMonth">Bulan Lalu</button>
+            </div>
+        </div>
+
+        {{-- Row 3: Search Bar & Actions --}}
+        <div class="shopee-tx-search-bar">
+            <div class="shopee-tx-search-wrap">
+                <i class="bi bi-search search-icon"></i>
+                <input id="txSearch" type="search" class="form-control" placeholder="Cari No. Pesanan / ID Transaksi / Keterangan / Pembeli..." autocomplete="off">
+                <button id="txSearchClear" type="button" class="shopee-tx-search-clear" title="Hapus pencarian">×</button>
+            </div>
+            <div class="shopee-tx-actions-group">
+                <button id="txResetBtn" type="button" class="btn btn-outline-secondary btn-pill" title="Reset filter ke kondisi awal">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+                </button>
+                <button id="txLoadBtn" type="button" class="btn btn-warning text-white fw-bold btn-pill" style="background:#ea580c; border-color:#ea580c;">
                     <span id="txLoadLabel"><i class="bi bi-cloud-arrow-down me-1"></i> Tarik Data</span>
                 </button>
-            </div>
-            <div>
                 <button id="txExportBtn" type="button" class="btn btn-outline-secondary btn-pill" title="Unduh CSV">
-                    <i class="bi bi-download"></i> CSV
+                    <i class="bi bi-download me-1"></i> CSV
                 </button>
             </div>
         </div>
+
         <div class="shopee-tx-help">
             <i class="bi bi-info-circle-fill text-warning"></i>
-            <span>Rentang waktu maksimal 15 hari sesuai batas endpoint Shopee. Penarikan data dieksekusi langsung secara live ke server Shopee.</span>
+            <span>Rentang waktu maksimal 60 hari. Shopee membatasi 15 hari per pemanggilan, sehingga rentang di atas 15 hari otomatis dipecah secara bertahap oleh sistem.</span>
         </div>
     </div>
 
@@ -463,6 +609,12 @@
             <div id="kpiNet" class="shopee-tx-kpi-value">—</div>
             <div class="shopee-tx-kpi-note">selisih masuk dikurangi keluar</div>
         </div>
+    </div>
+
+    {{-- Quick Type Breakdown Pills --}}
+    <div id="txBreakdownWrap" class="shopee-tx-breakdown" style="display:none;">
+        <span class="shopee-tx-breakdown-label">Filter Tipe:</span>
+        <div id="txBreakdownPills" class="shopee-tx-breakdown-pills"></div>
     </div>
 
     {{-- Transactions Table --}}
@@ -517,14 +669,58 @@
         loading: false,
     };
 
-    // Default dates: last 14 days (15 calendar days)
-    const today = new Date();
-    const isoDate = (d) => d.toISOString().slice(0, 10);
-    const defaultFrom = new Date(today);
-    defaultFrom.setDate(defaultFrom.getDate() - 14);
+    // Safe local date formatting (Avoids UTC shift issues in GMT+7 WIB)
+    const pad = (n) => String(n).padStart(2, '0');
+    const formatDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-    $('txFrom').value = isoDate(defaultFrom);
-    $('txTo').value = isoDate(today);
+    // Apply quick date presets
+    const setDateRange = (from, to, presetName = null) => {
+        $('txFrom').value = formatDate(from);
+        $('txTo').value = formatDate(to);
+
+        document.querySelectorAll('.shopee-tx-quick-btn').forEach(btn => {
+            if (presetName && btn.dataset.preset === presetName) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    };
+
+    const applyPreset = (presetName) => {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        if (presetName === 'today') {
+            setDateRange(today, today, 'today');
+        } else if (presetName === 'yesterday') {
+            const yest = new Date(today);
+            yest.setDate(yest.getDate() - 1);
+            setDateRange(yest, yest, 'yesterday');
+        } else if (presetName === '7days') {
+            const from = new Date(today);
+            from.setDate(from.getDate() - 6);
+            setDateRange(from, today, '7days');
+        } else if (presetName === '15days') {
+            const from = new Date(today);
+            from.setDate(from.getDate() - 14);
+            setDateRange(from, today, '15days');
+        } else if (presetName === '30days') {
+            const from = new Date(today);
+            from.setDate(from.getDate() - 29);
+            setDateRange(from, today, '30days');
+        } else if (presetName === 'thisMonth') {
+            const from = new Date(today.getFullYear(), today.getMonth(), 1);
+            setDateRange(from, today, 'thisMonth');
+        } else if (presetName === 'lastMonth') {
+            const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const to = new Date(today.getFullYear(), today.getMonth(), 0);
+            setDateRange(from, to, 'lastMonth');
+        }
+    };
+
+    // Initialize default date range: 15 days
+    applyPreset('15days');
 
     // Formatters
     const moneyFormat = (val) => {
@@ -547,18 +743,6 @@
         $('txAlert').className = 'shopee-tx-alert';
     };
 
-    // Quick date buttons
-    document.querySelectorAll('.shopee-tx-quick-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const days = parseInt(btn.dataset.days, 10);
-            const to = new Date();
-            const from = new Date();
-            from.setDate(to.getDate() - days);
-            $('txFrom').value = isoDate(from);
-            $('txTo').value = isoDate(to);
-        });
-    });
-
     const buildUrl = (exportMode = false) => {
         const storeId = $('txStore').value;
         if (!storeId) return null;
@@ -579,6 +763,9 @@
 
         const type = $('txType').value;
         if (type) params.set('transaction_type', type);
+
+        const search = $('txSearch')?.value?.trim();
+        if (search) params.set('search', search);
 
         return `${path}?${params.toString()}`;
     };
@@ -601,22 +788,72 @@
         const dTo = new Date(`${$('txTo').value}T00:00:00`);
         const diffDays = Math.round((dTo - dFrom) / 86400000) + 1;
 
-        if (diffDays > 15) {
-            showAlert(`Rentang tanggal yang dipilih ${diffDays} hari. Batas maksimal Shopee API adalah 15 hari per request.`);
+        if (diffDays > 60) {
+            showAlert(`Rentang tanggal yang dipilih ${diffDays} hari. Batas maksimal penarikan live Shopee adalah 60 hari.`);
             return false;
         }
 
         return true;
     };
 
+    const renderBreakdownPills = (breakdowns) => {
+        const wrap = $('txBreakdownWrap');
+        const container = $('txBreakdownPills');
+        if (!breakdowns || !breakdowns.length) {
+            wrap.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+
+        wrap.style.display = 'flex';
+        const currentType = $('txType').value;
+
+        const pillsHtml = breakdowns.map(b => {
+            const isActive = currentType && (currentType.toLowerCase() === b.type.toLowerCase() || currentType === b.type);
+            return `
+                <button type="button" class="shopee-tx-pill tx-badge ${b.badge || 'secondary'} ${isActive ? 'active' : ''}" data-type="${escHtml(b.type)}">
+                    <span>${escHtml(b.label)}</span>
+                    <span class="badge bg-dark-subtle text-dark ms-1">${b.count}</span>
+                </button>
+            `;
+        }).join('');
+
+        container.innerHTML = pillsHtml;
+
+        container.querySelectorAll('.shopee-tx-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                const type = pill.dataset.type;
+                if ($('txType').value === type) {
+                    $('txType').value = '';
+                } else {
+                    $('txType').value = type;
+                }
+                state.pageNo = 0;
+                loadData();
+            });
+        });
+    };
+
     const renderTable = (items) => {
         if (!items.length) {
+            const keyword = $('txSearch').value.trim();
             $('txTableWrap').innerHTML = `
                 <div class="shopee-tx-empty">
-                    <i class="bi bi-inbox fs-2 d-block mb-2 text-muted"></i>
-                    Tidak ada transaksi wallet pada rentang tanggal dan filter yang dipilih.
+                    <i class="bi bi-${keyword ? 'search' : 'inbox'} fs-2 d-block mb-2 text-muted"></i>
+                    ${keyword
+                        ? `Tidak ada transaksi yang cocok dengan kata kunci "<strong>${escHtml(keyword)}</strong>".`
+                        : 'Tidak ada transaksi wallet pada rentang tanggal dan filter yang dipilih.'}
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary btn-pill" id="emptyResetBtn">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Filter
+                        </button>
+                    </div>
                 </div>
             `;
+            const emptyReset = $('emptyResetBtn');
+            if (emptyReset) {
+                emptyReset.addEventListener('click', resetFilters);
+            }
             return;
         }
 
@@ -629,7 +866,12 @@
             return `
                 <tr>
                     <td class="text-muted">${escHtml(item.date_formatted)}</td>
-                    <td class="tx-code">${escHtml(item.transaction_id || '—')}</td>
+                    <td>
+                        <span class="tx-code">${escHtml(item.transaction_id || '—')}</span>
+                        <button type="button" class="btn btn-link btn-sm p-0 text-muted ms-1 copy-btn" data-text="${escHtml(item.transaction_id || '')}" title="Salin ID Transaksi">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </td>
                     <td>
                         <span class="tx-badge ${badgeClass}">
                             ${escHtml(item.transaction_type_label || item.transaction_type)}
@@ -648,13 +890,18 @@
                     </td>
                     <td>
                         ${item.order_sn ? `
-                            <span class="tx-code text-primary me-1">${escHtml(item.order_sn)}</span>
-                            <button type="button" class="btn btn-link btn-sm p-0 text-muted copy-btn" data-text="${escHtml(item.order_sn)}" title="Salin Order SN">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="tx-code text-primary">${escHtml(item.order_sn)}</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-muted copy-btn" data-text="${escHtml(item.order_sn)}" title="Salin Order SN">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
                         ` : '<span class="text-muted">—</span>'}
+                        ${item.buyer_name ? `
+                            <div class="small text-muted mt-1"><i class="bi bi-person me-1"></i>${escHtml(item.buyer_name)}</div>
+                        ` : ''}
                     </td>
-                    <td class="text-muted" style="max-width:260px; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(item.reason || '')}">
+                    <td class="text-muted" style="max-width:280px; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(item.reason || '')}">
                         ${escHtml(item.reason || '—')}
                     </td>
                     <td class="text-end">
@@ -676,8 +923,8 @@
                         <th>Arah Dana</th>
                         <th>Nominal</th>
                         <th>Saldo Berjalan</th>
-                        <th>No. Pesanan</th>
-                        <th>Keterangan / Alasan</th>
+                        <th>No. Pesanan / Pembeli</th>
+                        <th>Keterangan / Deskripsi</th>
                         <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
@@ -712,7 +959,7 @@
 
         const currentOffset = state.pageNo;
         const count = state.items.length;
-        $('txPageInfo').textContent = `Offset data: ${currentOffset} · Menampilkan ${count} item${state.more ? ' · Ada data berikutnya' : ' · Halaman terakhir'}`;
+        $('txPageInfo').textContent = `Offset data: ${currentOffset} · Menampilkan ${count} item${state.more ? ' · Ada data berikutnya' : ' · Selesai'}`;
     };
 
     const loadData = async () => {
@@ -757,6 +1004,9 @@
             $('kpiOut').textContent = moneyFormat(summary.total_money_out);
             $('kpiNet').textContent = (summary.net_amount < 0 ? '- ' : '+ ') + moneyFormat(Math.abs(summary.net_amount || 0));
 
+            // Render breakdown pills
+            renderBreakdownPills(summary.type_breakdown || []);
+
             renderTable(state.items);
             renderPagination();
         } catch (err) {
@@ -787,9 +1037,10 @@
             ['Nominal', item.signed_formatted_amount || item.formatted_amount],
             ['Saldo Akhir Shopee', item.formatted_balance || '—'],
             ['No. Pesanan (Order SN)', item.order_sn || '—'],
+            ['Nama Pembeli', item.buyer_name || '—'],
             ['Status Transaksi', item.status || '—'],
             ['Tipe Wallet', item.wallet_type || '—'],
-            ['Alasan / Keterangan', item.reason || '—'],
+            ['Alasan / Deskripsi', item.reason || '—'],
         ];
 
         const cardsHtml = fields.map(([label, val]) => `
@@ -825,12 +1076,83 @@
         if (e.key === 'Escape') $('txModalBackdrop').classList.remove('show');
     });
 
-    // Button interactions
+    // Reset all filters
+    const resetFilters = () => {
+        $('txFlow').value = 'ALL';
+        $('txType').value = '';
+        $('txSearch').value = '';
+        $('txSearchClear').classList.remove('show');
+        applyPreset('15days');
+        state.pageNo = 0;
+        loadData();
+    };
+
+    $('txResetBtn').addEventListener('click', resetFilters);
+
+    // Search input handler with debounce
+    let searchDebounce = null;
+    $('txSearch').addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        if (val.length > 0) {
+            $('txSearchClear').classList.add('show');
+        } else {
+            $('txSearchClear').classList.remove('show');
+        }
+
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => {
+            state.pageNo = 0;
+            loadData();
+        }, 350);
+    });
+
+    $('txSearchClear').addEventListener('click', () => {
+        $('txSearch').value = '';
+        $('txSearchClear').classList.remove('show');
+        $('txSearch').focus();
+        state.pageNo = 0;
+        loadData();
+    });
+
+    // Quick date preset button clicks
+    document.querySelectorAll('.shopee-tx-quick-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            applyPreset(btn.dataset.preset);
+            state.pageNo = 0;
+            loadData();
+        });
+    });
+
+    // Manual date changes
+    const onManualDateChange = () => {
+        document.querySelectorAll('.shopee-tx-quick-btn').forEach(b => b.classList.remove('active'));
+        state.pageNo = 0;
+        loadData();
+    };
+    $('txFrom').addEventListener('change', onManualDateChange);
+    $('txTo').addEventListener('change', onManualDateChange);
+
+    // Reactive filter dropdowns
+    $('txStore').addEventListener('change', () => {
+        state.pageNo = 0;
+        if ($('txStore').value) loadData();
+    });
+    $('txFlow').addEventListener('change', () => {
+        state.pageNo = 0;
+        loadData();
+    });
+    $('txType').addEventListener('change', () => {
+        state.pageNo = 0;
+        loadData();
+    });
+
+    // Manual Load Button
     $('txLoadBtn').addEventListener('click', () => {
         state.pageNo = 0;
         loadData();
     });
 
+    // Pagination buttons
     $('txPrev').addEventListener('click', () => {
         if (state.pageNo > 0) {
             state.pageNo = Math.max(0, state.pageNo - PAGE_SIZE);
@@ -845,6 +1167,7 @@
         }
     });
 
+    // Export CSV
     $('txExportBtn').addEventListener('click', () => {
         if (!validateInputs()) return;
         const url = buildUrl(true);
@@ -853,14 +1176,7 @@
         }
     });
 
-    $('txStore').addEventListener('change', () => {
-        state.pageNo = 0;
-        if ($('txStore').value) {
-            loadData();
-        }
-    });
-
-    // Auto-load if store is selected
+    // Auto-load on initial page render if store is selected
     if ($('txStore').value) {
         loadData();
     }

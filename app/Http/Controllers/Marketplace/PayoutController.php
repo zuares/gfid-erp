@@ -84,6 +84,86 @@ class PayoutController extends Controller
         }
     }
 
+    public function records(Request $request, Store $store): JsonResponse
+    {
+        $data = $request->validate([
+            'date_from' => ['required', 'date_format:Y-m-d'],
+            'date_to' => ['required', 'date_format:Y-m-d'],
+            'cursor' => ['nullable', 'string', 'max:1000'],
+            'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        [$from, $to] = $this->window($data);
+        if ($from->greaterThan($to)) {
+            return response()->json(['success' => false, 'message' => 'Tanggal mulai tidak boleh melewati tanggal akhir.'], 422);
+        }
+        if ($from->diffInSeconds($to) >= 15 * 86400) {
+            return response()->json(['success' => false, 'message' => 'Rentang tanggal maksimal 15 hari sesuai batas endpoint wallet payout Shopee.'], 422);
+        }
+
+        try {
+            return response()->json([
+                'success' => true,
+                'source' => 'database',
+                'data' => $this->payout->storedInfo(
+                    $store,
+                    $from,
+                    $to,
+                    (string) ($data['cursor'] ?? ''),
+                    (int) ($data['page_size'] ?? 100),
+                ),
+            ]);
+        } catch (RuntimeException $e) {
+            return $this->apiError($e, 'payout records', $store);
+        } catch (\Throwable $e) {
+            Log::error('[payout] Gagal membaca payout tersimpan', ['store_id' => $store->id, 'exception' => $e]);
+
+            return response()->json(['success' => false, 'message' => 'Gagal membaca data payout tersimpan.'], 500);
+        }
+    }
+
+    public function sync(Request $request, Store $store): JsonResponse
+    {
+        $data = $request->validate([
+            'date_from' => ['required', 'date_format:Y-m-d'],
+            'date_to' => ['required', 'date_format:Y-m-d'],
+            'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        [$from, $to] = $this->window($data);
+        if ($from->greaterThan($to)) {
+            return response()->json(['success' => false, 'message' => 'Tanggal mulai tidak boleh melewati tanggal akhir.'], 422);
+        }
+        if ($from->diffInSeconds($to) >= 15 * 86400) {
+            return response()->json(['success' => false, 'message' => 'Rentang tanggal maksimal 15 hari sesuai batas endpoint wallet payout Shopee.'], 422);
+        }
+
+        try {
+            $result = $this->payout->syncWallet(
+                $store,
+                $from,
+                $to,
+                (int) ($data['page_size'] ?? 100),
+            );
+
+            if (($result['status'] ?? null) !== 'synced') {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?: 'Sinkronisasi payout belum selesai.',
+                    'data' => $result,
+                ], 502);
+            }
+
+            return response()->json(['success' => true, 'source' => 'database', 'data' => $result]);
+        } catch (RuntimeException $e) {
+            return $this->apiError($e, 'payout sync', $store);
+        } catch (\Throwable $e) {
+            Log::error('[payout] Gagal menyinkronkan payout', ['store_id' => $store->id, 'exception' => $e]);
+
+            return response()->json(['success' => false, 'message' => 'Gagal menyinkronkan payout dari Shopee.'], 502);
+        }
+    }
+
     /** @return array{0:Carbon,1:Carbon} */
     private function window(array $data): array
     {

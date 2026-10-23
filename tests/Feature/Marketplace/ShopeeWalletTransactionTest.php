@@ -268,4 +268,73 @@ class ShopeeWalletTransactionTest extends TestCase
         // Pastikan database tetap kosong
         $this->assertDatabaseCount('marketplace_payouts', 0);
     }
+
+    public function test_service_filters_by_search_keyword(): void
+    {
+        $store = $this->createShopeeStore();
+
+        Http::fake([
+            '*/api/v2/payment/get_wallet_transaction_list*' => Http::response($this->dummyShopeeApiResponse(), 200),
+        ]);
+
+        $service = app(ShopeeWalletTransactionService::class);
+        $from = now()->subDays(5)->startOfDay();
+        $to = now()->endOfDay();
+
+        // Search by Order SN
+        $resOrder = $service->fetchTransactions($store, $from, $to, ['search' => '261023ABCD1234']);
+        $this->assertCount(1, $resOrder['items']);
+        $this->assertSame('90001', $resOrder['items'][0]['transaction_id']);
+        $this->assertEquals(350000.0, $resOrder['summary']['total_money_in']);
+
+        // Search by keyword in reason
+        $resReason = $service->fetchTransactions($store, $from, $to, ['search' => 'iklan']);
+        $this->assertCount(1, $resReason['items']);
+        $this->assertSame('90003', $resReason['items'][0]['transaction_id']);
+
+        // Search non-matching keyword
+        $resNone = $service->fetchTransactions($store, $from, $to, ['search' => 'xyz_not_found']);
+        $this->assertCount(0, $resNone['items']);
+        $this->assertSame(0, $resNone['summary']['total_count']);
+    }
+
+    public function test_controller_data_endpoint_supports_search_filter(): void
+    {
+        $user = $this->createTestUser('admin');
+        $store = $this->createShopeeStore();
+
+        Http::fake([
+            '*/api/v2/payment/get_wallet_transaction_list*' => Http::response($this->dummyShopeeApiResponse(), 200),
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('marketplace.api.shopee-transactions', [
+            'store'     => $store->id,
+            'date_from' => now()->subDays(6)->toDateString(),
+            'date_to'   => now()->toDateString(),
+            'search'    => '261023ABCD1234',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.summary.total_count', 1);
+        $response->assertJsonPath('data.items.0.order_sn', '261023ABCD1234');
+    }
+
+    public function test_artisan_command_supports_search_option(): void
+    {
+        $store = $this->createShopeeStore('SHP-CLI2');
+
+        Http::fake([
+            '*/api/v2/payment/get_wallet_transaction_list*' => Http::response($this->dummyShopeeApiResponse(), 200),
+        ]);
+
+        $this->artisan('shopee:fetch-transactions', [
+            'store'    => (string) $store->id,
+            '--from'   => now()->subDays(4)->toDateString(),
+            '--to'     => now()->toDateString(),
+            '--search' => '261023ABCD1234',
+        ])
+            ->expectsOutputToContain('Total Transaksi')
+            ->expectsOutputToContain('261023ABCD1234')
+            ->assertExitCode(0);
+    }
 }
