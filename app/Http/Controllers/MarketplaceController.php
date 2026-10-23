@@ -3390,6 +3390,10 @@ class MarketplaceController extends Controller
             'run_id' => $runId,
             'from' => $fromDate,
             'to' => $toDate,
+            'date_basis' => 'order',
+            'date_from' => $fromDate,
+            'date_to' => $toDate,
+            'platform' => $store->channel?->name ?: ($isTikTokFinance ? 'TikTok Shop' : 'Marketplace'),
             'updated_at' => now()->toISOString(),
         ], 1800);
 

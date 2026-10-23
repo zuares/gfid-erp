@@ -104,6 +104,21 @@
             background:rgba(148,163,184,.12);
             color:#475569;
         }
+        .settlement-sync-progress-context{
+            display:flex;
+            flex-wrap:wrap;
+            align-items:center;
+            gap:.35rem .55rem;
+            margin-top:.18rem;
+            color:var(--shp-muted);
+            font-size:.7rem;
+            line-height:1.35;
+        }
+        .settlement-sync-progress-context strong{
+            color:var(--shp-text);
+            font-weight:850;
+        }
+        .settlement-sync-progress-context .separator{ color:#cbd5e1; }
         .settlement-sync-feedback.success{
             border-color:rgba(34,197,94,.25);
             background:rgba(240,253,244,.92);
@@ -756,7 +771,10 @@
 
             <div id="settlementSyncProgressWrap" class="d-none" style="margin-top:1rem;">
                 <div style="display:flex; justify-content:space-between; gap:.75rem; align-items:center; margin-bottom:.35rem;">
-                    <div id="settlementSyncProgressLabel" style="font-size:.74rem; font-weight:800; color:var(--shp-text);">Menunggu proses…</div>
+                    <div style="min-width:0;">
+                        <div id="settlementSyncProgressLabel" style="font-size:.74rem; font-weight:800; color:var(--shp-text);">Menunggu proses…</div>
+                        <div id="settlementSyncProgressContext" class="settlement-sync-progress-context" aria-live="polite"></div>
+                    </div>
                     <div id="settlementSyncProgressPct" style="font-size:.72rem; font-weight:800; color:#1d4ed8;">0%</div>
                 </div>
                 <div class="progress" style="height:10px; border-radius:999px; background:rgba(148,163,184,.18); overflow:hidden;">
@@ -1335,9 +1353,10 @@
         const wrap = $('settlementSyncProgressWrap');
         const bar = $('settlementSyncProgressBar');
         const label = $('settlementSyncProgressLabel');
+        const context = $('settlementSyncProgressContext');
         const pct = $('settlementSyncProgressPct');
         const meta = $('settlementSyncProgressMeta');
-        if (!wrap || !bar || !label || !pct || !meta) return null;
+        if (!wrap || !bar || !label || !context || !pct || !meta) return null;
 
         const status = String(progress?.status || 'idle').toLowerCase();
         const isActive = ['queued', 'running'].includes(status);
@@ -1348,6 +1367,7 @@
             bar.style.background = '#3b82f6';
             bar.classList.add('progress-bar-striped', 'progress-bar-animated');
             label.textContent = 'Menunggu proses…';
+            context.innerHTML = '';
             pct.textContent = '0%';
             meta.innerHTML = '';
             return { status: 'idle', terminal: false };
@@ -1357,7 +1377,9 @@
         const percent = Math.max(0, Math.min(100, Number(rawPercent)));
         settlementSyncLastPercent = percent;
         const completion = isActive ? null : getSettlementCompletionPresentation(progress);
-        const statusLabel = completion?.title || progress.label || (status === 'queued' ? 'Mengantre…' : (status === 'running' ? 'Berjalan…' : 'Selesai'));
+        const statusLabel = isActive
+            ? (status === 'queued' ? 'Menunggu antrean sync' : 'Sedang sync order')
+            : (completion?.title || progress.label || 'Sync selesai');
         const visualStatus = isActive ? status : completion.level;
         const color = visualStatus === 'success' ? '#16a34a'
             : (visualStatus === 'warn' ? '#d97706'
@@ -1372,15 +1394,32 @@
         label.textContent = statusLabel;
         pct.textContent = percent + '%';
 
+        const selectedStore = stores.find(store => String(store.id) === String(progress?.store_id || getSyncStoreId()));
+        const platform = progress?.platform || selectedStore?.channel?.name || 'Platform marketplace';
+        const storeName = progress?.store_name || selectedStore?.name || 'Toko terpilih';
+        const dateFrom = progress?.date_from || progress?.from || '';
+        const dateTo = progress?.date_to || progress?.to || '';
+        const formatSyncDate = value => {
+            if (!value) return '';
+            const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+            if (Number.isNaN(date.getTime())) return String(value);
+            return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+        };
+        const dateRange = dateFrom && dateTo
+            ? `Tanggal order: ${formatSyncDate(dateFrom)} – ${formatSyncDate(dateTo)}`
+            : 'Tanggal order: rentang sync aktif';
+        context.innerHTML = `<strong>${esc(platform)}</strong><span class="separator">·</span><strong>${esc(storeName)}</strong><span class="separator">·</span><span>${esc(dateRange)}</span>`;
+
         // Detail angka ditampilkan di satu feedback final saja. Menyembunyikan
         // meta terminal mencegah Found/Processed/Synced muncul dua kali.
         const metaBits = [];
         if (isActive && progress.batch !== undefined && progress.max_batches !== undefined && progress.max_batches !== null) {
             metaBits.push(`Batch ${progress.batch}/${progress.max_batches}`);
         }
-        if (isActive && progress.found !== undefined) metaBits.push(`Ditemukan ${progress.found}`);
-        if (isActive && progress.processed !== undefined) metaBits.push(`Diproses ${progress.processed}`);
-        if (isActive && progress.synced !== undefined) metaBits.push(`Final ${progress.synced}`);
+        if (isActive && progress.found !== undefined) metaBits.push(`Order ditemukan ${progress.found}`);
+        if (isActive && progress.processed !== undefined) metaBits.push(`Order diproses ${progress.processed}`);
+        if (isActive && progress.synced !== undefined) metaBits.push(`Settlement diperbarui ${progress.synced}`);
+        if (isActive && progress.pending !== undefined) metaBits.push(`Menunggu settlement ${progress.pending}`);
         if (isActive && progress.errors !== undefined) metaBits.push(`Error ${progress.errors}`);
         if (isActive && progress.skipped !== undefined) metaBits.push(`Dilewati ${progress.skipped}`);
         if (isActive && progress.current_order) metaBits.push(`Order ${progress.current_order}`);
@@ -1418,10 +1457,25 @@
         const hasExplicitWarn = baseStatus === 'warn';
         const level = hasErrors || hasPending || hasExplicitWarn ? 'warn' : 'success';
         const state = hasErrors ? 'Parsial' : (hasPending ? 'Pending' : (hasExplicitWarn ? 'Parsial' : 'Siap'));
+        const platform = progress?.platform || 'Platform marketplace';
+        const storeName = progress?.store_name || 'Toko terpilih';
         const title = hasErrors || hasExplicitWarn
-            ? 'Sync selesai dengan catatan'
-            : (hasPending ? 'Sync selesai · menunggu settlement' : 'Sync selesai');
-        const message = `Finance TikTok: ${synced} final, ${pending} pending, ${estimates} estimasi diperbarui.`;
+            ? `Sync ${storeName} selesai dengan catatan`
+            : `Sync ${storeName} selesai`;
+        const message = hasPending
+            ? `${platform}: ${pending} order masih menunggu settlement. Estimasi payout diperbarui untuk ${estimates} order.`
+            : `${platform}: ${synced} settlement final diperbarui${estimates ? ` dan ${estimates} estimasi payout` : ''}.`;
+        const formatSyncDate = value => {
+            if (!value) return '';
+            const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+            if (Number.isNaN(date.getTime())) return String(value);
+            return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+        };
+        const completionDateFrom = progress?.date_from || progress?.from || '';
+        const completionDateTo = progress?.date_to || progress?.to || '';
+        const range = completionDateFrom && completionDateTo
+            ? `${formatSyncDate(completionDateFrom)} – ${formatSyncDate(completionDateTo)}`
+            : null;
 
         return {
             level,
@@ -1429,13 +1483,15 @@
             title,
             message,
             meta: [
-                `Ditemukan ${found}`,
-                `Diproses ${processed}`,
-                `Final ${synced}`,
-                `Pending ${pending}`,
-                `Estimasi ${estimates}`,
+                `${platform} · ${storeName}`,
+                range ? `Tanggal order ${range}` : null,
+                `Order diperiksa ${found}`,
+                `Order diproses ${processed}`,
+                `Settlement final ${synced}`,
+                `Menunggu settlement ${pending}`,
+                `Estimasi payout ${estimates}`,
                 `Error ${errors}`,
-            ],
+            ].filter(Boolean),
         };
     }
 

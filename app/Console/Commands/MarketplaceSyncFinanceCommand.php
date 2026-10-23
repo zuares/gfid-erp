@@ -284,17 +284,25 @@ class MarketplaceSyncFinanceCommand extends Command
 
             if ($tiktokFinanceSupported && ! $dryRun) {
                 $tiktokProgressKey = "marketplace:settlement_sync_progress:{$store->id}";
+                $syncContext = [
+                    'platform' => $store->channel?->name ?: 'TikTok Shop',
+                    'channel' => $channelCode,
+                    'mode' => $mode,
+                    'date_basis' => 'order',
+                    'date_from' => date('Y-m-d', $targetDate),
+                    'date_to' => date('Y-m-d', $syncEndTimestamp),
+                ];
                 $tiktokResult = $syncService->syncTikTokFinanceBatched(
                     $store,
                     $targetDate,
                     $syncEndTimestamp,
                     $missingOnly,
-                    function (array $progress) use ($tiktokProgressKey, $store, $runId): void {
+                    function (array $progress) use ($tiktokProgressKey, $store, $runId, $syncContext): void {
                         Cache::put($tiktokProgressKey, array_merge($progress, [
                             'store_id' => $store->id,
                             'store_name' => $store->name,
                             'run_id' => $runId,
-                        ]), 1800);
+                        ], $syncContext), 1800);
                     },
                     self::SETTLEMENT_BATCH_LIMIT,
                 );
@@ -338,6 +346,7 @@ class MarketplaceSyncFinanceCommand extends Command
                     'store_id' => $store->id,
                     'store_name' => $store->name,
                     'run_id' => $runId,
+                    ...$syncContext,
                 ], 1800);
             } elseif ($tiktokFinanceSupported) {
                 $this->info("   [DRY-RUN] Simulasi sinkronisasi finance TikTok dilewati.");
