@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Sales;
 
 use App\Http\Controllers\Controller;
-use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\MpReconciliation;
@@ -470,7 +469,7 @@ class ShipmentController extends Controller
         $shipment = $wave->relationLoaded('shipment')
             ? $wave->shipment
             : $wave->shipment()->firstOrFail();
-        $stockPosition = $this->stockPositionForShipmentDate(
+        $stockPosition = $this->stockPositionForShipment(
             $shipment,
             $warehouse,
             $lines->pluck('item_id')->unique()->all(),
@@ -2185,7 +2184,7 @@ class ShipmentController extends Controller
         }
 
         $itemIds = $lines->pluck('item_id')->unique()->toArray();
-        $stockPosition = $this->stockPositionForShipmentDate($shipment, $warehouse, $itemIds);
+        $stockPosition = $this->stockPositionForShipment($shipment, $warehouse, $itemIds);
 
         $requirements = $lines
             ->groupBy('item_id')
@@ -2224,17 +2223,16 @@ class ShipmentController extends Controller
     }
 
     /**
-     * Ambil posisi stok untuk tanggal shipment, bukan saldo berjalan hari ini.
+     * Ambil posisi stok yang sama dengan saldo yang akan dipakai stockOut().
      *
-     * Saldo fisik memakai saldo berjalan dengan membalik mutasi setelah tanggal
-     * shipment. Koreksi stok positif setelah tanggal tersebut tetap dihitung
-     * sebagai koreksi historis; bila belum ada saldo berjalan, ledger sampai
-     * tanggal tersebut dipakai sebagai fallback. Reservasi hanya mengambil draft
-     * shipment dengan tanggal yang sama/lebih awal.
+     * Saldo fisik dibaca dari inventory_stocks karena itulah sumber yang
+     * dikunci dan dikurangi saat posting. Reservasi shipment masa depan tidak
+     * boleh membuat shipment yang lebih dulu dibuat tidak bisa diposting, jadi
+     * alokasi hanya dihitung sampai tanggal shipment ini.
      *
      * @return array{physical:\Illuminate\Support\Collection, allocated:\Illuminate\Support\Collection}
      */
-    protected function stockPositionForShipmentDate(Shipment $shipment, Warehouse $warehouse, array $itemIds): array
+    protected function stockPositionForShipment(Shipment $shipment, Warehouse $warehouse, array $itemIds): array
     {
         $itemIds = collect($itemIds)
             ->filter(fn ($itemId) => (int) $itemId > 0)
@@ -2249,66 +2247,13 @@ class ShipmentController extends Controller
             ];
         }
 
-        $asOfDate = $shipment->date?->toDateString() ?: now()->toDateString();
-
         $currentStocks = InventoryStock::query()
             ->where('warehouse_id', $warehouse->id)
             ->whereIn('item_id', $itemIds->all())
             ->get(['item_id', 'qty'])
             ->keyBy('item_id');
-        $historicalPhysical = InventoryMutation::query()
-            ->where('warehouse_id', $warehouse->id)
-            ->whereIn('item_id', $itemIds->all())
-            ->whereDate('date', '<=', $asOfDate)
-            ->selectRaw('item_id, COALESCE(SUM(qty_change), 0) as qty')
-            ->groupBy('item_id')
-            ->pluck('qty', 'item_id');
-        $futureMutations = InventoryMutation::query()
-            ->where('warehouse_id', $warehouse->id)
-            ->whereIn('item_id', $itemIds->all())
-            ->whereDate('date', '>', $asOfDate)
-            ->selectRaw('item_id, COALESCE(SUM(qty_change), 0) as qty')
-            ->groupBy('item_id')
-            ->pluck('qty', 'item_id');
-        $futureCorrections = InventoryMutation::query()
-            ->where('warehouse_id', $warehouse->id)
-            ->whereIn('item_id', $itemIds->all())
-            ->whereDate('date', '>', $asOfDate)
-            ->where('qty_change', '>', 0)
-            ->where(function ($query) {
-                $query
-                    ->whereIn('source_type', [
-                        \App\Models\InventoryAdjustment::class,
-                        'adjustment',
-                        'inventory_adjustment',
-                        'inventory_adjustment_manual',
-                        'stock_opname_adjustment',
-                        'stock_opname_opening',
-                        'stock_opname_periodic',
-                    ])
-                    ->orWhereRaw("LOWER(COALESCE(source_type, '')) LIKE '%adjust%'")
-                    ->orWhereRaw("LOWER(COALESCE(source_type, '')) LIKE '%opname%'");
-            })
-            ->selectRaw('item_id, COALESCE(SUM(qty_change), 0) as qty')
-            ->groupBy('item_id')
-            ->pluck('qty', 'item_id');
-        $physical = $itemIds->mapWithKeys(function (int $itemId) use (
-            $currentStocks,
-            $historicalPhysical,
-            $futureMutations,
-            $futureCorrections,
-        ) {
-            if ($currentStocks->has($itemId)) {
-                return [
-                    $itemId => (float) $currentStocks->get($itemId)->qty
-                        - (float) $futureMutations->get($itemId, 0)
-                        + (float) $futureCorrections->get($itemId, 0),
-                ];
-            }
 
-            return [$itemId => (float) $historicalPhysical->get($itemId, 0)];
-        });
-
+        $asOfDate = $shipment->date?->toDateString() ?: now()->toDateString();
         $allocated = ShipmentLine::query()
             ->join('shipments as reserved_shipments', 'reserved_shipments.id', '=', 'shipment_lines.shipment_id')
             ->whereNull('reserved_shipments.cancelled_at')
@@ -2319,6 +2264,10 @@ class ShipmentController extends Controller
             ->selectRaw('shipment_lines.item_id, COALESCE(SUM(shipment_lines.allocated_qty), 0) as allocated_qty')
             ->groupBy('shipment_lines.item_id')
             ->pluck('allocated_qty', 'shipment_lines.item_id');
+
+        $physical = $itemIds->mapWithKeys(function (int $itemId) use ($currentStocks) {
+            return [$itemId => (float) ($currentStocks->get($itemId)->qty ?? 0)];
+        });
 
         return compact('physical', 'allocated');
     }

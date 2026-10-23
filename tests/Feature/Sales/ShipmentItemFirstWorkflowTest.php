@@ -92,7 +92,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->assertSame(5, (int) ShipmentLine::where('shipment_id', $shipment->id)->sum('qty_scanned'));
     }
 
-    public function test_confirmation_uses_stock_position_on_shipment_date(): void
+    public function test_confirmation_uses_current_stock_and_ignores_future_shipment_reservations(): void
     {
         [$user, $store, $item] = $this->shipmentContext();
         $warehouse = Warehouse::create([
@@ -132,7 +132,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'item_id' => $item->id,
             'qty_change' => 1,
             'direction' => 'in',
-            'source_type' => 'inventory_adjustment_manual',
+            'source_type' => 'stock_request',
         ]);
         InventoryStock::create([
             'warehouse_id' => $warehouse->id,
