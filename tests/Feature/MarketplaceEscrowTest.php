@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureModuleAccess;
 use App\Models\Channel;
 use App\Models\Store;
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderSettlement;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use Carbon\Carbon;
 use Illuminate\Auth\Middleware\Authenticate;
@@ -48,7 +49,7 @@ class MarketplaceEscrowTest extends TestCase
         $this->get(route('marketplace.escrow'))
             ->assertOk()
             ->assertSee('Escrow Shopee')
-            ->assertSee('tanpa cache database')
+            ->assertSee('Snapshot database')
             ->assertSee('Buyer transaction fee')
             ->assertSee('Final escrow product GST')
             ->assertSee('Items');
@@ -190,6 +191,51 @@ class MarketplaceEscrowTest extends TestCase
             ->assertJsonPath('data.items.0.order_sn', 'ORDER-PUSH')
             ->assertJsonPath('data.items.0.order_status', 'READY_TO_SHIP')
             ->assertJsonPath('data.items.0.source', 'webhook_order');
+    }
+
+    public function test_stored_list_and_detail_read_database_snapshot_without_calling_gateway(): void
+    {
+        $store = $this->store();
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'ORDER-STORED',
+            'external_order_id' => 'ORDER-STORED',
+            'order_status' => 'COMPLETED',
+            'status' => 'completed',
+            'buyer_username' => 'buyer-stored',
+            'total_amount' => 125000,
+            'currency' => 'IDR',
+            'ordered_at' => '2026-08-28 10:00:00',
+            'order_date' => '2026-08-28 10:00:00',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => 'ORDER-STORED',
+            'buyer_payment_amount' => 125000,
+            'final_income' => 110000,
+            'settlement_time' => '2026-08-29 12:00:00',
+            'synced_at' => '2026-08-29 12:05:00',
+            'raw_json' => ['escrow_amount' => 110000, 'commission_fee' => 15000],
+        ]);
+
+        $gateway = $this->mock(MarketplaceApiGateway::class);
+        $gateway->shouldNotReceive('getEscrowList');
+        $gateway->shouldNotReceive('getEscrowDetail');
+
+        $this->getJson("/api/marketplace/stores/{$store->id}/escrow-stored?source=orders&date_from=2026-08-28&date_to=2026-08-28")
+            ->assertOk()
+            ->assertJsonPath('source', 'database_snapshot')
+            ->assertJsonPath('data.items.0.order_sn', 'ORDER-STORED')
+            ->assertJsonPath('data.items.0.payout_amount', 110000)
+            ->assertJsonPath('data.items.0.detail_available', true)
+            ->assertJsonPath('data.items.0.source', 'database_settlement');
+
+        $this->getJson("/api/marketplace/stores/{$store->id}/escrow-stored-detail?order_sn=ORDER-STORED")
+            ->assertOk()
+            ->assertJsonPath('source', 'database_snapshot')
+            ->assertJsonPath('data.income.escrow_amount', 110000)
+            ->assertJsonPath('data.raw_response.source', 'database_snapshot');
     }
 
     public function test_non_shopee_store_is_rejected(): void

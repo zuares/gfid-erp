@@ -46,29 +46,47 @@ class PayoutService
 
         $pageSize = min(100, max(1, $pageSize));
         $offset = $this->walletOffset($cursor);
-        $settlements = MarketplaceFinanceSettlement::query()
+        $query = MarketplaceFinanceSettlement::query()
             ->where('store_id', $store->id)
             ->whereIn('channel', self::SHOPEE_CODES)
             ->whereDate('settlement_date', '>=', $from->toDateString())
             ->whereDate('settlement_date', '<=', $to->toDateString())
+            ->where(function ($query): void {
+                // source_kind is written by the current sync path. The type
+                // fallbacks keep older wallet rows visible during migration.
+                $query->whereJsonContains('raw_payload->source_kind', 'wallet_withdrawal');
+                foreach (['201', '202', 'withdrawal', 'withdrawal_created', 'withdrawal_completed'] as $type) {
+                    $query->orWhereJsonContains('raw_payload->transaction_type', $type)
+                        ->orWhereJsonContains('raw_payload->raw->transaction_type', $type);
+                }
+            });
+
+        // Keep pagination in SQL. A broad get()->filter() made this endpoint
+        // grow linearly with every settlement row in the date window and could
+        // exhaust memory for a busy store.
+        $total = (clone $query)->count();
+        $lastSyncedAt = (clone $query)->orderByDesc('updated_at')->value('updated_at');
+        $settlements = (clone $query)
             ->orderByDesc('settlement_date')
             ->orderByDesc('id')
-            ->get()
-            ->filter(fn (MarketplaceFinanceSettlement $settlement): bool => $settlement->isWalletWithdrawal())
-            ->values();
+            ->skip($offset)
+            ->take($pageSize)
+            ->get();
 
-        $items = $settlements->slice($offset, $pageSize)
+        $items = $settlements
             ->map(fn (MarketplaceFinanceSettlement $settlement): array => $this->normalizeStoredSettlement($settlement))
             ->values()
             ->all();
 
+        $more = $offset + $pageSize < $total;
+
         return [
             'items' => $items,
-            'more' => $offset + $pageSize < $settlements->count(),
-            'next_cursor' => $offset + $pageSize < $settlements->count() ? (string) ($offset + $pageSize) : '',
+            'more' => $more,
+            'next_cursor' => $more ? (string) ($offset + $pageSize) : '',
             'page_size' => $pageSize,
-            'total' => $settlements->count(),
-            'last_synced_at' => $settlements->max('updated_at')?->toIso8601String(),
+            'total' => $total,
+            'last_synced_at' => $lastSyncedAt ? Carbon::parse($lastSyncedAt)->toIso8601String() : null,
         ];
     }
 

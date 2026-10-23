@@ -24,7 +24,7 @@
                 <h1>Escrow Shopee</h1>
                 <p>Daftar order yang sudah masuk pencairan dan rincian accounting per order dari API Shopee.</p>
             </div>
-            <div class="escrow-live"><i></i> Live · tanpa cache database</div>
+            <div class="escrow-live"><i></i> Snapshot database · autosync</div>
         </div>
 
         <div id="escrowAlert" class="escrow-alert" role="alert"></div>
@@ -38,8 +38,9 @@
                 <div class="escrow-field">
                     <label for="escrowSource">Sumber daftar</label>
                     <select id="escrowSource" class="form-select" aria-label="Pilih sumber daftar escrow">
-                        <option value="orders">Order baru + escrow (push)</option>
-                        <option value="released">Escrow release</option>
+                        <option value="stored">Tersimpan di database</option>
+                        <option value="orders">Order lokal + snapshot escrow</option>
+                        <option value="released">Escrow release live</option>
                     </select>
                 </div>
                 <div class="escrow-field">
@@ -52,7 +53,7 @@
                 </div>
                 <button id="escrowLoad" type="button" class="btn btn-ship-primary btn-pill"><span class="escrow-load-label">Tampilkan escrow</span></button>
             </div>
-            <div class="escrow-help"><i class="bi bi-info-circle me-1"></i> Tabel utama hanya menampilkan field daftar order. Klik <strong>Detail</strong> untuk membuka seluruh rincian accounting live dari Shopee. Mode <strong>Order baru + escrow</strong> memakai order lokal yang masuk dari push, sedangkan mode <strong>Escrow release</strong> memakai rentang release Shopee (maksimal 15 hari). Tidak ada cache escrow baru.</div>
+            <div class="escrow-help"><i class="bi bi-info-circle me-1"></i> Default membaca snapshot escrow dari database. Sync otomatis memperbarui settlement terbaru setiap 5 menit dan sweep histori setiap 4 jam. Detail snapshot tidak memanggil Shopee; gunakan mode <strong>Escrow release live</strong> hanya saat perlu validasi langsung.</div>
         </div>
 
         <div class="escrow-kpis">
@@ -62,7 +63,7 @@
         </div>
 
         <div id="escrowTableWrap" class="escrow-table-wrap">
-            <div class="escrow-empty">Pilih toko dan rentang tanggal, lalu klik <strong>Tampilkan escrow</strong>.</div>
+            <div class="escrow-empty">Memuat snapshot escrow dari database…</div>
         </div>
         <div id="escrowPagination" class="escrow-actions" style="display:none">
             <button id="escrowPrev" type="button" class="btn btn-sm btn-ship-outline btn-pill">← Sebelumnya</button>
@@ -124,9 +125,12 @@
 
     const listUrl = (storeId, pageNo = state.page) => {
         const params = new URLSearchParams({ date_from: $('escrowFrom').value, date_to: $('escrowTo').value, page_no: pageNo, page_size: PAGE_SIZE });
-        const path = $('escrowSource').value === 'released' ? 'escrow-list' : 'escrow-orders';
+        const source = $('escrowSource').value;
+        if (source === 'stored') params.set('source', 'orders');
+        const path = source === 'stored' ? 'escrow-stored' : (source === 'released' ? 'escrow-list' : 'escrow-orders');
         return `/api/marketplace/stores/${encodeURIComponent(storeId)}/${path}?${params}`;
     };
+    const storedDetailUrl = (storeId, orderSn) => `/api/marketplace/stores/${encodeURIComponent(storeId)}/escrow-stored-detail?order_sn=${encodeURIComponent(orderSn)}`;
     const releaseListUrl = (storeId, pageNo = 1) => {
         const params = new URLSearchParams({ date_from: $('escrowFrom').value, date_to: $('escrowTo').value, page_no: pageNo, page_size: PAGE_SIZE });
         return `/api/marketplace/stores/${encodeURIComponent(storeId)}/escrow-list?${params}`;
@@ -278,23 +282,31 @@
         if ($('escrowSource').value === 'released' && rangeDays > 15) { showAlert('Rentang tanggal maksimal 15 hari sesuai batas endpoint escrow release Shopee.'); return; }
         if (state.page === 1) { state.storePages = {}; state.storeMore = {}; state.storeReleaseTimes = {}; }
         state.loading = true;
-        setLoading(true); $('escrowStatus').textContent = 'Memuat…'; $('escrowTableWrap').innerHTML = '<div class="escrow-empty"><span class="escrow-spinner"></span> Mengambil data live dari Shopee…</div>';
+        setLoading(true); $('escrowStatus').textContent = 'Memuat…'; $('escrowTableWrap').innerHTML = '<div class="escrow-empty"><span class="escrow-spinner"></span> ' + ($('escrowSource').value === 'stored' ? 'Membaca snapshot dari database…' : 'Mengambil data live dari Shopee…') + '</div>';
         try {
             const payload = $('escrowStore').value === 'all'
                 ? await loadAllStorePage(stores)
                 : await fetchStorePage(stores[0], state.page).then(() => ({ items: state.storePages[stores[0].id]?.[state.page] || [], more: Boolean(state.storeMore[stores[0].id]?.[state.page]) }));
             state.items = payload.items || []; state.more = Boolean(payload.more); state.details = {}; state.detailErrors = {}; state.detailLoading = {};
             renderRows(state.items); renderPagination();
-            $('escrowCount').textContent = state.items.length.toLocaleString('id-ID'); $('escrowTotal').textContent = money(state.items.reduce((sum, item) => sum + Number(item.payout_amount || 0), 0)); $('escrowStatus').textContent = 'Berhasil'; $('escrowStatusNote').textContent = `${activeStoreLabel()} · daftar dimuat live; klik Detail untuk rincian`;
+            $('escrowCount').textContent = state.items.length.toLocaleString('id-ID'); $('escrowTotal').textContent = money(state.items.reduce((sum, item) => sum + Number(item.payout_amount || 0), 0)); $('escrowStatus').textContent = 'Berhasil'; $('escrowStatusNote').textContent = activeStoreLabel() + ' · ' + ($('escrowSource').value === 'stored' ? 'snapshot database' : 'data live Shopee') + '; klik Detail untuk rincian';
         } catch (error) { $('escrowTableWrap').innerHTML = `<div class="escrow-empty">Tidak dapat memuat data escrow.</div>`; $('escrowPagination').style.display = 'none'; $('escrowStatus').textContent = 'Gagal'; $('escrowStatusNote').textContent = 'Periksa koneksi/credential Shopee'; showAlert(error.message); }
         finally { state.loading = false; setLoading(false); }
     };
 
     const openDetail = async (orderSn, storeId) => {
-        if (!orderSn || !storeId) return; $('escrowModalBackdrop').classList.add('show'); $('escrowModalTitle').textContent = `Detail escrow · ${orderSn}`; $('escrowModalSub').textContent = `${storeLabel(storeId)} · live dari Shopee`; $('escrowDetailBody').innerHTML = '<div class="escrow-empty"><span class="escrow-spinner"></span> Memuat detail dari Shopee…</div>';
+        if (!orderSn || !storeId) return;
+        const currentItem = state.items.find((item) => detailKey(item.store_id, item.order_sn) === detailKey(storeId, orderSn));
+        const isStored = $('escrowSource').value === 'stored';
+        $('escrowModalBackdrop').classList.add('show'); $('escrowModalTitle').textContent = 'Detail escrow · ' + orderSn; $('escrowModalSub').textContent = storeLabel(storeId) + ' · ' + (isStored ? 'snapshot database' : 'live dari Shopee');
+        if (isStored && currentItem && !currentItem.detail_available) {
+            $('escrowDetailBody').innerHTML = '<div class="escrow-empty">Snapshot escrow belum tersedia. Order akan diambil pada sync settlement berikutnya.</div>';
+            return;
+        }
+        $('escrowDetailBody').innerHTML = '<div class="escrow-empty"><span class="escrow-spinner"></span> Memuat detail ' + (isStored ? 'dari database' : 'dari Shopee') + '…</div>';
         try {
             const key = detailKey(storeId, orderSn);
-            const payload = state.details[key]?.raw_response ? { data: state.details[key] } : await api(detailUrl(storeId, orderSn));
+            const payload = state.details[key]?.raw_response ? { data: state.details[key] } : await api(isStored ? storedDetailUrl(storeId, orderSn) : detailUrl(storeId, orderSn));
             const detail = payload.data || {};
             state.details[key] = detail;
             const income = detail.income || {};
@@ -320,7 +332,9 @@
         try {
             const response = await api('/api/marketplace/stores'); state.stores = (Array.isArray(response) ? response : response.data || []).filter((store) => ['shopee', 'shp'].includes(String(store.channel?.code || '').toLowerCase()) && store.is_active !== false);
             $('escrowStore').innerHTML = state.stores.length ? `<option value="all">Semua toko Shopee (${state.stores.length})</option>${state.stores.map((store) => `<option value="${escapeHtml(store.id)}">${escapeHtml(store.name)}${store.connection_status === 'CONNECTED' ? ' · Connected' : ''}</option>`).join('')}` : '<option value="">Tidak ada toko Shopee aktif</option>';
+            return state.stores.length > 0;
         } catch (error) { $('escrowStore').innerHTML = '<option value="">Gagal memuat toko</option>'; showAlert(error.message); }
+        return false;
     };
     $('escrowLoad').addEventListener('click', () => { state.page = 1; loadList(); }); $('escrowSource').addEventListener('change', () => { state.page = 1; loadList(); }); $('escrowPrev').addEventListener('click', () => { if (state.page > 1) { state.page--; loadList(); } }); $('escrowNext').addEventListener('click', () => { if (state.more) { state.page++; loadList(); } }); $('escrowClose').addEventListener('click', () => $('escrowModalBackdrop').classList.remove('show')); $('escrowModalBackdrop').addEventListener('click', (event) => { if (event.target === $('escrowModalBackdrop')) $('escrowModalBackdrop').classList.remove('show'); }); document.addEventListener('keydown', (event) => { if (event.key === 'Escape') $('escrowModalBackdrop').classList.remove('show'); });
     if (window.Echo) {
@@ -339,7 +353,7 @@
             });
         } catch (error) { console.warn('Escrow realtime listener gagal:', error); }
     }
-    loadStores();
+    loadStores().then((hasStores) => { if (hasStores) loadList(); });
 })();
 </script>
 @endpush

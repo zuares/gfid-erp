@@ -49,7 +49,8 @@ class MarketplacePayoutTest extends TestCase
             ->assertSee('get_wallet_transaction_list')
             ->assertSee('seller lokal Shopee Indonesia')
             ->assertSee('DB-first')
-            ->assertSee('Sync dari Shopee');
+            ->assertSee('Sync dari Shopee')
+            ->assertSee('loadStores().then((hasStores)');
     }
 
     public function test_info_forwards_cursor_date_window_and_normalizes_payout(): void

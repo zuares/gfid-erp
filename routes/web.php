@@ -160,10 +160,12 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->where('connectionId', '[0-9a-fA-F-]{36}');
     Route::get('/stores',                      [MarketplaceController::class, 'stores']);
     Route::get('/stores/{store}/shop-info',    [MarketplaceController::class, 'shopInfo']);
+    Route::get('/stores/{store}/escrow-stored', [EscrowController::class, 'storedList'])->name('marketplace.api.escrow-stored');
     Route::get('/stores/{store}/escrow-list', [EscrowController::class, 'list'])->name('marketplace.api.escrow-list');
     Route::get('/stores/{store}/escrow-orders', [EscrowController::class, 'orders'])->name('marketplace.api.escrow-orders');
     Route::post('/stores/{store}/escrow-detail-batch', [EscrowController::class, 'detailBatch'])->name('marketplace.api.escrow-detail-batch');
     Route::get('/stores/{store}/escrow-detail', [EscrowController::class, 'detail'])->name('marketplace.api.escrow-detail');
+    Route::get('/stores/{store}/escrow-stored-detail', [EscrowController::class, 'storedDetail'])->name('marketplace.api.escrow-stored-detail');
     Route::get('/stores/{store}/payout-info', [PayoutController::class, 'info'])->name('marketplace.api.payout-info');
     Route::get('/stores/{store}/payout-detail', [PayoutController::class, 'detail'])->name('marketplace.api.payout-detail');
     Route::get('/stores/{store}/payout-records', [PayoutController::class, 'records'])->name('marketplace.api.payout-records');

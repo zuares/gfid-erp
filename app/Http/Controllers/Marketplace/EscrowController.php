@@ -75,6 +75,51 @@ class EscrowController extends Controller
         }
     }
 
+    public function storedList(Request $request, Store $store): JsonResponse
+    {
+        $data = $request->validate([
+            'date_from' => ['required', 'date_format:Y-m-d'],
+            'date_to' => ['required', 'date_format:Y-m-d'],
+            'source' => ['nullable', 'in:orders,released'],
+            'page_no' => ['nullable', 'integer', 'min:1', 'max:10000'],
+            'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $from = Carbon::createFromFormat('Y-m-d', $data['date_from'], config('app.timezone'))->startOfDay();
+        $to = Carbon::createFromFormat('Y-m-d', $data['date_to'], config('app.timezone'))->endOfDay();
+
+        if ($from->greaterThan($to)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tanggal mulai tidak boleh melewati tanggal akhir.',
+            ], 422);
+        }
+
+        try {
+            return response()->json([
+                'success' => true,
+                'source' => 'database_snapshot',
+                'data' => $this->escrow->fetchStoredList(
+                    $store,
+                    $from,
+                    $to,
+                    (string) ($data['source'] ?? 'orders'),
+                    (int) ($data['page_no'] ?? 1),
+                    (int) ($data['page_size'] ?? 100),
+                ),
+            ]);
+        } catch (RuntimeException $e) {
+            return $this->apiError($e, 'stored escrow list', $store);
+        } catch (\Throwable $e) {
+            Log::error('[escrow] Gagal mengambil snapshot database', ['store_id' => $store->id, 'exception' => $e]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil snapshot escrow dari database.',
+            ], 500);
+        }
+    }
+
     public function orders(Request $request, Store $store): JsonResponse
     {
         $data = $request->validate([
@@ -164,6 +209,30 @@ class EscrowController extends Controller
                 'success' => false,
                 'message' => 'Gagal mengambil detail escrow dari Shopee.',
             ], 502);
+        }
+    }
+
+    public function storedDetail(Request $request, Store $store): JsonResponse
+    {
+        $data = $request->validate([
+            'order_sn' => ['required', 'string', 'max:64'],
+        ]);
+
+        try {
+            return response()->json([
+                'success' => true,
+                'source' => 'database_snapshot',
+                'data' => $this->escrow->storedDetail($store, trim($data['order_sn'])),
+            ]);
+        } catch (RuntimeException $e) {
+            return $this->apiError($e, 'stored escrow detail', $store);
+        } catch (\Throwable $e) {
+            Log::error('[escrow] Gagal mengambil detail snapshot database', ['store_id' => $store->id, 'exception' => $e]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil detail snapshot escrow dari database.',
+            ], 500);
         }
     }
 

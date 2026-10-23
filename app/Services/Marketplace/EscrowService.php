@@ -3,17 +3,18 @@
 namespace App\Services\Marketplace;
 
 use App\Models\MarketplaceOrder;
+use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use RuntimeException;
 
 /**
- * Live reader untuk data escrow Shopee.
+ * Reader dan adapter data escrow Shopee.
  *
- * Service ini sengaja tidak mempunyai model/repository/cache. Setiap pemanggilan
- * akan diteruskan ke Shopee melalui MarketplaceApiGateway dan response asli tetap
- * dibawa agar field baru dari Shopee tidak hilang di UI.
+ * Jalur live tetap tersedia untuk refresh/detail manual. Jalur stored membaca
+ * snapshot settlement yang sudah dipersist oleh sync-settlements, sehingga UI
+ * tidak perlu memanggil API Shopee setiap kali dibuka.
  */
 class EscrowService
 {
@@ -227,6 +228,147 @@ class EscrowService
             'more' => $query->clone()->offset($offset + $pageSize)->limit(1)->exists(),
             'page_no' => $pageNo,
             'page_size' => $pageSize,
+        ];
+    }
+
+    /**
+     * Baca daftar escrow dari snapshot database.
+     *
+     * Mode orders memakai order lokal sebagai daftar utama dan menempelkan
+     * settlement bila tersedia. Mode released hanya menampilkan settlement yang
+     * sudah mempunyai waktu pencairan pada rentang yang dipilih.
+     *
+     * @return array{items:array<int,array<string,mixed>>,more:bool,page_no:int,page_size:int}
+     */
+    public function fetchStoredList(
+        Store $store,
+        Carbon $from,
+        Carbon $to,
+        string $source = 'orders',
+        int $pageNo = 1,
+        int $pageSize = 100,
+    ): array {
+        $this->assertShopee($store);
+
+        $pageNo = max(1, $pageNo);
+        $pageSize = min(100, max(1, $pageSize));
+        $offset = ($pageNo - 1) * $pageSize;
+
+        if ($source === 'released') {
+            $query = MarketplaceOrderSettlement::query()
+                ->where('store_id', $store->id)
+                ->whereNotNull('settlement_time')
+                ->whereBetween('settlement_time', [$from, $to])
+                ->with('order:id,store_id,channel_order_id,order_status,status,buyer_username,buyer_name,total_amount,ordered_at,order_date')
+                ->orderByDesc('settlement_time')
+                ->orderByDesc('id');
+
+            $rows = $query->clone()->offset($offset)->limit($pageSize)->get();
+            $more = $query->clone()->offset($offset + $pageSize)->limit(1)->exists();
+
+            return [
+                'items' => $rows->map(fn (MarketplaceOrderSettlement $settlement): array => $this->storedItem($settlement->order, $settlement, $store))->values()->all(),
+                'more' => $more,
+                'page_no' => $pageNo,
+                'page_size' => $pageSize,
+            ];
+        }
+
+        $query = MarketplaceOrder::query()
+            ->where('store_id', $store->id)
+            ->whereNotNull('channel_order_id')
+            ->where(function ($query) use ($from, $to): void {
+                $query->whereBetween('ordered_at', [$from, $to])
+                    ->orWhere(function ($query) use ($from, $to): void {
+                        $query->whereNull('ordered_at')
+                            ->whereBetween('order_date', [$from, $to]);
+                    });
+            })
+            ->with('settlement')
+            ->orderByDesc('ordered_at')
+            ->orderByDesc('order_date')
+            ->orderByDesc('id');
+
+        $rows = $query->clone()->offset($offset)->limit($pageSize)->get();
+        $more = $query->clone()->offset($offset + $pageSize)->limit(1)->exists();
+
+        return [
+            'items' => $rows->map(fn (MarketplaceOrder $order): array => $this->storedItem($order, $order->settlement, $store))->values()->all(),
+            'more' => $more,
+            'page_no' => $pageNo,
+            'page_size' => $pageSize,
+        ];
+    }
+
+    /**
+     * Detail escrow dari snapshot database, tanpa request ke Shopee.
+     *
+     * @return array<string,mixed>
+     */
+    public function storedDetail(Store $store, string $orderSn): array
+    {
+        $this->assertShopee($store);
+
+        $settlement = MarketplaceOrderSettlement::query()
+            ->where('store_id', $store->id)
+            ->where('channel_order_id', trim($orderSn))
+            ->with('order:id,store_id,channel_order_id,buyer_username,buyer_name')
+            ->first();
+
+        if (! $settlement) {
+            throw new RuntimeException('Snapshot escrow belum tersedia untuk order ini.');
+        }
+
+        return $this->storedDetailPayload($settlement->order, $settlement);
+    }
+
+    /** @return array<string,mixed> */
+    private function storedItem(?MarketplaceOrder $order, ?MarketplaceOrderSettlement $settlement, Store $store): array
+    {
+        $orderSn = (string) ($settlement?->channel_order_id ?: $order?->channel_order_id ?: '');
+        $releaseAt = $settlement?->settlement_time;
+        $raw = is_array($settlement?->raw_json) ? $settlement->raw_json : [];
+        $rawRelease = $raw['escrow_release_time'] ?? $raw['release_time'] ?? null;
+
+        return [
+            'order_sn' => $orderSn,
+            'store_id' => $store->id,
+            'order_status' => $order?->order_status ?: $order?->status,
+            'buyer_user_name' => $order?->buyer_username ?: $order?->buyer_name,
+            'ordered_at' => optional($order?->ordered_at ?: $order?->order_date)->toIso8601String(),
+            'order_total' => $order?->total_amount !== null ? (float) $order->total_amount : null,
+            'payout_amount' => $settlement?->final_income !== null ? (float) $settlement->final_income : null,
+            'escrow_release_time' => is_numeric($rawRelease) ? (int) $rawRelease : ($releaseAt?->timestamp),
+            'escrow_release_at' => $releaseAt?->toIso8601String() ?: $this->timestamp($rawRelease)?->toIso8601String(),
+            'synced_at' => $settlement?->synced_at?->toIso8601String(),
+            'data_status' => $settlement?->data_status,
+            'source' => $settlement ? 'database_settlement' : 'database_order',
+            'detail_available' => $settlement !== null,
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private function storedDetailPayload(?MarketplaceOrder $order, MarketplaceOrderSettlement $settlement): array
+    {
+        $income = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+        $releaseAt = $settlement->settlement_time;
+        $rawRelease = $income['escrow_release_time'] ?? $income['release_time'] ?? null;
+
+        return [
+            'order_sn' => (string) $settlement->channel_order_id,
+            'buyer_user_name' => $order?->buyer_username ?: $order?->buyer_name,
+            'return_order_sn_list' => is_array($income['return_order_sn_list'] ?? null) ? array_values($income['return_order_sn_list']) : [],
+            'escrow_release_time' => is_numeric($rawRelease) ? (int) $rawRelease : $releaseAt?->timestamp,
+            'escrow_release_at' => $releaseAt?->toIso8601String() ?: $this->timestamp($rawRelease)?->toIso8601String(),
+            'buyer_payment_info' => [],
+            'income' => $income,
+            'raw_response' => [
+                'source' => 'database_snapshot',
+                'settlement_id' => $settlement->id,
+                'synced_at' => $settlement->synced_at?->toIso8601String(),
+                'data_status' => $settlement->data_status,
+                'order_income' => $income,
+            ],
         ];
     }
 

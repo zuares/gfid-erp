@@ -222,6 +222,18 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-shopee-ad-wallet', [
     ->name('sync-shopee-ad-wallet')
     ->withoutOverlapping();
 
+// Payout wallet withdrawal disimpan sebagai Finance settlement. Statusnya
+// tetap WITHDRAWN/belum verifikasi bank sampai ada rekonsiliasi independen;
+// command ini tidak membuat jurnal accounting.
+Schedule::command('marketplace:sync-wallet-payouts', [
+    '--from' => now()->subDays(14)->toDateString(),
+    '--to' => now()->toDateString(),
+    '--trigger' => 'schedule',
+])
+    ->cron('59 */4 * * *')
+    ->name('sync-wallet-payouts')
+    ->withoutOverlapping(30);
+
 Schedule::call(fn () => Artisan::call('marketplace:sync-chats'))
     ->everyMinute()
     ->name('sync-chats')

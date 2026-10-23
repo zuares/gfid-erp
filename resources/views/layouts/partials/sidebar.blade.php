@@ -2335,19 +2335,19 @@
                         @if ($hasMarketplaceEscrow)
                             <x-sidebar.sub-link href="{{ route('marketplace.escrow') }}" icon="bi bi-safe2"
                                 :active="request()->routeIs('marketplace.escrow')">
-                                Escrow Shopee
+                                Escrow per Order
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplacePayout)
                             <x-sidebar.sub-link href="{{ route('marketplace.payout') }}" icon="bi bi-wallet2"
                                 :active="request()->routeIs('marketplace.payout')">
-                                Payout Shopee
+                                Penarikan Saldo
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceShopeeTransactions)
                             <x-sidebar.sub-link href="{{ route('marketplace.shopee.transactions') }}" icon="bi bi-arrow-left-right"
                                 :active="request()->routeIs('marketplace.shopee.transactions')">
-                                Transaksi Shopee
+                                Mutasi Wallet
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceProfit)

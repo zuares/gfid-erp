@@ -2134,21 +2134,21 @@
                             @if ($hasMarketplaceEscrow)
                                 <a href="{{ route('marketplace.escrow') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.escrow') ? 'active' : '' }}">
-                                    <span class="icon">🔐</span><span>Escrow Shopee</span>
+                                    <span class="icon">🔐</span><span>Escrow per Order</span>
                                 </a>
                             @endif
 
                             @if ($hasMarketplacePayout)
                                 <a href="{{ route('marketplace.payout') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.payout') ? 'active' : '' }}">
-                                    <span class="icon">👛</span><span>Payout Shopee</span>
+                                    <span class="icon">👛</span><span>Penarikan Saldo</span>
                                 </a>
                             @endif
 
                             @if ($hasMarketplaceShopeeTransactions)
                                 <a href="{{ route('marketplace.shopee.transactions') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.shopee.transactions') ? 'active' : '' }}">
-                                    <span class="icon">🔄</span><span>Transaksi Shopee</span>
+                                    <span class="icon">🔄</span><span>Mutasi Wallet</span>
                                 </a>
                             @endif
 
