@@ -20,6 +20,7 @@ use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\Marketplace\PurchaseChannel;
 use App\Services\Marketplace\Income\ImportedMarketplaceIncomeSyncService;
+use App\Services\Marketplace\Finance\MarketplaceFinanceBackfillService;
 use App\Services\Channels\ChannelManager;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use Carbon\Carbon;
@@ -75,6 +76,7 @@ class MarketplaceSyncService
         protected MarketplaceApiGateway $gateway,
         protected OrderFulfillmentService $fulfillment,
         protected ImportedMarketplaceIncomeSyncService $storedIncomeSync,
+        protected MarketplaceFinanceBackfillService $financeBackfill,
         protected MarketplaceIssueService $issueService = new MarketplaceIssueService(),
         protected MarketplaceFinancialDataQualityService $financialQuality = new MarketplaceFinancialDataQualityService(),
     ) {}
@@ -1156,6 +1158,20 @@ class MarketplaceSyncService
             ],
             'data_checked_at' => now(),
         ])->save();
+
+        // Keep the generic Marketplace Finance ledger in lockstep with the
+        // existing TikTok settlement snapshot. The legacy row remains the
+        // source of truth for compatibility; the projection is idempotent and
+        // deliberately does not post journals.
+        try {
+            $this->financeBackfill->syncOrderSettlement($settlement->fresh(['store.channel', 'order.store.channel']));
+        } catch (\Throwable $e) {
+            Log::warning('[TikTok Finance] Gagal memproyeksikan settlement ke Marketplace Finance generik', [
+                'store_id' => $store->id,
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         $orderUpdate = [
             'settlement_sync_error_code' => null,

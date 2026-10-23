@@ -24,6 +24,7 @@ class MarketplaceFinanceController extends Controller
     {
         $filters = $this->filters($request);
         $stores = $this->stores();
+        $channels = $this->channels($stores);
         $overviewData = $this->reconciliation->overview($filters);
         $report = ['summary' => $overviewData['summary']];
         $storeNames = $stores->pluck('name', 'id');
@@ -43,6 +44,7 @@ class MarketplaceFinanceController extends Controller
             'settlements' => $settlements,
             'storeNames' => $storeNames,
             'stores' => $stores,
+            'channels' => $channels,
             'transactions' => $transactions,
             'syncHealth' => $this->syncHealth->orderSync(),
         ]);
@@ -52,6 +54,7 @@ class MarketplaceFinanceController extends Controller
     {
         $filters = $this->filters($request);
         $stores = $this->stores();
+        $channels = $this->channels($stores);
         $rows = $this->reconciliation->paginateTransactions($filters, $this->transactionsPerPage($request));
         $storeNames = $stores->pluck('name', 'id');
 
@@ -60,6 +63,7 @@ class MarketplaceFinanceController extends Controller
             'rows' => $rows,
             'storeNames' => $storeNames,
             'stores' => $stores,
+            'channels' => $channels,
             'syncHealth' => $this->syncHealth->orderSync(),
         ]);
     }
@@ -68,6 +72,7 @@ class MarketplaceFinanceController extends Controller
     {
         $filters = $this->filters($request);
         $stores = $this->stores();
+        $channels = $this->channels($stores);
         $rows = $this->reconciliation->paginateSettlements($filters, $this->transactionsPerPage($request));
         $settlementIds = $rows->getCollection()->pluck('settlement_id');
         $settlementModels = MarketplaceFinanceSettlement::query()
@@ -81,6 +86,7 @@ class MarketplaceFinanceController extends Controller
             'rows' => $rows,
             'settlementModels' => $settlementModels,
             'stores' => $stores,
+            'channels' => $channels,
             'syncHealth' => $this->syncHealth->orderSync(),
         ]);
     }
@@ -89,6 +95,7 @@ class MarketplaceFinanceController extends Controller
     {
         $filters = $this->filters($request);
         $stores = $this->stores();
+        $channels = $this->channels($stores);
         $page = $this->reconciliation->paginateOrderReconciliation($filters, $this->transactionsPerPage($request));
         $report = [
             'summary' => $page['summary'],
@@ -99,6 +106,7 @@ class MarketplaceFinanceController extends Controller
             'filters' => $filters,
             'report' => $report,
             'stores' => $stores,
+            'channels' => $channels,
             'syncHealth' => $this->syncHealth->orderSync(),
         ]);
     }
@@ -107,6 +115,7 @@ class MarketplaceFinanceController extends Controller
     {
         $filters = $this->filters($request);
         $stores = $this->stores();
+        $channels = $this->channels($stores);
         $componentQuery = $this->feeComponentQuery($filters);
 
         $byType = (clone $componentQuery)
@@ -173,6 +182,7 @@ class MarketplaceFinanceController extends Controller
             'byType' => $byType,
             'filters' => $filters,
             'stores' => $stores,
+            'channels' => $channels,
             'syncHealth' => $this->syncHealth->orderSync(),
         ]);
     }
@@ -196,6 +206,9 @@ class MarketplaceFinanceController extends Controller
 
         if ($filters['store_id'] !== null) {
             $query->where('ft.store_id', $filters['store_id']);
+        }
+        if ($filters['channel'] !== null) {
+            $query->where('ft.channel', $filters['channel']);
         }
         if ($filters['order_sn'] !== null) {
             $query->where('ft.order_sn', $filters['order_sn']);
@@ -254,6 +267,7 @@ class MarketplaceFinanceController extends Controller
     {
         return $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'channel' => ['nullable', 'string', 'max:32'],
             'date_basis' => ['nullable', 'in:ordered_at,created_at,released_at'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
@@ -261,6 +275,7 @@ class MarketplaceFinanceController extends Controller
             'order_sn' => ['nullable', 'string', 'max:120'],
         ]) + [
             'store_id' => $request->input('store_id'),
+            'channel' => $request->input('channel'),
             'date_basis' => $request->input('date_basis', 'ordered_at'),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
@@ -272,6 +287,16 @@ class MarketplaceFinanceController extends Controller
     private function stores(): Collection
     {
         return Store::query()->with('channel')->where('is_active', true)->orderBy('name')->get();
+    }
+
+    private function channels(Collection $stores): Collection
+    {
+        return $stores
+            ->map(fn (Store $store) => $store->channel)
+            ->filter()
+            ->unique('id')
+            ->sortBy('name')
+            ->values();
     }
 
     private function transactionsPerPage(Request $request): int

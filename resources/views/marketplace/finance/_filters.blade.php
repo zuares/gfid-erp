@@ -2,6 +2,7 @@
     $isReconciliation = request()->routeIs('marketplace.finance.reconciliation');
     $activeFilterCount = collect([
         $filters['store_id'] ?? null,
+        $filters['channel'] ?? null,
         filled($filters['date_from'] ?? null) || filled($filters['date_to'] ?? null) ? 'date_range' : null,
         $filters['order_sn'] ?? null,
         $filters['status'] ?? null,
@@ -34,6 +35,15 @@
                         <option value="">Semua toko</option>
                         @foreach ($stores as $store)
                             <option value="{{ $store->id }}" @selected((string) ($filters['store_id'] ?? '') === (string) $store->id)>{{ $store->name }}{{ $store->channel ? ' · '.$store->channel->name : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="finance-filter-field">
+                    <label class="form-label" for="finance-channel">Marketplace</label>
+                    <select id="finance-channel" name="channel" class="form-select">
+                        <option value="">Semua marketplace</option>
+                        @foreach ($channels as $channel)
+                            <option value="{{ $channel->code }}" @selected(($filters['channel'] ?? '') === $channel->code)>{{ $channel->name }}</option>
                         @endforeach
                     </select>
                 </div>

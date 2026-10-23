@@ -14,6 +14,7 @@ use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplacePayout;
+use App\Models\MarketplaceTikTokFinancialTransaction;
 use App\Models\MpIncome;
 use App\Models\MpShipment;
 use App\Models\SalesInvoice;
@@ -30,6 +31,7 @@ class MarketplaceFinanceBackfillService
         'income_estimates',
         'mp_incomes',
         'payouts',
+        'tiktok_financial_transactions',
     ];
 
     private bool $dryRun = true;
@@ -50,6 +52,35 @@ class MarketplaceFinanceBackfillService
 
     /** @var array<string,array<string,bool>> */
     private array $seenSourceKeys = [];
+
+    /**
+     * Project one already-normalized legacy order settlement into the generic
+     * finance read model. TikTok's per-order statement sync uses this narrow
+     * bridge so the generic ledger is updated in the same sync cycle without
+     * scanning every legacy row.
+     *
+     * @return array{stats:array<string,int>,unmatched_rows:array<int,array<string,mixed>>,errors_rows:array<int,array<string,mixed>>}
+     */
+    public function syncOrderSettlement(MarketplaceOrderSettlement $row): array
+    {
+        $this->dryRun = false;
+        $this->plannedTransactions = [];
+        $this->plannedComponents = [];
+        $this->plannedSettlements = [];
+        $this->plannedAllocations = [];
+        $this->seenSourceKeys = [];
+
+        $row->loadMissing(['store.channel', 'order.store.channel']);
+        $stats = $this->sourceStats();
+        $result = ['unmatched_rows' => [], 'errors_rows' => []];
+        $this->backfillOrderSettlement($row, $stats, $result);
+
+        return [
+            'stats' => $stats,
+            'unmatched_rows' => $result['unmatched_rows'],
+            'errors_rows' => $result['errors_rows'],
+        ];
+    }
 
     /**
      * @param  array{dry_run?:bool,sources?:array<int,string>,store_id?:int|null}  $options
@@ -100,6 +131,18 @@ class MarketplaceFinanceBackfillService
 
                 continue;
             }
+            if ($source === 'tiktok_financial_transactions' && ! Schema::hasTable('marketplace_tiktok_financial_transactions')) {
+                $stats['errors']++;
+                $result['summary']['errors']++;
+                $result['errors_rows'][] = [
+                    'source' => $source,
+                    'source_id' => null,
+                    'message' => 'Tabel transaksi finance TikTok belum tersedia. Jalankan migration terlebih dahulu.',
+                ];
+                $result['sources'][$source] = $stats;
+
+                continue;
+            }
 
             $callback = match ($source) {
                 'order_settlements' => function (MarketplaceOrderSettlement $row) use (&$stats, &$result): void {
@@ -114,12 +157,16 @@ class MarketplaceFinanceBackfillService
                 'payouts' => function (MarketplacePayout $row) use (&$stats, &$result): void {
                     $this->backfillPayout($row, $stats, $result);
                 },
+                'tiktok_financial_transactions' => function (MarketplaceTikTokFinancialTransaction $row) use (&$stats, &$result): void {
+                    $this->backfillTikTokFinancialTransaction($row, $stats, $result);
+                },
             };
             $query = match ($source) {
                 'order_settlements' => MarketplaceOrderSettlement::query()->with(['store.channel', 'order.store.channel'])->when($this->storeId, fn (Builder $query) => $query->where('store_id', $this->storeId)),
                 'income_estimates' => MarketplaceOrderIncomeEstimate::query()->with(['store.channel', 'order'])->when($this->storeId, fn (Builder $query) => $query->where('store_id', $this->storeId)),
                 'mp_incomes' => MpIncome::query()->with('store.channel')->when($this->storeId, fn (Builder $query) => $query->where('store_id', $this->storeId)),
                 'payouts' => MarketplacePayout::query()->with('store.channel')->when($this->storeId, fn (Builder $query) => $query->where('store_id', $this->storeId)),
+                'tiktok_financial_transactions' => MarketplaceTikTokFinancialTransaction::query()->with('store.channel')->when($this->storeId, fn (Builder $query) => $query->where('store_id', $this->storeId)),
             };
             $this->scan($source, $query, $callback, $stats, $result);
             $result['sources'][$source] = $stats;
@@ -217,7 +264,7 @@ class MarketplaceFinanceBackfillService
             'source_hash' => $this->sourceHash('marketplace_order_settlements', $row->id, $row->raw_json),
         ], $stats);
 
-        foreach ([
+        $componentFields = [
             'commission_fee' => ['admin_fee', 'Admin Fee'],
             'service_fee' => ['service_fee', 'Service Fee'],
             'transaction_fee' => ['transaction_fee', 'Transaction Fee'],
@@ -230,7 +277,11 @@ class MarketplaceFinanceBackfillService
             'drc_adjustable_refund' => ['refund', 'Refund'],
             'escrow_tax' => ['other_fee', 'Escrow Tax'],
             'ad_cost' => ['advertising', 'Advertising'],
-        ] as $field => [$code, $name]) {
+        ];
+        if ($this->channel($row->store) === 'tiktok') {
+            $componentFields['actual_shipping_fee'] = ['shipping_cost', 'Shipping Cost'];
+        }
+        foreach ($componentFields as $field => [$code, $name]) {
             if ($row->{$field} !== null && abs((float) $row->{$field}) > 0.0) {
                 $this->component($transaction, $code, $name, $row->{$field}, 'marketplace_order_settlements', $row->id, $field, $row->raw_json, $stats);
             }
@@ -241,6 +292,106 @@ class MarketplaceFinanceBackfillService
         // fee mismatch in reconciliation. Do this only for released income;
         // pending rows must remain pending until a real payout is received.
         $this->settlementResidual($transaction, $row, $gross, $net, $stats);
+    }
+
+    private function backfillTikTokFinancialTransaction(MarketplaceTikTokFinancialTransaction $row, array &$stats, array &$result): void
+    {
+        $source = strtolower(trim((string) $row->source));
+        $type = strtoupper(trim((string) $row->transaction_type));
+        $orderSn = trim((string) $row->order_id);
+
+        // Account-level TikTok withdrawals are provider wallet movements, not
+        // order revenue. Keep them in the generic settlement stream so bank
+        // verification can be handled consistently across marketplaces.
+        if ($orderSn === '') {
+            if ($source !== 'withdrawals' || $type !== 'WITHDRAW') {
+                return;
+            }
+
+            $store = $row->store;
+            $channel = $this->channel($store);
+            $externalId = trim((string) $row->external_transaction_id);
+            if (! $store || $channel === '' || $externalId === '') {
+                $this->unmatched($stats, $result, 'tiktok_financial_transactions', $row->id, 'missing_wallet_context');
+
+                return;
+            }
+
+            $this->duplicateSource($stats, 'tiktok_financial_transactions', $store->id.'|'.$channel.'|'.$externalId);
+            $status = in_array(strtoupper((string) $row->status), ['COMPLETED', 'SUCCESS', 'SUCCESSFUL', 'PAID'], true)
+                ? SettlementStatus::WITHDRAWN
+                : SettlementStatus::PENDING;
+            $payload = $this->legacyPayload('marketplace_tiktok_financial_transactions', $row->id, $row->source_payload);
+            $payload['source_kind'] = 'wallet_withdrawal';
+            $payload['transaction_type'] = $type;
+
+            $settlement = $this->settlement($store, $channel, 'tiktok_withdrawal_'.$externalId, [
+                'amount' => $this->nullableAmount($row->amount) ?? '0.00',
+                'currency' => $row->currency ?: 'IDR',
+                'settlement_date' => $row->transaction_created_at?->toDateString(),
+                'status' => $status,
+                'raw_payload' => $payload,
+            ], $stats);
+
+            if ($settlement['id'] === null && ! $this->dryRun) {
+                $this->unmatched($stats, $result, 'tiktok_financial_transactions', $row->id, 'wallet_settlement_not_created');
+            }
+
+            return;
+        }
+
+        // If the order settlement legacy row exists, it is already the
+        // canonical source for this order (including TikTok's normalized fee
+        // breakdown). Avoid double-counting the same statement components.
+        if (MarketplaceOrderSettlement::query()
+            ->where('store_id', $row->store_id)
+            ->where('channel_order_id', $orderSn)
+            ->exists()) {
+            return;
+        }
+
+        $context = $this->context($row->store, $orderSn);
+        if (! $context['valid']) {
+            $this->unmatched($stats, $result, 'tiktok_financial_transactions', $row->id, $context['reason']);
+
+            return;
+        }
+        $this->duplicateSource($stats, 'tiktok_financial_transactions', $context['key']);
+
+        $gross = $this->nullableAmount($row->revenue_amount);
+        $net = $this->nullableAmount($row->settlement_amount);
+        $final = $source === 'statement_transactions'
+            && $net !== null
+            && in_array(strtoupper((string) $row->status), ['SETTLED', 'COMPLETED', 'PAID', ''], true);
+        $raw = $this->legacyPayload('marketplace_tiktok_financial_transactions', $row->id, $row->source_payload);
+        $raw['source'] = $source;
+        $raw['external_transaction_id'] = $row->external_transaction_id;
+
+        $transaction = $this->transaction($context, [
+            'gross_amount' => $gross ?? $net,
+            'net_amount' => $net ?? $this->nullableAmount($row->amount),
+            'escrow_status' => $final ? EscrowStatus::FINALIZED : EscrowStatus::SYNCED,
+            'income_status' => $final ? IncomeStatus::RELEASED : IncomeStatus::PENDING,
+            'released_at' => $final ? $row->transaction_created_at : null,
+            'synced_at' => $row->synced_at,
+            'raw_payload' => $raw,
+            'source_hash' => $this->sourceHash('marketplace_tiktok_financial_transactions', $row->id, $row->source_payload),
+        ], $stats);
+
+        foreach ([
+            'fee_tax_amount' => ['tiktok_fee_tax', 'TikTok fee & tax'],
+            'shipping_cost_amount' => ['shipping_cost', 'Shipping cost'],
+            'adjustment_amount' => ['adjustment', 'Adjustment'],
+            'reserve_amount' => ['reserve', 'Reserve'],
+        ] as $field => [$code, $name]) {
+            $value = $row->{$field};
+            if ($value !== null && abs((float) $value) > 0.0) {
+                // TikTok statement fees are commonly returned as negative
+                // seller-side movements. Canonical components store costs as
+                // positive debits so gross - components remains auditable.
+                $this->component($transaction, $code, $name, abs((float) $value), 'marketplace_tiktok_financial_transactions', $row->id, $field, $row->source_payload, $stats);
+            }
+        }
     }
 
     private function backfillIncomeEstimate(MarketplaceOrderIncomeEstimate $row, array &$stats, array &$result): void
@@ -816,7 +967,7 @@ class MarketplaceFinanceBackfillService
         }
 
         $componentsTotal = 0.0;
-        foreach ([
+        $residualFields = [
             'commission_fee',
             'service_fee',
             'transaction_fee',
@@ -829,7 +980,11 @@ class MarketplaceFinanceBackfillService
             'drc_adjustable_refund',
             'escrow_tax',
             'ad_cost',
-        ] as $field) {
+        ];
+        if ($this->channel($row->store) === 'tiktok') {
+            $residualFields[] = 'actual_shipping_fee';
+        }
+        foreach ($residualFields as $field) {
             $componentsTotal += (float) ($row->{$field} ?? 0);
         }
         $residual = round((float) $gross - (float) $net - $componentsTotal, 2);

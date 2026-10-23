@@ -9,7 +9,7 @@ class MarketplaceFinanceBackfillCommand extends Command
 {
     protected $signature = 'marketplace:finance-backfill
                             {--apply : Tulis hasil backfill ke tabel finance baru (default: dry-run)}
-                            {--source=* : Batasi sumber: order_settlements, income_estimates, mp_incomes, payouts}
+                            {--source=* : Batasi sumber: order_settlements, income_estimates, mp_incomes, payouts, tiktok_financial_transactions}
                             {--store_id= : Batasi satu store_id}';
 
     protected $description = 'Backfill Marketplace Finance dari sumber legacy secara idempotent (default dry-run)';

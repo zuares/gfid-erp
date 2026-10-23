@@ -1,6 +1,7 @@
 @php
     $activeFilterCount = collect([
         $filters['store_id'] ?? null,
+        $filters['channel'] ?? null,
         ($filters['date_basis'] ?? 'ordered_at') !== 'ordered_at' ? ($filters['date_basis'] ?? null) : null,
         filled($filters['date_from'] ?? null) || filled($filters['date_to'] ?? null) ? 'date_range' : null,
         $filters['order_sn'] ?? null,
@@ -34,6 +35,16 @@
                         <option value="{{ $store->id }}" @selected((string) ($filters['store_id'] ?? '') === (string) $store->id)>
                             {{ $store->name }}{{ $store->channel ? ' · '.$store->channel->name : '' }}
                         </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="finance-sidebar-field">
+                <label class="form-label" for="transaction-channel">Marketplace</label>
+                <select id="transaction-channel" name="channel" class="form-select">
+                    <option value="">Semua marketplace</option>
+                    @foreach ($channels as $channel)
+                        <option value="{{ $channel->code }}" @selected(($filters['channel'] ?? '') === $channel->code)>{{ $channel->name }}</option>
                     @endforeach
                 </select>
             </div>

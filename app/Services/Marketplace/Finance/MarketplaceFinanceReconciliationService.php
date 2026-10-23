@@ -460,6 +460,9 @@ class MarketplaceFinanceReconciliationService
         if ($filters['store_id'] !== null) {
             $query->where('store_id', $filters['store_id']);
         }
+        if ($filters['channel'] !== null) {
+            $query->where('channel', $filters['channel']);
+        }
         if ($filters['order_sn'] !== null) {
             $query->where('order_sn', $filters['order_sn']);
         }
@@ -523,6 +526,9 @@ class MarketplaceFinanceReconciliationService
             ]);
         if ($filters['store_id'] !== null) {
             $query->where('store_id', $filters['store_id']);
+        }
+        if ($filters['channel'] !== null) {
+            $query->where('channel', $filters['channel']);
         }
         if ($filters['date_from'] !== null) {
             $query->where('settlement_date', '>=', $filters['date_from']);
@@ -816,6 +822,7 @@ class MarketplaceFinanceReconciliationService
 
         return [
             'store_id' => isset($filters['store_id']) && $filters['store_id'] !== '' ? (int) $filters['store_id'] : null,
+            'channel' => isset($filters['channel']) && trim((string) $filters['channel']) !== '' ? strtolower(trim((string) $filters['channel'])) : null,
             'scope' => ($filters['scope'] ?? null) === 'order' ? 'order' : 'full',
             'date_basis' => $basis,
             'date_from' => $filters['date_from'] ?? null,

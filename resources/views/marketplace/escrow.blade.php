@@ -23,6 +23,7 @@
             <div>
                 <h1>Escrow Shopee</h1>
                 <p>Daftar order yang sudah masuk pencairan dan rincian accounting per order dari API Shopee.</p>
+                <p class="mt-2 mb-0"><a class="link-light fw-semibold" href="{{ route('marketplace.finance.index') }}">Buka Marketplace Finance untuk gabungan semua marketplace →</a></p>
             </div>
             <div class="escrow-live"><i></i> Snapshot database · autosync</div>
         </div>

@@ -1,6 +1,7 @@
 @php
     $activeFilterCount = collect([
         $filters['store_id'] ?? null,
+        $filters['channel'] ?? null,
         filled($filters['date_from'] ?? null) || filled($filters['date_to'] ?? null) ? 'date_range' : null,
     ])->filter(fn ($value) => filled($value))->count();
 @endphp
@@ -32,6 +33,16 @@
                         <option value="{{ $store->id }}" @selected((string) ($filters['store_id'] ?? '') === (string) $store->id)>
                             {{ $store->name }}{{ $store->channel ? ' · '.$store->channel->name : '' }}
                         </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="finance-sidebar-field">
+                <label class="form-label" for="settlement-channel">Marketplace</label>
+                <select id="settlement-channel" name="channel" class="form-select">
+                    <option value="">Semua marketplace</option>
+                    @foreach ($channels as $channel)
+                        <option value="{{ $channel->code }}" @selected(($filters['channel'] ?? '') === $channel->code)>{{ $channel->name }}</option>
                     @endforeach
                 </select>
             </div>
