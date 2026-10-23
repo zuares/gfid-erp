@@ -875,6 +875,42 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame('queued', Cache::get('marketplace:settlement_sync_progress:'.$store->id)['status'] ?? null);
     }
 
+    public function test_endpoint_sync_tiktok_reguler_dialihkan_ke_queue_background()
+    {
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'TT-BLOCKING-'.rand(1000, 9999),
+            'name' => 'TikTok Blocking Guard Test',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => ['access_token' => 'dummy-token'],
+            'token_expires_at' => now()->addDay(),
+        ]);
+
+        Artisan::shouldReceive('queue')
+            ->once()
+            ->with('marketplace:sync-finance', \Mockery::on(function (array $options) use ($store): bool {
+                return ($options['--store_id'] ?? null) === $store->id
+                    && ($options['--channel'] ?? null) === 'tiktok'
+                    && ($options['--mode'] ?? null) === 'missing';
+            }))
+            ->andReturn(new class
+            {
+                public function onQueue($queue)
+                {
+                    return $this;
+                }
+            });
+
+        $request = Request::create('/api/marketplace/stores/'.$store->id.'/sync-settlements', 'POST');
+        $response = app(MarketplaceController::class)->syncSettlements($request, $store);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('queued', $response->getData(true)['status']);
+        $this->assertSame('regular', $response->getData(true)['mode']);
+    }
+
     public function test_backfill_tiktok_finance_menggunakan_mode_full()
     {
         $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);

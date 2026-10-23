@@ -456,8 +456,8 @@
         .settlement-ledger-meta{ color:var(--shp-muted); font-size:.7rem; }
         .settlement-ledger-status{ display:inline-flex; align-items:center; gap:.3rem; color:#15803d; font-size:.68rem; font-weight:850; }
         .settlement-ledger-status::before{ content:""; width:6px; height:6px; border-radius:50%; background:#22c55e; }
-        .settlement-table-scroll{ max-height:65vh; overflow:auto; }
-        .settlement-ledger-table{ min-width:0; table-layout:fixed; }
+        .settlement-table-scroll{ max-height:65vh; overflow-x:auto; overflow-y:auto; }
+        .settlement-ledger-table{ min-width:0; width:100%; table-layout:fixed; }
         .settlement-ledger-table thead th{ padding:.65rem .8rem; background:var(--card,#fff); }
         .settlement-ledger-table thead th:nth-child(1){ width:22%; }
         .settlement-ledger-table thead th:nth-child(2){ width:20%; }
@@ -466,14 +466,14 @@
         .settlement-ledger-table thead th:nth-child(5){ width:19%; }
         .settlement-ledger-table tbody tr{ transition:background .15s ease; }
         .settlement-ledger-table tbody tr:hover{ background:rgba(91,92,226,.035); }
-        .settlement-ledger-table tbody td{ padding:.72rem .8rem; border-top-color:var(--shp-border); }
+        .settlement-ledger-table tbody td{ padding:.72rem .8rem; border-top-color:var(--shp-border); overflow-wrap:anywhere; }
         .settlement-order-id{ display:block; font-size:.78rem; font-weight:850; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .settlement-order-store{ margin-top:.35rem; color:var(--shp-muted); font-size:.7rem; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .settlement-order-source{ margin-top:.28rem; color:#2563eb; font-size:.6rem; font-weight:850; letter-spacing:.035em; text-transform:uppercase; }
         .settlement-timeline{ display:grid; gap:.5rem; }
         .settlement-timeline-item{ display:grid; gap:.12rem; }
         .settlement-timeline-label{ color:var(--shp-muted); font-size:.59rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
-        .settlement-timeline-value{ color:var(--shp-text); font-size:.72rem; font-weight:700; }
+        .settlement-timeline-value{ color:var(--shp-text); font-size:.72rem; font-weight:700; overflow-wrap:anywhere; }
         .settlement-timeline-value.muted{ color:var(--shp-muted); }
         .settlement-money-stack{ display:grid; gap:.35rem; text-align:right; }
         .settlement-money-item{ display:grid; gap:.08rem; }
@@ -482,11 +482,17 @@
         .settlement-money-value.net{ color:#16a34a; font-size:.9rem; }
         .settlement-money-value.pending{ color:#d97706; }
         .settlement-money-source{ color:var(--shp-muted); font-size:.6rem; font-weight:800; }
-        .settlement-breakdown{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.55rem; }
+        .settlement-breakdown{ display:grid; grid-template-columns:1fr; gap:.55rem; }
         .settlement-breakdown-block{ min-width:0; }
+        .settlement-breakdown-block + .settlement-breakdown-block{ padding-top:.5rem; border-top:1px dashed rgba(148,163,184,.22); }
         .settlement-breakdown-title{ margin-bottom:.25rem; color:var(--shp-muted); font-size:.59rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
         .settlement-breakdown .fee-list{ font-size:.68rem; }
-        .settlement-breakdown .fee-list li{ margin-bottom:.16rem; }
+        .settlement-ledger-table .fee-list{ min-width:0; overflow-wrap:anywhere; }
+        .settlement-ledger-table .fee-list li{ align-items:flex-start; min-width:0; margin-bottom:.16rem; }
+        .settlement-ledger-table .fee-list li > span:first-child{ min-width:0; flex:1 1 auto; overflow-wrap:anywhere; }
+        .settlement-ledger-table .fee-list .fee-val,
+        .settlement-ledger-table .fee-list .subsidy-val,
+        .settlement-ledger-table .fee-list .drc-val{ flex:0 0 auto; white-space:nowrap; text-align:right; }
         .settlement-pending-note{ padding:.5rem .6rem; border:1px dashed rgba(217,119,6,.38); border-radius:9px; background:rgba(245,158,11,.07); color:#92400e; font-size:.68rem; line-height:1.35; }
         .settlement-pagination{ display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.7rem .9rem; border-top:1px solid var(--shp-border); color:var(--shp-muted); font-size:.72rem; }
 
@@ -523,7 +529,7 @@
             .settlement-filter-field.search{ grid-column:span 1; }
             .settlement-filter-field.search{ grid-column:1 / -1; }
             .settlement-filter-shell{ padding:.7rem; }
-            .settlement-page-header{ margin-inline:-.7rem; border-radius:0; border-inline:0; }
+            .settlement-page-header{ position:relative; top:auto; z-index:auto; margin-inline:-.7rem; border-radius:0; border-inline:0; }
             .settlement-page-title{ font-size:1.1rem; }
             .settlement-page-sub{ max-width:34rem; }
             .settlement-kpi-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
@@ -733,7 +739,7 @@
                 </span>
                 <span class="settlement-sync-chip">
                     <i class="bi bi-check2-circle" style="color:#15803d;"></i>
-                    Sukses terakhir: <strong id="settlementSyncLastSuccess" style="color:var(--shp-text);">—</strong>
+                    Sync terakhir: <strong id="settlementSyncLastSuccess" style="color:var(--shp-text);">—</strong>
                 </span>
                 <span class="settlement-sync-chip">
                     <i class="bi bi-broadcast" style="color:#64748b;"></i>
@@ -1037,6 +1043,16 @@
         return store?.status === 'active' && store?.is_active === true;
     }
 
+    function isSettlementSyncReadyStore(store) {
+        if (!isActiveStore(store) || !isFinanceStore(store)) return false;
+
+        const connection = String(store?.connection_status || '').toUpperCase();
+        if (!['CONNECTED', 'TOKEN_EXPIRED'].includes(connection)) return false;
+
+        return !(isTikTokStore(store)
+            && String(store?.meta?.tiktok_finance_scope_status || '').toLowerCase() === 'missing');
+    }
+
     function updateSyncPlatformActions() {
         const selectedStore = stores.find(store => String(store.id) === String($('syncStore')?.value || ''));
         const isTikTok = selectedStore && isTikTokStore(selectedStore);
@@ -1073,11 +1089,10 @@
 
         const selectedPlatform = String(platformSel?.value || '').trim().toLowerCase();
         const currentStoreId = String(preferredStoreId || storeSel.value || '');
-        const candidates = stores.filter(store => isFinanceStore(store)
-            && isActiveStore(store)
+        const candidates = stores.filter(store => isSettlementSyncReadyStore(store)
             && (!selectedPlatform || storePlatformCode(store) === selectedPlatform));
 
-        storeSel.innerHTML = '<option value="">Pilih Toko</option>';
+        storeSel.innerHTML = '<option value="">Pilih Toko siap sync</option>';
         candidates.forEach(store => {
             const option = document.createElement('option');
             option.value = store.id;
@@ -1085,13 +1100,12 @@
             storeSel.appendChild(option);
         });
 
-        const hasPlatformFilter = Boolean(selectedPlatform);
         const hasCandidates = candidates.length > 0;
-        storeSel.disabled = hasPlatformFilter && !hasCandidates;
-        if (hasPlatformFilter && !hasCandidates) {
+        storeSel.disabled = !hasCandidates;
+        if (!hasCandidates) {
             const emptyOption = document.createElement('option');
             emptyOption.value = '';
-            emptyOption.textContent = 'Tidak ada toko terkait';
+            emptyOption.textContent = selectedPlatform ? 'Tidak ada toko siap sync' : 'Tidak ada toko siap sync';
             emptyOption.disabled = true;
             storeSel.appendChild(emptyOption);
             storeSel.value = '';
@@ -1275,11 +1289,13 @@
         const rawPercent = progress.percent ?? (isActive ? settlementSyncLastPercent || 5 : 100);
         const percent = Math.max(0, Math.min(100, Number(rawPercent)));
         settlementSyncLastPercent = percent;
-        const statusLabel = progress.label || (status === 'queued' ? 'Mengantre…' : (status === 'running' ? 'Berjalan…' : 'Selesai'));
-        const color = status === 'success' ? '#16a34a'
-            : (status === 'warn' ? '#d97706'
-            : (status === 'error' ? '#dc2626'
-            : (status === 'queued' ? '#2563eb' : '#3b82f6')));
+        const completion = isActive ? null : getSettlementCompletionPresentation(progress);
+        const statusLabel = completion?.title || progress.label || (status === 'queued' ? 'Mengantre…' : (status === 'running' ? 'Berjalan…' : 'Selesai'));
+        const visualStatus = isActive ? status : completion.level;
+        const color = visualStatus === 'success' ? '#16a34a'
+            : (visualStatus === 'warn' ? '#d97706'
+            : (visualStatus === 'error' ? '#dc2626'
+            : (visualStatus === 'queued' ? '#2563eb' : '#3b82f6')));
 
         wrap.classList.remove('d-none');
         bar.style.width = percent + '%';
@@ -1289,17 +1305,19 @@
         label.textContent = statusLabel;
         pct.textContent = percent + '%';
 
+        // Detail angka ditampilkan di satu feedback final saja. Menyembunyikan
+        // meta terminal mencegah Found/Processed/Synced muncul dua kali.
         const metaBits = [];
-        if (progress.batch !== undefined && progress.max_batches !== undefined && progress.max_batches !== null) {
+        if (isActive && progress.batch !== undefined && progress.max_batches !== undefined && progress.max_batches !== null) {
             metaBits.push(`Batch ${progress.batch}/${progress.max_batches}`);
         }
-        if (progress.found !== undefined) metaBits.push(`Found ${progress.found}`);
-        if (progress.processed !== undefined) metaBits.push(`Processed ${progress.processed}`);
-        if (progress.synced !== undefined) metaBits.push(`Synced ${progress.synced}`);
-        if (progress.errors !== undefined) metaBits.push(`Errors ${progress.errors}`);
-        if (progress.skipped !== undefined) metaBits.push(`Skipped ${progress.skipped}`);
-        if (progress.current_order) metaBits.push(`Order ${progress.current_order}`);
-        if (progress.retry_after !== undefined && progress.retry_after !== null) metaBits.push(`Tunggu ${progress.retry_after}s`);
+        if (isActive && progress.found !== undefined) metaBits.push(`Ditemukan ${progress.found}`);
+        if (isActive && progress.processed !== undefined) metaBits.push(`Diproses ${progress.processed}`);
+        if (isActive && progress.synced !== undefined) metaBits.push(`Final ${progress.synced}`);
+        if (isActive && progress.errors !== undefined) metaBits.push(`Error ${progress.errors}`);
+        if (isActive && progress.skipped !== undefined) metaBits.push(`Dilewati ${progress.skipped}`);
+        if (isActive && progress.current_order) metaBits.push(`Order ${progress.current_order}`);
+        if (isActive && progress.retry_after !== undefined && progress.retry_after !== null) metaBits.push(`Tunggu ${progress.retry_after}s`);
         meta.innerHTML = metaBits.map(item => `<span style="display:inline-flex; align-items:center; gap:.25rem; padding:.12rem .45rem; border-radius:999px; background:rgba(148,163,184,.12); color:var(--shp-muted);">${esc(item)}</span>`).join('');
 
         return {
@@ -1307,6 +1325,50 @@
             terminal: ['success', 'warn', 'error'].includes(status),
             percent,
             label: statusLabel,
+        };
+    }
+
+    function getSettlementCompletionPresentation(progress) {
+        const baseStatus = String(progress?.status || '').toLowerCase();
+        const found = Number(progress?.found || 0);
+        const processed = Number(progress?.processed || 0);
+        const synced = Number(progress?.synced || 0);
+        const pending = Number(progress?.pending || 0);
+        const estimates = Number(progress?.estimates_updated || 0);
+        const errors = Number(progress?.errors || 0) + Number(progress?.statement_ad_cost_errors || 0);
+
+        if (baseStatus === 'error') {
+            return {
+                level: 'error',
+                state: 'Gagal',
+                title: 'Sync gagal',
+                message: progress?.label || 'Finance TikTok belum berhasil diproses.',
+            };
+        }
+
+        const hasPending = pending > 0;
+        const hasErrors = errors > 0;
+        const hasExplicitWarn = baseStatus === 'warn';
+        const level = hasErrors || hasPending || hasExplicitWarn ? 'warn' : 'success';
+        const state = hasErrors ? 'Parsial' : (hasPending ? 'Pending' : (hasExplicitWarn ? 'Parsial' : 'Siap'));
+        const title = hasErrors || hasExplicitWarn
+            ? 'Sync selesai dengan catatan'
+            : (hasPending ? 'Sync selesai · menunggu settlement' : 'Sync selesai');
+        const message = `Finance TikTok: ${synced} final, ${pending} pending, ${estimates} estimasi diperbarui.`;
+
+        return {
+            level,
+            state,
+            title,
+            message,
+            meta: [
+                `Ditemukan ${found}`,
+                `Diproses ${processed}`,
+                `Final ${synced}`,
+                `Pending ${pending}`,
+                `Estimasi ${estimates}`,
+                `Error ${errors}`,
+            ],
         };
     }
 
@@ -1357,7 +1419,7 @@
 
         filterSel.innerHTML = '<option value="">Semua Toko</option>';
         if (platformSel) platformSel.innerHTML = '<option value="">Semua Platform</option>';
-        if (syncPlatformSel) syncPlatformSel.innerHTML = '<option value="">Semua Platform</option>';
+        if (syncPlatformSel) syncPlatformSel.innerHTML = '<option value="">Platform siap sync</option>';
         syncSel.innerHTML = '<option value="">Pilih Toko</option>';
 
         const platforms = new Map();
@@ -1376,12 +1438,22 @@
         }
 
         if (syncPlatformSel) {
-            platforms.forEach((name, code) => {
+            const readyStores = stores.filter(store => isSettlementSyncReadyStore(store));
+            const readyPlatforms = new Map();
+            readyStores.forEach(store => {
+                const code = storePlatformCode(store);
+                const name = String(store.channel?.name || code || 'Platform').trim();
+                if (code && !readyPlatforms.has(code)) readyPlatforms.set(code, name);
+            });
+            syncPlatformSel.innerHTML = '<option value="">Platform siap sync</option>';
+            readyPlatforms.forEach((name, code) => {
                 const option = document.createElement('option');
                 option.value = code;
                 option.textContent = name;
                 syncPlatformSel.appendChild(option);
             });
+            syncPlatformSel.disabled = readyPlatforms.size === 0;
+            syncSel.disabled = readyStores.length === 0;
         }
 
         populateFilterStoreSelect();
@@ -1502,43 +1574,40 @@
             const progressStatus = String(progress?.status || 'idle').toLowerCase();
             const progressActive = ['queued', 'running'].includes(progressStatus);
 
+            const completion = progressState?.terminal ? getSettlementCompletionPresentation(progress) : null;
+            const lastSyncAt = progressState?.terminal && progress?.updated_at
+                ? progress.updated_at
+                : (lastSuccess ? lastSuccess.created_at : null);
+
             if (progressActive) {
                 setSyncState('running', progressStatus === 'queued' ? 'Antre' : 'Berjalan');
                 updateSyncDot(true);
-                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSyncAt ? fmtDateTime(lastSyncAt) : '—';
             } else if (progressState?.terminal) {
-                setSyncState(progressStatus === 'success' ? 'success' : (progressStatus === 'warn' ? 'warn' : 'error'),
-                    progressStatus === 'success' ? 'Siap' : (progressStatus === 'warn' ? 'Parsial' : 'Gagal'));
+                setSyncState(completion.level, completion.state);
                 updateSyncDot(false);
-                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSyncAt ? fmtDateTime(lastSyncAt) : '—';
             } else if (!latest) {
                 setSyncState('warn', 'Kosong');
                 updateSyncDot(false);
-                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = '—';
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSyncAt ? fmtDateTime(lastSyncAt) : '—';
             } else if (latest.status === 'success' || latest.status === 'partial_success') {
                 setSyncState('success', latest.status === 'success' ? 'Siap' : 'Parsial');
                 updateSyncDot(false);
-                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSyncAt ? fmtDateTime(lastSyncAt) : '—';
             } else if (syncLogs.some(log => log.status === 'processing')) {
                 setSyncState('running', 'Berjalan');
                 updateSyncDot(true);
-                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSyncAt ? fmtDateTime(lastSyncAt) : '—';
             } else {
                 setSyncState('error', 'Gagal');
                 updateSyncDot(false);
-                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSuccess ? fmtDateTime(lastSuccess.created_at) : '—';
+                if ($('settlementSyncLastSuccess')) $('settlementSyncLastSuccess').textContent = lastSyncAt ? fmtDateTime(lastSyncAt) : '—';
             }
 
             if (progressState && progressState.terminal && lastSettlementProgressStatus !== progressStatus) {
                 loadSettlements();
-                const finalVariant = progressStatus === 'success' ? 'success' : (progressStatus === 'warn' ? 'warn' : 'error');
-                showSyncFeedback(finalVariant, progressStatus === 'success' ? 'Sync selesai' : 'Sync selesai dengan catatan', progress?.label || 'Settlement sync selesai.', [
-                    progress?.batch !== undefined && progress?.max_batches !== undefined ? `Batch: ${progress.batch}/${progress.max_batches}` : null,
-                    progress?.found !== undefined ? `Found: ${progress.found}` : null,
-                    progress?.processed !== undefined ? `Processed: ${progress.processed}` : null,
-                    progress?.synced !== undefined ? `Synced: ${progress.synced}` : null,
-                    progress?.errors !== undefined ? `Errors: ${progress.errors}` : null,
-                ].filter(Boolean));
+                showSyncFeedback(completion.level, completion.title, completion.message, completion.meta || []);
             }
 
             lastSettlementProgressStatus = progressStatus;
@@ -2200,6 +2269,23 @@
             return;
         }
 
+        // Finance TikTok memanggil endpoint statement per order. Untuk toko
+        // dengan ratusan order, proses ini tidak aman dijalankan di request
+        // browser karena dapat melewati timeout HTTP. Gunakan jalur queue yang
+        // sama dengan backfill agar progress tetap bisa dipantau dan hasil
+        // batch pertama tidak hilang ketika batch berikutnya masih berjalan.
+        const selectedStore = stores.find(store => String(store.id) === String(storeId));
+        if (selectedStore && isTikTokStore(selectedStore)) {
+            await queueSettlementSyncRequest({
+                btnId: 'runSettlementBtn',
+                payload: {},
+                busyText: 'Mengantre Finance TikTok…',
+                idleText: 'Tarik Settlement',
+                ackTitle: 'Finance TikTok masuk antrian',
+            });
+            return;
+        }
+
         const btn = $('runSettlementBtn');
         if (!btn || btn.disabled) return;
         const oldHtml = btn.innerHTML;
@@ -2361,12 +2447,8 @@
 
     window.runSettlementSyncBackground = async function () {
         const selectedPlatform = String($('syncPlatform')?.value || '').trim().toLowerCase();
-        const targetStores = stores.filter(s => {
-            const active = s.status === 'active' && s.is_active === true;
-            const tokenReady = ['CONNECTED', 'TOKEN_EXPIRED'].includes(String(s.connection_status || '').toUpperCase());
-            return active && isFinanceStore(s) && tokenReady
-                && (!selectedPlatform || storePlatformCode(s) === selectedPlatform);
-        });
+        const targetStores = stores.filter(s => isSettlementSyncReadyStore(s)
+            && (!selectedPlatform || storePlatformCode(s) === selectedPlatform));
         const skippedStores = stores.filter(s => {
             return s.status === 'active'
                 && s.is_active === true

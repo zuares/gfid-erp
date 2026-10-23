@@ -281,6 +281,7 @@ class MarketplaceSyncFinanceCommand extends Command
                     'statement_ad_cost_errors' => $statementAdCostErrors,
                     'label' => "Finance TikTok selesai: {$tiktokSynced} settled, {$tiktokPending} belum settled, "
                         . "{$estimateUpdated} estimasi diperbarui, {$tiktokErrors} error.",
+                    'updated_at' => now()->toISOString(),
                     'store_id' => $store->id,
                     'store_name' => $store->name,
                 ], 1800);

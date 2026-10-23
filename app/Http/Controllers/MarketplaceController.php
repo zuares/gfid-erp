@@ -3132,6 +3132,19 @@ class MarketplaceController extends Controller
         set_time_limit($isBackfill ? 0 : 180);
         $store->loadMissing('channel');
 
+        // Finance TikTok mengambil statement per order. Jangan jalankan alur
+        // blocking dari endpoint HTTP karena ratusan order dapat melewati
+        // timeout web sebelum seluruh batch selesai. Endpoint lama tetap
+        // kompatibel, tetapi pekerjaannya dialihkan ke queue background.
+        $isTikTokFinance = in_array(
+            strtolower((string) ($store->channel?->code ?? '')),
+            ['tiktok', 'ttk', 'tkt'],
+            true,
+        );
+        if ($isTikTokFinance) {
+            return $this->syncSettlementsBackground($request, $store);
+        }
+
         if ($response = $this->ensureSettlementStoreSyncable($store)) {
             return $response;
         }
@@ -3258,6 +3271,7 @@ class MarketplaceController extends Controller
                 'percent' => 100,
                 'store_id' => $store->id,
                 'store_name' => $store->name,
+                'updated_at' => now()->toISOString(),
             ], $result), 1800);
         } catch (\Throwable $e) {
             // Detail exception (bisa memuat pesan driver HTTP, query, dsb) HANYA masuk log —
@@ -3382,8 +3396,8 @@ class MarketplaceController extends Controller
                 $isTikTokFinance ? 'marketplace:sync-finance' : 'marketplace:sync-settlements',
                 $options
             );
-            if ($isBackfill || $isAll) {
-                $pending->onQueue('heavy'); // backfill escrow per order = lama → jangan sumbat queue default
+            if ($isTikTokFinance || $isBackfill || $isAll) {
+                $pending->onQueue('heavy'); // Finance TikTok/ backfill per order = lama → jangan sumbat queue default
             }
         } catch (\Throwable $e) {
             Cache::put($progressKey, [
