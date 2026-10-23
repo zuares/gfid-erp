@@ -86,9 +86,11 @@
     };
     const syncUrl = (store) => `/api/marketplace/stores/${encodeURIComponent(store.id)}/sync-payouts`;
 
-    const reconciliationLabel = (item) => item.reconciliation_status === 'received'
-        ? '<span class="badge text-bg-success">Diterima bank</span>'
-        : '<span class="badge text-bg-warning">Belum verifikasi bank</span>';
+    const reconciliationLabel = (item) => item.status === 'void'
+        ? '<span class="badge text-bg-danger">Dibatalkan</span>'
+        : item.reconciliation_status === 'received'
+            ? '<span class="badge text-bg-success">Diterima bank</span>'
+            : '<span class="badge text-bg-warning">Belum verifikasi bank</span>';
 
     const renderRows = (items) => {
         if (!items.length) {
@@ -132,7 +134,8 @@
             $('payoutTotal').textContent = state.items.reduce((sum, item) => sum + Number(item.payout_amount || 0), 0).toLocaleString('id-ID', { maximumFractionDigits: 2 });
             $('payoutCurrencies').textContent = currencies.join(', ') || '—';
             $('payoutStatus').textContent = 'Database';
-            $('payoutStatusNote').textContent = `${$('payoutStore').value === 'all' ? `${stores.length} toko` : selectedStore()?.name || 'Toko'} · data tersimpan`;
+            const latestSync = results.map((result) => result.lastSyncedAt).filter(Boolean).sort().pop();
+            $('payoutStatusNote').textContent = `${$('payoutStore').value === 'all' ? `${stores.length} toko` : selectedStore()?.name || 'Toko'} · sync ${latestSync ? dateTime(latestSync) : 'belum pernah'}`;
         } catch (error) {
             $('payoutTableWrap').innerHTML = '<div class="payout-empty">Tidak dapat membaca data payout tersimpan.</div>';
             $('payoutPagination').style.display = 'none';
@@ -147,7 +150,7 @@
     };
     const renderDetail = (row) => {
         const raw = row.raw || {};
-        const status = row.reconciliation_status === 'received' ? 'Diterima bank' : 'Belum verifikasi bank';
+        const status = row.status === 'void' ? 'Dibatalkan' : row.reconciliation_status === 'received' ? 'Diterima bank' : 'Belum verifikasi bank';
         $('payoutDetailBody').innerHTML = `<div class="payout-detail-grid">${[['Toko', storeLabel(row.store_id)],['Waktu penarikan', dateTime(row.payout_at)],['Nominal penarikan', money(row.payout_amount, row.payout_currency)],['Currency', row.payout_currency || 'IDR'],['Status rekonsiliasi', status],['Status Shopee', row.shopee_status || '—'],['Tipe transaksi', row.transaction_type || '—'],['Transaction ID', row.transaction_id || '—'],['Keterangan', row.reason || '—'],['Finance settlement ID', row.finance_settlement_id || '—']].map(([key, value]) => `<div class="payout-detail-card"><div class="payout-detail-label">${esc(key)}</div><div class="payout-detail-value">${esc(value)}</div></div>`).join('')}</div><div class="payout-detail-section"><h3>Raw response Shopee tersimpan</h3><pre class="payout-raw">${esc(JSON.stringify(raw, null, 2))}</pre></div>`;
     };
     const openDetail = (row) => {
