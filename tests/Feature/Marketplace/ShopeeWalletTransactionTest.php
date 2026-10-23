@@ -200,14 +200,14 @@ class ShopeeWalletTransactionTest extends TestCase
         $this->assertDatabaseCount('marketplace_payouts', 0);
     }
 
-    public function test_controller_validates_15_days_limit(): void
+    public function test_controller_validates_60_days_limit(): void
     {
         $user = $this->createTestUser('admin');
         $store = $this->createShopeeStore();
 
         $response = $this->actingAs($user)->getJson(route('marketplace.api.shopee-transactions', [
             'store'     => $store->id,
-            'date_from' => now()->subDays(20)->toDateString(),
+            'date_from' => now()->subDays(70)->toDateString(),
             'date_to'   => now()->toDateString(),
         ]));
 
@@ -215,7 +215,7 @@ class ShopeeWalletTransactionTest extends TestCase
         $response->assertJson([
             'success' => false,
         ]);
-        $this->assertStringContainsString('maksimal 15 hari', $response->json('message'));
+        $this->assertStringContainsString('maksimal 60 hari', $response->json('message'));
     }
 
     public function test_controller_export_streams_csv_without_database(): void

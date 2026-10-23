@@ -110,6 +110,7 @@ class ShopeeTransactionController extends Controller
             'money_flow'       => ['nullable', 'string'],
             'transaction_type' => ['nullable', 'string'],
             'wallet_type'      => ['nullable', 'string'],
+            'search'           => ['nullable', 'string', 'max:100'],
         ]);
 
         [$from, $to, $error] = $this->validateAndParseDateWindow($validated['date_from'], $validated['date_to']);
@@ -127,6 +128,7 @@ class ShopeeTransactionController extends Controller
                 'money_flow'       => $validated['money_flow'] ?? null,
                 'transaction_type' => $validated['transaction_type'] ?? null,
                 'wallet_type'      => $validated['wallet_type'] ?? null,
+                'search'           => $validated['search'] ?? null,
             ];
 
             $result = $this->walletService->fetchTransactions($store, $from, $to, $options);
@@ -153,7 +155,8 @@ class ShopeeTransactionController extends Controller
                     'Nominal (Rp)',
                     'Saldo Berjalan (Rp)',
                     'No Pesanan (Order SN)',
-                    'Keterangan / Alasan',
+                    'Nama Pembeli',
+                    'Keterangan / Deskripsi',
                     'Status',
                     'Tipe Wallet',
                 ]);
@@ -167,6 +170,7 @@ class ShopeeTransactionController extends Controller
                         $item['signed_amount'] ?? 0,
                         $item['current_balance'] ?? '',
                         $item['order_sn'] ?? '',
+                        $item['buyer_name'] ?? '',
                         $item['reason'] ?? '',
                         $item['status'] ?? '',
                         $item['wallet_type'] ?? '',
@@ -191,7 +195,8 @@ class ShopeeTransactionController extends Controller
     }
 
     /**
-     * Validasi batas rentang tanggal maksimal 15 hari sesuai aturan Shopee API.
+     * Validasi batas rentang tanggal maksimal 60 hari.
+     * Service secara otomatis memecah request ke potongan 14 hari bila rentang > 15 hari.
      *
      * @return array{0: ?Carbon, 1: ?Carbon, 2: ?string}
      */
@@ -205,9 +210,8 @@ class ShopeeTransactionController extends Controller
             return [null, null, 'Tanggal mulai tidak boleh melewati tanggal akhir.'];
         }
 
-        // Batas maksimal endpoint get_wallet_transaction_list Shopee adalah 15 hari kalender
-        if ($from->diffInSeconds($to) >= 15 * 86400) {
-            return [null, null, 'Rentang tanggal maksimal 15 hari sesuai batas endpoint Shopee get_wallet_transaction_list.'];
+        if ($from->diffInDays($to) > 60) {
+            return [null, null, 'Rentang tanggal maksimal 60 hari.'];
         }
 
         return [$from, $to, null];
