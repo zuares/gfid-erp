@@ -264,12 +264,11 @@ Schedule::command('marketplace:run-ads-campaign-schedules')
     ->name('run-ads-campaign-schedules')
     ->withoutOverlapping(5);
 
-// Proses antrean job CEPAT (order webhook, download resi) lewat cron —
+// Proses antrean job CEPAT (order webhook, download resi, quality audit) lewat cron —
 // tanpa perlu queue worker daemon terpisah. Drain tiap menit sampai antrean kosong.
-// --queue=default,labels: queue default (webhook, promosi kilat) SELALU didahulukan;
-// unduhan resi (queue 'labels') hanya diproses saat default kosong — resi tidak
-// pernah lagi menyumbat pekerjaan real-time.
-Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'default,labels', '--stop-when-empty' => true, '--max-time' => 55, '--tries' => 3, '--sleep' => 1]))
+// --queue=default,labels,marketplace-quality: queue default (webhook, promosi kilat) SELALU didahulukan;
+// unduhan resi ('labels') dan audit kualitas ('marketplace-quality') diproses saat default kosong.
+Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'default,labels,marketplace-quality', '--stop-when-empty' => true, '--max-time' => 55, '--tries' => 3, '--sleep' => 1]))
     ->everyMinute()
     ->name('queue-work')
     ->withoutOverlapping(5);

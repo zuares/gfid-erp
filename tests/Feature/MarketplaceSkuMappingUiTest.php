@@ -8,6 +8,7 @@ use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceOrderSettlement;
 use App\Models\OrderFulfillment;
 use App\Models\OrderFulfillmentLine;
 use App\Models\SkuMapping;
@@ -578,6 +579,99 @@ class MarketplaceSkuMappingUiTest extends TestCase
             'id' => $line->id,
             'item_id' => $newItem->id,
             'stock_available' => 20,
+        ]);
+    }
+
+    public function test_mapping_refreshes_parent_financial_quality_status(): void
+    {
+        $owner = User::factory()->create([
+            'role' => 'owner',
+            'employee_code' => 'OWNER-SKU-QUALITY-'.uniqid(),
+        ]);
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'code' => 'STORE-SKU-QUALITY-'.uniqid(),
+            'name' => 'Store SKU Quality',
+            'channel_id' => $channel->id,
+            'is_active' => true,
+        ]);
+        $internalItem = Item::create([
+            'code' => 'ITEM-SKU-QUALITY',
+            'name' => 'Item SKU Quality',
+            'unit' => 'pcs',
+            'type' => 'finished',
+            'base_unit_cost' => 100,
+            'hpp' => 100,
+            'active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-SKU-QUALITY-'.uniqid(),
+            'channel_order_id' => 'ORDER-SKU-QUALITY-'.uniqid(),
+            'order_date' => now(),
+            'ordered_at' => now(),
+            'order_status' => 'COMPLETED',
+            'financial_data_status' => 'incomplete',
+            'financial_issue_reason' => 'item_mapping_or_hpp_incomplete',
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'marketplace_order_id' => $order->id,
+            'line_no' => 1,
+            'external_item_id' => 'ITEM-QUALITY-1',
+            'item_name' => 'Order Item Quality',
+            'item_sku' => 'SKU-QUALITY',
+            'qty' => 1,
+            'price' => 100,
+            'mapping_status' => 'mapping_not_found',
+            'data_status' => 'incomplete',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'raw_json' => [
+                'buyer_total_amount' => 100,
+                'commission_fee' => 0,
+                'service_fee' => 0,
+                'transaction_fee' => 0,
+                'affiliate_fee' => 0,
+                'voucher_from_seller' => 0,
+                'seller_coin_cash_back' => 0,
+                'actual_shipping_fee' => 0,
+                'shopee_shipping_rebate' => 0,
+                'reverse_shipping_fee' => 0,
+                'shipping_insurance_fee' => 0,
+                'activity_fee' => 0,
+                'drc_adjustable_refund' => 0,
+                'escrow_tax' => 0,
+                'final_income' => 100,
+            ],
+        ]);
+        $mapping = SkuMapping::create([
+            'marketplace_sku' => 'SKU-QUALITY',
+            'channel_code' => 'shopee',
+            'item_id' => $internalItem->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->putJson('/api/sku-mappings/'.$mapping->id, [
+                'marketplace_sku' => 'SKU-QUALITY',
+                'channel_code' => 'shopee',
+                'item_id' => $internalItem->id,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('marketplace_order_items', [
+            'marketplace_order_id' => $order->id,
+            'mapping_status' => 'mapped',
+            'data_status' => 'valid',
+            'hpp_snapshot' => 100,
+        ]);
+        $this->assertDatabaseHas('marketplace_orders', [
+            'id' => $order->id,
+            'financial_data_status' => 'ready',
+            'financial_issue_reason' => null,
         ]);
     }
 }

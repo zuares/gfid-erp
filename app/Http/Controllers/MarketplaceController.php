@@ -3516,6 +3516,79 @@ class MarketplaceController extends Controller
         }
     }
 
+    public function syncReleasedSettlements(Request $request, Store $store): JsonResponse
+    {
+        @set_time_limit(180);
+
+        $data = $request->validate([
+            'days' => ['nullable', 'integer', 'min:1', 'max:180'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $store->loadMissing('channel');
+        $channelCode = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($channelCode, ['shopee', 'shp'], true)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'RELEASED_SETTLEMENT_CHANNEL_UNSUPPORTED',
+                'message' => 'Sinkronisasi tanggal cair via GetEscrowList hanya berlaku untuk Shopee.',
+            ], 422);
+        }
+
+        if ($response = $this->ensureSettlementStoreSyncable($store)) {
+            return $response;
+        }
+
+        if ($response = $this->ensureStoreReadyForBackgroundSync($store)) {
+            return $response;
+        }
+
+        $lock = Cache::lock(
+            "sync_settlements_store_{$store->id}",
+            (int) config('marketplace.settlement_lock_ttl', 3600)
+        );
+
+        if (! $lock->get()) {
+            return response()->json([
+                'success' => false,
+                'code' => 'SETTLEMENT_SYNC_BUSY',
+                'message' => "Toko {$store->name} sedang menjalankan sinkronisasi settlement/marketplace lain. Coba lagi setelah proses tersebut selesai.",
+            ], 429);
+        }
+
+        try {
+            $days = (int) ($data['days'] ?? config('shopee.release_time_lookback_days', 45));
+            $from = now()->subDays($days)->startOfDay()->timestamp;
+            $to = now()->timestamp;
+            $limit = (int) ($data['limit'] ?? 100);
+
+            $result = $this->sync->syncReleasedSettlementTimes($store, $from, $to, $limit);
+            $hasErrors = (int) ($result['errors'] ?? 0) > 0;
+            $updatedCount = (int) ($result['updated'] ?? 0);
+            $foundCount = (int) ($result['found'] ?? 0);
+
+            return response()->json(array_merge($result, [
+                'success' => ! $hasErrors,
+                'message' => "Berhasil memperbarui tanggal cair untuk {$updatedCount} order (ditemukan {$foundCount} record di escrow list).",
+                'synced_at' => now()->toISOString(),
+            ]), $hasErrors ? 502 : 200);
+        } catch (\Throwable $e) {
+            Log::error('Sinkronisasi tanggal cair gagal dari UI', [
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'code' => 'RELEASED_SETTLEMENT_SYNC_ERROR',
+                'message' => 'Tanggal pencairan dana belum berhasil diperbarui. Detail teknis sudah dicatat di log server.',
+            ], 502);
+        } finally {
+            $lock->release();
+        }
+    }
+
     public function settlements(Request $request): JsonResponse
     {
         $query = MarketplaceOrderSettlement::with([

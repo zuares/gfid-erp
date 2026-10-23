@@ -37,7 +37,23 @@
 .sd-order-pesanan strong{color:#475569;font-weight:800}
 .sd-badge{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid rgba(148,163,184,.25);padding:.16rem .48rem;font-size:.69rem;font-weight:900;color:#64748b;white-space:nowrap}
 .sd-badge.pending{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:#92400e}
+.sd-badge.linked{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+.sd-badge.unlinked{background:#fff7ed;border-color:#fed7aa;color:#b45309}
 .sd-badge.skip{background:rgba(148,163,184,.08)}
+.sd-order-link-meta{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:.3rem;margin-top:.35rem}
+.sd-store-name{display:inline-flex;align-items:center;min-height:22px;padding:.1rem .4rem;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;color:#334155;font-size:.62rem;font-weight:800;white-space:nowrap}
+.sd-platform-highlight{display:inline-flex;align-items:center;gap:.22rem;min-height:22px;padding:.1rem .4rem;border:1px solid transparent;border-radius:999px;font-size:.61rem;font-weight:850;white-space:nowrap}
+.sd-platform-highlight::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.sd-platform-highlight.is-shopee{border-color:#fed7aa;background:#fff1e9;color:#c2410c}
+.sd-platform-highlight.is-tiktok{border-color:#cbd5e1;background:#f1f5f9;color:#111827}
+.sd-order-lead-side{display:flex;flex-direction:column;align-items:flex-end;gap:.35rem;min-width:0}
+.sd-order-qty-breakdown{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:.25rem}
+.sd-order-qty-metric{display:inline-flex;align-items:baseline;gap:.2rem;min-width:52px;padding:.16rem .38rem;border:1px solid #dbe3ee;border-radius:999px;background:#fff;color:#64748b;font-size:.58rem;font-weight:750;white-space:nowrap}
+.sd-order-qty-metric strong{color:#475569;font-size:.68rem;font-variant-numeric:tabular-nums}
+.sd-order-qty-metric.is-ok{border-color:#bbf7d0;background:#f0fdf4}.sd-order-qty-metric.is-ok strong{color:#15803d}
+.sd-order-qty-metric.is-short{border-color:#fecaca;background:#fef2f2}.sd-order-qty-metric.is-short strong{color:#b91c1c}
+.sd-order-qty-metric.is-over{border-color:#fed7aa;background:#fff7ed}.sd-order-qty-metric.is-over strong{color:#c2410c}
+.sd-order-qty-metric.is-unknown{border-color:#e2e8f0;background:#f8fafc}
 .sd-empty{padding:1.6rem 1rem;text-align:center;color:#64748b;font-size:.84rem}
 .sd-table-wrap{overflow:auto;border:1px solid rgba(148,163,184,.16);border-radius:8px}
 .sd-table{width:100%;border-collapse:collapse}
@@ -193,6 +209,19 @@ body[data-theme="dark"] .sd-code,
 body[data-theme="dark"] .sd-value,
 body[data-theme="dark"] .sd-order-no,
 body[data-theme="dark"] .sd-order-item-code{color:#f1f5f9}
+body[data-theme="dark"] .sd-badge.linked{background:rgba(6,78,59,.35);border-color:rgba(110,231,183,.4);color:#6ee7b7}
+body[data-theme="dark"] .sd-badge.unlinked{background:rgba(124,45,18,.3);border-color:rgba(251,146,60,.4);color:#fdba74}
+body[data-theme="dark"] .sd-store-name{border-color:rgba(148,163,184,.45);background:#1e293b;color:#e2e8f0}
+body[data-theme="dark"] .sd-platform-highlight.is-shopee{border-color:rgba(251,146,60,.4);background:rgba(124,45,18,.3);color:#fdba74}
+body[data-theme="dark"] .sd-platform-highlight.is-tiktok{border-color:rgba(148,163,184,.45);background:#1e293b;color:#f8fafc}
+body[data-theme="dark"] .sd-order-qty-metric{border-color:rgba(148,163,184,.4);background:#1e293b;color:#94a3b8}
+body[data-theme="dark"] .sd-order-qty-metric strong{color:#e2e8f0}
+body[data-theme="dark"] .sd-order-qty-metric.is-ok{border-color:rgba(74,222,128,.4);background:rgba(20,83,45,.3)}
+body[data-theme="dark"] .sd-order-qty-metric.is-ok strong{color:#86efac}
+body[data-theme="dark"] .sd-order-qty-metric.is-short{border-color:rgba(248,113,113,.4);background:rgba(127,29,29,.3)}
+body[data-theme="dark"] .sd-order-qty-metric.is-short strong{color:#fca5a5}
+body[data-theme="dark"] .sd-order-qty-metric.is-over{border-color:rgba(251,146,60,.4);background:rgba(124,45,18,.3)}
+body[data-theme="dark"] .sd-order-qty-metric.is-over strong{color:#fdba74}
 
 @media(max-width:860px){
   .sd-wrap{padding:.5rem .5rem 3.5rem}
@@ -200,6 +229,8 @@ body[data-theme="dark"] .sd-order-item-code{color:#f1f5f9}
   .sd-btn,.sd-pill{font-size:.68rem}
   .sd-code{font-size:.94rem}
   .sd-body{padding:.58rem .6rem}
+  .sd-order-lead-side{align-items:flex-start;width:100%}
+  .sd-order-link-meta,.sd-order-qty-breakdown{justify-content:flex-start}
 }
 
 /* Detail page follows the compact operator language used by confirm_orders. */
@@ -465,17 +496,48 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
     };
     $marketplaceCounts = ['all' => (int) $orderScans->count(), 'shopee' => 0, 'tiktok' => 0, 'anomaly' => 0, 'problem' => 0];
     $linkCounts = ['all' => (int) $orderScans->count(), 'linked' => 0, 'unlinked' => 0];
+    $linkedOrdersForScan = static function ($scan) {
+        $linkedOrders = $scan->marketplaceOrders ?? collect();
+        if ($linkedOrders->isEmpty() && $scan->fulfillment?->marketplaceOrder) {
+            $linkedOrders = collect([$scan->fulfillment->marketplaceOrder]);
+        }
+
+        return $linkedOrders;
+    };
+    $scanHasMarketplaceLink = static function ($scan) use ($linkedOrdersForScan): bool {
+        return $linkedOrdersForScan($scan)->isNotEmpty()
+            || $scan->source === 'marketplace'
+            || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order';
+    };
+    $sourceSku = static fn ($item): string => strtoupper(trim((string) (
+        $item->model_sku
+        ?: $item->item_sku
+        ?: $item->item_code_snapshot
+        ?: ''
+    )));
+    $sourceQty = static function ($item, $shipmentLines) use ($sourceSku): int {
+        $qty = (int) ($item->qty ?? 0);
+        $sku = $sourceSku($item);
+        if (!preg_match('/^(.+)-([1-9][0-9]*)$/', $sku, $matches)) {
+            return $qty;
+        }
+
+        $baseMatchesShipment = collect($shipmentLines)->contains(
+            fn ($line) => strtoupper(trim((string) ($line->item?->code ?? ''))) === $matches[1]
+        );
+        $internalItemCode = strtoupper(trim((string) ($item->internalItem?->code ?? '')));
+
+        return $baseMatchesShipment || $internalItemCode === $matches[1]
+            ? $qty * (int) $matches[2]
+            : $qty;
+    };
     foreach ($orderScans as $orderScan) {
         $marketplaceCounts[$marketplaceGroup($orderScan->order_no)]++;
         $orderScanLines = $orderScan->lines->merge($singleOrderFallbackLines);
         if ($orderScanLines->isEmpty()) {
             $marketplaceCounts['problem']++;
         }
-        $hasMarketplaceLink = (bool) (
-            $orderScan->fulfillment?->marketplaceOrder
-            || $orderScan->source === 'marketplace'
-            || data_get($orderScan->raw_payload, 'linked_source') === 'marketplace_order'
-        );
+        $hasMarketplaceLink = $scanHasMarketplaceLink($orderScan);
         $linkCounts[$hasMarketplaceLink ? 'linked' : 'unlinked']++;
     }
     if ($orderScans->count() > 1 && $ungroupedLines->isNotEmpty()) {
@@ -642,11 +704,11 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                     @foreach($orderScans->sortBy('id') as $scan)
                         @php
                             $scanStatus = $scan->status ?: 'pending';
-                            $scanLabel = $scanStatus === 'skip' ? 'Diabaikan' : 'Ditunda';
                             $orderLines = $scan->lines
                                 ->merge($singleOrderFallbackLines)
                                 ->values();
-                            $linkedOrder = $scan->fulfillment?->marketplaceOrder;
+                            $linkedMarketplaceOrders = $linkedOrdersForScan($scan);
+                            $linkedOrder = $scan->fulfillment?->marketplaceOrder ?: $linkedMarketplaceOrders->first();
                             $scanOrderNo = trim((string) (
                                 $scan->order_no
                                 ?: data_get($scan->raw_payload, 'no')
@@ -663,11 +725,34 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                             $orderQty = (int) $orderLines->sum('qty_scanned');
                             $orderMarketplace = $marketplaceGroup($scanOrderNo);
                             $orderNeedsReview = $orderLines->isEmpty();
-                            $orderLinked = (bool) (
-                                $linkedOrder
-                                || $scan->source === 'marketplace'
-                                || data_get($scan->raw_payload, 'linked_source') === 'marketplace_order'
-                            );
+                            $orderLinked = $scanHasMarketplaceLink($scan);
+                            $sourceItems = $linkedMarketplaceOrders->flatMap(fn ($order) => $order->items ?? collect());
+                            $sourceQtyTotal = $sourceItems->isEmpty()
+                                ? null
+                                : (int) $sourceItems->sum(fn ($item) => $sourceQty($item, $orderLines));
+                            $orderQtyDifference = $sourceQtyTotal === null ? null : $orderQty - $sourceQtyTotal;
+                            $orderQtyDifferenceClass = $orderQtyDifference === null
+                                ? 'is-unknown'
+                                : ($orderQtyDifference === 0 ? 'is-ok' : ($orderQtyDifference < 0 ? 'is-short' : 'is-over'));
+                            $linkedOrderCount = $linkedMarketplaceOrders->count();
+                            $linkedStore = $linkedOrder?->store ?: $linkedMarketplaceOrders->first()?->store;
+                            $linkedPlatformCode = strtolower(trim((string) ($linkedStore?->channel?->code ?? '')));
+                            $platformHighlight = match ($linkedPlatformCode) {
+                                'shopee', 'shp' => 'shopee',
+                                'tiktok', 'tiktok shop', 'ttk', 'tt' => 'tiktok',
+                                default => '',
+                            };
+                            $scanLabel = $scanStatus === 'skip'
+                                ? 'Diabaikan'
+                                : ($orderLinked ? 'Tertaut' : 'Belum Tertaut');
+                            $scanBadgeClass = $scanStatus === 'skip'
+                                ? 'skip'
+                                : ($orderLinked ? 'linked' : 'unlinked');
+                            $linkedOrderNumbers = $linkedMarketplaceOrders
+                                ->map(fn ($order) => trim((string) ($order->channel_order_id ?: $order->external_order_id ?: '')))
+                                ->filter()
+                                ->unique()
+                                ->values();
                         @endphp
                         <div class="sd-order sd-order-group sd-order-card"
                              data-marketplace="{{ $orderMarketplace }}"
@@ -683,21 +768,62 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                                         @else
                                             <span class="sd-muted">Nomor pesanan belum tersedia</span>
                                         @endif
-                                        @if($scan->fulfillment && $scan->fulfillment->marketplaceOrder && $scan->fulfillment->marketplaceOrder->store)
-                                            <span style="font-size:0.6rem; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:6px; color:#475569; border:1px solid #e2e8f0; vertical-align:middle;">{{ $scan->fulfillment->marketplaceOrder->store->name }}</span>
+                                        @if($linkedOrderCount > 1)
+                                            <span class="sd-muted" style="font-size:.62rem; margin-left:.35rem;">{{ $linkedOrderCount }} order marketplace</span>
                                         @endif
                                     </div>
                                     @if($marketplaceOrderNumber !== '' && $marketplaceOrderNumber !== $displayOrderNo)
                                         <div class="sd-muted sd-order-pesanan"><strong>No. pesanan:</strong> {{ $marketplaceOrderNumber }}</div>
                                     @endif
+                                    @if($linkedOrderNumbers->count() > 1)
+                                        <div class="sd-muted sd-order-pesanan"><strong>Order tertaut:</strong> {{ $linkedOrderNumbers->implode(', ') }}</div>
+                                    @endif
                                     <div class="sd-muted">
-                                        {{ $scan->source === 'manual_scan' ? 'Belum tertaut' : $scan->source }}
+                                        {{ $scanStatus === 'skip' ? 'Scan dilewati' : ($orderLinked ? 'Tautan marketplace terdeteksi' : 'Order belum tertaut') }}
                                         @if($scan->confirmed_at)
                                             · {{ $scan->confirmed_at->format('d M Y H:i') }}
                                         @endif
                                     </div>
                                 </div>
-                                <span class="sd-order-qty">x{{ number_format($orderQty,0,',','.') }}</span>
+                                <div class="sd-order-lead-side">
+                                    <div class="sd-order-link-meta">
+                                        @if($linkedStore)
+                                            <span class="sd-store-name" title="Toko order">{{ $linkedStore->name ?: $linkedStore->code }}</span>
+                                        @endif
+                                        @if($platformHighlight !== '')
+                                            <span class="sd-platform-highlight is-{{ $platformHighlight }}">{{ $platformHighlight === 'tiktok' ? 'TikTok Shop' : 'Shopee' }}</span>
+                                        @endif
+                                        <span class="sd-badge {{ $scanBadgeClass }}">{{ $scanLabel }}</span>
+                                    </div>
+                                    <div
+                                        class="sd-order-qty-breakdown"
+                                        aria-label="Ringkasan qty order"
+                                        data-order-qty="{{ $sourceQtyTotal ?? '' }}"
+                                        data-scanned-qty="{{ $orderQty }}"
+                                        data-qty-difference="{{ $orderQtyDifference ?? '' }}"
+                                    >
+                                        <span class="sd-order-qty-metric" title="Total qty dari order marketplace">
+                                            <span>Order</span>
+                                            <strong>{{ $sourceQtyTotal === null ? '—' : number_format($sourceQtyTotal, 0, ',', '.') }}</strong>
+                                        </span>
+                                        <span class="sd-order-qty-metric" title="Total qty hasil scan">
+                                            <span>Scan</span>
+                                            <strong>{{ number_format($orderQty, 0, ',', '.') }}</strong>
+                                        </span>
+                                        <span class="sd-order-qty-metric {{ $orderQtyDifferenceClass }}" title="Selisih = Scan - Order">
+                                            <span>Selisih</span>
+                                            <strong>
+                                                @if($orderQtyDifference === null)
+                                                    —
+                                                @elseif($orderQtyDifference > 0)
+                                                    +{{ number_format($orderQtyDifference, 0, ',', '.') }}
+                                                @else
+                                                    {{ number_format($orderQtyDifference, 0, ',', '.') }}
+                                                @endif
+                                            </strong>
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                             <div class="sd-order-items">
                                 @forelse($orderLines as $line)
@@ -712,7 +838,6 @@ body[data-theme="dark"] .sd-grid .sd-kpi { background: #1e293b; border-color: rg
                                     <div class="sd-muted" style="padding:.45rem 0">Belum ada item di order ini.</div>
                                 @endforelse
                             </div>
-                            <span class="sd-badge {{ $scanStatus }}">{{ $scanLabel }}</span>
                         </div>
                     @endforeach
                     @if($orderScans->count() > 1 && $ungroupedLines->isNotEmpty())

@@ -349,6 +349,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->middleware('role:owner');
     Route::post('/stores/{store}/sync-settlements', [MarketplaceController::class, 'syncSettlements']);
     Route::post('/stores/{store}/sync-settlements-background', [MarketplaceController::class, 'syncSettlementsBackground']);
+    Route::post('/stores/{store}/sync-released-settlements', [MarketplaceController::class, 'syncReleasedSettlements']);
     Route::get('/order-profits',                     MarketplaceProfitOverviewController::class);
     
     // Returns Module

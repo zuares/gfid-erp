@@ -85,8 +85,12 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
                 ->name('reports.profit.export');
             Route::get('reports/financial-quality', [MarketplaceFinancialQualityController::class, 'index'])
                 ->name('reports.financial-quality');
+            Route::get('reports/financial-quality/status', [MarketplaceFinancialQualityController::class, 'status'])
+                ->name('reports.financial-quality.status');
             Route::post('reports/financial-quality/refresh', [MarketplaceFinancialQualityController::class, 'refresh'])
                 ->name('reports.financial-quality.refresh');
+            Route::post('reports/financial-quality/process-now', [MarketplaceFinancialQualityController::class, 'processNow'])
+                ->name('reports.financial-quality.process-now');
             Route::post('reports/financial-quality/orders/{order}/repair', [MarketplaceFinancialQualityController::class, 'repairOrder'])
                 ->name('reports.financial-quality.orders.repair');
         });

@@ -10,7 +10,12 @@ use App\Models\Store;
 use App\Services\MarketplaceIssueService;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\MarketplaceSyncService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class MarketplaceFinancialQualityController extends Controller
 {
@@ -116,6 +121,12 @@ class MarketplaceFinancialQualityController extends Controller
                 MarketplaceFinancialDataQualityService::ORDER_INCOMPLETE,
             ])
             ->sum();
+        $eligibleOrderTotal = (int) $eligibleOrderCounts->sum();
+        $postingReadyCount = (int) ($eligibleOrderCounts[MarketplaceFinancialDataQualityService::ORDER_READY] ?? 0);
+        $postingBlockedCount = max(0, $eligibleOrderTotal - $postingReadyCount);
+        $postingReadyPercentage = $eligibleOrderTotal > 0
+            ? (int) round(($postingReadyCount / $eligibleOrderTotal) * 100)
+            : 0;
 
         $settlementCounts = $settlementQuery()
             ->selectRaw('COALESCE(data_status, ?) AS status, COUNT(*) AS total', ['unknown'])
@@ -180,6 +191,10 @@ class MarketplaceFinancialQualityController extends Controller
             'orderCounts' => $eligibleOrderCounts,
             'waitingOrderCount' => $waitingOrderCount,
             'qualityIssueCount' => $qualityIssueCount,
+            'eligibleOrderTotal' => $eligibleOrderTotal,
+            'postingReadyCount' => $postingReadyCount,
+            'postingBlockedCount' => $postingBlockedCount,
+            'postingReadyPercentage' => $postingReadyPercentage,
             'settlementCounts' => $settlementCounts,
             'issueBreakdown' => $issueBreakdown,
             'orders' => $orders,
@@ -194,7 +209,67 @@ class MarketplaceFinancialQualityController extends Controller
                 ->orderBy('order_status')
                 ->pluck('order_status'),
             'lastCheckedAt' => $lastCheckedAt ?: null,
+            'activeAudit' => Cache::get(MarketplaceRefreshDataQualityJob::cacheKey((string) ($storeId ?: 'all'))),
         ]);
+    }
+
+    public function status(Request $request)
+    {
+        $storeId = (string) ($request->input('store_id') ?: 'all');
+        $cacheKey = MarketplaceRefreshDataQualityJob::cacheKey($storeId);
+        $data = Cache::get($cacheKey);
+
+        if (! $data) {
+            $hasPendingJob = DB::table('jobs')
+                ->where('queue', 'marketplace-quality')
+                ->exists();
+
+            return response()->json([
+                'status' => $hasPendingJob ? 'queued' : 'idle',
+                'message' => $hasPendingJob ? 'Audit kualitas sedang dalam antrean worker...' : null,
+            ]);
+        }
+
+        $isStale = false;
+        if (($data['status'] ?? null) === 'queued' && isset($data['queued_at'])) {
+            $queuedTime = Carbon::parse($data['queued_at']);
+            if ($queuedTime->diffInSeconds(now()) > 10) {
+                $isStale = true;
+            }
+        }
+
+        return response()->json(array_merge($data, [
+            'is_stale' => $isStale,
+        ]));
+    }
+
+    public function processNow(Request $request)
+    {
+        set_time_limit(180);
+
+        Artisan::call('queue:work', [
+            '--queue' => 'marketplace-quality',
+            '--stop-when-empty' => true,
+            '--max-time' => 60,
+            '--tries' => 1,
+        ]);
+
+        $storeId = (string) ($request->input('store_id') ?: 'all');
+        $data = Cache::get(MarketplaceRefreshDataQualityJob::cacheKey($storeId));
+
+        if (($data['status'] ?? null) === 'failed') {
+            return back()->with('error', $data['message'] ?? 'Audit kualitas data gagal.');
+        }
+
+        $message = $data['message'] ?? 'Pemeriksaan kualitas data selesai diproses.';
+
+        return back()
+            ->with('success', $message)
+            ->with('quality_result', [
+                'message' => $message,
+                'dry_run' => (bool) ($data['dry_run'] ?? false),
+                'queued' => false,
+            ]);
     }
 
     public function refresh(Request $request)
@@ -216,11 +291,20 @@ class MarketplaceFinancialQualityController extends Controller
             ? 'Audit dry-run masuk antrean dan akan memeriksa data tanpa menyimpan perubahan.'
             : 'Refresh status kualitas masuk antrean dan akan diproses oleh worker marketplace-quality.';
 
+        Cache::put(MarketplaceRefreshDataQualityJob::cacheKey($storeId), [
+            'status' => 'queued',
+            'store_id' => $storeId,
+            'dry_run' => $dryRun,
+            'queued_at' => now()->toIso8601String(),
+            'message' => $message,
+        ], 3600);
+
         return redirect()
             ->route('marketplace.reports.financial-quality', [
                 'store_id' => $storeId === 'all' ? null : $storeId,
                 'status' => 'incomplete',
             ])
+            ->with('success', $message)
             ->with('quality_result', [
                 'message' => $message,
                 'dry_run' => $dryRun,
@@ -244,53 +328,72 @@ class MarketplaceFinancialQualityController extends Controller
     ) {
         set_time_limit(180);
 
-        $order->load(['store.channel', 'items']);
-        abort_unless($order->store, 404, 'Toko order tidak ditemukan.');
+        try {
+            $order->load(['store.channel', 'items']);
+            abort_unless($order->store, 404, 'Toko order tidak ditemukan.');
 
-        $resolvedItems = 0;
-        foreach ($order->items as $item) {
-            $issues->resolveItem($item, $order->store->channel?->code);
-            $resolvedItems++;
-        }
+            $resolvedItems = 0;
+            foreach ($order->items as $item) {
+                $issues->resolveItem($item, $order->store->channel?->code);
+                $resolvedItems++;
+            }
 
-        $settlementResult = null;
-        $channelCode = strtolower((string) $order->store->channel?->code);
-        if (
-            strtoupper((string) $order->order_status) === 'COMPLETED'
-            && in_array($channelCode, ['shopee', 'shp'], true)
-            && $order->store->is_active
-            && $order->store->status === 'active'
-            && $order->store->connection_status === 'CONNECTED'
-        ) {
-            $settlementResult = $sync->syncSettlements(
-                store: $order->store,
-                orderSn: $order->channel_order_id,
-                resync: true,
-                limit: 1,
+            $settlementResult = null;
+            $channelCode = strtolower((string) $order->store->channel?->code);
+            if (
+                strtoupper((string) $order->order_status) === 'COMPLETED'
+                && in_array($channelCode, ['shopee', 'shp'], true)
+                && $order->store->is_active
+                && $order->store->status === 'active'
+                && $order->store->connection_status === 'CONNECTED'
+            ) {
+                $settlementResult = $sync->syncSettlements(
+                    store: $order->store,
+                    orderSn: $order->channel_order_id,
+                    resync: true,
+                    limit: 1,
+                );
+            }
+
+            $assessment = $quality->refreshOrder($order->fresh());
+            $syncMessage = $settlementResult === null
+                ? 'Payout tidak ditarik ulang karena order belum COMPLETED atau toko belum CONNECTED.'
+                : sprintf(
+                    'Payout: %d berhasil, %d error.',
+                    (int) ($settlementResult['synced'] ?? 0),
+                    (int) ($settlementResult['errors'] ?? 0),
+                );
+
+            $message = sprintf(
+                'Perbaikan order %s selesai. %d item di-resolve ulang. Status kualitas: %s. %s',
+                $order->channel_order_id ?: ('#' . $order->id),
+                $resolvedItems,
+                $assessment['status'],
+                $syncMessage,
             );
+
+            return redirect()->back()
+                ->with('success', $message)
+                ->with('quality_result', [
+                    'message' => $message,
+                    'dry_run' => false,
+                    'queued' => false,
+                ]);
+        } catch (\Throwable $e) {
+            Log::error("Gagal perbaiki order #{$order->id}: " . $e->getMessage(), [
+                'exception' => $e,
+            ]);
+
+            $errorMsg = 'Gagal memperbaiki order ' . ($order->channel_order_id ?: ('#' . $order->id)) . ': ' . $e->getMessage();
+
+            return redirect()->back()
+                ->with('error', $errorMsg)
+                ->with('quality_result', [
+                    'message' => $errorMsg,
+                    'error' => true,
+                    'dry_run' => false,
+                    'queued' => false,
+                ]);
         }
-
-        $assessment = $quality->refreshOrder($order->fresh());
-        $syncMessage = $settlementResult === null
-            ? 'Payout tidak ditarik ulang karena order belum COMPLETED atau toko belum CONNECTED.'
-            : sprintf(
-                'Payout: %d berhasil, %d error.',
-                (int) ($settlementResult['synced'] ?? 0),
-                (int) ($settlementResult['errors'] ?? 0),
-            );
-
-        $message = sprintf(
-            'Perbaikan order %s selesai. %d item di-resolve ulang. Status kualitas: %s. %s',
-            $order->channel_order_id ?: ('#' . $order->id),
-            $resolvedItems,
-            $assessment['status'],
-            $syncMessage,
-        );
-
-        return redirect()->back()->with('quality_result', [
-            'message' => $message,
-            'dry_run' => false,
-            'queued' => false,
-        ]);
     }
 }

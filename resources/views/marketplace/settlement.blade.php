@@ -543,13 +543,16 @@
                     </div>
 
                     <div class="settlement-sync-actions-row" style="margin-left:auto;">
-                        <button class="btn btn-sm btn-ship-primary btn-pill" id="runSettlementBtn" onclick="runSettlementSync()">
+                        <button class="btn btn-sm btn-ship-primary btn-pill" id="runSettlementBtn" onclick="runSettlementSync()" title="Tarik nominal breakdown settlement order">
                             <i class="bi bi-arrow-down-circle"></i> Tarik Settlement
                         </button>
-                        <button class="btn btn-sm btn-warning btn-pill" id="runIncomeEstimateBtn" onclick="runIncomeEstimateSync()">
+                        <button class="btn btn-sm btn-info btn-pill text-white" id="runSyncReleasedBtn" onclick="runSyncReleasedSettlements()" title="Tarik tanggal dana cair dari Shopee GetEscrowList">
+                            <i class="bi bi-calendar-check"></i> Tarik Tanggal Cair
+                        </button>
+                        <button class="btn btn-sm btn-warning btn-pill" id="runIncomeEstimateBtn" onclick="runIncomeEstimateSync()" title="Perbarui estimasi payout order yang belum cair">
                             <i class="bi bi-clock-history"></i> Perbarui Estimasi
                         </button>
-                        <button class="btn btn-sm btn-ship-outline btn-pill" id="runSettlementBackfillBtn" onclick="runSettlementBackfill()">
+                        <button class="btn btn-sm btn-ship-outline btn-pill" id="runSettlementBackfillBtn" onclick="runSettlementBackfill()" title="Backfill data settlement beberapa bulan ke belakang">
                             <i class="bi bi-clock-history"></i> Jalankan Backfill
                         </button>
                     </div>
@@ -1991,6 +1994,53 @@
             await loadSettlements();
         } catch (error) {
             const presentation = presentSyncError(error, 'Gagal memperbarui estimasi');
+            showSyncFeedback(presentation.level, presentation.title, presentation.message, [presentation.code ? `Kode: ${presentation.code}` : null].filter(Boolean), presentation.action);
+            setSyncState(presentation.level === 'warn' ? 'warn' : 'error', presentation.level === 'warn' ? 'Tertunda' : 'Gagal');
+            updateSyncDot(false);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+        }
+    };
+
+    window.runSyncReleasedSettlements = async function () {
+        const storeId = getSyncStoreId();
+        if (!storeId) {
+            alert('Pilih toko dulu sebelum menarik tanggal cair.');
+            return;
+        }
+
+        const selectedStore = stores.find(store => String(store.id) === String(storeId));
+        if (selectedStore && !isShopeeStore(selectedStore)) {
+            alert('Penarikan tanggal cair via Escrow List hanya berlaku untuk Shopee. TikTok memakai settlement status otomatis.');
+            return;
+        }
+
+        const btn = $('runSyncReleasedBtn');
+        if (!btn || btn.disabled) return;
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menarik…';
+        hideSyncFeedback();
+        setSyncState('running', 'Tgl Cair');
+        updateSyncDot(true);
+
+        try {
+            const result = await api('/api/marketplace/stores/' + storeId + '/sync-released-settlements', {
+                method: 'POST',
+                body: JSON.stringify({ days: 45 }),
+            });
+            showSyncFeedback('success', 'Tanggal pencairan berhasil diperbarui', result.message || 'Tanggal dana cair berhasil disinkronkan.', [
+                result.found !== undefined ? `Ditemukan: ${result.found}` : null,
+                result.updated !== undefined ? `Diperbarui cair: ${result.updated}` : null,
+                result.unmatched !== undefined ? `Tidak cocok: ${result.unmatched}` : null,
+            ].filter(Boolean));
+            setSyncState('success', 'Siap');
+            updateSyncDot(false);
+            currentPage = 1;
+            await loadSettlements();
+        } catch (error) {
+            const presentation = presentSyncError(error, 'Gagal menarik tanggal cair');
             showSyncFeedback(presentation.level, presentation.title, presentation.message, [presentation.code ? `Kode: ${presentation.code}` : null].filter(Boolean), presentation.action);
             setSyncState(presentation.level === 'warn' ? 'warn' : 'error', presentation.level === 'warn' ? 'Tertunda' : 'Gagal');
             updateSyncDot(false);

@@ -23,8 +23,10 @@ class MarketplaceFinancialQualityUiTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Pemeriksaan Data Keuangan Marketplace')
-            ->assertSee('Cek tanpa menyimpan')
-            ->assertSee('Periksa dan simpan hasil', false)
+            ->assertSee('Jalankan audit')
+            ->assertSee('Kesiapan posting akuntansi')
+            ->assertSee('Siap posting')
+            ->assertDontSee('Cek tanpa menyimpan')
             ->assertSee(route('marketplace.reports.financial-quality'), false);
     }
 
@@ -242,6 +244,64 @@ class MarketplaceFinancialQualityUiTest extends TestCase
 
         $this->assertSame('incomplete', $order->fresh()->financial_data_status);
         $this->assertSame('settlement_missing', $order->fresh()->financial_issue_reason);
+    }
+
+    public function test_refresh_flashes_success_notification(): void
+    {
+        $store = $this->store();
+
+        $this->actingAs($this->owner())
+            ->post(route('marketplace.reports.financial-quality.refresh'), [
+                'store_id' => (string) $store->id,
+                'dry_run' => '0',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success')
+            ->assertSessionHas('quality_result');
+    }
+
+    public function test_status_endpoint_returns_audit_status(): void
+    {
+        $store = $this->store();
+
+        \Illuminate\Support\Facades\Cache::put(
+            MarketplaceRefreshDataQualityJob::cacheKey((string) $store->id),
+            [
+                'status' => 'processing',
+                'store_id' => (string) $store->id,
+                'message' => 'Sedang memeriksa data: 10/20 order selesai...',
+                'processed_orders' => 10,
+                'total_orders' => 20,
+            ]
+        );
+
+        $this->actingAs($this->owner())
+            ->get(route('marketplace.reports.financial-quality.status', ['store_id' => $store->id]))
+            ->assertOk()
+            ->assertJson([
+                'status' => 'processing',
+                'store_id' => (string) $store->id,
+                'processed_orders' => 10,
+            ]);
+    }
+
+    public function test_process_now_runs_and_returns_success(): void
+    {
+        $store = $this->store();
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'UI-PROC-NOW-001',
+            'channel_order_id' => 'UI-PROC-NOW-001',
+            'order_date' => now(),
+            'order_status' => 'COMPLETED',
+        ]);
+
+        $this->actingAs($this->owner())
+            ->post(route('marketplace.reports.financial-quality.process-now'), [
+                'store_id' => (string) $store->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
     }
 
     private function owner()

@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\InventoryStock;
+use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\OrderFulfillment;
 use App\Models\OrderFulfillmentLine;
 use App\Models\SkuMapping;
+use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +24,7 @@ class SkuMappingPropagationService
     public function __construct(
         private readonly MarketplaceIssueService $issueService,
         private readonly AdItemMapper $adItemMapper,
+        private readonly MarketplaceFinancialDataQualityService $qualityService,
     ) {}
 
     /**
@@ -45,6 +48,7 @@ class SkuMappingPropagationService
 
         $skuValues = $keys->pluck('marketplace_sku')->unique()->values();
         $orderItems = $this->resolveOrderItems($keys, $skuValues);
+        $this->refreshOrderQuality($orderItems);
         $fulfillmentLines = $this->syncPendingFulfillmentLines($orderItems, $skuValues);
         $adCampaigns = $this->refreshAdCampaigns($orderItems);
 
@@ -96,6 +100,41 @@ class SkuMappingPropagationService
         }
 
         return $resolved;
+    }
+
+    /**
+     * Mapping/HPP pada order item adalah sumber penilaian parent order.
+     * Refresh parent setelah propagasi agar alasan issue lama tidak tertinggal
+     * walaupun item sudah valid.
+     */
+    private function refreshOrderQuality(Collection $orderItems): void
+    {
+        $orderIds = $orderItems
+            ->map(fn (MarketplaceOrderItem $item) => ($item->order ?: $item->legacyOrder)?->getKey())
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($orderIds->isEmpty()) {
+            return;
+        }
+
+        try {
+            MarketplaceOrder::query()
+                ->whereIn('id', $orderIds)
+                ->with(['settlement', 'items'])
+                ->chunkById(100, function ($orders): void {
+                    foreach ($orders as $order) {
+                        try {
+                            $this->qualityService->refreshOrder($order);
+                        } catch (\Throwable $e) {
+                            Log::warning("Refresh kualitas order #{$order->id} setelah propagasi mapping gagal: {$e->getMessage()}");
+                        }
+                    }
+                });
+        } catch (\Throwable $e) {
+            Log::warning('Refresh kualitas parent order setelah propagasi mapping gagal: '.$e->getMessage());
+        }
     }
 
     private function syncPendingFulfillmentLines(Collection $orderItems, Collection $skuValues): int

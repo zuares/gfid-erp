@@ -817,6 +817,83 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('ORDER-TO-REKON-001', false);
     }
 
+    public function test_shipment_detail_shows_marketplace_link_status_per_order(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $shipment = Shipment::create([
+            'code' => 'SHP-DETAIL-LINK-STATUS-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'order_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        $marketplaceOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-DETAIL-LINKED-001',
+            'channel_order_id' => 'ORDER-DETAIL-LINKED-001',
+            'order_status' => 'SHIPPED',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $marketplaceOrder->id,
+            'marketplace_order_id' => $marketplaceOrder->id,
+            'item_id' => $item->id,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'item_sku' => $item->code,
+            'model_sku' => $item->code,
+            'qty' => 3,
+        ]);
+        $fulfillment = OrderFulfillment::create([
+            'marketplace_order_id' => $marketplaceOrder->id,
+            'status' => OrderFulfillment::STATUS_DRAFT,
+        ]);
+        $linkedScan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => 'ORDER-DETAIL-LINKED-001',
+            'fulfillment_id' => $fulfillment->id,
+            'status' => 'pending',
+            'source' => 'scanner',
+        ]);
+        $unlinkedScan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => 'ORDER-DETAIL-UNLINKED-001',
+            'status' => 'pending',
+            'source' => 'scanner',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $linkedScan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $unlinkedScan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 2,
+            'allocated_qty' => 2,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.show', $shipment))
+            ->assertOk()
+            ->assertSee('data-link-status="linked"', false)
+            ->assertSee('data-link-status="unlinked"', false)
+            ->assertSee('sd-badge linked', false)
+            ->assertSee('sd-badge unlinked', false)
+            ->assertSee('Tertaut')
+            ->assertSee('Belum Tertaut')
+            ->assertSee('data-order-qty="3"', false)
+            ->assertSee('data-scanned-qty="1"', false)
+            ->assertSee('data-qty-difference="-2"', false)
+            ->assertSee('Ringkasan qty order', false)
+            ->assertSee('Shipment Test Store');
+    }
+
     public function test_confirmation_marks_per_order_item_and_quantity_differences_for_review(): void
     {
         [$user, $store, $scannedItem] = $this->shipmentContext();
