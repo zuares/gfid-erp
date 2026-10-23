@@ -15,6 +15,11 @@ return [
     'finance_pilot_store_name' => env('MARKETPLACE_FINANCE_PILOT_STORE_NAME', 'Greatfit.id'),
     'finance_pilot_sync_enabled' => (bool) env('MARKETPLACE_FINANCE_PILOT_SYNC_ENABLED', false),
 
+    // Order-only ledger sync is independent from payout/bank reconciliation.
+    // It only imports the three legacy order sources for one exact store name.
+    'finance_order_sync_store_name' => env('MARKETPLACE_FINANCE_ORDER_SYNC_STORE_NAME', 'Greatfit.id'),
+    'finance_order_sync_enabled' => (bool) env('MARKETPLACE_FINANCE_ORDER_SYNC_ENABLED', false),
+
     // Ads dashboard menyimpan spend sebelum pajak. Jadikan configurable agar
     // laporan profit tidak mengunci aturan pajak di source code.
     'ads_vat_percent' => (float) env('MARKETPLACE_ADS_VAT_PERCENT', 11),

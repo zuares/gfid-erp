@@ -221,6 +221,19 @@ Schedule::call(fn () => Artisan::call('marketplace:finance-pilot-sync', [
     ->name('sync-greatfit-finance-ledger-pilot')
     ->withoutOverlapping();
 
+// Finance order-only: salin settlement/income per order yang sudah tersedia
+// secara lokal ke ledger Finance baru. Jalur ini sengaja tidak membaca payout,
+// tidak membuat settlement/alokasi bank, dan tidak mem-posting jurnal.
+Schedule::command('marketplace:finance-order-sync', [
+    '--store' => config('marketplace.finance_order_sync_store_name'),
+    '--apply' => true,
+    '--trigger' => 'schedule',
+])
+    ->cron('13,28,43,58 * * * *')
+    ->when(fn (): bool => (bool) config('marketplace.finance_order_sync_enabled'))
+    ->name('sync-greatfit-finance-orders')
+    ->withoutOverlapping(30);
+
 // Biaya iklan wallet Shopee adalah sumber subledger terpisah dari order,
 // settlement, dan HPP. Ambil rolling 15 hari agar koreksi transaksi terbaru
 // ikut tersinkron; service memecah rentang yang lebih panjang saat backfill.
