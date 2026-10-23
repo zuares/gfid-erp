@@ -83,6 +83,7 @@ use App\Http\Controllers\Marketplace\MarketplaceAnalyticsController;
 use App\Http\Controllers\Marketplace\MarketplaceSalesDashboardController;
 use App\Http\Controllers\Marketplace\ShopeeShopPerformanceController;
 use App\Http\Controllers\Marketplace\ShopeeTransactionController;
+use App\Http\Controllers\Marketplace\TikTokFinancialTransactionController;
 
 // Marketplace — halaman
 Route::middleware(['auth', 'access:marketplace'])->group(function () {
@@ -109,6 +110,7 @@ Route::middleware(['auth', 'access:marketplace'])->group(function () {
     Route::get('/marketplace/escrow', [EscrowController::class, 'index'])->name('marketplace.escrow');
     Route::get('/marketplace/payout', [PayoutController::class, 'index'])->name('marketplace.payout');
     Route::get('/marketplace/shopee-transactions', [ShopeeTransactionController::class, 'index'])->name('marketplace.shopee.transactions');
+    Route::get('/marketplace/tiktok-financial-transactions', [TikTokFinancialTransactionController::class, 'index'])->name('marketplace.tiktok.financial-transactions');
     Route::get('/marketplace/penghasilan/produk', [MarketplaceFinanceController::class, 'incomeProducts'])->name('marketplace.income-detail.products');
     Route::get('/marketplace/profit',      [MarketplaceFinanceController::class, 'profit'])->name('marketplace.profit');
     Route::get('/marketplace/ads',         [MarketplaceController::class, 'ads'])->name('marketplace.ads');
@@ -172,6 +174,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::post('/stores/{store}/sync-payouts', [PayoutController::class, 'sync'])->name('marketplace.api.sync-payouts');
     Route::get('/stores/{store}/shopee-transactions', [ShopeeTransactionController::class, 'data'])->name('marketplace.api.shopee-transactions');
     Route::get('/stores/{store}/shopee-transactions/export', [ShopeeTransactionController::class, 'export'])->name('marketplace.api.shopee-transactions.export');
+    Route::get('/stores/{store}/tiktok-financial-transactions', [TikTokFinancialTransactionController::class, 'data'])->name('marketplace.api.tiktok-financial-transactions');
+    Route::get('/stores/{store}/tiktok-financial-transactions/export', [TikTokFinancialTransactionController::class, 'export'])->name('marketplace.api.tiktok-financial-transactions.export');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/sync-orders-background', [MarketplaceController::class, 'syncOrdersBackground'])

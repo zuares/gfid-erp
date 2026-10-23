@@ -110,6 +110,7 @@
     $hasMarketplaceEscrow = $router->has('marketplace.escrow');
     $hasMarketplacePayout = $router->has('marketplace.payout');
     $hasMarketplaceShopeeTransactions = $router->has('marketplace.shopee.transactions');
+    $hasMarketplaceTikTokFinancialTransactions = $router->has('marketplace.tiktok.financial-transactions');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
@@ -267,6 +268,7 @@
         $hasMarketplacePickingBarang = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
         $hasMarketplacePencairanDana = $hasMarketplaceProfit = $hasMarketplaceAds = false;
         $hasMarketplaceAnalytics = $hasMarketplaceIssues = $hasMarketplaceShopeeApiLogs = false;
+        $hasMarketplaceTikTokFinancialTransactions = false;
         $hasMarketplaceSalesDashboard = false;
         $hasMarketplaceIndex = $hasMarketplaceCreate = $hasMarketplaceShow = false;
         $hasMarketplaceSalesReport = $hasMarketplaceSalesExport = false;
@@ -2114,6 +2116,7 @@
                 $hasMarketplaceEscrow,
                 $hasMarketplacePayout,
                 $hasMarketplaceShopeeTransactions,
+                $hasMarketplaceTikTokFinancialTransactions,
                 $hasMarketplaceProfit,
                 $hasMarketplaceFinance,
                 $hasMarketplaceSalesReport,
@@ -2276,7 +2279,7 @@
                             </div>
                         @endif
 
-                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceShopeeTransactions || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
+                        @if ($hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceShopeeTransactions || $hasMarketplaceTikTokFinancialTransactions || $hasMarketplaceProfit || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialClosing || $hasMarketplaceSalesReport || $hasMarketplaceAmsPerformance || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceFinancialQuality || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceFinance)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceFinanceGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerFinance"
                                 aria-expanded="{{ $openMarketplaceFinanceGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerFinance">
@@ -2348,6 +2351,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.shopee.transactions') }}" icon="bi bi-arrow-left-right"
                                 :active="request()->routeIs('marketplace.shopee.transactions')">
                                 Mutasi Wallet
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceTikTokFinancialTransactions)
+                            <x-sidebar.sub-link href="{{ route('marketplace.tiktok.financial-transactions') }}" icon="bi bi-cash-stack"
+                                :active="request()->routeIs('marketplace.tiktok.financial-transactions')">
+                                Transaksi Finansial TikTok
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceProfit)

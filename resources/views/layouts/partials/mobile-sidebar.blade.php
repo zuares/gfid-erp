@@ -428,6 +428,7 @@
     $hasMarketplaceEscrow = $router->has('marketplace.escrow');
     $hasMarketplacePayout = $router->has('marketplace.payout');
     $hasMarketplaceShopeeTransactions = $router->has('marketplace.shopee.transactions');
+    $hasMarketplaceTikTokFinancialTransactions = $router->has('marketplace.tiktok.financial-transactions');
     $hasMarketplaceProfit = $router->has('marketplace.profit');
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
@@ -574,6 +575,7 @@
         $hasMarketplacePickingBarang = $hasMarketplaceSkuMapping = $hasMarketplaceSync = false;
         $hasMarketplacePencairanDana = $hasMarketplaceProfit = $hasMarketplaceAds = false;
         $hasMarketplaceAnalytics = $hasMarketplaceIssues = $hasMarketplaceShopeeApiLogs = false;
+        $hasMarketplaceTikTokFinancialTransactions = false;
         $hasMarketplaceSalesDashboard = false;
         $hasMarketplaceIndex = $hasMarketplaceSalesReport = false;
         $hasMarketplaceReconcileQueue = $hasMarketplaceReconcileItemsIndex = false;
@@ -1976,7 +1978,7 @@
                     @endif
 
                     {{-- SALES & MARKETPLACE --}}
-                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceShopeeTransactions || $hasMarketplaceProfit || $hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
+                    @if ($hasMarketplaceToko || $hasMarketplaceOrders || $hasMarketplaceCreate || $hasMarketplacePemenuhan || $hasMarketplacePickingBarang || $hasMarketplaceSkuMapping || $hasMarketplaceSync || $hasMarketplacePencairanDana || $hasMarketplaceIncomeDetail || $hasMarketplaceEscrow || $hasMarketplacePayout || $hasMarketplaceShopeeTransactions || $hasMarketplaceTikTokFinancialTransactions || $hasMarketplaceProfit || $hasMarketplaceSalesReport || $hasMarketplaceSalesDashboard || $hasMarketplaceShopeePerformance || $hasMarketplaceProfitReport || $hasMarketplaceFinancialStatement || $hasMarketplaceFinancialQuality || $hasMarketplaceFinance || $hasMarketplaceAds || $hasMarketplaceAnalytics || $hasMarketplaceIssues || $hasMarketplaceShopeeApiLogs || $hasImportMarketplaceIndex || $hasImportMarketplaceDraft || $hasImportMarketplaceIncomeIndex || $hasImportMarketplaceIncomeDraft)
                     <div class="mobile-sidebar-section-label">Toko Online</div>
                     <li class="mb-1">
                         <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $marketplaceOpen ? 'is-open' : '' }}"
@@ -2149,6 +2151,12 @@
                                 <a href="{{ route('marketplace.shopee.transactions') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.shopee.transactions') ? 'active' : '' }}">
                                     <span class="icon">🔄</span><span>Mutasi Wallet</span>
+                                </a>
+                            @endif
+                            @if ($hasMarketplaceTikTokFinancialTransactions)
+                                <a href="{{ route('marketplace.tiktok.financial-transactions') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.tiktok.financial-transactions') ? 'active' : '' }}">
+                                    <span class="icon">💸</span><span>Transaksi Finansial TikTok</span>
                                 </a>
                             @endif
 

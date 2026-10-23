@@ -716,6 +716,35 @@ class TikTokShopChannel implements MarketplaceChannel
     }
 
     /**
+     * Ambil transaksi finansial level akun seller.
+     *
+     * Endpoint ini berbeda dari statement per order: hasilnya berisi mutasi
+     * akun seperti WITHDRAW, SETTLE, TRANSFER, REVERSE, PAYMENT, dan REFUND.
+     */
+    public function getSellerFinancialTransactions(
+        Store $store,
+        int $createTimeFrom,
+        int $createTimeTo,
+        array $types,
+        string $pageToken = '',
+        int $pageSize = 100,
+    ): array {
+        $pageSize = max(1, min($pageSize, 100));
+        $types = array_values(array_filter(array_map(
+            static fn (mixed $type): string => strtoupper(trim((string) $type)),
+            $types,
+        )));
+
+        return $this->get($store, '/finance/202309/withdrawals', array_filter([
+            'create_time_ge' => $createTimeFrom,
+            'create_time_lt' => $createTimeTo,
+            'types' => implode(',', $types),
+            'page_size' => $pageSize,
+            'page_token' => $pageToken !== '' ? $pageToken : null,
+        ], static fn (mixed $value): bool => $value !== null && $value !== ''));
+    }
+
+    /**
      * Ambil daftar statement seller dalam rentang waktu tertentu.
      * Statement endpoint dipakai sebagai sumber biaya GMV Max yang benar-benar
      * dipotong dari settlement, bukan sebagai pengganti report performa iklan.
