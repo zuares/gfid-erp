@@ -138,9 +138,11 @@ class SupplierController extends Controller
 
         $supplier = Supplier::create($data);
 
-        return redirect()
-            ->route('master.suppliers.show', $supplier)
-            ->with('success', 'Supplier berhasil dibuat.');
+        $redirect = $request->boolean('supplier_modal')
+            ? redirect()->route('master.suppliers.index')
+            : redirect()->route('master.suppliers.show', $supplier);
+
+        return $redirect->with('success', 'Supplier berhasil dibuat.');
     }
 
     public function show(Supplier $supplier): View
@@ -189,9 +191,11 @@ class SupplierController extends Controller
 
         $supplier->update($data);
 
-        return redirect()
-            ->route('master.suppliers.show', $supplier)
-            ->with('success', 'Supplier berhasil diperbarui.');
+        $redirect = $request->boolean('supplier_modal')
+            ? redirect()->route('master.suppliers.index')
+            : redirect()->route('master.suppliers.show', $supplier);
+
+        return $redirect->with('success', 'Supplier berhasil diperbarui.');
     }
 
     public function destroy(Supplier $supplier): RedirectResponse

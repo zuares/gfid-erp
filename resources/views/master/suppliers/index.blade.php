@@ -11,6 +11,10 @@
     $poType = $poType ?? request('po_type', '');
     $hasFilter = filled($q ?? request('q')) || filled($poType);
     $poLabels = ['material' => 'Bahan Baku', 'finished_good' => 'Barang Jadi', 'packing' => 'Packing'];
+    $oldPoTypes = (array) old('po_types', []);
+    $modalShouldOpen = old('supplier_modal') === '1' && in_array(old('supplier_modal_mode'), ['create', 'edit'], true);
+    $modalMode = old('supplier_modal_mode', 'create');
+    $modalSupplierId = (int) old('supplier_modal_id', 0);
 @endphp
 
 @push('head')
@@ -47,6 +51,46 @@
         .supplier-btn-primary:hover,
         .supplier-btn-primary:focus-visible { color: #fff; border-color: var(--supplier-brand-strong); background: var(--supplier-brand-strong); }
         .supplier-btn-sm { min-height: 36px; padding: .48rem .7rem; font-size: .69rem; }
+        .supplier-btn > i, .supplier-btn > span { color: inherit; }
+
+        .supplier-modal .modal-content { overflow: hidden; border: 1px solid var(--supplier-line); border-radius: 18px; color: var(--supplier-text); background: var(--supplier-surface); box-shadow: 0 24px 70px rgba(16, 24, 40, .22); }
+        .supplier-modal .modal-header { display: grid; grid-template-columns: 42px minmax(0, 1fr) 40px; align-items: start; gap: .8rem; padding: 1.05rem 1.1rem; border-bottom: 1px solid var(--supplier-line); background: linear-gradient(135deg, color-mix(in srgb, var(--supplier-brand) 9%, var(--supplier-surface)), var(--supplier-surface)); }
+        .supplier-modal-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 13px; color: #fff; background: var(--supplier-brand); box-shadow: 0 8px 18px rgba(91, 92, 226, .22); font-size: 1rem; }
+        .supplier-modal-kicker { margin-bottom: .18rem; color: var(--supplier-brand-strong); font-size: .62rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+        .supplier-modal-title { margin: 0; color: var(--supplier-text); font-size: 1.05rem; font-weight: 900; letter-spacing: -.03em; }
+        .supplier-modal-subtitle { margin: .2rem 0 0; color: var(--supplier-muted); font-size: .72rem; line-height: 1.45; }
+        .supplier-modal .btn-close { width: 40px; height: 40px; margin: -.2rem -.25rem 0 0; border-radius: 10px; opacity: .7; }
+        .supplier-modal .btn-close:hover, .supplier-modal .btn-close:focus { opacity: 1; background-color: color-mix(in srgb, var(--supplier-brand) 10%, transparent); box-shadow: none; }
+        .supplier-modal .modal-body { padding: 1.05rem 1.1rem; }
+        .supplier-modal-form { display: grid; gap: .9rem; }
+        .supplier-modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+        .supplier-modal-field { display: grid; gap: .32rem; min-width: 0; }
+        .supplier-modal-field-full { grid-column: 1 / -1; }
+        .supplier-modal-label { color: var(--supplier-muted); font-size: .66rem; font-weight: 850; letter-spacing: .045em; text-transform: uppercase; }
+        .supplier-modal-label span { color: #b42318; }
+        .supplier-modal-control { width: 100%; min-height: 44px; padding: .62rem .72rem; border: 1px solid var(--supplier-line); border-radius: 10px; color: var(--supplier-text); background: var(--supplier-surface); box-shadow: none; font: inherit; font-size: .82rem; }
+        .supplier-modal-control:focus { border-color: var(--supplier-brand); box-shadow: 0 0 0 .2rem rgba(91, 92, 226, .12); }
+        .supplier-modal-control::placeholder { color: var(--supplier-muted); opacity: .82; }
+        textarea.supplier-modal-control { min-height: 92px; resize: vertical; }
+        .supplier-modal-help { color: var(--supplier-muted); font-size: .66rem; line-height: 1.4; }
+        .supplier-modal-section { display: grid; gap: .7rem; padding: .85rem; border: 1px solid var(--supplier-line); border-radius: 13px; background: color-mix(in srgb, var(--supplier-soft) 55%, var(--supplier-surface) 45%); }
+        .supplier-modal-section-title { display: flex; align-items: center; gap: .4rem; color: var(--supplier-text); font-size: .75rem; font-weight: 850; }
+        .supplier-modal-section-title i { color: var(--supplier-brand-strong); }
+        .supplier-modal-checks { display: flex; flex-wrap: wrap; gap: .45rem; }
+        .supplier-modal-check { display: inline-flex; align-items: center; gap: .42rem; min-height: 42px; padding: .45rem .65rem; border: 1px solid var(--supplier-line); border-radius: 10px; color: var(--supplier-text); background: var(--supplier-surface); font-size: .73rem; font-weight: 750; cursor: pointer; }
+        .supplier-modal-check:has(input:checked) { border-color: color-mix(in srgb, var(--supplier-brand) 48%, var(--supplier-line)); color: var(--supplier-brand-strong); background: color-mix(in srgb, var(--supplier-brand) 9%, var(--supplier-surface)); }
+        .supplier-modal-check input { width: 17px; height: 17px; margin: 0; accent-color: var(--supplier-brand); }
+        .supplier-modal-errors { display: grid; gap: .3rem; padding: .7rem .8rem; border: 1px solid #fecdca; border-radius: 11px; color: #b42318; background: #fef3f2; font-size: .72rem; line-height: 1.4; }
+        .supplier-modal-errors:empty { display: none; }
+        .supplier-modal .modal-footer { display: flex; justify-content: flex-end; gap: .5rem; padding: .85rem 1.1rem; border-top: 1px solid var(--supplier-line); background: var(--supplier-surface); }
+        .supplier-modal .modal-footer .supplier-btn { min-width: 112px; }
+        .supplier-modal .modal-footer .supplier-btn-primary { color: #fff; }
+        .supplier-modal .supplier-btn-primary[aria-busy="true"] { cursor: wait; }
+        .supplier-spin { animation: supplier-spin .8s linear infinite; }
+        @keyframes supplier-spin { to { transform: rotate(360deg); } }
+        body[data-theme="dark"] .supplier-modal .modal-content { box-shadow: 0 24px 70px rgba(0, 0, 0, .46); }
+        body[data-theme="dark"] .supplier-modal .modal-header { background: linear-gradient(135deg, rgba(91, 92, 226, .18), var(--supplier-surface)); }
+        body[data-theme="dark"] .supplier-modal-errors { color: #fda4af; border-color: rgba(244,63,94,.4); background: rgba(159,18,57,.2); }
 
         .supplier-alert { display: flex; align-items: flex-start; gap: .55rem; margin: 0; padding: .72rem .85rem; border: 1px solid; border-radius: 12px; font-size: .76rem; line-height: 1.45; }
         .supplier-alert-success { color: #067647; border-color: #abefc6; background: #ecfdf3; }
@@ -115,7 +159,7 @@
         .supplier-status::before { width: 5px; height: 5px; border-radius: 50%; background: currentColor; content: ''; }
         .supplier-status-active { color: #067647; border-color: #abefc6; background: #ecfdf3; }
         .supplier-status-inactive { color: #b42318; border-color: #fecdca; background: #fef3f2; }
-        .supplier-actions-cell { display: flex; justify-content: flex-end; align-items: center; gap: .35rem; min-width: 96px; }
+        .supplier-actions-cell { display: flex; justify-content: flex-end; align-items: center; gap: .35rem; min-width: 142px; }
         .supplier-empty { display: grid; place-items: center; min-height: 210px; padding: 1.25rem; text-align: center; }
         .supplier-empty-icon { display: grid; width: 42px; height: 42px; place-items: center; margin-bottom: .55rem; border-radius: 13px; color: var(--supplier-brand-strong); background: #eeefff; font-size: 1.1rem; }
         .supplier-empty-title { color: var(--supplier-text); font-size: .85rem; font-weight: 850; }
@@ -131,6 +175,7 @@
         .supplier-mobile-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem .8rem; padding-top: .75rem; border-top: 1px solid var(--supplier-line); }
         .supplier-mobile-details dt { color: var(--supplier-muted); font-size: .59rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
         .supplier-mobile-details dd { margin: .16rem 0 0; overflow-wrap: anywhere; color: var(--supplier-text); font-size: .69rem; line-height: 1.4; }
+        .supplier-mobile-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .45rem; }
         .supplier-mobile-action { width: 100%; min-height: 44px; }
         .supplier-footer { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .85rem 1.15rem; border-top: 1px solid var(--supplier-line); }
         .supplier-footer-copy { color: var(--supplier-muted); font-size: .7rem; }
@@ -171,6 +216,13 @@
             .supplier-list-panel .gf-panel-body { padding: 0 !important; }
             .supplier-table-wrap, .supplier-table-scroll-hint { display: none; }
             .supplier-mobile-list { display: block; }
+            .supplier-modal .modal-dialog { margin: .5rem; }
+            .supplier-modal .modal-content { border-radius: 15px; }
+            .supplier-modal .modal-header, .supplier-modal .modal-body, .supplier-modal .modal-footer { padding: .85rem; }
+            .supplier-modal-grid { grid-template-columns: 1fr; }
+            .supplier-modal-field-full { grid-column: auto; }
+            .supplier-modal .modal-footer { display: grid; grid-template-columns: 1fr; }
+            .supplier-modal .modal-footer .supplier-btn { width: 100%; }
             .supplier-footer { align-items: flex-start; flex-direction: column; padding: .85rem; }
             .supplier-footer > :last-child { width: 100%; overflow-x: auto; }
         }
@@ -186,17 +238,17 @@
     <x-gf.page class="supplier-page" eyebrow="Master Data · Purchasing" title="Suppliers" description="Kelola data supplier, kontak, status aktif, dan mapping item pembelian.">
         <x-slot:actions>
             <div class="supplier-actions">
-                <a href="{{ route('master.suppliers.create') }}" class="supplier-btn supplier-btn-primary">
+                <button type="button" class="supplier-btn supplier-btn-primary" data-supplier-create>
                     <i class="bi bi-plus-lg" aria-hidden="true"></i>
                     <span>Tambah Supplier</span>
-                </a>
+                </button>
             </div>
         </x-slot:actions>
 
         @if (session('success'))
             <div class="supplier-alert supplier-alert-success" role="status"><i class="bi bi-check-circle" aria-hidden="true"></i><span>{{ session('success') }}</span></div>
         @endif
-        @if ($errors->any())
+        @if ($errors->any() && !$modalShouldOpen)
             <div class="supplier-alert supplier-alert-danger" role="alert"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i><span>{{ $errors->first() }}</span></div>
         @endif
 
@@ -234,7 +286,7 @@
                 <div class="supplier-table-scroll-hint"><i class="bi bi-arrows-expand" aria-hidden="true"></i><span>Geser tabel untuk melihat kolom dan aksi lainnya.</span></div>
                 <div class="supplier-table-wrap">
                     <table class="table supplier-table">
-                        <thead><tr><th style="width:56px;" class="text-center">No.</th><th style="width:120px;">Kode</th><th>Supplier</th><th style="width:190px;">Kontak</th><th style="width:175px;">Jenis PO</th><th style="width:115px;">Status</th><th style="width:96px;" class="text-end">Aksi</th></tr></thead>
+                        <thead><tr><th style="width:56px;" class="text-center">No.</th><th style="width:120px;">Kode</th><th>Supplier</th><th style="width:190px;">Kontak</th><th style="width:175px;">Jenis PO</th><th style="width:115px;">Status</th><th style="width:142px;" class="text-end">Aksi</th></tr></thead>
                         <tbody>
                             @foreach ($suppliers as $s)
                                 @php $banks = $s->bankAccounts ?? collect(); $poTypes = $s->po_types ?? []; @endphp
@@ -245,7 +297,17 @@
                                     <td><div class="supplier-contact"><span class="supplier-name">{{ $s->phone ?: 'Kontak belum diisi' }}</span>@if ($s->email)<span class="supplier-muted">{{ $s->email }}</span>@endif @foreach ($banks as $bk)<span class="supplier-bank"><strong>{{ $bk->bank_name }}</strong> {{ $bk->account_number }}</span>@endforeach</div></td>
                                     <td>@if (empty($poTypes))<span class="supplier-pill supplier-pill-all">Semua jenis</span>@else<div class="supplier-pills">@foreach ($poTypes as $pt)<span class="supplier-pill supplier-pill-{{ $pt === 'material' ? 'material' : ($pt === 'packing' ? 'packing' : 'finished') }}">{{ $poLabels[$pt] ?? $pt }}</span>@endforeach</div>@endif</td>
                                     <td><span class="supplier-status {{ (int) $s->active === 1 ? 'supplier-status-active' : 'supplier-status-inactive' }}">{{ (int) $s->active === 1 ? 'Aktif' : 'Nonaktif' }}</span></td>
-                                    <td><div class="supplier-actions-cell"><a href="{{ route('master.suppliers.show', $s) }}" class="supplier-btn supplier-btn-sm" aria-label="Buka detail {{ $s->name }}">Detail</a></div></td>
+                                    <td><div class="supplier-actions-cell"><button type="button" class="supplier-btn supplier-btn-sm" data-supplier-edit
+                                            data-id="{{ $s->id }}"
+                                            data-action="{{ route('master.suppliers.update', $s) }}"
+                                            data-code="{{ $s->code }}"
+                                            data-name="{{ $s->name }}"
+                                            data-phone="{{ $s->phone }}"
+                                            data-email="{{ $s->email }}"
+                                            data-active="{{ (int) $s->active }}"
+                                            data-address="{{ $s->address }}"
+                                            data-po-types="{{ implode(',', $poTypes) }}"
+                                            aria-label="Edit {{ $s->name }}">Edit</button><a href="{{ route('master.suppliers.show', $s) }}" class="supplier-btn supplier-btn-sm" aria-label="Buka detail {{ $s->name }}">Detail</a></div></td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -263,12 +325,22 @@
                                 <div><dt>Alamat</dt><dd>{{ $s->address ?: 'Belum diisi' }}</dd></div>
                                 <div><dt>Rekening</dt><dd>@if ($banks->isNotEmpty()){{ $banks->first()->bank_name }} · {{ $banks->first()->account_number }}@if ($banks->count() > 1) <span class="supplier-muted">+{{ $banks->count() - 1 }}</span>@endif @else Belum diisi @endif</dd></div>
                             </dl>
-                            <a href="{{ route('master.suppliers.show', $s) }}" class="supplier-btn supplier-btn-primary supplier-mobile-action"><i class="bi bi-arrow-right" aria-hidden="true"></i><span>Buka detail supplier</span></a>
+                            <div class="supplier-mobile-actions"><button type="button" class="supplier-btn supplier-btn-sm" data-supplier-edit
+                                    data-id="{{ $s->id }}"
+                                    data-action="{{ route('master.suppliers.update', $s) }}"
+                                    data-code="{{ $s->code }}"
+                                    data-name="{{ $s->name }}"
+                                    data-phone="{{ $s->phone }}"
+                                    data-email="{{ $s->email }}"
+                                    data-active="{{ (int) $s->active }}"
+                                    data-address="{{ $s->address }}"
+                                    data-po-types="{{ implode(',', $poTypes) }}"
+                                    aria-label="Edit {{ $s->name }}"><i class="bi bi-pencil" aria-hidden="true"></i><span>Edit</span></button><a href="{{ route('master.suppliers.show', $s) }}" class="supplier-btn supplier-btn-primary supplier-mobile-action"><i class="bi bi-arrow-right" aria-hidden="true"></i><span>Buka detail supplier</span></a></div>
                         </article>
                     @endforeach
                 </div>
             @else
-                <div class="supplier-empty"><div class="supplier-empty-icon"><i class="bi bi-truck" aria-hidden="true"></i></div><div class="supplier-empty-title">Belum ada supplier yang cocok.</div><div class="supplier-empty-text">Tambah supplier baru untuk mulai mapping item dan harga pembelian.</div><a href="{{ route('master.suppliers.create') }}" class="supplier-btn supplier-btn-primary supplier-btn-sm">Tambah supplier</a></div>
+                <div class="supplier-empty"><div class="supplier-empty-icon"><i class="bi bi-truck" aria-hidden="true"></i></div><div class="supplier-empty-title">Belum ada supplier yang cocok.</div><div class="supplier-empty-text">Tambah supplier baru untuk mulai mapping item dan harga pembelian.</div><button type="button" class="supplier-btn supplier-btn-primary supplier-btn-sm" data-supplier-create>Tambah supplier</button></div>
             @endif
 
             <div class="supplier-footer">
@@ -276,6 +348,81 @@
                 <div class="ms-auto">{{ $suppliers->links() }}</div>
             </div>
         </x-gf.panel>
+
+        <div class="modal fade supplier-modal" id="supplierFormModal" tabindex="-1" aria-labelledby="supplierFormModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="supplier-modal-icon" aria-hidden="true"><i class="bi bi-buildings"></i></div>
+                        <div>
+                            <div class="supplier-modal-kicker">Master supplier</div>
+                            <h2 class="supplier-modal-title" id="supplierFormModalTitle">Tambah supplier</h2>
+                            <p class="supplier-modal-subtitle" id="supplierFormModalSubtitle">Lengkapi identitas dan preferensi pembelian supplier.</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup modal"></button>
+                    </div>
+                    <form id="supplierForm" class="supplier-modal-form" method="POST" action="{{ route('master.suppliers.store') }}">
+                        @csrf
+                        <input type="hidden" name="supplier_modal" value="1">
+                        <input type="hidden" name="supplier_modal_mode" id="supplierModalMode" value="{{ $modalMode }}">
+                        <input type="hidden" name="supplier_modal_id" id="supplierModalId" value="{{ $modalSupplierId ?: '' }}">
+                        <input type="hidden" name="_method" value="PUT" id="supplierFormMethod" disabled>
+                        <div class="modal-body">
+                            <div class="supplier-modal-errors" id="supplierModalErrors" role="alert" aria-live="assertive">
+                                @if ($modalShouldOpen && $errors->any())
+                                    @foreach ($errors->all() as $error)<div>{{ $error }}</div>@endforeach
+                                @endif
+                            </div>
+                            <div class="supplier-modal-section">
+                                <div class="supplier-modal-section-title"><i class="bi bi-person-vcard" aria-hidden="true"></i><span>Identitas supplier</span></div>
+                                <div class="supplier-modal-grid">
+                                    <div class="supplier-modal-field">
+                                        <label class="supplier-modal-label" for="supplierModalCode">Kode supplier <span aria-hidden="true">*</span></label>
+                                        <input class="supplier-modal-control" id="supplierModalCode" name="code" type="text" value="{{ old('code') }}" maxlength="50" required autocomplete="off" placeholder="Contoh: SUP-001">
+                                    </div>
+                                    <div class="supplier-modal-field">
+                                        <label class="supplier-modal-label" for="supplierModalName">Nama supplier <span aria-hidden="true">*</span></label>
+                                        <input class="supplier-modal-control" id="supplierModalName" name="name" type="text" value="{{ old('name') }}" maxlength="255" required autocomplete="organization" placeholder="Nama perusahaan atau pemasok">
+                                    </div>
+                                    <div class="supplier-modal-field">
+                                        <label class="supplier-modal-label" for="supplierModalPhone">Nomor telepon</label>
+                                        <input class="supplier-modal-control" id="supplierModalPhone" name="phone" type="tel" value="{{ old('phone') }}" maxlength="50" autocomplete="tel" placeholder="08xx atau nomor kantor">
+                                    </div>
+                                    <div class="supplier-modal-field">
+                                        <label class="supplier-modal-label" for="supplierModalEmail">Email</label>
+                                        <input class="supplier-modal-control" id="supplierModalEmail" name="email" type="email" value="{{ old('email') }}" maxlength="255" autocomplete="email" placeholder="email@perusahaan.com">
+                                    </div>
+                                    <div class="supplier-modal-field">
+                                        <label class="supplier-modal-label" for="supplierModalActive">Status</label>
+                                        <select class="supplier-modal-control" id="supplierModalActive" name="active">
+                                            <option value="1" @selected((string) old('active', '1') === '1')>Aktif</option>
+                                            <option value="0" @selected((string) old('active', '1') === '0')>Nonaktif</option>
+                                        </select>
+                                    </div>
+                                    <div class="supplier-modal-field supplier-modal-field-full">
+                                        <label class="supplier-modal-label" for="supplierModalAddress">Alamat</label>
+                                        <textarea class="supplier-modal-control" id="supplierModalAddress" name="address" rows="3" placeholder="Alamat lengkap supplier">{{ old('address') }}</textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="supplier-modal-section">
+                                <div class="supplier-modal-section-title"><i class="bi bi-box-seam" aria-hidden="true"></i><span>Jenis PO yang dilayani</span></div>
+                                <div class="supplier-modal-checks" aria-describedby="supplierModalPoHelp">
+                                    <label class="supplier-modal-check"><input type="checkbox" name="po_types[]" value="material" @checked(in_array('material', $oldPoTypes, true))><span>Bahan baku</span></label>
+                                    <label class="supplier-modal-check"><input type="checkbox" name="po_types[]" value="finished_good" @checked(in_array('finished_good', $oldPoTypes, true))><span>Barang jadi</span></label>
+                                    <label class="supplier-modal-check"><input type="checkbox" name="po_types[]" value="packing" @checked(in_array('packing', $oldPoTypes, true))><span>Packing</span></label>
+                                </div>
+                                <div class="supplier-modal-help" id="supplierModalPoHelp">Kosongkan jika supplier dapat digunakan untuk semua jenis PO.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="supplier-btn" data-bs-dismiss="modal">Batal</button>
+                            <button type="submit" class="supplier-btn supplier-btn-primary" id="supplierModalSubmit"><i class="bi bi-check2" aria-hidden="true"></i><span data-submit-label>Simpan supplier</span></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </x-gf.page>
 @endsection
 
@@ -306,6 +453,102 @@
             input?.addEventListener('input', function () { submitLive(); });
             input?.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); submitLive(0); } });
             form.querySelector('#filterPoType')?.addEventListener('change', function () { submitLive(0); });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalElement = document.getElementById('supplierFormModal');
+            const form = document.getElementById('supplierForm');
+            if (!modalElement || !form || !window.bootstrap?.Modal) return;
+
+            const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+            const storeAction = @json(route('master.suppliers.store'));
+            const updateRouteTemplate = @json(route('master.suppliers.update', ['supplier' => '__SUPPLIER__']));
+            const shouldReopen = @json($modalShouldOpen);
+            const initialMode = @json($modalMode);
+            const initialId = @json($modalSupplierId);
+            const title = document.getElementById('supplierFormModalTitle');
+            const subtitle = document.getElementById('supplierFormModalSubtitle');
+            const modeInput = document.getElementById('supplierModalMode');
+            const idInput = document.getElementById('supplierModalId');
+            const methodInput = document.getElementById('supplierFormMethod');
+            const submitButton = document.getElementById('supplierModalSubmit');
+            const submitLabel = submitButton?.querySelector('[data-submit-label]');
+            const codeInput = document.getElementById('supplierModalCode');
+            const nameInput = document.getElementById('supplierModalName');
+            const phoneInput = document.getElementById('supplierModalPhone');
+            const emailInput = document.getElementById('supplierModalEmail');
+            const activeInput = document.getElementById('supplierModalActive');
+            const addressInput = document.getElementById('supplierModalAddress');
+            const poInputs = [...form.querySelectorAll('input[name="po_types[]"]')];
+
+            function setHeading(isEdit, supplierName = '') {
+                if (!title || !subtitle) return;
+                title.textContent = isEdit ? 'Edit supplier' : 'Tambah supplier';
+                subtitle.textContent = isEdit
+                    ? `Perbarui data ${supplierName || 'supplier'} tanpa meninggalkan halaman daftar.`
+                    : 'Lengkapi identitas dan preferensi pembelian supplier.';
+                if (submitLabel) submitLabel.textContent = isEdit ? 'Simpan perubahan' : 'Simpan supplier';
+            }
+
+            function setFormMode(mode, supplierId = '', action = '') {
+                const isEdit = mode === 'edit';
+                form.action = isEdit ? action : storeAction;
+                if (methodInput) methodInput.disabled = !isEdit;
+                if (modeInput) modeInput.value = isEdit ? 'edit' : 'create';
+                if (idInput) idInput.value = isEdit ? supplierId : '';
+                setHeading(isEdit, nameInput?.value || '');
+            }
+
+            function clearForm() {
+                form.reset();
+                [codeInput, nameInput, phoneInput, emailInput, addressInput].forEach((input) => { if (input) input.value = ''; });
+                if (activeInput) activeInput.value = '1';
+                poInputs.forEach((input) => { input.checked = false; });
+            }
+
+            function openCreate() {
+                clearForm();
+                setFormMode('create');
+                modal.show();
+            }
+
+            function openEdit(button) {
+                clearForm();
+                if (codeInput) codeInput.value = button.dataset.code || '';
+                if (nameInput) nameInput.value = button.dataset.name || '';
+                if (phoneInput) phoneInput.value = button.dataset.phone || '';
+                if (emailInput) emailInput.value = button.dataset.email || '';
+                if (activeInput) activeInput.value = button.dataset.active === '0' ? '0' : '1';
+                if (addressInput) addressInput.value = button.dataset.address || '';
+                const selectedTypes = (button.dataset.poTypes || '').split(',').filter(Boolean);
+                poInputs.forEach((input) => { input.checked = selectedTypes.includes(input.value); });
+                setFormMode('edit', button.dataset.id || '', button.dataset.action || '');
+                modal.show();
+            }
+
+            document.querySelectorAll('[data-supplier-create]').forEach((button) => button.addEventListener('click', openCreate));
+            document.querySelectorAll('[data-supplier-edit]').forEach((button) => button.addEventListener('click', () => openEdit(button)));
+
+            form.addEventListener('submit', function () {
+                if (form.dataset.submitting === '1') return;
+                form.dataset.submitting = '1';
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.setAttribute('aria-busy', 'true');
+                    if (submitLabel) submitLabel.textContent = 'Menyimpan…';
+                    submitButton.querySelector('i')?.classList.replace('bi-check2', 'bi-arrow-repeat');
+                    submitButton.querySelector('i')?.classList.add('supplier-spin');
+                }
+            });
+
+            modalElement.addEventListener('shown.bs.modal', function () { codeInput?.focus(); });
+
+            if (shouldReopen) {
+                const isEdit = initialMode === 'edit';
+                const action = isEdit && initialId ? updateRouteTemplate.replace('__SUPPLIER__', String(initialId)) : storeAction;
+                setFormMode(isEdit ? 'edit' : 'create', isEdit ? initialId : '', action);
+                modal.show();
+            }
         });
     </script>
 @endpush
