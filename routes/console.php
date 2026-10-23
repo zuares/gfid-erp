@@ -229,7 +229,9 @@ Schedule::command('marketplace:finance-order-sync', [
     '--apply' => true,
     '--trigger' => 'schedule',
 ])
-    ->cron('13,28,43,58 * * * *')
+    // Cron hosting memanggil schedule:run tiap 5 menit, jadi event harus
+    // ditempatkan pada menit yang juga kelipatan lima.
+    ->cron('*/15 * * * *')
     ->when(fn (): bool => (bool) config('marketplace.finance_order_sync_enabled'))
     ->name('sync-greatfit-finance-orders')
     ->withoutOverlapping(30);

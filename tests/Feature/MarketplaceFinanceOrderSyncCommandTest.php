@@ -83,6 +83,7 @@ class MarketplaceFinanceOrderSyncCommandTest extends TestCase
 
         $this->assertStringContainsString('marketplace:finance-order-sync', $output);
         $this->assertStringContainsString("--store='Greatfit.id'", $output);
+        $this->assertStringContainsString('*/15', $output);
     }
 
     private function storeWithOrder(): Store
