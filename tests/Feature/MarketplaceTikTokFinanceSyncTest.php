@@ -281,6 +281,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
     public function test_batched_sync_uses_statement_transactions_for_final_order_settlement(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+        $paymentTime = now()->subHour()->timestamp;
 
         $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
         $store = Store::create([
@@ -327,6 +328,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
                     'statements' => [[
                         'id' => 'STATEMENT-BATCH-1',
                         'statement_time' => now()->timestamp,
+                        'payment_time' => $paymentTime,
                     ]],
                     'next_page_token' => '',
                 ],
@@ -381,6 +383,91 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
         $this->assertSame('STATEMENT-BATCH-1', data_get($settlement->raw_json, 'tiktok_statement.statement_id'));
         $this->assertSame('TX-ORDER-BATCH-1', data_get($settlement->raw_json, 'tiktok_statement.statement_transaction_id'));
+        $this->assertSame(
+            Carbon::createFromTimestamp($paymentTime, config('app.timezone'))->toDateTimeString(),
+            $settlement->settlement_time?->toDateTimeString(),
+        );
+        $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.payment_time'));
+    }
+
+    public function test_backfill_replaces_legacy_sync_timestamp_with_statement_payment_time(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-BACKFILL-DATE',
+            'name' => 'TikTok Backfill Date Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-BACKFILL-DATE-1',
+            'external_order_id' => 'TT-ORDER-BACKFILL-DATE-1',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDays(10),
+            'order_date' => now()->subDays(10),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        $legacySyncTime = Carbon::create(2026, 10, 24, 5, 5, 21, config('app.timezone'));
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'final_income' => 65364,
+            'settlement_time' => $legacySyncTime,
+            'synced_at' => $legacySyncTime,
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'order_id' => $order->channel_order_id,
+                'sku_transactions' => [['statement_id' => 'STATEMENT-BACKFILL-1']],
+            ],
+        ]);
+        $paymentTime = Carbon::create(2026, 9, 13, 8, 0, 10, config('app.timezone'))->timestamp;
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'statements' => [[
+                        'id' => 'STATEMENT-BACKFILL-1',
+                        'statement_time' => Carbon::create(2026, 9, 13, 7, 0, 0, config('app.timezone'))->timestamp,
+                        'payment_time' => $paymentTime,
+                        'payment_status' => 'SETTLED',
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ]),
+        ]);
+
+        $stats = app(MarketplaceSyncService::class)->backfillTikTokSettlementTimes(
+            $store,
+            Carbon::create(2026, 9, 1, 0, 0, 0, config('app.timezone')),
+            Carbon::create(2026, 10, 1, 23, 59, 59, config('app.timezone')),
+            true,
+        );
+
+        $this->assertSame(1, $stats['candidates']);
+        $this->assertSame(1, $stats['matched']);
+        $this->assertSame(1, $stats['updated']);
+
+        $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('2026-09-13 08:00:10', $settlement->settlement_time?->toDateTimeString());
+        $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.payment_time'));
+        $this->assertTrue((bool) data_get($settlement->raw_json, 'tiktok_settlement_backfill'));
+        $this->assertTrue((bool) data_get($settlement->data_quality_flags, 'settlement_time_backfilled'));
     }
 
     public function test_statement_transactions_supply_gmv_max_cost_from_settlement(): void

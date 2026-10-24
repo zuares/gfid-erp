@@ -1147,30 +1147,22 @@ class MarketplaceSyncService
             'tiktok_fee_breakdown' => $tiktokFeeBreakdown,
             'sku_transactions' => $skuTransactions,
         ]);
-        foreach (['statement_id', 'statement_transaction_id', 'statement_time'] as $key) {
+        foreach (['statement_id', 'statement_transaction_id', 'statement_time', 'payment_time', 'paid_time'] as $key) {
             if (array_key_exists($key, $data)) {
                 $raw['tiktok_statement'][$key] = $data[$key];
             }
         }
 
-        $statementTime = $this->normalizeOrderEventTimestamp(
-            $data['statement_time'] ?? $data['settlement_time'] ?? $data['paid_time'] ?? null
-        );
-        if (! $statementTime && $hasStatement) {
-            $statementTime = $this->normalizeOrderEventTimestamp(
-                data_get($skuTransactions, '0.statement_time')
-                ?? data_get($skuTransactions, '0.paid_time')
-                ?? data_get($skuTransactions, '0.settlement_time')
-            );
-        }
+        $statementTime = $this->resolveTikTokSettlementTime($data, $skuTransactions);
 
         // Tanggal saat proses sync berjalan bukan tanggal pencairan. Jangan
         // mengisi settlement_time dengan now() ketika Finance TikTok tidak
         // mengirim timestamp statement; tanggal palsu tersebut merusak audit
         // dan membuat payout terlihat cair pada hari sync.
         if (! $statementTime) {
-            $statementTime = $this->normalizeOrderEventTimestamp(
-                data_get($order->settlement?->raw_json, 'tiktok_statement.statement_time')
+            $statementTime = $this->resolveTikTokSettlementTime(
+                (array) data_get($order->settlement?->raw_json, 'tiktok_statement', []),
+                [],
             );
         }
 
@@ -1240,6 +1232,201 @@ class MarketplaceSyncService
             'has_statement' => $hasStatement,
             'response' => $response,
         ];
+    }
+
+    /**
+     * Repair legacy TikTok rows whose settlement_time was populated with the
+     * sync timestamp when the per-order endpoint did not return a payout date.
+     * The statement list is authoritative for the statement/payment timestamp.
+     * This method only changes the date and audit metadata; financial amounts
+     * remain untouched.
+     *
+     * @return array{scanned:int,candidates:int,matched:int,updated:int,unchanged:int,missing_statement:int,missing_date:int,errors:int,examples:array<int,array<string,mixed>>}
+     */
+    public function backfillTikTokSettlementTimes(
+        Store $store,
+        Carbon $from,
+        Carbon $to,
+        bool $apply = false,
+        int $limit = 5000,
+    ): array {
+        $store->loadMissing('channel');
+        $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
+            return [
+                'scanned' => 0,
+                'candidates' => 0,
+                'matched' => 0,
+                'updated' => 0,
+                'unchanged' => 0,
+                'missing_statement' => 0,
+                'missing_date' => 0,
+                'errors' => 1,
+                'examples' => [],
+            ];
+        }
+
+        $settlements = MarketplaceOrderSettlement::query()
+            ->where('store_id', $store->id)
+            ->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+            ->whereNotNull('settlement_time')
+            ->whereColumn('settlement_time', 'synced_at')
+            ->orderBy('id')
+            ->limit(max(1, $limit))
+            ->get();
+
+        $candidates = $settlements->filter(function (MarketplaceOrderSettlement $settlement): bool {
+            $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+            $source = strtolower((string) ($raw['source'] ?? ''));
+
+            return $source === 'tiktok_finance_202501_order_statement_transactions';
+        })->values();
+
+        $statementIds = $candidates->mapWithKeys(function (MarketplaceOrderSettlement $settlement): array {
+            $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+            $statementId = trim((string) (
+                data_get($raw, 'tiktok_statement.statement_id')
+                ?? data_get($raw, 'sku_transactions.0.statement_id')
+                ?? ''
+            ));
+
+            return $statementId !== '' ? [$statementId => true] : [];
+        });
+
+        $statementsById = [];
+        $statementToken = '';
+        $errors = 0;
+        $maxPages = 100;
+
+        try {
+            for ($page = 0; $page < $maxPages; $page++) {
+                $response = $this->gateway->getStatements(
+                    $store,
+                    $from->timestamp,
+                    $to->timestamp,
+                    $statementToken,
+                    100,
+                );
+
+                if (! empty($response['error'])
+                    || (($response['code'] ?? null) !== null && (string) $response['code'] !== '0')) {
+                    $errors++;
+                    break;
+                }
+
+                $statements = data_get($response, 'data.statements', []);
+                if (! is_array($statements)) {
+                    $statements = [];
+                }
+
+                foreach ($statements as $statement) {
+                    if (! is_array($statement)) {
+                        continue;
+                    }
+
+                    $statementId = trim((string) ($statement['id'] ?? $statement['statement_id'] ?? ''));
+                    if ($statementId !== '' && isset($statementIds[$statementId])) {
+                        $statementsById[$statementId] = $statement;
+                    }
+                }
+
+                $nextToken = trim((string) data_get($response, 'data.next_page_token', ''));
+                if ($nextToken === '' || $nextToken === $statementToken) {
+                    break;
+                }
+                $statementToken = $nextToken;
+            }
+        } catch (\Throwable $e) {
+            $errors++;
+            Log::warning('[TikTok Finance] Backfill settlement time gagal mengambil statements', [
+                'store_id' => $store->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $stats = [
+            'scanned' => $settlements->count(),
+            'candidates' => $candidates->count(),
+            'matched' => 0,
+            'updated' => 0,
+            'unchanged' => 0,
+            'missing_statement' => 0,
+            'missing_date' => 0,
+            'errors' => $errors,
+            'examples' => [],
+        ];
+
+        foreach ($candidates as $settlement) {
+            $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+            $statementId = trim((string) (
+                data_get($raw, 'tiktok_statement.statement_id')
+                ?? data_get($raw, 'sku_transactions.0.statement_id')
+                ?? ''
+            ));
+            $statement = $statementId !== '' ? ($statementsById[$statementId] ?? null) : null;
+
+            if (! is_array($statement)) {
+                $stats['missing_statement']++;
+                continue;
+            }
+            $stats['matched']++;
+
+            $settlementTime = $this->resolveTikTokSettlementTime($statement, []);
+            if (! $settlementTime) {
+                $stats['missing_date']++;
+                continue;
+            }
+
+            $example = [
+                'settlement_id' => $settlement->id,
+                'order_id' => $settlement->channel_order_id,
+                'old_time' => $settlement->settlement_time?->toIso8601String(),
+                'new_time' => $settlementTime->toIso8601String(),
+                'source' => ($statement['payment_time'] ?? $statement['paid_time'] ?? null) !== null
+                    ? 'payment_time'
+                    : (data_get($statement, 'statement_time') !== null ? 'statement_time' : 'create_time'),
+            ];
+            if (count($stats['examples']) < 20) {
+                $stats['examples'][] = $example;
+            }
+
+            if ($settlement->settlement_time?->equalTo($settlementTime)) {
+                $stats['unchanged']++;
+                continue;
+            }
+
+            $stats['updated']++;
+            if (! $apply) {
+                continue;
+            }
+
+            $raw['tiktok_statement'] = array_merge(
+                is_array($raw['tiktok_statement'] ?? null) ? $raw['tiktok_statement'] : [],
+                array_filter([
+                    'statement_id' => $statement['id'] ?? $statement['statement_id'] ?? $statementId,
+                    'statement_time' => $statement['statement_time'] ?? null,
+                    'payment_time' => $statement['payment_time'] ?? null,
+                    'payment_status' => $statement['payment_status'] ?? $statement['status'] ?? null,
+                ], static fn (mixed $value): bool => $value !== null && $value !== ''),
+            );
+            $raw['tiktok_settlement_backfill'] = [
+                'source' => 'tiktok_finance_202309_statements',
+                'settlement_time_source' => $example['source'],
+                'backfilled_at' => now()->toIso8601String(),
+            ];
+
+            $flags = is_array($settlement->data_quality_flags) ? $settlement->data_quality_flags : [];
+            $flags['settlement_time_source'] = $example['source'];
+            $flags['settlement_time_backfilled'] = true;
+
+            $settlement->settlement_time = $settlementTime;
+            $settlement->raw_json = $raw;
+            $settlement->data_quality_flags = $flags;
+            $settlement->data_checked_at = now();
+            $settlement->save();
+        }
+
+        return $stats;
     }
 
     private function isTikTokFinanceScopeError(array $response): bool
@@ -1410,6 +1597,11 @@ class MarketplaceSyncService
                                 'order_id' => $orderId,
                                 'statement_id' => $statementId,
                                 'statement_transaction_id' => $transaction['id'] ?? null,
+                                'payment_time' => $statement['payment_time']
+                                    ?? $statement['paid_time']
+                                    ?? $transactionData['payment_time']
+                                    ?? $transactionData['paid_time']
+                                    ?? null,
                                 'statement_time' => $statement['statement_time']
                                     ?? $statement['create_time']
                                     ?? $transactionData['create_time']
@@ -4506,6 +4698,32 @@ class MarketplaceSyncService
         return collect($detail['package_list'] ?? [])
             ->map(fn ($package) => trim((string) ($package['group_shipment_id'] ?? '')))
             ->first(fn ($value) => $value !== '');
+    }
+
+    /**
+     * TikTok's statement list exposes the actual payment timestamp separately
+     * from the statement timestamp. Prefer the payment event for the UI's
+     * "tanggal cair", while retaining compatibility with older payloads.
+     */
+    private function resolveTikTokSettlementTime(array $data, array $skuTransactions = []): ?Carbon
+    {
+        foreach ([
+            $data['payment_time'] ?? null,
+            $data['paid_time'] ?? null,
+            $data['statement_time'] ?? null,
+            $data['settlement_time'] ?? null,
+            data_get($skuTransactions, '0.payment_time'),
+            data_get($skuTransactions, '0.paid_time'),
+            data_get($skuTransactions, '0.statement_time'),
+            data_get($skuTransactions, '0.settlement_time'),
+        ] as $value) {
+            $timestamp = $this->normalizeOrderEventTimestamp($value);
+            if ($timestamp) {
+                return $timestamp;
+            }
+        }
+
+        return null;
     }
 
     private function normalizeOrderEventTimestamp(mixed $value): ?Carbon
