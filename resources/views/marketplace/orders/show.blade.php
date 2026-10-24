@@ -961,10 +961,33 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         $adTaxRate = 0.11;
         $orderAdCostBeforeTax = $dailyAcos !== null ? round(max($subtotal, 0) * $dailyAcos, 2) : null;
         $orderAdTax = $orderAdCostBeforeTax !== null ? round($orderAdCostBeforeTax * $adTaxRate, 2) : null;
+        if ($isTikTok) {
+            $tiktokAdFee = $tiktokFeeTaxBreakdown['fee']['gmv_max_ad_fee_amount']
+                ?? $tiktokFeeTaxBreakdown['fees']['gmv_max_ad_fee_amount']
+                ?? null;
+            $tiktokAdCoupon = $tiktokFeeTaxBreakdown['fee']['gmv_max_coupon_fee']
+                ?? $tiktokFeeTaxBreakdown['fees']['gmv_max_coupon_fee']
+                ?? null;
+            $tiktokAdTax = $tiktokFeeTaxBreakdown['tax']['cps_shop_ads_commission_tax_amount']
+                ?? $tiktokFeeTaxBreakdown['taxes']['cps_shop_ads_commission_tax_amount']
+                ?? null;
+
+            if (is_numeric($tiktokAdFee) || is_numeric($tiktokAdCoupon) || is_numeric($tiktokAdTax)) {
+                $orderAdCostBeforeTax = abs((float) ($tiktokAdFee ?? 0)) + abs((float) ($tiktokAdCoupon ?? 0));
+                $orderAdTax = abs((float) ($tiktokAdTax ?? 0));
+            }
+        }
         $grossProfitBeforeAds = $hppComplete ? round($penghasilan - $hppTotal, 2) : null;
-        $grossProfit = $grossProfitBeforeAds !== null && $orderAdCostBeforeTax !== null
-            ? round($grossProfitBeforeAds - $orderAdCostBeforeTax - $orderAdTax, 2)
+        $grossProfit = $grossProfitBeforeAds !== null
+            && ($isTikTok || $orderAdCostBeforeTax !== null)
+            ? round($grossProfitBeforeAds - ($orderAdCostBeforeTax ?? 0) - ($orderAdTax ?? 0), 2)
             : null;
+        $grossProfitIsEstimate = $isTikTok && $grossProfitBeforeAds !== null
+            && $orderAdCostBeforeTax === null;
+        $grossProfitLabel = $grossProfitIsEstimate ? 'Laba Kotor Estimasi' : 'Laba Kotor Setelah Iklan';
+        $grossProfitSummaryLabel = $isEstimasi && ! $grossProfitIsEstimate
+            ? 'Estimasi '.$grossProfitLabel
+            : $grossProfitLabel;
         $marginBase = max($subtotal, 0);
         $cogsPct = $hppComplete && $marginBase > 0 ? round(($hppTotal / $marginBase) * 100, 2) : null;
         $adPct = $dailyAcos !== null ? round($dailyAcos * 100, 2) : null;
@@ -990,7 +1013,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     </div>
                 </div>
                 <div>
-                    <div class="od-label">ACOS {{ $adsDate ? $adsDate : 'hari order' }}</div>
+                <div class="od-label">ACOS {{ $adsDate ? $adsDate : 'hari order' }}</div>
                     <div class="od-value">{{ $dailyAcos !== null ? number_format($dailyAcos * 100, 2, ',', '.').'%' : '—' }}</div>
                 </div>
                 <div>
@@ -1001,14 +1024,16 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     @endif
                 </div>
                 <div>
-                    <div class="od-label">Laba Kotor Setelah Iklan</div>
+                    <div class="od-label">{{ $grossProfitLabel }}</div>
                     <div class="od-value" style="color:{{ $grossProfit !== null && $grossProfit < 0 ? '#b91c1c' : '#166534' }}">
                         {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum tersedia' }}
                     </div>
                 </div>
             </div>
             <div class="od-muted" style="font-size:.72rem">
-                @if($adsDaily && $dailyAcos !== null)
+                @if($grossProfitIsEstimate)
+                    Estimasi laba kotor dihitung dari estimasi penghasilan TikTok Rp{{ number_format($penghasilan, 0, ',', '.') }} dikurangi HPP Rp{{ number_format($hppTotal, 0, ',', '.') }}. Biaya iklan TikTok belum tersedia pada data order ini.
+                @elseif($adsDaily && $dailyAcos !== null)
                     Persentase biaya iklan menggunakan ACOS harian toko pada tanggal order ({{ $adsDate }}): {{ number_format($dailyAcos * 100, 2, ',', '.') }}%. Biaya iklan Rp{{ number_format($orderAdCostBeforeTax, 0, ',', '.') }} dan PPN iklan 11% Rp{{ number_format($orderAdTax, 0, ',', '.') }} mengurangi laba kotor.
                 @else
                     Data ACOS harian toko pada tanggal order belum tersedia, sehingga biaya iklan, PPN iklan, dan laba kotor setelah iklan belum dapat dihitung.
@@ -1208,7 +1233,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 </div>
 
                 <div class="od-finance-row od-finance-row-total">
-                    <span>{{ $isEstimasi ? 'Estimasi Laba Kotor Setelah Iklan' : 'Laba Kotor Setelah Iklan' }}</span>
+                    <span>{{ $grossProfitSummaryLabel }}</span>
                     <span style="color:{{ $grossProfit === null ? '#b45309' : ($grossProfit < 0 ? '#b91c1c' : '#15803d') }}">
                         {{ $grossProfit !== null ? 'Rp'.number_format($grossProfit, 0, ',', '.') : 'Belum lengkap' }}
                         @if($grossProfitPct !== null)<small class="od-finance-percent">({{ number_format($grossProfitPct, 2, ',', '.') }}%)</small>@endif

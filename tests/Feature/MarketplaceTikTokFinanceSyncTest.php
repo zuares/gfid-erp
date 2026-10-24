@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderIncomeEstimate;
+use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
 use App\Services\MarketplaceSyncService;
@@ -162,6 +163,15 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
             ],
             'synced_at' => now(),
         ]);
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'item_name' => 'TikTok test item',
+            'qty' => 1,
+            'line_gross_amount' => 100000,
+            'hpp_unit_snapshot' => 30000,
+            'hpp_total_snapshot' => 30000,
+        ]);
 
         $response = app(\App\Http\Controllers\Marketplace\MarketplaceOrderController::class)->show($order);
         $html = $response->render();
@@ -176,6 +186,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertStringContainsString('Adjustment TikTok', $html);
         $this->assertStringContainsString('data-fee-tab="voucher">Diskon</button>', $html);
         $this->assertStringContainsString('Total Diskon', $html);
+        $this->assertStringContainsString('Laba Kotor Estimasi', $html);
+        $this->assertStringContainsString('Rp51.234', $html);
     }
 
     public function test_final_statement_preserves_tiktok_fee_and_tax_breakdown(): void
