@@ -156,17 +156,28 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
 
 // TikTok tidak masuk ke sync-settlements karena tidak memiliki endpoint
 // escrow Shopee. Jalankan Finance v202501 + estimasi unsettled v202507 pada
-// jendela order terbaru agar halaman settlement ikut berubah seperti Orders.
+// jendela order terbaru. Mode MISSING mencegah order yang sudah final dipanggil
+// ulang terus-menerus dan mengurangi risiko rate limit TikTok Finance.
 Schedule::call(fn () => Artisan::call('marketplace:sync-finance', [
     '--from' => now()->subDays(3)->toDateString(),
     '--to' => now()->toDateString(),
-    '--mode' => 'full',
+    '--mode' => 'missing',
     '--channel' => 'tiktok',
     '--store_id' => 'all',
 ]))
-    ->everyFiveMinutes()
+    ->everyFifteenMinutes()
     ->name('sync-recent-tiktok-finance')
-    ->withoutOverlapping(15);
+    ->withoutOverlapping(20);
+
+// Refresh audit kualitas setelah finance sync selesai. Perintah ini hanya
+// membaca settlement/item lokal dan memperbarui status kualitas; tidak memanggil
+// API marketplace sehingga aman dijalankan terpisah dari sync TikTok.
+Schedule::command('marketplace:refresh-data-quality', [
+    '--store_id' => 'all',
+])
+    ->cron('8,23,38,53 * * * *')
+    ->name('refresh-marketplace-finance-quality')
+    ->withoutOverlapping(20);
 
 Schedule::call(fn () => Artisan::call('marketplace:sync-settlements', [
     '--all' => true,

@@ -77,10 +77,12 @@ class TikTokFinancialTransactionController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
+            $rateLimited = preg_match('/too many requests|rate[ _-]?limit/i', $e->getMessage()) === 1;
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-            ], str_contains($e->getMessage(), 'bukan channel') ? 422 : 502);
+            ], str_contains($e->getMessage(), 'bukan channel') ? 422 : ($rateLimited ? 429 : 502));
         } catch (\Throwable $e) {
             Log::error('[tiktok-financial-transactions] Kesalahan internal', [
                 'store_id' => $store->id,

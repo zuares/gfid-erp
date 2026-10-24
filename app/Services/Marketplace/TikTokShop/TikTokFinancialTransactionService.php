@@ -480,6 +480,11 @@ class TikTokFinancialTransactionService
 
     private function assertSuccessfulResponse(array $response): void
     {
+        $status = (int) data_get($response, '_meta.http_status', data_get($response, 'status', 0));
+        if ($status === 429) {
+            throw new RuntimeException('TikTok Finance API rate limit: Too many requests. Coba lagi beberapa saat lagi.');
+        }
+
         if (! empty($response['error']) || (isset($response['code']) && (int) $response['code'] !== 0)) {
             throw new RuntimeException('TikTok Finance API Error: '.(string) ($response['message'] ?? $response['error'] ?? 'Unknown error'));
         }

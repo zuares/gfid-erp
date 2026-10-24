@@ -205,6 +205,55 @@ class TikTokShopChannelTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_finance_get_retries_tiktok_rate_limit_response(): void
+    {
+        config()->set('tiktok_shop.finance_min_gap_ms', 0);
+        config()->set('tiktok_shop.rate_limit_backoff_seconds', 0);
+        config()->set('tiktok_shop.rate_limit_max_sleep_seconds', 0);
+        config()->set('tiktok_shop.rate_limit_max_attempts', 2);
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-RATE-LIMIT-RETRY',
+            'name' => 'TikTok Rate Limit Retry',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'external_shop_id' => 'shop-123',
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/withdrawals*' => Http::sequence()
+                ->push([
+                    'message' => 'Too many requests. Please retry later.',
+                ], 429, ['Retry-After' => '0'])
+                ->push([
+                    'code' => 0,
+                    'data' => [
+                        'withdrawals' => [],
+                        'next_page_token' => '',
+                    ],
+                ], 200),
+        ]);
+
+        $response = app(TikTokShopChannel::class)->getSellerFinancialTransactions(
+            $store,
+            1754006400,
+            1754438400,
+            ['SETTLE'],
+        );
+
+        $this->assertSame(0, $response['code']);
+        $this->assertSame([], data_get($response, 'data.withdrawals'));
+        Http::assertSentCount(2);
+    }
+
     public function test_order_responses_are_normalized_to_the_shared_marketplace_schema(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
@@ -471,4 +520,3 @@ class TikTokShopChannelTest extends TestCase
         $this->assertSame([], $res['response']['return']);
     }
 }
-

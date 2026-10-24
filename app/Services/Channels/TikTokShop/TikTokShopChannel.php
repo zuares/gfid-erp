@@ -5,6 +5,7 @@ namespace App\Services\Channels\TikTokShop;
 use App\Models\Store;
 use App\Models\MarketplaceOrder;
 use App\Services\Channels\Contracts\MarketplaceChannel;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -71,15 +72,38 @@ class TikTokShopChannel implements MarketplaceChannel
 
     protected function get(Store $store, string $path, array $params = []): array
     {
-        $result = $this->doRequest($store, 'GET', $path, $params);
+        $maxAttempts = max(1, (int) config('tiktok_shop.rate_limit_max_attempts', 3));
+        $result = [];
 
-        // Token expired → auto-refresh sekali lalu retry
-        $code = $result['code'] ?? null;
-        if ($code === 105 || $code === 'invalid_access_token') {
-            $refreshed = $this->refreshToken($store);
-            if (empty($refreshed['error'])) {
-                $store->refresh();
-                $result = $this->doRequest($store, 'GET', $path, $params);
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $this->paceFinanceRequest($store, $path);
+            $result = $this->doRequest($store, 'GET', $path, $params);
+
+            // Token expired → auto-refresh sekali lalu retry.
+            $code = $result['code'] ?? null;
+            if ($code === 105 || $code === 'invalid_access_token') {
+                $refreshed = $this->refreshToken($store);
+                if (empty($refreshed['error'])) {
+                    $store->refresh();
+                    $this->paceFinanceRequest($store, $path);
+                    $result = $this->doRequest($store, 'GET', $path, $params);
+                }
+            }
+
+            if (! $this->isRateLimitedResponse($result) || $attempt >= $maxAttempts) {
+                break;
+            }
+
+            $delay = $this->rateLimitDelaySeconds($result, $attempt);
+            Log::warning('[TikTokShopChannel] Finance API rate limit; retrying request.', [
+                'store_id' => $store->id,
+                'path' => $path,
+                'attempt' => $attempt,
+                'max_attempts' => $maxAttempts,
+                'delay_seconds' => $delay,
+            ]);
+            if ($delay > 0) {
+                sleep($delay);
             }
         }
 
@@ -152,6 +176,7 @@ class TikTokShopChannel implements MarketplaceChannel
                     && $exception->response->status() >= 500) {
                     return $attempt * 1000;
                 }
+
                 return false; // Jangan retry 4xx (client error)
             }, throw: false)
             ->withHeaders([
@@ -173,21 +198,79 @@ class TikTokShopChannel implements MarketplaceChannel
             : $request->get($url, $query);
 
         $json = $response->json();
+        $meta = [
+            'http_status' => $response->status(),
+            'retry_after' => (int) ($response->header('Retry-After') ?? 0),
+        ];
         if ($json === null) {
             return [
-                'error'   => true,
-                'code'    => -1,
+                'error' => true,
+                'code' => -1,
                 'message' => $response->body(),
-                'status'  => $response->status(),
+                'status' => $response->status(),
+                '_meta' => $meta,
             ];
         }
 
-        // TikTok Shop API v202309 usually returns code != 0 for errors
-        if (isset($json['code']) && (int) $json['code'] !== 0) {
+        // TikTok Shop API v202309 usually returns code != 0 for errors.
+        // Some rate-limit responses use HTTP 429 without a TikTok error code,
+        // so preserve the HTTP failure as an application error as well.
+        if ($response->status() >= 400 || (isset($json['code']) && (int) $json['code'] !== 0)) {
             $json['error'] = true;
         }
 
+        $json['_meta'] = array_merge((array) ($json['_meta'] ?? []), $meta);
+
         return $json;
+    }
+
+    /**
+     * Jaga jarak khusus endpoint Finance. Panggilan statement detail bersifat
+     * N+1 sehingga burst request mudah memicu rate limit TikTok walaupun setiap
+     * request sendiri berhasil secara HTTP.
+     */
+    protected function paceFinanceRequest(Store $store, string $path): void
+    {
+        if (! str_starts_with($path, '/finance/')) {
+            return;
+        }
+
+        $minGapMs = max(0, (int) config('tiktok_shop.finance_min_gap_ms', 250));
+        if ($minGapMs === 0) {
+            return;
+        }
+
+        $key = "tiktok:finance:last_call:{$store->id}";
+        $last = (float) Cache::get($key, 0);
+        $wait = ($last + ($minGapMs / 1000)) - microtime(true);
+        if ($wait > 0) {
+            usleep((int) round($wait * 1_000_000));
+        }
+        Cache::put($key, microtime(true), 30);
+    }
+
+    protected function isRateLimitedResponse(array $result): bool
+    {
+        $status = (int) data_get($result, '_meta.http_status', data_get($result, 'status', 0));
+        $error = strtolower((string) ($result['error'] ?? ''));
+        $message = strtolower((string) ($result['message'] ?? ''));
+
+        return $status === 429
+            || str_contains($error, 'rate_limit')
+            || str_contains($error, 'rate limit')
+            || str_contains($message, 'too many requests')
+            || str_contains($message, 'rate limit')
+            || str_contains($message, 'rate_limit');
+    }
+
+    protected function rateLimitDelaySeconds(array $result, int $attempt): int
+    {
+        $retryAfter = max(0, (int) data_get($result, '_meta.retry_after', 0));
+        $cap = max(0, (int) config('tiktok_shop.rate_limit_max_sleep_seconds', 4));
+        $fallback = max(0, (int) config('tiktok_shop.rate_limit_backoff_seconds', 1));
+        $backoff = $fallback > 0 ? $fallback * (2 ** max(0, $attempt - 1)) : 0;
+
+        return min($cap, max($retryAfter, $backoff));
     }
 
     // ─── MarketplaceChannel interface ─────────────────────────────────────────
@@ -239,7 +322,7 @@ class TikTokShopChannel implements MarketplaceChannel
      */
     public function getProduct(Store $store, string $productId): array
     {
-        return $this->get($store, '/product/202309/products/' . rawurlencode($productId));
+        return $this->get($store, '/product/202309/products/'.rawurlencode($productId));
     }
 
     /**
@@ -272,7 +355,7 @@ class TikTokShopChannel implements MarketplaceChannel
             ];
         }
 
-        return $this->post($store, '/product/202309/products/' . rawurlencode($productId) . '/inventory/update', [
+        return $this->post($store, '/product/202309/products/'.rawurlencode($productId).'/inventory/update', [
             'skus' => $skus,
         ]);
     }
@@ -303,7 +386,7 @@ class TikTokShopChannel implements MarketplaceChannel
             return ['error' => 'sku_missing', 'message' => 'SKU TikTok tidak ditemukan.'];
         }
 
-        return $this->post($store, '/product/202309/products/' . rawurlencode($productId) . '/prices/update', [
+        return $this->post($store, '/product/202309/products/'.rawurlencode($productId).'/prices/update', [
             'skus' => $skus,
         ]);
     }
@@ -368,7 +451,7 @@ class TikTokShopChannel implements MarketplaceChannel
         $body = array_filter($body, static fn ($value): bool => $value !== null && $value !== []);
         $response = $this->post(
             $store,
-            '/fulfillment/202309/orders/' . rawurlencode($orderId) . '/shipping_services/query',
+            '/fulfillment/202309/orders/'.rawurlencode($orderId).'/shipping_services/query',
             $body
         );
 
@@ -449,7 +532,7 @@ class TikTokShopChannel implements MarketplaceChannel
         }
         $shipped = $this->post(
             $store,
-            '/fulfillment/202309/packages/' . rawurlencode($packageId) . '/ship',
+            '/fulfillment/202309/packages/'.rawurlencode($packageId).'/ship',
             $shipPayload
         );
 
@@ -503,7 +586,7 @@ class TikTokShopChannel implements MarketplaceChannel
             // when the package has already been shipped.
             $result = $this->get(
                 $store,
-                '/fulfillment/202309/packages/' . rawurlencode($packageId) . '/shipping_documents',
+                '/fulfillment/202309/packages/'.rawurlencode($packageId).'/shipping_documents',
                 [
                     'document_type' => 'SHIPPING_LABEL',
                     'document_size' => 'A6',
@@ -642,7 +725,7 @@ class TikTokShopChannel implements MarketplaceChannel
             return ['error' => 'return_sn_missing', 'message' => 'Return ID wajib diisi.'];
         }
 
-        $result = $this->get($store, '/return_refund/202309/returns/' . rawurlencode($returnSn));
+        $result = $this->get($store, '/return_refund/202309/returns/'.rawurlencode($returnSn));
 
         if (! empty($result['error']) || ((int) ($result['code'] ?? 0) !== 0)) {
             return [
@@ -711,7 +794,7 @@ class TikTokShopChannel implements MarketplaceChannel
 
         return $this->get(
             $store,
-            '/finance/202501/orders/' . rawurlencode($orderId) . '/statement_transactions'
+            '/finance/202501/orders/'.rawurlencode($orderId).'/statement_transactions'
         );
     }
 
@@ -790,7 +873,7 @@ class TikTokShopChannel implements MarketplaceChannel
 
         return $this->get(
             $store,
-            '/finance/202501/statements/' . rawurlencode($statementId) . '/statement_transactions',
+            '/finance/202501/statements/'.rawurlencode($statementId).'/statement_transactions',
             [
                 'page_size' => $pageSize,
                 'page_token' => $pageToken,
@@ -833,7 +916,7 @@ class TikTokShopChannel implements MarketplaceChannel
      */
     public function getTrackingNumber(Store $store, string $orderSn): array
     {
-        $result = $this->get($store, '/fulfillment/202309/orders/' . rawurlencode($orderSn) . '/tracking');
+        $result = $this->get($store, '/fulfillment/202309/orders/'.rawurlencode($orderSn).'/tracking');
         if (($result['code'] ?? null) !== 0) {
             return $result;
         }
@@ -860,7 +943,7 @@ class TikTokShopChannel implements MarketplaceChannel
 
     public function getPackageDetail(Store $store, string $packageId): array
     {
-        return $this->get($store, '/fulfillment/202309/packages/' . rawurlencode($packageId));
+        return $this->get($store, '/fulfillment/202309/packages/'.rawurlencode($packageId));
     }
 
     protected function buildShipPayload(Store $store, array $params, array $context): array
@@ -965,7 +1048,7 @@ class TikTokShopChannel implements MarketplaceChannel
         $orderLineItemIds = [];
         $orderLineList = [];
         foreach ($lineItems as $item) {
-            if (!is_array($item)) {
+            if (! is_array($item)) {
                 continue;
             }
             $lineId = (string) ($item['order_line_item_id'] ?? $item['line_item_id'] ?? $item['order_line_id'] ?? $item['id'] ?? '');
@@ -1038,8 +1121,8 @@ class TikTokShopChannel implements MarketplaceChannel
         // pagination. The channel contract calls this value cursor.
         $prefix = $timeRangeField === 'create_time' ? 'create_time' : 'update_time';
         $body = [
-            $prefix . '_ge' => $timeFrom,
-            $prefix . '_lt' => $timeTo,
+            $prefix.'_ge' => $timeFrom,
+            $prefix.'_lt' => $timeTo,
         ];
 
         if ($orderStatus !== '') {
@@ -1047,7 +1130,7 @@ class TikTokShopChannel implements MarketplaceChannel
         }
 
         $params = [
-            'page_size'  => min(100, max(1, $pageSize)),
+            'page_size' => min(100, max(1, $pageSize)),
             'sort_field' => $prefix,
             'sort_order' => 'ASC',
         ];
@@ -1102,15 +1185,15 @@ class TikTokShopChannel implements MarketplaceChannel
     {
         $status = strtoupper((string) ($order['status'] ?? $order['order_status'] ?? ''));
         $statusMap = [
-            'ON_HOLD'            => 'PENDING',
-            'AWAITING_SHIPMENT'  => 'READY_TO_SHIP',
+            'ON_HOLD' => 'PENDING',
+            'AWAITING_SHIPMENT' => 'READY_TO_SHIP',
             'PARTIALLY_SHIPPING' => 'PROCESSED',
             'AWAITING_COLLECTION' => 'PROCESSED',
-            'IN_TRANSIT'         => 'SHIPPED',
-            'DELIVERED'          => 'TO_CONFIRM_RECEIVE',
-            'COMPLETED'          => 'COMPLETED',
-            'CANCELLED'          => 'CANCELLED',
-            'IN_CANCEL'          => 'IN_CANCEL',
+            'IN_TRANSIT' => 'SHIPPED',
+            'DELIVERED' => 'TO_CONFIRM_RECEIVE',
+            'COMPLETED' => 'COMPLETED',
+            'CANCELLED' => 'CANCELLED',
+            'IN_CANCEL' => 'IN_CANCEL',
         ];
         $canonicalStatus = $statusMap[$status] ?? ($status !== '' ? $status : null);
 
@@ -1132,7 +1215,7 @@ class TikTokShopChannel implements MarketplaceChannel
         }
 
         $normalizedAddress = array_merge($address, [
-            'name' => $addressName !== '' ? $addressName : trim($firstName . ' ' . $lastName),
+            'name' => $addressName !== '' ? $addressName : trim($firstName.' '.$lastName),
             'phone_number' => $address['phone_number'] ?? $address['phone'] ?? null,
             'full_address' => $fullAddress !== '' ? $fullAddress : null,
             'zip_code' => $address['zip_code'] ?? $address['postal_code'] ?? null,
@@ -1178,7 +1261,7 @@ class TikTokShopChannel implements MarketplaceChannel
             $cancelUser = trim((string) ($item['cancel_user'] ?? ''));
             $displayStatus = strtoupper(trim((string) ($item['display_status'] ?? '')));
             if ($cancelReason !== '') {
-                $disputeReasons[] = $cancelReason . ($cancelUser !== '' ? " ({$cancelUser})" : '');
+                $disputeReasons[] = $cancelReason.($cancelUser !== '' ? " ({$cancelUser})" : '');
             }
 
             return array_merge($item, [
@@ -1398,29 +1481,29 @@ class TikTokShopChannel implements MarketplaceChannel
             return ['error' => 'not_configured', 'message' => 'Kredensial toko belum lengkap, refresh dilewati'];
         }
 
-        $authUrl   = rtrim(config('tiktok_shop.auth_url', 'https://auth.tiktok-shops.com'), '/');
-        $appKey    = $this->appKey($store);
+        $authUrl = rtrim(config('tiktok_shop.auth_url', 'https://auth.tiktok-shops.com'), '/');
+        $appKey = $this->appKey($store);
         $appSecret = $this->appSecret($store);
 
         $response = Http::connectTimeout(10)->timeout(30)
             ->retry(2, 1000, throw: false)
-            ->get($authUrl . '/api/v2/token/refresh', [
-            'app_key'       => $appKey,
-            'app_secret'    => $appSecret,
-            'refresh_token' => $store->credential('refresh_token'),
-            'grant_type'    => 'refresh_token',
-        ]);
+            ->get($authUrl.'/api/v2/token/refresh', [
+                'app_key' => $appKey,
+                'app_secret' => $appSecret,
+                'refresh_token' => $store->credential('refresh_token'),
+                'grant_type' => 'refresh_token',
+            ]);
 
         $data = $response->json() ?? [];
         $body = $data['data'] ?? $data;
 
         if (! $response->successful() || (isset($data['code']) && (int) $data['code'] !== 0)) {
             Log::warning('TikTok token refresh failed', [
-                'store'       => $store->code,
+                'store' => $store->code,
                 'http_status' => $response->status(),
-                'code'        => $data['code'] ?? null,
-                'request_id'  => $data['request_id'] ?? null,
-                'message'     => $data['message'] ?? null,
+                'code' => $data['code'] ?? null,
+                'request_id' => $data['request_id'] ?? null,
+                'message' => $data['message'] ?? null,
             ]);
 
             return $data;
@@ -1428,7 +1511,7 @@ class TikTokShopChannel implements MarketplaceChannel
 
         if (! empty($body['access_token'])) {
             $credentials = $store->credentials ?? [];
-            $credentials['access_token']  = $body['access_token'];
+            $credentials['access_token'] = $body['access_token'];
             $credentials['refresh_token'] = $body['refresh_token'] ?? $credentials['refresh_token'] ?? null;
             $accessTokenExpiresIn = $body['access_token_expire_in'] ?? $body['expires_in'] ?? null;
             $refreshTokenExpiresIn = $body['refresh_token_expire_in'] ?? $body['refresh_expires_in'] ?? null;
@@ -1459,8 +1542,8 @@ class TikTokShopChannel implements MarketplaceChannel
             }
 
             $store->update([
-                'credentials'      => $credentials,
-                'meta'             => $meta,
+                'credentials' => $credentials,
+                'meta' => $meta,
                 'token_expires_at' => $accessTokenExpiresIn !== null
                     ? $this->tokenExpiresAt($accessTokenExpiresIn)
                     : $store->token_expires_at,
