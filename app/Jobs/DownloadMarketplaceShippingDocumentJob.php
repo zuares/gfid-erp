@@ -67,6 +67,16 @@ class DownloadMarketplaceShippingDocumentJob implements ShouldQueue, ShouldBeUni
 
         if (!$order) return;
 
+        // TikTok tidak memakai alur pre-download label Shopee. Jangan panggil
+        // API shipping document otomatis untuk order TikTok, termasuk job lama
+        // yang mungkin sudah telanjur masuk antrean sebelum guard dispatch ada.
+        $channelCode = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (in_array($channelCode, [
+            'tiktok', 'ttk', 'tkt', 'tt', 'tiktok shop',
+        ], true)) {
+            return;
+        }
+
         // Cek apakah sudah ter-cache
         $disk = Storage::disk('local');
         $cachePath = "shipping_labels/{$store->id}/{$this->orderSn}.pdf.gz";

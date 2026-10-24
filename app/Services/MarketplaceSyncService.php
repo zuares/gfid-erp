@@ -4347,7 +4347,15 @@ class MarketplaceSyncService
                 // Pre-download resi: HANYA order segar (≤7 hari — backfill histori tidak
                 // butuh label) dan yang label-nya belum ter-cache. Job-nya sendiri unik
                 // per (store, order_sn), jadi sync berulang tidak menumpuk duplikat.
-                if (in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED'])) {
+                $channelCode = strtolower(trim((string) ($store->channel?->code ?? '')));
+                $isTikTokStore = in_array($channelCode, [
+                    'tiktok', 'ttk', 'tkt', 'tt', 'tiktok shop',
+                ], true);
+
+                // TikTok tidak boleh mencoba mengunduh/cetak resi otomatis saat
+                // order baru masuk. Label TikTok hanya diminta dari aksi cetak
+                // manual setelah package/fulfillment benar-benar siap.
+                if (! $isTikTokStore && in_array($orderStatus, ['READY_TO_SHIP', 'PROCESSED'])) {
                     $orderedTs = isset($detail['create_time']) ? (int) $detail['create_time'] : null;
                     $isFresh = $orderedTs === null || $orderedTs >= now()->subDays(7)->timestamp;
                     if ($isFresh) {

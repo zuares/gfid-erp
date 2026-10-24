@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\DownloadMarketplaceShippingDocumentJob;
 use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\Store;
+use App\Services\Channels\ChannelManager;
 use App\Services\Channels\TikTokShop\TikTokShopChannel;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Marketplace\MarketplaceLogisticsService;
@@ -184,6 +186,22 @@ class TikTokShopLogisticsTest extends TestCase
                 && ($params['document_size'] ?? null) === 'A6'
                 && ($params['document_format'] ?? null) === 'PDF';
         });
+    }
+
+    public function test_tiktok_auto_shipping_document_job_does_not_call_marketplace_driver(): void
+    {
+        $store = $this->storeWithOrder([
+            'order_id' => 'TT-ORDER-AUTO-LABEL-BLOCKED',
+            'packages' => [['package_id' => 'TT-PACKAGE-AUTO-LABEL-BLOCKED']],
+        ]);
+
+        $manager = Mockery::mock(ChannelManager::class);
+        $manager->shouldNotReceive('driver');
+
+        (new DownloadMarketplaceShippingDocumentJob($store->id, 'TT-ORDER-AUTO-LABEL-BLOCKED'))
+            ->handle($manager);
+
+        Http::assertNothingSent();
     }
 
     public function test_tiktok_arrange_returns_immediately_without_follow_up_tracking_requests(): void
