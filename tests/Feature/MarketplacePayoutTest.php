@@ -53,6 +53,16 @@ class MarketplacePayoutTest extends TestCase
             ->assertSee('loadStores().then((hasStores)');
     }
 
+    public function test_store_page_exposes_settlement_api_test_action(): void
+    {
+        $this->get(route('marketplace.toko'))
+            ->assertOk()
+            ->assertSee('testSettlement')
+            ->assertSee('Tes API: settlement (pencairan dana)')
+            ->assertSee('/payout-info?')
+            ->assertSee('get_wallet_transaction_list');
+    }
+
     public function test_info_forwards_cursor_date_window_and_normalizes_payout(): void
     {
         $store = $this->store();

@@ -842,10 +842,23 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body bg-light">
-                <div class="input-group mb-3">
+                <div class="input-group mb-3" id="apiTestInputGroup">
                     <span class="input-group-text bg-white" id="apiTestInputLabel">Order SN</span>
                     <input type="text" id="apiTestInput" class="form-control form-control-sm" placeholder="Contoh: 2404098R48U37H">
                     <button class="btn btn-primary btn-sm px-3" id="btnTestApi" style="font-weight:600">Fetch JSON</button>
+                </div>
+                <div class="row g-2 mb-3" id="apiSettlementDateGroup" style="display:none">
+                    <div class="col-sm-5">
+                        <label for="apiSettlementFrom" class="form-label small fw-semibold mb-1">Dari tanggal</label>
+                        <input type="date" id="apiSettlementFrom" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-sm-5">
+                        <label for="apiSettlementTo" class="form-label small fw-semibold mb-1">Sampai tanggal</label>
+                        <input type="date" id="apiSettlementTo" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-sm-2 d-flex align-items-end">
+                        <button class="btn btn-primary btn-sm w-100" id="btnSettlementTest" style="font-weight:600">Fetch JSON</button>
+                    </div>
                 </div>
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
@@ -876,6 +889,17 @@
     const importOrderPreviewUrl = @json(route('imports.marketplace.preview'));
     const importIncomePreviewUrl = @json(route('imports.marketplace_income.preview'));
     const $ = id => document.getElementById(id);
+    const localDate = (daysFromToday = 0) => {
+        const date = new Date();
+        date.setHours(0, 0, 0, 0);
+        date.setDate(date.getDate() + daysFromToday);
+        const pad = value => String(value).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const showSettlementApiForm = (show) => {
+        $('apiTestInputGroup').style.display = show ? 'none' : 'flex';
+        $('apiSettlementDateGroup').style.display = show ? 'flex' : 'none';
+    };
 
     // ── Icons for Platform ────────────────────────────────────────────────
     const platformIcon = (channelCode) => {
@@ -1200,6 +1224,7 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testBookingDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-file-earmark-text text-warning me-2"></i>Tes API: get_booking_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="checkBookingList(${s.id}, '${esc(s.name)}')"><i class="bi bi-list-check text-primary me-2"></i>Tes API: get_booking_list</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="testSettlement(${s.id}, '${esc(s.name)}')"><i class="bi bi-wallet2 text-success me-2"></i>Tes API: settlement (pencairan dana)</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="triggerHistoricalBackfill(${s.id}, '${esc(s.name)}')"><i class="bi bi-clock-history text-primary me-2"></i>Tarik Histori (Mesin Waktu)</button></li>
                             ` : ''}
                             ${connectUrl ? `<li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>` : ''}
@@ -1607,6 +1632,7 @@
     };
 
     window.testOrderDetail = function(storeId, storeName) {
+        showSettlementApiForm(false);
         window.testApiStoreId = storeId;
         window.testApiEndpointType = 'order';
         $('apiTestModalTitle').textContent = 'Tes API: get_order_detail — ' + storeName;
@@ -1618,6 +1644,7 @@
     };
 
     window.testPackageDetail = function(storeId, storeName) {
+        showSettlementApiForm(false);
         window.testApiStoreId = storeId;
         window.testApiEndpointType = 'package';
         $('apiTestModalTitle').textContent = 'Tes API: get_package_detail — ' + storeName;
@@ -1629,6 +1656,7 @@
     };
 
     window.testReturnList = function(storeId, storeName) {
+        showSettlementApiForm(false);
         window.testApiStoreId = storeId;
         window.testApiEndpointType = 'return_list';
         $('apiTestModalTitle').textContent = 'Tes API: get_return_list — ' + storeName;
@@ -1640,6 +1668,7 @@
     };
 
     window.testBookingDetail = function(storeId, storeName) {
+        showSettlementApiForm(false);
         window.testApiStoreId = storeId;
         window.testApiEndpointType = 'booking_detail';
         $('apiTestModalTitle').textContent = 'Tes API: get_booking_detail — ' + storeName;
@@ -1647,6 +1676,18 @@
         $('apiTestInput').value = '';
         $('apiTestOutput').textContent = 'Masukkan Booking SN lalu klik Fetch JSON.';
         
+        new bootstrap.Modal($('apiTestModal')).show();
+    };
+
+    window.testSettlement = function(storeId, storeName) {
+        showSettlementApiForm(true);
+        window.testApiStoreId = storeId;
+        window.testApiEndpointType = 'settlement';
+        $('apiTestModalTitle').textContent = 'Tes API: settlement / pencairan dana — ' + storeName;
+        $('apiSettlementFrom').value = localDate(-14);
+        $('apiSettlementTo').value = localDate();
+        $('apiTestOutput').textContent = 'Pilih rentang tanggal lalu klik Fetch JSON untuk memanggil payout-info (get_wallet_transaction_list).';
+
         new bootstrap.Modal($('apiTestModal')).show();
     };
 
@@ -1679,6 +1720,33 @@
             $('apiTestOutput').textContent = 'Error: ' + e.message;
         } finally {
             $('btnTestApi').disabled = false;
+        }
+    };
+
+    $('btnSettlementTest').onclick = async function() {
+        const storeId = window.testApiStoreId;
+        const from = $('apiSettlementFrom').value;
+        const to = $('apiSettlementTo').value;
+        if (!from || !to || from > to) return alert('Rentang tanggal settlement tidak valid.');
+
+        const days = Math.round((new Date(`${to}T00:00:00`) - new Date(`${from}T00:00:00`)) / 86400000) + 1;
+        if (days > 15) return alert('Rentang tanggal maksimal 15 hari sesuai batas endpoint Shopee.');
+
+        const url = '/api/marketplace/stores/' + storeId + '/payout-info?' + new URLSearchParams({
+            date_from: from,
+            date_to: to,
+            page_size: '100',
+        }).toString();
+        $('apiTestOutput').textContent = 'Memanggil ' + url + ' ...\nTunggu sebentar...';
+        $('btnSettlementTest').disabled = true;
+
+        try {
+            const res = await api(url);
+            $('apiTestOutput').textContent = JSON.stringify(res, null, 2);
+        } catch (e) {
+            $('apiTestOutput').textContent = 'Error: ' + e.message;
+        } finally {
+            $('btnSettlementTest').disabled = false;
         }
     };
 
