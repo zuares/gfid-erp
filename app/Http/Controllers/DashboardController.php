@@ -65,6 +65,18 @@ class DashboardController extends Controller
         return response()->json(['awb' => $awb ?: null]);
     }
 
+    /**
+     * Worklist yang dipakai bersama oleh dashboard owner dan halaman shipment.
+     * Tidak memakai cache agar operator selalu melihat permintaan terbaru.
+     */
+    public function shipmentWorklist(): array
+    {
+        return [
+            'repeat_orders' => $this->mpRepeatOrderList(8),
+            'list_todo_items' => $this->mpUnshippedItemList(50),
+        ];
+    }
+
     /** Resi yang sudah dipakai di modul Sales > Shipments untuk order ini. */
     private function findShipmentAwb(MarketplaceOrder $order): ?string
     {

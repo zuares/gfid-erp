@@ -1,12 +1,26 @@
 @php
     /** Var: title, rows (array), link (url|null) */
     $qty = fn ($value) => number_format((float) $value, 0, ',', '.');
+    $accordion = (bool) ($accordion ?? false);
 @endphp
+@if($accordion)
+<details class="dpanel shipment-accordion">
+    <summary class="dpanel-head">
+@else
 <div class="dpanel">
     <div class="dpanel-head">
+@endif
         <div class="t"><i class="bi bi-box-seam"></i> {{ $title }}</div>
-        @if(!empty($link))<a href="{{ $link }}">Lihat semua <i class="bi bi-arrow-right-short"></i></a>@endif
+        @if($accordion)
+            <span class="shipment-accordion-toggle" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+        @elseif(!empty($link))
+            <a href="{{ $link }}">Lihat semua <i class="bi bi-arrow-right-short"></i></a>
+        @endif
+@if($accordion)
+    </summary>
+@else
     </div>
+@endif
     <div class="dpanel-body">
         @if(!empty($rows))
             <div class="ditem-table-wrap">
@@ -216,4 +230,8 @@
             <div class="dash-empty"><i class="bi bi-check2-circle"></i> Tidak ada permintaan yang menunggu. Aman!</div>
         @endif
     </div>
+@if($accordion)
+</details>
+@else
 </div>
+@endif

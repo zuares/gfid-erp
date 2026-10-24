@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sales;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\DashboardController;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\MpReconciliation;
@@ -860,6 +861,10 @@ class ShipmentController extends Controller
 
         $isDummy = request()->boolean('dummy') && app()->environment(['local', 'testing']);
 
+        $shipmentWorklist = app(DashboardController::class)->shipmentWorklist();
+        $repeatOrders = $shipmentWorklist['repeat_orders'] ?? [];
+        $pendingItemRequests = $shipmentWorklist['list_todo_items'] ?? [];
+
         return view('sales.shipments.index', compact(
             'shipments',
             'statusFilter',
@@ -874,7 +879,9 @@ class ShipmentController extends Controller
             'canSeeNominal',
             'canFreshShipments',
             'staleDrafts',
-            'isDummy'
+            'isDummy',
+            'repeatOrders',
+            'pendingItemRequests'
         ));
     }
 

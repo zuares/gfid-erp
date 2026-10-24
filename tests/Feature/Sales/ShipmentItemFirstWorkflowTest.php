@@ -632,6 +632,57 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertDontSee('<th style="width: 170px;">Waktu</th>', false);
     }
 
+    public function test_shipment_index_shows_repeat_orders_and_pending_internal_item_requests(): void
+    {
+        [$owner, $store, $item] = $this->shipmentContext();
+
+        $previousOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-PREVIOUS-001',
+            'buyer_username' => 'repeat-buyer',
+            'order_status' => 'COMPLETED',
+            'status' => 'COMPLETED',
+            'order_date' => now()->subDays(3),
+            'ordered_at' => now()->subDays(3),
+        ]);
+        $currentOrder = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'ORDER-TODAY-001',
+            'buyer_username' => 'repeat-buyer',
+            'order_status' => 'READY_TO_SHIP',
+            'status' => 'READY_TO_SHIP',
+            'order_date' => now(),
+            'ordered_at' => now(),
+        ]);
+
+        MarketplaceOrderItem::create([
+            'order_id' => $previousOrder->id,
+            'marketplace_order_id' => $previousOrder->id,
+            'marketplace_sku' => $item->code,
+            'qty' => 1,
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $currentOrder->id,
+            'marketplace_order_id' => $currentOrder->id,
+            'marketplace_sku' => $item->code,
+            'internal_item_id' => $item->id,
+            'item_name' => $item->name,
+            'qty' => 2,
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('sales.shipments.index'))
+            ->assertOk()
+            ->assertSee('Repeat order pesanan hari ini')
+            ->assertSee('Permintaan belum dikirim per item internal')
+            ->assertSee('<details class="dpanel shipment-accordion">', false)
+            ->assertSee('<summary class="dpanel-head">', false)
+            ->assertSee('repeat-buyer')
+            ->assertSee('ORDER-TODAY-001')
+            ->assertSee($item->code)
+            ->assertSee('2 pcs');
+    }
+
     public function test_admin_create_defaults_to_marketplace_and_order_first(): void
     {
         [$owner] = $this->shipmentContext();

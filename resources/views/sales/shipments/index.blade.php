@@ -4,6 +4,7 @@
 @section('title', 'Shipments • Keluar Barang')
 
 @push('head')
+@include('dashboard.partials._styles')
 <style>
     :root{
         --shp-accent:#334155;
@@ -13,6 +14,15 @@
         --shp-muted:#64748b;
     }
     .page-wrap{ max-width:1040px; margin-inline:auto; padding:.75rem .75rem 4rem; background:transparent!important; }
+    .shipment-worklist{ display:grid; gap:.65rem; margin-bottom:.75rem; }
+    .shipment-worklist .dpanel{ min-width:0; }
+    .shipment-worklist .dpanel-head a{ min-height:34px; }
+    .shipment-accordion > summary{ list-style:none; cursor:pointer; user-select:none; }
+    .shipment-accordion > summary::-webkit-details-marker{ display:none; }
+    .shipment-accordion > summary:focus-visible{ outline:2px solid #60a5fa; outline-offset:-2px; }
+    .shipment-accordion-toggle{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; color:#64748b; transition:transform .16s ease; }
+    .shipment-accordion[open] .shipment-accordion-toggle{ transform:rotate(180deg); }
+    @media (prefers-reduced-motion: reduce){ .shipment-accordion-toggle{ transition:none; } }
 
     .card-main{
         background: var(--card);
@@ -997,6 +1007,20 @@
             @if($staleDrafts->count() > 5) <span>dan lainnya</span> @endif
         </div>
     @endif
+
+    <section class="shipment-worklist" aria-label="Prioritas order untuk diproses">
+        @include('dashboard.partials._list_repeat_orders', [
+            'title' => 'Repeat order pesanan hari ini',
+            'rows' => $repeatOrders ?? [],
+            'link' => null,
+        ])
+        @include('dashboard.partials._list_order_items', [
+            'title' => 'Permintaan belum dikirim per item internal',
+            'rows' => $pendingItemRequests ?? [],
+            'link' => null,
+            'accordion' => true,
+        ])
+    </section>
 
     <form id="shipment-filter-form" method="GET" class="shipment-filter-form">
         <input type="hidden" name="sort" value="{{ $sort }}">
