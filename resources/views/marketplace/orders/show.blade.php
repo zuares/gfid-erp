@@ -903,8 +903,9 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         $buildFeeRows($sellerFeeBreakdown, 'Biaya Iklan', $feeValue('ad_cost'));
         $buildFeeRows($sellerFeeBreakdown, 'Premi', $feeValue('premi', $feeValue('shipping_insurance', $feeValue('insurance_fee'))));
 
-        $buildFeeRows($voucherFeeBreakdown, 'Voucher Platform', $voucherPlatform);
-        $buildFeeRows($voucherFeeBreakdown, 'Voucher Toko', $voucherToko);
+        $discountLabel = $isTikTok ? 'Diskon' : 'Voucher';
+        $buildFeeRows($voucherFeeBreakdown, $discountLabel.' Platform', $voucherPlatform);
+        $buildFeeRows($voucherFeeBreakdown, $discountLabel.' Toko', $voucherToko);
 
         $buildFeeRows($platformFeeBreakdown, 'Biaya Kampanye', $feeValue('campaign_fee'));
         $buildFeeRows($platformFeeBreakdown, 'Subsidi Ongkir Platform', $feeValue('shipping_fee_subsidy', $potonganOngkir));
@@ -1091,7 +1092,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
 
                     <div class="od-finance-tabs">
                         <button type="button" class="od-btn od-fee-tab active" data-fee-tab="seller">Beban Seller</button>
-                        <button type="button" class="od-btn od-fee-tab" data-fee-tab="voucher">Voucher</button>
+                        <button type="button" class="od-btn od-fee-tab" data-fee-tab="voucher">{{ $isTikTok ? 'Diskon' : 'Voucher' }}</button>
                         <button type="button" class="od-btn od-fee-tab" data-fee-tab="buyer">Beban Pembeli</button>
                         <button type="button" class="od-btn od-fee-tab" data-fee-tab="platform">Beban Platform</button>
                         <button type="button" class="od-btn od-fee-tab" data-fee-tab="adjustment">Penyesuaian</button>
@@ -1133,7 +1134,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
 
                 <div class="od-fee-panel" data-fee-panel="voucher" style="display:none">
                     <div style="font-weight:700; color:#334155; margin-bottom:.1rem">
-                        Total Voucher <span style="float:right; color:#b91c1c">-Rp{{ number_format($voucherFeeBreakdownTotal, 0, ',', '.') }}</span>
+                        Total {{ $isTikTok ? 'Diskon' : 'Voucher' }} <span style="float:right; color:#b91c1c">-Rp{{ number_format($voucherFeeBreakdownTotal, 0, ',', '.') }}</span>
                     </div>
                     @forelse($voucherFeeBreakdown as $feeRow)
                     <div style="display:flex; justify-content:space-between; margin-left:.5rem">

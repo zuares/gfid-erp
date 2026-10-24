@@ -174,6 +174,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertStringContainsString('TikTok Fee - Transaction Fee', $html);
         $this->assertStringContainsString('data-fee-panel="seller"', $html);
         $this->assertStringContainsString('Adjustment TikTok', $html);
+        $this->assertStringContainsString('data-fee-tab="voucher">Diskon</button>', $html);
+        $this->assertStringContainsString('Total Diskon', $html);
     }
 
     public function test_final_statement_preserves_tiktok_fee_and_tax_breakdown(): void
