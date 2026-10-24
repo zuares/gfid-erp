@@ -982,9 +982,13 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             && ($isTikTok || $orderAdCostBeforeTax !== null)
             ? round($grossProfitBeforeAds - ($orderAdCostBeforeTax ?? 0) - ($orderAdTax ?? 0), 2)
             : null;
-        $grossProfitIsEstimate = $isTikTok && $grossProfitBeforeAds !== null
+        $grossProfitIsEstimate = $isTikTokApiEstimate && $grossProfitBeforeAds !== null
             && $orderAdCostBeforeTax === null;
-        $grossProfitLabel = $grossProfitIsEstimate ? 'Laba Kotor Estimasi' : 'Laba Kotor Setelah Iklan';
+        $grossProfitBeforeAdsOnly = $isTikTok && $grossProfitBeforeAds !== null
+            && $orderAdCostBeforeTax === null;
+        $grossProfitLabel = $grossProfitIsEstimate
+            ? 'Laba Kotor Estimasi'
+            : ($grossProfitBeforeAdsOnly ? 'Laba Kotor' : 'Laba Kotor Setelah Iklan');
         $grossProfitSummaryLabel = $isEstimasi && ! $grossProfitIsEstimate
             ? 'Estimasi '.$grossProfitLabel
             : $grossProfitLabel;
@@ -1033,6 +1037,8 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             <div class="od-muted" style="font-size:.72rem">
                 @if($grossProfitIsEstimate)
                     Estimasi laba kotor dihitung dari estimasi penghasilan TikTok Rp{{ number_format($penghasilan, 0, ',', '.') }} dikurangi HPP Rp{{ number_format($hppTotal, 0, ',', '.') }}. Biaya iklan TikTok belum tersedia pada data order ini.
+                @elseif($grossProfitBeforeAdsOnly)
+                    Laba kotor dihitung dari payout final TikTok Rp{{ number_format($penghasilan, 0, ',', '.') }} dikurangi HPP Rp{{ number_format($hppTotal, 0, ',', '.') }}. Biaya iklan TikTok belum tersedia pada data order ini.
                 @elseif($adsDaily && $dailyAcos !== null)
                     Persentase biaya iklan menggunakan ACOS harian toko pada tanggal order ({{ $adsDate }}): {{ number_format($dailyAcos * 100, 2, ',', '.') }}%. Biaya iklan Rp{{ number_format($orderAdCostBeforeTax, 0, ',', '.') }} dan PPN iklan 11% Rp{{ number_format($orderAdTax, 0, ',', '.') }} mengurangi laba kotor.
                 @else

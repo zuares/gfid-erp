@@ -259,6 +259,23 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame(5000.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.platform_commission_fee'));
         $this->assertSame(1000.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.transaction_fee'));
         $this->assertSame(766.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.taxes.vat'));
+
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'item_name' => 'TikTok final test item',
+            'qty' => 1,
+            'line_gross_amount' => 100000,
+            'hpp_unit_snapshot' => 30000,
+            'hpp_total_snapshot' => 30000,
+        ]);
+        $html = app(\App\Http\Controllers\Marketplace\MarketplaceOrderController::class)->show($order)->render();
+
+        $this->assertStringContainsString('Penghasilan Akhir', $html);
+        $this->assertStringNotContainsString('Estimasi Penghasilan Akhir', $html);
+        $this->assertStringNotContainsString('Laba Kotor Estimasi', $html);
+        $this->assertStringContainsString('Rp51.234', $html);
+        $this->assertStringContainsString('payout final TikTok', $html);
     }
 
     public function test_batched_sync_uses_statement_transactions_for_final_order_settlement(): void
