@@ -121,7 +121,7 @@ class MarketplaceReturnsTest extends TestCase
                     'return_status' => 'RETURN_REQUEST_PENDING',
                     'return_reason_text' => 'Barang tidak sesuai',
                     'refund_total' => '125000',
-                    'tracking_number' => 'JNE-RETURN-001',
+                    'return_tracking_number' => 'JNE-RETURN-001',
                     'sku_list' => [[
                         'seller_sku' => 'SKU-001',
                         'sku_id' => 'MODEL-001',
@@ -138,6 +138,7 @@ class MarketplaceReturnsTest extends TestCase
             ->assertJsonPath('channel_code', 'TIKTOK')
             ->assertJsonPath('return_sn', 'TTK-RETURN-001')
             ->assertJsonPath('order_sn', 'TTK-ORDER-001')
+            ->assertJsonPath('tracking_number', 'JNE-RETURN-001')
             ->assertJsonPath('item.0.item_name', 'Produk TikTok')
             ->assertJsonPath('item.0.return_item_quantity', 1);
     }

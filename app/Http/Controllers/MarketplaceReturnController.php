@@ -740,7 +740,10 @@ class MarketplaceReturnController extends Controller
                 ?? $detail['refund_total']
                 ?? ($localDetail['amount_before_discount'] ?? 0);
             $detail['needs_logistics'] = $detail['needs_logistics'] ?? ($localDetail['needs_logistics'] ?? false);
-            $detail['tracking_number'] = ($detail['tracking_number'] ?? '') ?: ($localDetail['tracking_number'] ?? null);
+            $detail['tracking_number'] = ($detail['tracking_number']
+                ?? $detail['return_tracking_number']
+                ?? $detail['return_shipping_tracking_number']
+                ?? '') ?: ($localDetail['tracking_number'] ?? null);
             $detail['create_time'] = $detail['create_time'] ?? ($localDetail['create_time'] ?? null);
             $detail['update_time'] = $detail['update_time'] ?? ($localDetail['update_time'] ?? null);
             $detail['item'] = $this->normalizeReturnDetailItems(

@@ -696,7 +696,13 @@ class TikTokShopChannel implements MarketplaceChannel
                 'return_solution' => $isRefundOnly ? 1 : 0,
                 'amount_before_discount' => (float) ($r['refund_total'] ?? $r['refund_amount'] ?? 0),
                 'needs_logistics' => ! $isRefundOnly,
-                'tracking_number' => $r['tracking_number'] ?? null,
+                // TikTok memakai return_tracking_number untuk resi yang
+                // dikirim pembeli kembali ke seller. tracking_number tetap
+                // dipertahankan sebagai fallback kompatibilitas.
+                'tracking_number' => $r['return_tracking_number']
+                    ?? $r['tracking_number']
+                    ?? $r['return_shipping_tracking_number']
+                    ?? null,
                 'create_time' => $r['create_time'] ?? null,
                 'update_time' => $r['update_time'] ?? null,
                 'item' => $items,
@@ -767,7 +773,10 @@ class TikTokShopChannel implements MarketplaceChannel
                 'return_solution' => $isRefundOnly ? 1 : 0,
                 'amount_before_discount' => (float) ($r['refund_total'] ?? $r['refund_amount'] ?? 0),
                 'needs_logistics' => ! $isRefundOnly,
-                'tracking_number' => $r['tracking_number'] ?? null,
+                'tracking_number' => $r['return_tracking_number']
+                    ?? $r['tracking_number']
+                    ?? $r['return_shipping_tracking_number']
+                    ?? null,
                 'create_time' => $r['create_time'] ?? null,
                 'update_time' => $r['update_time'] ?? null,
                 'item' => $items,
