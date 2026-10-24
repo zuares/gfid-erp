@@ -3980,7 +3980,7 @@ class MarketplaceSyncService
                 $purchaseChannel = PurchaseChannel::normalize($detail['purchase_channel'] ?? null)
                     ?? PurchaseChannel::normalize($store->channel?->code);
 
-                $orderedAt   = ! empty($detail['create_time']) ? now()->setTimestamp((int) $detail['create_time']) : null;
+                $orderedAt   = $this->normalizeOrderEventTimestamp($detail['create_time'] ?? null);
                 $orderDate   = $orderedAt ? $orderedAt->toDateTimeString() : now()->toDateTimeString();
                 $orderStatus = $detail['order_status'] ?? null;
 
@@ -4470,6 +4470,10 @@ class MarketplaceSyncService
             $timestamp = (int) $value;
             if ($timestamp <= 0) {
                 return null;
+            }
+
+            if ($timestamp > 9_999_999_999) {
+                $timestamp = (int) floor($timestamp / 1000);
             }
 
             return Carbon::createFromTimestamp($timestamp, config('app.timezone'));

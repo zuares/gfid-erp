@@ -8,6 +8,7 @@ use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
 use App\Services\MarketplaceSyncService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -120,6 +121,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
             'order_status' => 'SHIPPED',
             'ordered_at' => now()->subDay(),
             'order_date' => now()->subDay(),
+            'shipped_at' => Carbon::create(2026, 4, 16, 12, 0, 0, config('app.timezone')),
             'subtotal_items' => 100000,
             'total_paid_customer' => 100000,
             'total_amount' => 100000,
@@ -142,6 +144,21 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
             'estimated_escrow_amount' => 81234,
             'status_description' => 'waiting for delivery',
             'currency' => 'IDR',
+            'raw_json' => [
+                'transaction' => [
+                    'order_create_time' => Carbon::create(2026, 4, 14, 10, 30, 0, config('app.timezone'))->timestamp,
+                    'est_fee_tax_amount' => '-30',
+                    'fee_tax_breakdown' => [
+                        'fee' => ['transaction_fee_amount' => '-2'],
+                        'tax' => ['sales_tax_amount' => '-10'],
+                    ],
+                    'shipping_cost_breakdown' => [
+                        'actual_shipping_fee_amount' => '-50',
+                        'customer_paid_shipping_fee_amount' => '70',
+                        'shipping_fee_discount_amount' => '50',
+                    ],
+                ],
+            ],
             'synced_at' => now(),
         ]);
 
@@ -151,6 +168,10 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertStringContainsString('Estimasi Penghasilan Akhir', $html);
         $this->assertStringContainsString('Berdasarkan estimasi TikTok Finance API', $html);
         $this->assertStringContainsString('Rp81.234', $html);
+        $this->assertStringContainsString('14 April 2026 10:30', $html);
+        $this->assertStringContainsString('16 April 2026 12:00', $html);
+        $this->assertStringContainsString('TikTok Fee - Transaction Fee', $html);
+        $this->assertStringContainsString('Total Fee & Pajak TikTok', $html);
     }
 
     public function test_final_statement_preserves_tiktok_fee_and_tax_breakdown(): void

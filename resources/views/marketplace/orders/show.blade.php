@@ -151,6 +151,24 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
     $isTikTok = in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true);
     $platformLabel = $isTikTok ? 'TikTok' : 'Shopee';
     $settlementRaw = is_array($settlement?->raw_json ?? null) ? $settlement->raw_json : [];
+    $isTikTokFinalSettlement = $isTikTok && $settlement && (
+        $settlement->data_status === \App\Services\Marketplace\MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
+        || $settlement->settlement_time
+        || (float) $settlement->final_income > 0
+    );
+    $tiktokEstimateRaw = is_array($incomeEstimate?->raw_json ?? null) ? $incomeEstimate->raw_json : [];
+    $tiktokEstimateTransaction = is_array($tiktokEstimateRaw['transaction'] ?? null)
+        ? $tiktokEstimateRaw['transaction']
+        : [];
+    $tiktokPendingTransaction = $isTikTok && ! $isTikTokFinalSettlement
+        ? $tiktokEstimateTransaction
+        : [];
+    $tiktokShippingBreakdown = is_array($tiktokPendingTransaction['shipping_cost_breakdown'] ?? null)
+        ? $tiktokPendingTransaction['shipping_cost_breakdown']
+        : [];
+    $tiktokFeeTaxBreakdown = is_array($tiktokPendingTransaction['fee_tax_breakdown'] ?? null)
+        ? $tiktokPendingTransaction['fee_tax_breakdown']
+        : (is_array($settlementRaw['tiktok_fee_breakdown'] ?? null) ? $settlementRaw['tiktok_fee_breakdown'] : []);
     $inc = array_replace($liveData['income_details'] ?? [], $settlementRaw);
     $promotionBreakdown = $promotionBreakdown ?? [
         'product_discount' => 0,
@@ -414,6 +432,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 <div class="od-body od-list">
                     @php
                         $createTime = $firstDateTime(
+                            $tiktokPendingTransaction['order_create_time'] ?? null,
                             $order->ordered_at,
                             $order->order_date,
                             $liveData['create_time'] ?? null,
@@ -426,6 +445,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                             $liveData['payment_info']['pay_time'] ?? null
                         );
                         $shipTime = $firstDateTime(
+                            $order->shipped_at,
                             $order->shipping_arranged_at,
                             $liveData['ship_time'] ?? null,
                             $liveData['arrange_ship_time'] ?? null,
@@ -716,15 +736,30 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
     @php
         // Seller Income Data
         // Subtotal = Harga Produk Setelah Diskon (dari loop item_list atau fallback database)
-        $subtotal = (float)($inc['order_discounted_price'] ?? $inc['revenue_amount'] ?? $order->subtotal_items ?? ($subtotalItems > 0 ? $subtotalItems : 0));
+        $subtotal = (float)($tiktokPendingTransaction['est_revenue_amount']
+            ?? $inc['order_discounted_price']
+            ?? $inc['revenue_amount']
+            ?? $order->subtotal_items
+            ?? ($subtotalItems > 0 ? $subtotalItems : 0));
         
         $ongkirRebate = (float)($inc['shopee_shipping_rebate'] ?? 0);
-        $ongkirDibayarPembeli = $buyerShippingAmount($inc, $liveData, $order->shipping_fee_customer);
+        $ongkirDibayarPembeli = (float)($tiktokShippingBreakdown['customer_paid_shipping_fee_amount']
+            ?? $buyerShippingAmount($inc, $liveData, $order->shipping_fee_customer));
         
-        $ongkosJasaKirim = (float)($settlement->actual_shipping_fee ?? $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0))));
-        $potonganOngkir = (float)($settlement->shipping_fee_subsidy ?? $inc['shipping_fee_subsidy'] ?? $inc['tiktok_shop_shipping_incentive_amount'] ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0);
+        $ongkosJasaKirim = $tiktokShippingBreakdown !== []
+            ? abs((float)($tiktokShippingBreakdown['actual_shipping_fee_amount']
+                ?? $tiktokPendingTransaction['est_shipping_cost_amount']
+                ?? 0))
+            : (float)($settlement->actual_shipping_fee ?? $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0))));
+        $potonganOngkir = $tiktokShippingBreakdown !== []
+            ? abs((float)($tiktokShippingBreakdown['shipping_fee_discount_amount']
+                ?? $tiktokShippingBreakdown['tiktok_shop_shipping_incentive_amount']
+                ?? 0))
+            : (float)($settlement->shipping_fee_subsidy ?? $inc['shipping_fee_subsidy'] ?? $inc['tiktok_shop_shipping_incentive_amount'] ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0);
         
-        $voucherToko = (float)($settlement->seller_voucher ?? $inc['voucher_from_seller'] ?? $inc['seller_voucher_rebate'] ?? 0);
+        $voucherToko = $tiktokPendingTransaction !== []
+            ? abs((float)($tiktokPendingTransaction['revenue_breakdown']['seller_discount_amount'] ?? 0))
+            : (float)($settlement->seller_voucher ?? $inc['voucher_from_seller'] ?? $inc['seller_voucher_rebate'] ?? 0);
         
         // Buyer Payment Data dipakai juga untuk estimasi saat settlement belum ada.
         $voucherPlatform = (float)($inc['voucher_from_shopee'] ?? $inc['voucher_from_platform'] ?? $inc['platform_voucher'] ?? 0);
@@ -826,6 +861,32 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 ];
             }
         };
+
+        $tiktokFeeDetailRows = [];
+        $tiktokFeeDetailLabel = static function (string $key, string $section): string {
+            $key = preg_replace('/_amount$/', '', $key) ?? $key;
+            $key = str_replace('_', ' ', $key);
+
+            return 'TikTok '.ucwords($section).' - '.ucwords($key);
+        };
+        foreach ([
+            'fee' => (array) ($tiktokFeeTaxBreakdown['fee'] ?? $tiktokFeeTaxBreakdown['fees'] ?? []),
+            'tax' => (array) ($tiktokFeeTaxBreakdown['tax'] ?? $tiktokFeeTaxBreakdown['taxes'] ?? []),
+        ] as $section => $rows) {
+            foreach ($rows as $key => $value) {
+                if (is_array($value) || ! is_numeric($value) || (float) $value == 0.0) {
+                    continue;
+                }
+
+                $tiktokFeeDetailRows[] = [
+                    'label' => $tiktokFeeDetailLabel((string) $key, $section),
+                    'amount' => abs((float) $value),
+                ];
+            }
+        }
+        $tiktokFeeTaxTotal = $tiktokPendingTransaction['est_fee_tax_amount']
+            ?? $settlementRaw['fee_and_tax_amount']
+            ?? null;
 
         $sellerFeeBreakdown = [];
         $voucherFeeBreakdown = [];
@@ -1020,6 +1081,24 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                             -Rp{{ number_format($marketplaceFeeTotal, 0, ',', '.') }}
                         </span>
                     </div>
+
+                    @if($isTikTok && $tiktokFeeDetailRows)
+                    <div style="margin:.25rem 0 .55rem; padding:.45rem .55rem; border:1px dashed rgba(148,163,184,.45); border-radius:.45rem; background:#f8fafc">
+                        <div style="font-weight:700; color:#334155; margin-bottom:.15rem">Breakdown TikTok Finance</div>
+                        @foreach($tiktokFeeDetailRows as $feeRow)
+                        <div style="display:flex; justify-content:space-between; margin-left:.35rem">
+                            <span class="od-muted">{{ $feeRow['label'] }}</span>
+                            <span class="od-code-cell" style="font-size:.8rem; color:#b91c1c">-Rp{{ number_format($feeRow['amount'], 0, ',', '.') }}</span>
+                        </div>
+                        @endforeach
+                        @if($tiktokFeeTaxTotal !== null && is_numeric($tiktokFeeTaxTotal))
+                        <div style="display:flex; justify-content:space-between; margin:.2rem 0 0; padding-top:.2rem; border-top:1px solid rgba(148,163,184,.3)">
+                            <span style="font-weight:700; color:#334155">Total Fee & Pajak TikTok</span>
+                            <span class="od-code-cell" style="font-size:.8rem; font-weight:700; color:#b91c1c">-Rp{{ number_format(abs((float) $tiktokFeeTaxTotal), 0, ',', '.') }}</span>
+                        </div>
+                        @endif
+                    </div>
+                    @endif
 
                     <div class="od-finance-tabs">
                         <button type="button" class="od-btn od-fee-tab active" data-fee-tab="seller">Beban Seller</button>
