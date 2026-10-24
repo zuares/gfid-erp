@@ -12,6 +12,20 @@ use App\Services\Channels\ChannelManager;
 
 class MarketplaceReturnController extends Controller
 {
+    private const CANCELLED_ORDER_STATUSES = [
+        'CANCELLED',
+        'CANCELED',
+        'IN_CANCEL',
+        'CANCELLED_BEFORE_SHIPPING',
+    ];
+
+    private const LEGACY_CANCELLED_ORDER_STATUSES = [
+        'cancelled',
+        'canceled',
+        'in_cancel',
+        'cancelled_before_shipping',
+    ];
+
     protected ChannelManager $manager;
 
     public function __construct(ChannelManager $manager)
@@ -278,7 +292,10 @@ class MarketplaceReturnController extends Controller
         if ($type === 'cancel') {
             $q = \App\Models\MarketplaceOrder::with(['items', 'store'])
                 ->whereIn('store_id', $storeIds)
-                ->where('status', 'cancelled');
+                ->where(function ($w) {
+                    $w->whereIn('order_status', self::CANCELLED_ORDER_STATUSES)
+                        ->orWhereIn('status', self::LEGACY_CANCELLED_ORDER_STATUSES);
+                });
 
             if ($from && $to) {
                 $q->where(function ($w) use ($from, $to) {
@@ -287,7 +304,9 @@ class MarketplaceReturnController extends Controller
                 });
             }
             if ($search !== '') {
-                $q->where(fn ($w) => $w->where('external_order_id', 'like', "%{$search}%")->orWhere('shipping_awb_no', 'like', "%{$search}%"));
+                $q->where(fn ($w) => $w->where('external_order_id', 'like', "%{$search}%")
+                    ->orWhere('channel_order_id', 'like', "%{$search}%")
+                    ->orWhere('shipping_awb_no', 'like', "%{$search}%"));
             }
 
             $orders = $q->orderByRaw('COALESCE(cancelled_at, order_date) DESC')->limit(1000)->get();
@@ -370,6 +389,19 @@ class MarketplaceReturnController extends Controller
                 $disputedOrders = \App\Models\MarketplaceOrder::with(['items', 'store'])
                     ->whereIn('store_id', $storeIds)
                     ->whereJsonContains('meta->has_return_request', true)
+                    // TikTok menyimpan cancel_reason pada item, lalu sync order
+                    // mengisi has_return_request untuk menjaga alasan dispute.
+                    // Order yang statusnya batal harus tetap masuk jalur Batal,
+                    // bukan muncul sebagai Retur palsu dengan prefix DISPUTE-.
+                    ->where(function ($q) {
+                        $q->where(function ($w) {
+                            $w->whereNull('order_status')
+                                ->orWhereNotIn('order_status', self::CANCELLED_ORDER_STATUSES);
+                        })->where(function ($w) {
+                            $w->whereNull('status')
+                                ->orWhereNotIn('status', self::LEGACY_CANCELLED_ORDER_STATUSES);
+                        });
+                    })
                     ->when($from && $to, function ($q) use ($from, $to) {
                         $q->whereBetween('ordered_at', [date('Y-m-d H:i:s', $from), date('Y-m-d H:i:s', $to)]);
                     })

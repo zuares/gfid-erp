@@ -990,8 +990,9 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             bodyContainer.classList.add('animate-tab');
         }
 
-        // Tab Retur/Refund/Batal: data diambil LIVE dari API Shopee, bukan dari
-        // array `orders` lokal. Jadi jangan panggil renderTable() — panggil loadRrc().
+        // Tab Retur/Refund: data dibaca dari database hasil sync semua marketplace,
+        // bukan dari array `orders` lokal. Jadi jangan panggil renderTable() —
+        // panggil loadRrc().
         if (tab === 'rrc') {
             updateToolbar();
             loadRrc();
@@ -1012,7 +1013,7 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
         loadOrders();
     };
 
-    // ── Tab Retur / Refund (data LIVE dari API Shopee) ──────────────────────
+    // ── Tab Retur / Refund (data tersimpan lintas marketplace) ──────────────
     let rrcSub = 'return';
     let rrcLoadSeq = 0;
     const rrcLabels = { return: 'Retur', refund: 'Refund' };
@@ -1040,7 +1041,7 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
         }
 
         // Baca dari DATABASE (tersimpan, tanpa batas rentang tanggal). Untuk menarik
-        // data terbaru dari Shopee, gunakan tombol "Tarik dari Shopee" (syncRrc()).
+        // data terbaru dari semua marketplace, gunakan tombol syncRrc().
         const params = new URLSearchParams({ type: rrcSub });
         // Filter tanggal bersifat opsional; kirim hanya bila user membatasi rentang.
         if (getFrom()) params.set('date_from', getFrom());
@@ -1055,7 +1056,7 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
         } catch (e) {
             if (seq !== rrcLoadSeq) return;
             if (silent) return false;
-            body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal mengambil data dari Shopee: ${esc(e.message || 'error')}</div>`;
+            body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal mengambil data retur/refund marketplace: ${esc(e.message || 'error')}</div>`;
             return false;
         }
         if (seq !== rrcLoadSeq) return; // sudah ada permintaan lebih baru
@@ -1073,20 +1074,20 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
     }
     window.loadRrc = loadRrc;
 
-    // Tarik data terbaru dari Shopee → simpan ke DB (anti-duplikat via upsert) → muat ulang.
+    // Tarik data terbaru dari semua marketplace → simpan ke DB (anti-duplikat via upsert) → muat ulang.
     window.syncRrc = async function () {
         const btn = document.getElementById('btnSyncRrc');
         const prev = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menarik…'; }
         const body = $('ordersBody');
-        body.innerHTML = `<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Menarik data dari Shopee & menyimpan ke database… (retur/refund; ini bisa memakan waktu)</div>`;
+        body.innerHTML = `<div class="prod-tab-loading"><span class="prod-tab-spinner"></span> Menarik data retur/refund semua marketplace & menyimpan ke database… (ini bisa memakan waktu)</div>`;
         try {
             const res = await api('/api/marketplace/returns/sync-all?full=1', { method: 'POST' });
             if (res && res.errors && res.errors.length) {
                 console.warn('sync-all errors:', res.errors);
             }
         } catch (e) {
-            if (body) body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal menarik dari Shopee: ${esc(e.message || 'error')}</div>`;
+            if (body) body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">⚠️</div>Gagal menarik data retur/refund marketplace: ${esc(e.message || 'error')}</div>`;
             if (btn) { btn.disabled = false; btn.innerHTML = prev; }
             return;
         }
@@ -1102,7 +1103,7 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
         }
 
         if (!rows.length) {
-            const hint = `<div style="margin-top:6px;font-size:.72rem;color:#94a3b8">Diperiksa ${storesQueried || 0} toko Shopee untuk periode ${esc(getFrom())} s/d ${esc(getTo())}. Coba lebarkan rentang tanggal di atas (retur/refund biasanya jarang).</div>`;
+            const hint = `<div style="margin-top:6px;font-size:.72rem;color:#94a3b8">Diperiksa ${storesQueried || 0} toko marketplace untuk periode ${esc(getFrom())} s/d ${esc(getTo())}. Coba lebarkan rentang tanggal di atas (retur/refund biasanya jarang).</div>`;
             body.innerHTML = `<div class="ord-empty"><div class="ord-empty-icon">📭</div>Tidak ada data ${rrcLabels[rrcSub]} pada periode ini.${hint}</div>` + (warn ? `<div style="text-align:center">${warn}</div>` : '');
             return;
         }

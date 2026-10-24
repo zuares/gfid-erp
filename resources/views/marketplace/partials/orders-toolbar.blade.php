@@ -27,7 +27,7 @@
                 <button class="ord-subtab active" data-sub="return" onclick="switchSubTabRrc('return', this)">↩️ Retur <span class="ord-badge bg-secondary" id="badge-sub-rrc-return">—</span></button>
                 <button class="ord-subtab" data-sub="refund" onclick="switchSubTabRrc('refund', this)">💸 Refund <span class="ord-badge bg-secondary" id="badge-sub-rrc-refund">—</span></button>
                 <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:0.1rem 0.5rem;margin-left:4px" onclick="loadRrc(true)" title="Muat ulang dari database">🔄 Segarkan</button>
-                <button class="btn btn-sm btn-outline-primary" id="btnSyncRrc" style="font-size:0.7rem;padding:0.1rem 0.5rem" onclick="syncRrc()" title="Tarik data terbaru dari Shopee lalu simpan ke database">⬇️ Tarik dari Shopee</button>
+                <button class="btn btn-sm btn-outline-primary" id="btnSyncRrc" style="font-size:0.7rem;padding:0.1rem 0.5rem" onclick="syncRrc()" title="Tarik data terbaru dari semua marketplace lalu simpan ke database">⬇️ Tarik Data Marketplace</button>
             </div>
         </div>
 
