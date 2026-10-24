@@ -884,10 +884,6 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                 ];
             }
         }
-        $tiktokFeeTaxTotal = $tiktokPendingTransaction['est_fee_tax_amount']
-            ?? $settlementRaw['fee_and_tax_amount']
-            ?? null;
-
         $sellerFeeBreakdown = [];
         $voucherFeeBreakdown = [];
         $buyerFeeBreakdown = [];
@@ -914,6 +910,17 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         $buildFeeRows($platformFeeBreakdown, 'Subsidi Ongkir Platform', $feeValue('shipping_fee_subsidy', $potonganOngkir));
 
         $buildFeeRows($adjustmentFeeBreakdown, 'Refund / Adjustment', $feeValue('drc_adjustable_refund', $feeValue('seller_return_refund_amount', $settlement?->drc_adjustable_refund ?? 0)));
+
+        // TikTok Finance memakai breakdown fee_tax_breakdown, bukan field
+        // canonical Shopee. Masukkan detailnya ke tab Beban Seller agar
+        // struktur detail kedua marketplace tetap konsisten.
+        if ($isTikTok && $tiktokFeeDetailRows !== []) {
+            $sellerFeeBreakdown = $tiktokFeeDetailRows;
+        }
+        $tiktokAdjustmentAmount = $tiktokPendingTransaction['est_adjustment_amount']
+            ?? $settlementRaw['adjustment_amount']
+            ?? null;
+        $buildFeeRows($adjustmentFeeBreakdown, 'Adjustment TikTok', $tiktokAdjustmentAmount);
 
         $sellerFeeBreakdownTotal = array_sum(array_column($sellerFeeBreakdown, 'amount'));
         $voucherFeeBreakdownTotal = array_sum(array_column($voucherFeeBreakdown, 'amount'));
@@ -1081,24 +1088,6 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                             -Rp{{ number_format($marketplaceFeeTotal, 0, ',', '.') }}
                         </span>
                     </div>
-
-                    @if($isTikTok && $tiktokFeeDetailRows)
-                    <div style="margin:.25rem 0 .55rem; padding:.45rem .55rem; border:1px dashed rgba(148,163,184,.45); border-radius:.45rem; background:#f8fafc">
-                        <div style="font-weight:700; color:#334155; margin-bottom:.15rem">Breakdown TikTok Finance</div>
-                        @foreach($tiktokFeeDetailRows as $feeRow)
-                        <div style="display:flex; justify-content:space-between; margin-left:.35rem">
-                            <span class="od-muted">{{ $feeRow['label'] }}</span>
-                            <span class="od-code-cell" style="font-size:.8rem; color:#b91c1c">-Rp{{ number_format($feeRow['amount'], 0, ',', '.') }}</span>
-                        </div>
-                        @endforeach
-                        @if($tiktokFeeTaxTotal !== null && is_numeric($tiktokFeeTaxTotal))
-                        <div style="display:flex; justify-content:space-between; margin:.2rem 0 0; padding-top:.2rem; border-top:1px solid rgba(148,163,184,.3)">
-                            <span style="font-weight:700; color:#334155">Total Fee & Pajak TikTok</span>
-                            <span class="od-code-cell" style="font-size:.8rem; font-weight:700; color:#b91c1c">-Rp{{ number_format(abs((float) $tiktokFeeTaxTotal), 0, ',', '.') }}</span>
-                        </div>
-                        @endif
-                    </div>
-                    @endif
 
                     <div class="od-finance-tabs">
                         <button type="button" class="od-btn od-fee-tab active" data-fee-tab="seller">Beban Seller</button>

@@ -148,6 +148,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
                 'transaction' => [
                     'order_create_time' => Carbon::create(2026, 4, 14, 10, 30, 0, config('app.timezone'))->timestamp,
                     'est_fee_tax_amount' => '-30',
+                    'est_adjustment_amount' => '170',
                     'fee_tax_breakdown' => [
                         'fee' => ['transaction_fee_amount' => '-2'],
                         'tax' => ['sales_tax_amount' => '-10'],
@@ -171,7 +172,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertStringContainsString('14 April 2026 10:30', $html);
         $this->assertStringContainsString('16 April 2026 12:00', $html);
         $this->assertStringContainsString('TikTok Fee - Transaction Fee', $html);
-        $this->assertStringContainsString('Total Fee & Pajak TikTok', $html);
+        $this->assertStringContainsString('data-fee-panel="seller"', $html);
+        $this->assertStringContainsString('Adjustment TikTok', $html);
     }
 
     public function test_final_statement_preserves_tiktok_fee_and_tax_breakdown(): void
