@@ -968,6 +968,7 @@ class MarketplaceSalesDashboardController extends Controller
                 'o.raw_json',
                 'o.raw_payload_json',
                 'o.voucher_discount',
+                'payment_ms.id as settlement_id',
                 'payment_ms.buyer_payment_amount',
                 'payment_ms.seller_voucher',
                 'payment_ms.raw_json as settlement_raw_json',
@@ -1272,6 +1273,71 @@ SQL;
                 ->get();
         }
 
+        // Payment snapshots already decode the settlement payload for every
+        // order and every comparison period. Reuse them for voucher metrics
+        // so the Sales tab does not lose settlement-backed vouchers while
+        // avoiding another large raw_json query.
+        $settlementVoucherDaily = $paymentSnapshotRows
+            ->filter(fn ($row) => (bool) data_get($row, 'settlement_backed', false))
+            ->groupBy('day')
+            ->map(function ($rows) {
+                return (object) [
+                    'voucher_store' => (float) $rows->sum('voucher_store'),
+                    'voucher_store_orders' => $rows->where('voucher_store', '>', 0)->count(),
+                    'voucher_store_sales' => (float) $rows
+                        ->filter(fn ($row) => (float) ($row->voucher_store ?? 0) > 0)
+                        ->sum('promotion_sales'),
+                    'voucher_platform' => (float) $rows->sum('voucher_platform'),
+                    'voucher_platform_orders' => $rows->where('voucher_platform', '>', 0)->count(),
+                    'voucher_platform_sales' => (float) $rows
+                        ->filter(fn ($row) => (float) ($row->voucher_platform ?? 0) > 0)
+                        ->sum('promotion_sales'),
+                    'promotion_orders' => $rows->filter(function ($row) {
+                        return (float) ($row->voucher_store ?? 0) > 0
+                            || (float) ($row->voucher_platform ?? 0) > 0;
+                    })->count(),
+                    'total_promotion' => (float) $rows->sum(fn ($row) => (float) ($row->voucher_store ?? 0)
+                        + (float) ($row->voucher_platform ?? 0)
+                    ),
+                ];
+            });
+
+        foreach ($settlementVoucherDaily as $day => $voucherRow) {
+            if (! isset($promotionDaily[$day])) {
+                $promotionDaily[$day] = (object) [
+                    'day' => (string) $day,
+                    'promotion_orders' => 0,
+                    'product_discount' => 0,
+                    'product_discount_orders' => 0,
+                    'voucher_store' => 0,
+                    'voucher_store_orders' => 0,
+                    'voucher_store_sales' => 0,
+                    'voucher_platform' => 0,
+                    'voucher_platform_orders' => 0,
+                    'voucher_platform_sales' => 0,
+                    'bundle_discount' => 0,
+                    'bundle_discount_orders' => 0,
+                    'bundle_discount_sales' => 0,
+                    'combo_hemat' => 0,
+                    'combo_hemat_orders' => 0,
+                    'combo_hemat_sales' => 0,
+                    'other_discount' => 0,
+                    'shipping_discount' => 0,
+                    'total_promotion' => 0,
+                ];
+            }
+
+            $row = $promotionDaily[$day];
+            $row->voucher_store += (float) $voucherRow->voucher_store;
+            $row->voucher_store_orders += (int) $voucherRow->voucher_store_orders;
+            $row->voucher_store_sales += (float) $voucherRow->voucher_store_sales;
+            $row->voucher_platform += (float) $voucherRow->voucher_platform;
+            $row->voucher_platform_orders += (int) $voucherRow->voucher_platform_orders;
+            $row->voucher_platform_sales += (float) $voucherRow->voucher_platform_sales;
+            $row->promotion_orders += (int) $voucherRow->promotion_orders;
+            $row->total_promotion += (float) $voucherRow->total_promotion;
+        }
+
         foreach ($settlementPromotionRows as $settlementRow) {
             $raw = is_array($settlementRow->raw_json)
                 ? $settlementRow->raw_json
@@ -1337,23 +1403,17 @@ SQL;
             }
 
             $row = $promotionDaily[$day];
-            $promotionTotal = $productDiscount + $voucherStore + $voucherPlatform + $bundleDiscount + $comboHemat;
-            if ($promotionTotal > 0) {
+            // Voucher amounts are already aggregated from payment snapshots
+            // above. Keep this pass focused on item-level discounts so the
+            // Promosi tab does not double-count settlement vouchers.
+            $promotionTotal = $productDiscount + $bundleDiscount + $comboHemat;
+            $hasVoucher = $voucherStore > 0 || $voucherPlatform > 0;
+            if ($promotionTotal > 0 && ! $hasVoucher) {
                 $row->promotion_orders++;
             }
             $row->product_discount += $productDiscount;
             if ($productDiscount > 0) {
                 $row->product_discount_orders++;
-            }
-            $row->voucher_store += $voucherStore;
-            if ($voucherStore > 0) {
-                $row->voucher_store_orders++;
-                $row->voucher_store_sales += (float) $settlementRow->order_subtotal;
-            }
-            $row->voucher_platform += $voucherPlatform;
-            if ($voucherPlatform > 0) {
-                $row->voucher_platform_orders++;
-                $row->voucher_platform_sales += (float) $settlementRow->order_subtotal;
             }
             $row->bundle_discount += $bundleDiscount;
             if ($bundleDiscount > 0) {
@@ -3434,6 +3494,13 @@ SQL;
             'day' => (string) $row->day,
             'store_id' => $row->store_id !== null ? (int) $row->store_id : null,
             'store_name' => trim((string) ($row->store_name ?: 'Toko marketplace')),
+            'settlement_backed' => $row->settlement_id !== null,
+            'promotion_sales' => max(
+                (float) ($row->subtotal_items ?? 0) > 0
+                    ? (float) $row->subtotal_items
+                    : (float) ($row->total_amount ?? 0),
+                0,
+            ),
             'category' => $this->paymentCategoryForDashboard($row->payment_method, $row->payment_status),
             'is_paid' => in_array(strtoupper((string) $row->payment_status), ['PAID', 'COMPLETED', 'SELESAI', 'LUNAS'], true),
             'buyer_paid' => max($buyerPaid, 0),
@@ -3441,6 +3508,7 @@ SQL;
             'buyer_service_fee' => max($buyerServiceFee, 0),
             'product_protection' => max($productProtection, 0),
             'voucher_store' => max($voucherStore, 0),
+            'voucher_platform' => max($voucherPlatform, 0),
             'bundle_discount' => max((float) ($promotion['bundle_discount'] ?? 0), 0),
             'combo_hemat' => max((float) ($promotion['combo_hemat'] ?? 0), 0),
         ];
