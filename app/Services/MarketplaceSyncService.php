@@ -373,14 +373,14 @@ class MarketplaceSyncService
     }
 
     /**
-     * Sync order rentang PANJANG secara berjendela (per <=14 hari) dengan lock
-     * per-jendela — kunci yang SAMA dengan sync 5-menit (sync_store_{id}) supaya
-     * tidak tabrakan, tapi dilepas di tiap jendela agar cron tidak terblokir lama.
+     * Sync order rentang PANJANG secara berjendela (per <=14 hari) dengan satu
+     * lock yang mencakup seluruh rentang — kunci yang SAMA dengan sync 5-menit
+     * (sync_store_{id}) supaya scheduler tidak masuk di tengah backfill panjang.
      *
      * SATU-SATUNYA implementasi loop berjendela: dipakai marketplace:sync-orders
-     * (--days > 14) dan shopee:sync-historical-orders. Sebelumnya logika ini
-     * terduplikasi di dua command dengan perilaku lock berbeda (command sync-orders
-     * memegang satu lock TTL 240 dtk yang kedaluwarsa di tengah rentang panjang).
+     * (--days > 14) dan shopee:sync-historical-orders. Sebelumnya lock hanya
+     * diambil per jendela dengan TTL 240 detik; ketika satu jendela lama, lock
+     * kedaluwarsa dan scheduler dapat menulis bersamaan.
      *
      * @param callable|null $onWindow fn(int $index, int $total, int $wFrom, int $wTo, ?array $result, ?\Throwable $error): void
      * @return array{windows:int, new:int, updated:int, failed:int, skipped_locked:int}
@@ -402,38 +402,82 @@ class MarketplaceSyncService
 
         $totals = ['windows' => count($windows), 'new' => 0, 'updated' => 0, 'failed' => 0, 'skipped_locked' => 0];
 
-        foreach ($windows as $i => [$wFrom, $wTo]) {
-            $lock   = \Illuminate\Support\Facades\Cache::lock("sync_store_{$store->id}", 240);
-            $result = null;
-            $error  = null;
+        // Satu jendela bisa berisi banyak order dan membutuhkan lebih dari 240
+        // detik. TTL dihitung dari jumlah jendela agar lock tidak kedaluwarsa
+        // di tengah proses, tetapi tetap memiliki batas atas untuk menghindari
+        // lock yatim terlalu lama bila worker mati mendadak.
+        $lockTtl = max(3600, min(86400, (count($windows) * 3600) + 600));
+        $lock = \Illuminate\Support\Facades\Cache::lock("sync_store_{$store->id}", $lockTtl);
+        $lockAcquired = false;
 
-            try {
-                $lock->block(120); // tunggu maks 2 menit bila proses lain sedang sync toko ini
-                $result = $this->syncOrders($store, $wFrom, $wTo, $pageSize, false, null, $timeRangeField);
-                $totals['new']     += (int) ($result['new'] ?? 0);
-                $totals['updated'] += (int) ($result['updated'] ?? 0);
-            } catch (\Illuminate\Contracts\Cache\LockTimeoutException $e) {
-                $totals['skipped_locked']++;
-                $error = $e;
-            } catch (\Throwable $e) {
-                $totals['failed']++;
-                $error = $e;
-                Log::warning('syncOrdersWindowed: jendela gagal', [
-                    'store_id' => $store->id,
-                    'from'     => date('Y-m-d', $wFrom),
-                    'to'       => date('Y-m-d', $wTo),
-                    'error'    => $e->getMessage(),
-                ]);
-            } finally {
-                optional($lock)->release();
+        try {
+            $lock->block(120); // tunggu maks 2 menit bila proses lain sedang sync toko ini
+            $lockAcquired = true;
+
+            foreach ($windows as $i => [$wFrom, $wTo]) {
+                $result = null;
+                $error  = null;
+                $windowAttempts = 0;
+
+                do {
+                    $windowAttempts++;
+                    try {
+                        $result = $this->syncOrders($store, $wFrom, $wTo, $pageSize, false, null, $timeRangeField);
+                        $totals['new']     += (int) ($result['new'] ?? 0);
+                        $totals['updated'] += (int) ($result['updated'] ?? 0);
+                        $error = null;
+                    } catch (\Throwable $e) {
+                        $error = $e;
+                        $isDatabaseLock = str_contains(strtolower($e->getMessage()), 'database is locked')
+                            || str_contains(strtolower($e->getMessage()), 'database file is locked')
+                            || str_contains(strtolower($e->getMessage()), 'database table is locked');
+
+                        if (! $isDatabaseLock || $windowAttempts >= 3) {
+                            break;
+                        }
+
+                        Log::warning('syncOrdersWindowed: retry jendela karena database lock', [
+                            'store_id' => $store->id,
+                            'from' => date('Y-m-d', $wFrom),
+                            'to' => date('Y-m-d', $wTo),
+                            'attempt' => $windowAttempts,
+                        ]);
+                        sleep($windowAttempts * 2);
+                    }
+                } while ($error !== null && $windowAttempts < 3);
+
+                if ($error) {
+                    $totals['failed']++;
+                    Log::warning('syncOrdersWindowed: jendela gagal', [
+                        'store_id' => $store->id,
+                        'from'     => date('Y-m-d', $wFrom),
+                        'to'       => date('Y-m-d', $wTo),
+                        'error'    => $error->getMessage(),
+                        'attempts' => $windowAttempts,
+                    ]);
+                }
+
+                if ($onWindow) {
+                    try { $onWindow($i + 1, $totals['windows'], $wFrom, $wTo, $result, $error); } catch (\Throwable $e) { /* abaikan */ }
+                }
+
+                if ($pauseSeconds > 0 && $i + 1 < $totals['windows']) {
+                    sleep($pauseSeconds); // jeda antar jendela, jaring pengaman rate limit
+                }
             }
-
-            if ($onWindow) {
-                try { $onWindow($i + 1, $totals['windows'], $wFrom, $wTo, $result, $error); } catch (\Throwable $e) { /* abaikan */ }
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException $e) {
+            // Seluruh rentang tidak dijalankan bila toko masih diproses oleh
+            // sync lain. Laporkan setiap jendela agar progress UI tidak terlihat
+            // menggantung di persentase terakhir.
+            $totals['skipped_locked'] = count($windows);
+            foreach ($windows as $i => [$wFrom, $wTo]) {
+                if ($onWindow) {
+                    try { $onWindow($i + 1, $totals['windows'], $wFrom, $wTo, null, $e); } catch (\Throwable $callbackError) { /* abaikan */ }
+                }
             }
-
-            if ($pauseSeconds > 0 && $i + 1 < $totals['windows']) {
-                sleep($pauseSeconds); // jeda antar jendela, jaring pengaman rate limit
+        } finally {
+            if ($lockAcquired) {
+                $lock->release();
             }
         }
 
@@ -3965,9 +4009,9 @@ class MarketplaceSyncService
         $outerStats = ['new' => 0, 'updated' => 0, 'sku_empty' => 0, 'mapping_not_found' => 0, 'missing_hpp' => 0, 'ready' => 0, 'incomplete' => 0, 'skipped' => 0];
 
         try {
-        // Proses per-batch kecil; tiap batch transaksi sendiri agar kunci tulis SQLite tidak
-        // ditahan lama sepanjang seluruh sync (mengurangi "database is locked" saat bersamaan).
-        foreach (array_chunk($details, 50) as $chunk) {
+        // SQLite hanya memiliki satu penulis. Batch kecil mengurangi durasi write
+        // lock, sedangkan attempts menangani lock singkat dari sync/queue lain.
+        foreach (array_chunk($details, 10) as $chunk) {
         DB::transaction(function () use ($store, $chunk, &$outerStats, $dryRun) {
 
             foreach ($chunk as $detail) {
@@ -4432,7 +4476,7 @@ class MarketplaceSyncService
                     );
                 }
             }
-        });
+        }, 3);
         } // akhir per-batch (array_chunk)
 
         if (!$dryRun) {

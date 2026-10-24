@@ -111,9 +111,9 @@ class SyncOrdersCommand extends Command
             $progressKey = "marketplace:sync_progress:{$store->id}";
 
             // ── Rentang panjang (>14 hari): per-jendela lewat service ─────────
-            // Lock diambil-dilepas PER JENDELA di syncOrdersWindowed() — satu lock
-            // TTL 240 dtk akan kedaluwarsa di tengah rentang panjang dan membuka
-            // celah tabrakan dengan sync 5-menit.
+            // Service memegang satu lock selama seluruh rentang agar scheduler
+            // 5-menit tidak masuk di tengah proses dan membuat database SQLite
+            // kembali berebut penulis.
             if ($days > 14) {
                 try {
                     Cache::put($progressKey, [
@@ -137,9 +137,17 @@ class SyncOrdersCommand extends Command
                     // hourly agar order READY_TO_SHIP segera keluar dari Dikemas.
                     $this->syncBookings($store, $timeFrom, $timeTo);
 
+                    $warningLabel = '';
+                    if (($totals['failed'] ?? 0) > 0) {
+                        $warningLabel .= ", {$totals['failed']} periode gagal";
+                    }
+                    if (($totals['skipped_locked'] ?? 0) > 0) {
+                        $warningLabel .= ", {$totals['skipped_locked']} periode dilewati (lock)";
+                    }
+
                     Cache::put($progressKey, [
                         'percent' => 100,
-                        'label'   => "Selesai · {$totals['new']} baru, {$totals['updated']} update",
+                        'label'   => "Selesai · {$totals['new']} baru, {$totals['updated']} update{$warningLabel}",
                         'status'  => 'done', 'store' => $store->name,
                         'new' => $totals['new'], 'updated' => $totals['updated'], 'ts' => now()->timestamp,
                     ], 300);

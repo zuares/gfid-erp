@@ -44,7 +44,7 @@ return [
             // Anti "database is locked": WAL mengizinkan banyak pembaca + satu penulis
             // bersamaan, dan busy_timeout membuat penulis MENUNGGU (ms) saat file terkunci
             // alih-alih langsung gagal. synchronous NORMAL aman dipakai bersama WAL.
-            'busy_timeout' => env('DB_BUSY_TIMEOUT', 15000),
+            'busy_timeout' => env('DB_BUSY_TIMEOUT', 60000),
             'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
             'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
             // IMMEDIATE mengambil write lock sejak awal transaksi sehingga
