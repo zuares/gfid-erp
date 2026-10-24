@@ -518,7 +518,7 @@ trait MarketplaceOrdersPaginatedTrait
         }
 
         $storeChannel = strtolower(trim((string) ($order->store?->channel?->code ?? '')));
-        $isTikTokPending = in_array($storeChannel, ['tiktok', 'ttk', 'tkt'], true)
+        $isTikTokPending = in_array($storeChannel, ['tiktok', 'ttk', 'tkt', 'tt'], true)
             && $order->settlement
             && $order->settlement->data_status !== MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
             && ! $order->settlement->settlement_time;

@@ -3632,10 +3632,10 @@ SQL;
     private function salesOrderPayoutExpression(string $settlementAlias, string $estimateAlias): string
     {
         return "CASE
-            WHEN UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT')
+            WHEN UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT', 'TT')
                 AND COALESCE({$settlementAlias}.data_status, '') = 'complete'
                 THEN COALESCE({$settlementAlias}.final_income, NULLIF(o.net_payout_estimated, 0), {$estimateAlias}.estimated_escrow_amount, 0)
-            WHEN UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT')
+            WHEN UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT', 'TT')
                 THEN COALESCE({$estimateAlias}.estimated_escrow_amount, NULLIF(o.net_payout_estimated, 0), NULLIF({$settlementAlias}.final_income, 0), 0)
             ELSE COALESCE(NULLIF(o.net_payout_estimated, 0), NULLIF({$settlementAlias}.final_income, 0), {$estimateAlias}.estimated_escrow_amount, 0)
         END";
@@ -3649,7 +3649,7 @@ SQL;
     private function salesFinalIncomeCondition(string $settlementAlias): string
     {
         return "({$settlementAlias}.settlement_time IS NOT NULL OR (
-            UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT')
+            UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT', 'TT')
             AND COALESCE({$settlementAlias}.data_status, '') = 'complete'
         ))";
     }

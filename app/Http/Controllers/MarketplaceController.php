@@ -3138,7 +3138,7 @@ class MarketplaceController extends Controller
         // kompatibel, tetapi pekerjaannya dialihkan ke queue background.
         $isTikTokFinance = in_array(
             strtolower((string) ($store->channel?->code ?? '')),
-            ['tiktok', 'ttk', 'tkt'],
+            ['tiktok', 'ttk', 'tkt', 'tt'],
             true,
         );
         if ($isTikTokFinance) {
@@ -3151,7 +3151,7 @@ class MarketplaceController extends Controller
 
         $channelName = $store->channel?->name ?? 'channel marketplace';
         $channelCode = $store->channel?->code;
-        $connectUrl = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
+        $connectUrl = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt', 'tt'], true)
             ? url('/marketplace/tiktok/connect')
             : url('/marketplace/shopee/connect');
 
@@ -3181,11 +3181,11 @@ class MarketplaceController extends Controller
                     $store->loadMissing('channel');
                     $channelName = $store->channel?->name ?? $channelName;
                     $channelCode = $store->channel?->code ?? $channelCode;
-                    $connectUrl = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
+                    $connectUrl = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt', 'tt'], true)
                         ? url('/marketplace/tiktok/connect')
                         : url('/marketplace/shopee/connect');
                     $status = $store->connection_status;
-                } elseif (in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)) {
+                } elseif (in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
                     $tiktok = app(\App\Services\Channels\TikTokShop\TikTokShopChannel::class);
                     $tiktok->refreshToken($store);
                     $store->refresh();
@@ -3244,7 +3244,7 @@ class MarketplaceController extends Controller
 
         try {
             if ($isBackfill) {
-                $result = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
+                $result = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt', 'tt'], true)
                     ? $this->sync->syncTikTokFinanceBatched($store, $timeFrom, $timeTo, false, function (array $progress) use ($progressKey, $store): void {
                         Cache::put($progressKey, array_merge($progress, [
                             'store_id' => $store->id,
@@ -3253,7 +3253,7 @@ class MarketplaceController extends Controller
                     }, 200)
                     : $this->sync->syncSettlementsBackfill($store, $timeFrom, $timeTo);
             } else {
-                $result = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt'], true)
+                $result = in_array(strtolower((string) $channelCode), ['tiktok', 'ttk', 'tkt', 'tt'], true)
                     ? $this->sync->syncTikTokFinanceBatched($store, $timeFrom, $timeTo, false, function (array $progress) use ($progressKey, $store): void {
                         Cache::put($progressKey, array_merge($progress, [
                             'store_id' => $store->id,
@@ -3338,7 +3338,7 @@ class MarketplaceController extends Controller
         $isAll = ! $isBackfill && $request->boolean('all');
         $store->loadMissing('channel');
         $channelCode = strtolower(trim((string) ($store->channel?->code ?? '')));
-        $isTikTokFinance = in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true);
+        $isTikTokFinance = in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true);
 
         // Background dispatch tidak melakukan refresh token di request path.
         // Kalau token expired, worker akan menangani refresh saat job benar-benar jalan.
@@ -3655,7 +3655,7 @@ class MarketplaceController extends Controller
         $includeMissingPending = $settlementStatus === 'belum_cair'
             || $request->input('tab') === 'belum_cair';
         $isTikTokFinanceChannel = static function ($channelQuery): void {
-            $channelQuery->whereIn('code', ['tiktok', 'ttk', 'tkt']);
+            $channelQuery->whereIn('code', ['tiktok', 'ttk', 'tkt', 'tt']);
         };
         $isTikTokFinanceFinal = static function ($settlementQuery) use ($isTikTokFinanceChannel): void {
             $settlementQuery->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
@@ -4029,7 +4029,7 @@ class MarketplaceController extends Controller
             $isBookingOnly = filled($bookingSn)
                 && filled($orderChannelId)
                 && (string) $orderChannelId === (string) $bookingSn;
-            $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt'], true)
+            $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt', 'tt'], true)
                 && $s->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
             $isFinalSettlement = (bool) $s->settlement_time || $isTikTokFinanceFinal;
             $breakdown = $s->marketplaceFeeBreakdown();
@@ -4361,7 +4361,7 @@ class MarketplaceController extends Controller
                 }) : 0;
                 $isCancelledOrReturned = in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
                 $isReturning = in_array($st, ['TO_RETURN', 'RETURNING']);
-                $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt'], true)
+                $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt', 'tt'], true)
                     && $s->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
                 $isFinalSettlement = (bool) $s->settlement_time || $isTikTokFinanceFinal;
 

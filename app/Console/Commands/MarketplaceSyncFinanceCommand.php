@@ -280,7 +280,7 @@ class MarketplaceSyncFinanceCommand extends Command
 
             $channelCode = strtolower((string) ($store->channel?->code ?? ''));
             $settlementSupported = in_array($channelCode, ['shopee', 'shp'], true);
-            $tiktokFinanceSupported = in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true);
+            $tiktokFinanceSupported = in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true);
 
             if ($tiktokFinanceSupported && ! $dryRun) {
                 $tiktokProgressKey = "marketplace:settlement_sync_progress:{$store->id}";

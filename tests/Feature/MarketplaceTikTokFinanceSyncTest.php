@@ -20,7 +20,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
 
-        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $channel = Channel::create(['code' => 'tt', 'name' => 'TikTok Shop']);
         $store = Store::create([
             'code' => 'TTK-FINANCE-SYNC',
             'name' => 'TikTok Finance Sync Test',

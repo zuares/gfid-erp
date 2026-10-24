@@ -978,7 +978,7 @@ class MarketplaceSyncService
     {
         $store->loadMissing('channel');
         $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
-        if (! in_array($channel, ['tiktok', 'ttk', 'tkt'], true)) {
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
             return ['status' => 'skipped', 'message' => "Channel {$channel} bukan TikTok Shop."];
         }
 
@@ -1442,7 +1442,7 @@ class MarketplaceSyncService
     ): array {
         $store->loadMissing('channel');
         $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
-        if (! in_array($channel, ['tiktok', 'ttk', 'tkt'], true)) {
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
             return [
                 'found' => 0,
                 'processed' => 0,

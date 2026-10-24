@@ -353,7 +353,7 @@ class MarketplaceFinancialQualityController extends Controller
                 && $order->store->status === 'active'
                 && $order->store->connection_status === 'CONNECTED'
             ) {
-                $settlementResult = in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true)
+                $settlementResult = in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true)
                     ? $sync->syncTikTokOrderFinance($order->store, $order)
                     : $sync->syncSettlements(
                         store: $order->store,
@@ -366,7 +366,7 @@ class MarketplaceFinancialQualityController extends Controller
             $assessment = $quality->refreshOrder($order->fresh());
             if ($settlementResult === null) {
                 $syncMessage = 'Payout tidak ditarik ulang karena order belum COMPLETED atau toko belum CONNECTED.';
-            } elseif (in_array($channelCode, ['tiktok', 'ttk', 'tkt'], true)) {
+            } elseif (in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
                 $syncMessage = match ($settlementResult['status'] ?? null) {
                     'synced' => 'Finance TikTok berhasil disinkronkan.',
                     'pending' => 'Finance TikTok belum memiliki statement final.',
