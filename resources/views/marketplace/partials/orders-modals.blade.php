@@ -47,6 +47,26 @@
     </div>
 </div>
 
+{{-- Detail Retur / Refund (Shopee & TikTok) --}}
+<div class="ord-rrc-detail-bg" id="ordRrcDetailBg" hidden onclick="closeRrcDetail(event)">
+    <section class="ord-rrc-detail-modal" role="dialog" aria-modal="true" aria-labelledby="ordRrcDetailTitle" onclick="event.stopPropagation()">
+        <header class="ord-rrc-detail-header">
+            <div>
+                <div class="ord-rrc-detail-kicker" id="ordRrcDetailKicker">RETUR / REFUND</div>
+                <h2 class="ord-rrc-detail-title" id="ordRrcDetailTitle">Detail Retur</h2>
+                <div class="ord-rrc-detail-subtitle" id="ordRrcDetailSubtitle">—</div>
+            </div>
+            <button type="button" class="ord-rrc-detail-close" id="ordRrcDetailClose" onclick="closeRrcDetail()" aria-label="Tutup detail retur">×</button>
+        </header>
+        <div class="ord-rrc-detail-body" id="ordRrcDetailBody">
+            <div class="ord-rrc-detail-loading" role="status"><span class="prod-tab-spinner"></span> Memuat detail retur…</div>
+        </div>
+        <footer class="ord-rrc-detail-footer">
+            <button type="button" class="btn-review" onclick="closeRrcDetail()">Tutup</button>
+        </footer>
+    </section>
+</div>
+
 {{-- Quick Sync Modal --}}
 {{-- Arrange Shipment Modal --}}
 <div class="modal fade" id="arrangeShipmentModal" tabindex="-1">

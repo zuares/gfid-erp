@@ -739,11 +739,17 @@
 
         try {
             const data = await api(`/api/marketplace/stores/${storeId}/returns/${returnSn}/detail`);
-            
+            const channelLabel = ['TIKTOK', 'TTK', 'TT'].includes(String(data.channel_code || '').toUpperCase())
+                ? 'TikTok Shop'
+                : (['SHOPEE', 'SHP'].includes(String(data.channel_code || '').toUpperCase()) ? 'Shopee' : 'Marketplace');
+
             let html = `<div class="mb-3">
-                <div class="fw-bold mb-1">Status Retur (Shopee)</div>
+                <div class="fw-bold mb-1">Status Retur (${channelLabel})</div>
                 <div class="badge bg-secondary mb-2">${data.status || 'UNKNOWN'}</div>
-                <div><strong>Alasan:</strong> ${data.reason_text_code || data.reason || '-'}</div>
+                <div><strong>Order:</strong> ${data.order_sn || '-'}</div>
+                <div><strong>Nilai refund:</strong> ${data.amount_before_discount !== undefined ? Number(data.amount_before_discount || 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }) : '-'}</div>
+                <div><strong>Alasan:</strong> ${data.reason || data.reason_text_code || '-'}</div>
+                <div><strong>Resi pengembalian:</strong> ${data.tracking_number || 'Belum tersedia'}</div>
             </div>`;
 
             if (data.item && data.item.length > 0) {

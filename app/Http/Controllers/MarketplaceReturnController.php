@@ -617,7 +617,7 @@ class MarketplaceReturnController extends Controller
             $total = $query->count();
 
             // Format ke bentuk response API yang diharapkan UI
-            $formattedReturns = $returns->map(function ($r) {
+            $formattedReturns = $returns->map(function ($r) use ($store) {
                 $items = $r->items->map(function ($itm) {
                     return [
                         'item_sku' => $itm->item_sku,
@@ -632,6 +632,8 @@ class MarketplaceReturnController extends Controller
 
                 return [
                     'store_id' => $r->store_id,
+                    'store_name' => $store->name,
+                    'channel_code' => strtoupper((string) ($store->channel?->code ?? '')),
                     'return_sn' => $r->return_sn,
                     'order_sn' => $r->order_sn,
                     'status' => $r->status,
@@ -674,21 +676,201 @@ class MarketplaceReturnController extends Controller
 
     public function getReturnDetail(Store $store, string $returnSn)
     {
+        $returnSn = trim($returnSn);
+
+        if ($returnSn === '') {
+            return response()->json(['error' => 'Return ID wajib diisi.'], 422);
+        }
+
+        // Jangan meneruskan return ID bebas ke API marketplace. Selain menjaga
+        // scope toko, data lokal juga dipakai untuk dispute TikTok yang belum
+        // memiliki return_id resmi dari endpoint return/refund.
+        $stored = MarketplaceReturn::with('items')
+            ->where('store_id', $store->id)
+            ->where('return_sn', $returnSn)
+            ->first();
+
+        $localDetail = $stored
+            ? $this->formatStoredReturnDetail($store, $stored)
+            : $this->formatDisputeReturnDetail($store, $returnSn);
+
+        if (! $localDetail) {
+            return response()->json(['error' => 'Detail retur tidak ditemukan untuk toko ini.'], 404);
+        }
+
+        // Prefix ini adalah record sintetis dari metadata order, bukan ID yang
+        // dapat dipanggil ke API TikTok/Shopee.
+        if (str_starts_with($returnSn, 'DISPUTE-')) {
+            return response()->json($localDetail);
+        }
+
         try {
             $driver = $this->manager->driver($store);
             if (!method_exists($driver, 'getReturnDetail')) {
-                return response()->json(['error' => 'Not supported'], 400);
+                return response()->json($localDetail);
             }
 
             $result = $driver->getReturnDetail($store, $returnSn);
             if (isset($result['error']) && !empty($result['error'])) {
-                return response()->json(['error' => $result['message'] ?? $result['error']], 400);
+                return response()->json(array_merge($localDetail, [
+                    'detail_source' => 'database',
+                    'detail_warning' => $result['message'] ?? 'Detail dari marketplace belum tersedia.',
+                ]));
             }
 
-            return response()->json($result['response'] ?? $result);
+            $providerDetail = $result['response'] ?? $result;
+            if (isset($providerDetail['return']) && is_array($providerDetail['return'])
+                && ! isset($providerDetail['status'])) {
+                $providerDetail = array_merge($providerDetail, $providerDetail['return']);
+            }
+
+            $detail = array_merge($localDetail, is_array($providerDetail) ? $providerDetail : []);
+            $detail['detail_source'] = 'marketplace';
+            $detail['store_id'] = $store->id;
+            $detail['store_name'] = $store->name;
+            $detail['channel_code'] = strtoupper((string) ($store->channel?->code ?? ''));
+            $detail['return_sn'] = ($detail['return_sn'] ?? $detail['return_id'] ?? '') ?: $returnSn;
+            $detail['order_sn'] = ($detail['order_sn'] ?? $detail['order_id'] ?? '') ?: ($localDetail['order_sn'] ?? '');
+            $detail['status'] = ($detail['status'] ?? $detail['return_status'] ?? '') ?: ($localDetail['status'] ?? null);
+            $detail['reason'] = ($detail['reason'] ?? $detail['return_reason_text'] ?? $detail['return_reason'] ?? '') ?: ($localDetail['reason'] ?? null);
+            $detail['reason_text_code'] = ($detail['reason_text_code'] ?? $detail['return_reason'] ?? '') ?: ($localDetail['reason_text_code'] ?? null);
+            $detail['return_solution'] = $detail['return_solution'] ?? ($localDetail['return_solution'] ?? null);
+            $detail['amount_before_discount'] = $detail['amount_before_discount']
+                ?? $detail['refund_amount']
+                ?? $detail['refund_total']
+                ?? ($localDetail['amount_before_discount'] ?? 0);
+            $detail['needs_logistics'] = $detail['needs_logistics'] ?? ($localDetail['needs_logistics'] ?? false);
+            $detail['tracking_number'] = ($detail['tracking_number'] ?? '') ?: ($localDetail['tracking_number'] ?? null);
+            $detail['create_time'] = $detail['create_time'] ?? ($localDetail['create_time'] ?? null);
+            $detail['update_time'] = $detail['update_time'] ?? ($localDetail['update_time'] ?? null);
+            $detail['item'] = $this->normalizeReturnDetailItems(
+                $detail['item'] ?? $detail['items'] ?? [],
+                $localDetail['item'] ?? []
+            );
+            $detail['items'] = $detail['item'];
+
+            return response()->json($detail);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            // Detail tersimpan tetap berguna ketika credential/API marketplace
+            // sedang bermasalah, sehingga pengguna masih dapat melihat retur.
+            return response()->json(array_merge($localDetail, [
+                'detail_source' => 'database',
+                'detail_warning' => 'Detail terbaru dari marketplace belum dapat diambil.',
+            ]));
         }
+    }
+
+    private function formatStoredReturnDetail(Store $store, MarketplaceReturn $return): array
+    {
+        $items = $return->items->map(fn ($item) => [
+            'item_sku' => $item->item_sku,
+            'variation_sku' => $item->variation_sku,
+            'item_name' => $item->item_name,
+            'variation_name' => $item->variation_name,
+            'return_item_quantity' => (int) $item->return_item_quantity,
+            'quantity' => (int) $item->return_item_quantity,
+            'images' => is_array($item->images) ? $item->images : [],
+        ])->values()->all();
+
+        return [
+            'detail_source' => 'database',
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+            'channel_code' => strtoupper((string) ($store->channel?->code ?? '')),
+            'return_sn' => $return->return_sn,
+            'order_sn' => $return->order_sn,
+            'status' => $return->status,
+            'reason' => $return->reason,
+            'reason_text_code' => $return->reason_text_code,
+            'return_solution' => $return->return_solution,
+            'amount_before_discount' => (float) $return->amount_before_discount,
+            'needs_logistics' => (bool) $return->needs_logistics,
+            'tracking_number' => $return->tracking_number,
+            'create_time' => $return->create_time,
+            'update_time' => $return->update_time,
+            'item' => $items,
+            'items' => $items,
+        ];
+    }
+
+    private function formatDisputeReturnDetail(Store $store, string $returnSn): ?array
+    {
+        if (! str_starts_with($returnSn, 'DISPUTE-')) {
+            return null;
+        }
+
+        $orderSn = substr($returnSn, strlen('DISPUTE-'));
+        if ($orderSn === '') {
+            return null;
+        }
+
+        $order = MarketplaceOrder::with('items')
+            ->where('store_id', $store->id)
+            ->where(fn ($q) => $q->where('channel_order_id', $orderSn)->orWhere('external_order_id', $orderSn))
+            ->first();
+
+        if (! $order) {
+            return null;
+        }
+
+        $items = $order->items->map(fn ($item) => [
+            'item_sku' => $item->item_sku,
+            'variation_sku' => $item->model_sku,
+            'item_name' => $item->item_name,
+            'variation_name' => $item->variant_name,
+            'return_item_quantity' => (int) ($item->qty ?? 0),
+            'quantity' => (int) ($item->qty ?? 0),
+            'images' => $item->image_url ? [$item->image_url] : [],
+        ])->values()->all();
+        $meta = is_array($order->meta) ? $order->meta : [];
+
+        return [
+            'detail_source' => 'database',
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+            'channel_code' => strtoupper((string) ($store->channel?->code ?? '')),
+            'return_sn' => $returnSn,
+            'order_sn' => $order->channel_order_id ?: $order->external_order_id,
+            'status' => 'DISPUTE_REQUESTED',
+            'reason' => data_get($meta, 'buyer_dispute_reason', 'Permintaan Retur / Komplain Pembeli'),
+            'reason_text_code' => null,
+            'return_solution' => 0,
+            'amount_before_discount' => (float) $order->total_amount,
+            'needs_logistics' => false,
+            'tracking_number' => $order->shipping_awb_no,
+            'create_time' => $order->delivered_at?->timestamp ?: $order->ordered_at?->timestamp,
+            'update_time' => $order->updated_at?->timestamp,
+            'item' => $items,
+            'items' => $items,
+        ];
+    }
+
+    private function normalizeReturnDetailItems(mixed $items, array $fallback = []): array
+    {
+        if (! is_array($items) || $items === []) {
+            return $fallback;
+        }
+
+        return collect($items)->map(function ($item): array {
+            $item = is_array($item) ? $item : [];
+            $quantity = (int) ($item['return_item_quantity'] ?? $item['return_quantity'] ?? $item['quantity'] ?? 1);
+
+            return [
+                'item_sku' => $item['item_sku'] ?? $item['seller_sku'] ?? $item['sku_id'] ?? $item['variation_sku'] ?? null,
+                'variation_sku' => $item['variation_sku'] ?? $item['model_sku'] ?? $item['sku_id'] ?? null,
+                'item_name' => $item['item_name'] ?? $item['product_name'] ?? $item['name'] ?? null,
+                'variation_name' => $item['variation_name'] ?? $item['model_name'] ?? $item['sku_name'] ?? null,
+                'return_item_quantity' => $quantity,
+                'quantity' => $quantity,
+                'images' => is_array($item['images'] ?? null)
+                    ? $item['images']
+                    : array_values(array_filter([
+                        $item['image_url'] ?? null,
+                        data_get($item, 'image_info.image_url'),
+                        data_get($item, 'sku_image'),
+                    ])),
+            ];
+        })->values()->all();
     }
 
     public function getTracking(Store $store, $returnSn, Request $request)

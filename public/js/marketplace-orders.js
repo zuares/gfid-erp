@@ -1032,6 +1032,141 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
         } catch (e) { return '—'; }
     }
 
+    let rrcDetailPreviousFocus = null;
+
+    function rrcDetailDate(value) {
+        if (value === null || value === undefined || value === '') return '—';
+        const numeric = Number(value);
+        const date = Number.isFinite(numeric) && numeric > 0
+            ? new Date(numeric < 100000000000 ? numeric * 1000 : numeric)
+            : new Date(value);
+        if (Number.isNaN(date.getTime())) return '—';
+        return date.toLocaleString('id-ID', {
+            day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+    }
+
+    function rrcDetailItems(data) {
+        const items = data?.item || data?.items || data?.item_list || [];
+        return Array.isArray(items) ? items : [];
+    }
+
+    function rrcDetailChannel(code) {
+        const normalized = String(code || '').toLowerCase();
+        if (['tiktok', 'ttk', 'tt'].includes(normalized)) return 'TikTok Shop';
+        if (['shopee', 'shp'].includes(normalized)) return 'Shopee';
+        return code || 'Marketplace';
+    }
+
+    function rrcDetailButton(row) {
+        const returnSn = row.return_sn || (row.order_sn ? `DISPUTE-${row.order_sn}` : '');
+        if (!returnSn || !row.store_id) return '';
+        return `<button type="button" class="ord-rrc-detail-btn" data-rrc-store-id="${esc(row.store_id)}"
+            data-rrc-return-sn="${esc(returnSn)}" data-rrc-order-sn="${esc(row.order_sn || '')}"
+            onclick="event.stopPropagation(); window.openRrcDetailFromButton(this)" aria-label="Lihat detail retur">Detail</button>`;
+    }
+
+    function renderRrcDetail(data) {
+        const body = document.getElementById('ordRrcDetailBody');
+        if (!body) return;
+
+        const itemRows = rrcDetailItems(data);
+        const status = data.status || '—';
+        const amount = data.amount_before_discount ?? data.refund_amount ?? data.refund_total ?? data.amount;
+        const solution = Number(data.return_solution) === 1 ? 'Refund saja' : 'Retur & refund';
+        const images = item => Array.isArray(item.images) && item.images.length ? item.images[0] : '';
+        const itemsHtml = itemRows.length
+            ? itemRows.map(item => {
+                const name = item.item_name || item.product_name || item.item_sku || 'Item retur';
+                const sku = item.variation_sku || item.item_sku || '—';
+                const variation = item.variation_name || item.model_name || '';
+                const quantity = item.return_item_quantity || item.return_quantity || item.quantity || 1;
+                const image = images(item);
+                return `<div class="ord-rrc-detail-item">
+                    ${image ? `<img class="ord-rrc-detail-item-image" src="${esc(image)}" alt="" loading="lazy" onerror="this.style.display='none'">` : '<div class="ord-rrc-detail-item-image" aria-hidden="true"></div>'}
+                    <div class="ord-rrc-detail-item-info">
+                        <div class="ord-rrc-detail-item-name">${esc(name)}</div>
+                        <div class="ord-rrc-detail-item-meta">${variation ? `${esc(variation)} · ` : ''}SKU: ${esc(sku)}</div>
+                    </div>
+                    <div class="ord-rrc-detail-item-qty">×${esc(quantity)}</div>
+                </div>`;
+            }).join('')
+            : '<div class="ord-payment-empty">Tidak ada item yang tersimpan.</div>';
+
+        const warning = data.detail_warning
+            ? `<div class="ord-rrc-detail-alert"><i class="bi bi-info-circle me-1"></i>${esc(data.detail_warning)} Data terakhir yang tersimpan ditampilkan.</div>`
+            : '';
+
+        body.innerHTML = `${warning}
+            <div class="ord-rrc-detail-summary">
+                <div class="ord-rrc-detail-stat"><div class="ord-rrc-detail-stat-label">Status</div><div class="ord-rrc-detail-stat-value">${esc(status)}</div></div>
+                <div class="ord-rrc-detail-stat"><div class="ord-rrc-detail-stat-label">Nilai refund</div><div class="ord-rrc-detail-stat-value">${esc(fmtRp(amount))}</div></div>
+                <div class="ord-rrc-detail-stat"><div class="ord-rrc-detail-stat-label">Jenis penyelesaian</div><div class="ord-rrc-detail-stat-value">${esc(solution)}</div></div>
+                <div class="ord-rrc-detail-stat"><div class="ord-rrc-detail-stat-label">Resi pengembalian</div><div class="ord-rrc-detail-stat-value">${esc(data.tracking_number || 'Belum tersedia')}</div></div>
+            </div>
+            <div class="ord-rrc-detail-section">
+                <div class="ord-rrc-detail-section-title">Informasi retur</div>
+                <div class="ord-rrc-detail-meta">
+                    <div><strong>Return ID</strong>${esc(data.return_sn || '—')}</div>
+                    <div><strong>Order ID</strong>${esc(data.order_sn || '—')}</div>
+                    <div><strong>Toko / channel</strong>${esc(data.store_name || '—')} · ${esc(rrcDetailChannel(data.channel_code))}</div>
+                    <div><strong>Alasan</strong>${esc(data.reason || data.reason_text_code || '—')}</div>
+                    <div><strong>Dibuat</strong>${esc(rrcDetailDate(data.create_time))}</div>
+                    <div><strong>Diperbarui</strong>${esc(rrcDetailDate(data.update_time))}</div>
+                </div>
+            </div>
+            <div class="ord-rrc-detail-section">
+                <div class="ord-rrc-detail-section-title">Barang yang diretur</div>
+                ${itemsHtml}
+            </div>`;
+    }
+
+    window.openRrcDetailFromButton = function (button) {
+        window.openRrcDetail(button?.dataset?.rrcStoreId, button?.dataset?.rrcReturnSn, button?.dataset?.rrcOrderSn, button);
+    };
+
+    window.openRrcDetail = async function (storeId, returnSn, orderSn, trigger) {
+        if (!storeId || !returnSn) return;
+        const modal = document.getElementById('ordRrcDetailBg');
+        const body = document.getElementById('ordRrcDetailBody');
+        const close = document.getElementById('ordRrcDetailClose');
+        if (!modal || !body) return;
+
+        rrcDetailPreviousFocus = trigger || document.activeElement;
+        modal.hidden = false;
+        document.body.classList.add('ord-rrc-detail-open');
+        document.getElementById('ordRrcDetailKicker').textContent = 'RETUR / REFUND';
+        document.getElementById('ordRrcDetailTitle').textContent = 'Detail Retur';
+        document.getElementById('ordRrcDetailSubtitle').textContent = `Order ${orderSn || '—'}`;
+        body.innerHTML = '<div class="ord-rrc-detail-loading" role="status"><span class="prod-tab-spinner"></span> Memuat detail retur…</div>';
+        window.setTimeout(() => close?.focus(), 0);
+
+        try {
+            const data = await api(`/api/marketplace/stores/${encodeURIComponent(storeId)}/returns/${encodeURIComponent(returnSn)}/detail`);
+            document.getElementById('ordRrcDetailKicker').textContent = `${rrcDetailChannel(data.channel_code)} · ${Number(data.return_solution) === 1 ? 'REFUND' : 'RETUR'}`;
+            document.getElementById('ordRrcDetailTitle').textContent = data.return_sn || returnSn;
+            document.getElementById('ordRrcDetailSubtitle').textContent = `Order ${data.order_sn || orderSn || '—'} · ${data.store_name || '—'}`;
+            renderRrcDetail(data);
+        } catch (error) {
+            body.innerHTML = `<div class="ord-rrc-detail-alert" style="border-color:#fecaca;background:#fef2f2;color:#991b1b"><i class="bi bi-exclamation-triangle me-1"></i>Gagal memuat detail retur: ${esc(error.message || 'Terjadi kesalahan.')}</div>`;
+        }
+    };
+
+    window.closeRrcDetail = function (event) {
+        const modal = document.getElementById('ordRrcDetailBg');
+        if (!modal || (event && event.target !== modal)) return;
+        modal.hidden = true;
+        document.body.classList.remove('ord-rrc-detail-open');
+        if (rrcDetailPreviousFocus?.isConnected) rrcDetailPreviousFocus.focus();
+        rrcDetailPreviousFocus = null;
+    };
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !document.getElementById('ordRrcDetailBg')?.hidden) {
+            window.closeRrcDetail();
+        }
+    });
+
     async function loadRrc(force = false, silent = false) {
         if (activeTab !== 'rrc') return;
         const seq = ++rrcLoadSeq;
@@ -1137,6 +1272,7 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             const returnNo = r.return_sn || '—';
             const orderNo = r.order_sn || '—';
             const amount = Number(r.amount || 0);
+            const detailButton = rrcDetailButton(r);
 
             return `
             <div class="ord-card" style="padding:12px;margin-bottom:10px;">
@@ -1154,6 +1290,7 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
                     </div>
                     <div style="text-align:right;min-width:120px">
                         <div class="ord-rrc-amount">${esc(fmtRp(amount))}</div>
+                        ${detailButton ? `<div class="ord-rrc-detail-action">${detailButton}</div>` : ''}
                     </div>
                 </div>
                 <div class="ord-items-cell" style="margin-top:8px">${itemsHtml(r.items)}</div>
@@ -1169,6 +1306,7 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
             const returnNo = r.return_sn || '—';
             const orderNo = r.order_sn || '—';
             const amount = Number(r.amount || 0);
+            const detailButton = rrcDetailButton(r);
             return `<tr>
                 <td>
                     <div class="ord-id">${esc(returnNo)}</div>
@@ -1185,12 +1323,13 @@ const CAN_VIEW_MARKETPLACE_FINANCIALS = window.CAN_VIEW_MARKETPLACE_FINANCIALS =
                     ${r.tracking_number ? `<div class="ord-rrc-resi">↩ ${esc(r.tracking_number)}</div>` : '<div class="ord-rrc-resi pending">Resi pengembalian belum tersedia</div>'}
                 </td>
                 <td class="ord-rrc-amount">${esc(fmtRp(amount))}</td>
+                <td class="text-center">${detailButton}</td>
             </tr>`;
         }).join('');
 
         body.innerHTML = `${warn}<div style="overflow:auto"><table class="ord-table ord-rrc-table">
-            <colgroup><col class="col-order"><col class="col-items-sm"><col class="col-store-sm"><col class="col-status"><col class="col-total"></colgroup>
-            <thead><tr><th>Retur / Pesanan</th><th>Item Produk</th><th>Tipe & Alasan</th><th>Status Pengembalian</th><th>Nilai Refund</th></tr></thead>
+            <colgroup><col class="col-order"><col class="col-items-sm"><col class="col-store-sm"><col class="col-status"><col class="col-total"><col class="col-actions"></colgroup>
+            <thead><tr><th>Retur / Pesanan</th><th>Item Produk</th><th>Tipe & Alasan</th><th>Status Pengembalian</th><th>Nilai Refund</th><th>Aksi</th></tr></thead>
             <tbody>${tableRows}</tbody>
         </table></div>`;
     }
