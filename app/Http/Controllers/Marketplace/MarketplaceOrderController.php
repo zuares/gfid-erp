@@ -102,7 +102,7 @@ class MarketplaceOrderController extends Controller
 
     public function show(MarketplaceOrder $order)
     {
-        $order->load(['store.channel', 'items.internalItem', 'settlement']);
+        $order->load(['store.channel', 'items.internalItem', 'settlement', 'incomeEstimate']);
 
         $raw = is_array($order->raw_json) ? $order->raw_json : (json_decode((string) $order->raw_json, true) ?: []);
         $liveData = $raw['order_list'][0] ?? $raw['response']['order_list'][0] ?? (isset($raw['order_sn']) ? $raw : []);

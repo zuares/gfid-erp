@@ -146,6 +146,10 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
     $liveData = $raw['order_list'][0] ?? $raw['response']['order_list'][0] ?? (isset($raw['order_sn']) ? $raw : []);
     $pkg = $liveData['package_list'][0] ?? [];
     $settlement = $order->settlement;
+    $incomeEstimate = $order->incomeEstimate;
+    $channelCode = strtolower(trim((string) ($order->store?->channel?->code ?? '')));
+    $isTikTok = in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true);
+    $platformLabel = $isTikTok ? 'TikTok' : 'Shopee';
     $settlementRaw = is_array($settlement?->raw_json ?? null) ? $settlement->raw_json : [];
     $inc = array_replace($liveData['income_details'] ?? [], $settlementRaw);
     $promotionBreakdown = $promotionBreakdown ?? [
@@ -242,7 +246,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         return null;
     };
 
-    $paymentSubtotal = (float) ($inc['order_discounted_price'] ?? $order->subtotal_items ?? 0);
+    $paymentSubtotal = (float) ($inc['order_discounted_price'] ?? $inc['revenue_amount'] ?? $order->subtotal_items ?? 0);
     if ($paymentSubtotal <= 0 && isset($liveData['item_list']) && is_array($liveData['item_list'])) {
         foreach ($liveData['item_list'] as $paymentItem) {
             $paymentPrice = (float) ($paymentItem['model_discounted_price'] ?? $paymentItem['discounted_price'] ?? $paymentItem['model_original_price'] ?? $paymentItem['selling_price'] ?? 0);
@@ -474,7 +478,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                             <span class="od-code-cell" style="font-size:.85rem">{{ $paymentVoucherStore > 0 ? '-' : '' }}Rp{{ number_format($paymentVoucherStore, 0, ',', '.') }}</span>
                         </div>
                         <div class="od-finance-row">
-                            <span class="od-muted">Koin Shopee Ditukarkan</span>
+                            <span class="od-muted">Koin {{ $platformLabel }} Ditukarkan</span>
                             <span class="od-code-cell" style="font-size:.85rem">{{ $paymentCoins > 0 ? '-' : '' }}Rp{{ number_format($paymentCoins, 0, ',', '.') }}</span>
                         </div>
                         <div class="od-finance-row">
@@ -501,7 +505,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         $promoPaketDiskon = (float) ($promotionBreakdown['bundle_discount'] ?? 0);
                         $promoKomboHemat = (float) ($promotionBreakdown['combo_hemat'] ?? 0);
                         $promoKoinShopee = (float) ($promotionBreakdown['coin'] ?? $inc['coin'] ?? 0);
-                        $promoSubtotal = (float)($inc['order_discounted_price'] ?? $order->subtotal_items ?? 0);
+                        $promoSubtotal = (float)($inc['order_discounted_price'] ?? $inc['revenue_amount'] ?? $order->subtotal_items ?? 0);
                         if ($promoSubtotal <= 0 && isset($liveData['item_list']) && is_array($liveData['item_list'])) {
                             foreach ($liveData['item_list'] as $it) {
                                 $price = (float)($it['model_discounted_price'] ?? $it['discounted_price'] ?? $it['model_original_price'] ?? $it['selling_price'] ?? 0);
@@ -552,7 +556,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         <span class="od-code-cell" style="font-size:.85rem; color:#991c1b">-Rp{{ number_format($promoKomboHemat, 0, ',', '.') }}</span>
                     </div>
                     <div style="display:flex; justify-content:space-between">
-                        <span class="od-muted">Koin Shopee</span>
+                        <span class="od-muted">Koin {{ $platformLabel }}</span>
                         <span class="od-code-cell" style="font-size:.85rem; color:#991b1b">-Rp{{ number_format($promoKoinShopee, 0, ',', '.') }}</span>
                     </div>
                     <div style="display:flex; justify-content:space-between">
@@ -712,13 +716,13 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
     @php
         // Seller Income Data
         // Subtotal = Harga Produk Setelah Diskon (dari loop item_list atau fallback database)
-        $subtotal = (float)($inc['order_discounted_price'] ?? $order->subtotal_items ?? ($subtotalItems > 0 ? $subtotalItems : 0));
+        $subtotal = (float)($inc['order_discounted_price'] ?? $inc['revenue_amount'] ?? $order->subtotal_items ?? ($subtotalItems > 0 ? $subtotalItems : 0));
         
         $ongkirRebate = (float)($inc['shopee_shipping_rebate'] ?? 0);
         $ongkirDibayarPembeli = $buyerShippingAmount($inc, $liveData, $order->shipping_fee_customer);
         
         $ongkosJasaKirim = (float)($settlement->actual_shipping_fee ?? $inc['actual_shipping_fee'] ?? ($inc['estimated_shipping_fee'] ?? ($liveData['actual_shipping_fee'] ?? ($liveData['estimated_shipping_fee'] ?? 0))));
-        $potonganOngkir = (float)($settlement->shipping_fee_subsidy ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0);
+        $potonganOngkir = (float)($settlement->shipping_fee_subsidy ?? $inc['shipping_fee_subsidy'] ?? $inc['tiktok_shop_shipping_incentive_amount'] ?? $inc['shopee_shipping_rebate'] ?? $order->shipping_discount_platform ?? 0);
         
         $voucherToko = (float)($settlement->seller_voucher ?? $inc['voucher_from_seller'] ?? $inc['seller_voucher_rebate'] ?? 0);
         
@@ -730,10 +734,16 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             : ($settlement->buyer_payment_amount ?? ($liveData['total_amount'] ?? 0))));
         
         $isEstimasi = false;
+        $isTikTokApiEstimate = false;
         $estimatedMarketplaceFee = 0.0;
         $estimatedFeeBase = 0.0;
+
+        $hasFinalSettlement = $settlement && (! $isTikTok
+            || $settlement->data_status === \App\Services\Marketplace\MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
+            || $settlement->settlement_time
+            || (float) $settlement->final_income > 0);
         
-        if ($settlement) {
+        if ($hasFinalSettlement) {
             $biayaAdmin = abs((float)($settlement->commission_fee ?? 0)) + abs((float)($settlement->transaction_fee ?? 0));
             $biayaLayananSeller = abs((float)($settlement->service_fee ?? 0));
             $biayaAffiliate = abs((float)($settlement->affiliate_fee ?? 0));
@@ -755,11 +765,18 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
 
             $biayaLainnya = $biayaLainnyaLuar;
 
-            $penghasilan = (float)($inc['escrow_amount'] 
-                ?? $liveData['payment_info']['net_revenue'] 
-                ?? $order->net_payout_estimated ?? 0);
+            $penghasilan = $isTikTok && $incomeEstimate?->estimated_escrow_amount !== null
+                ? (float) $incomeEstimate->estimated_escrow_amount
+                : (float)($inc['escrow_amount']
+                    ?? $liveData['payment_info']['net_revenue']
+                    ?? $order->net_payout_estimated ?? 0);
+
+            if ($isTikTok && $incomeEstimate?->estimated_escrow_amount !== null) {
+                $isTikTokApiEstimate = true;
+                $isEstimasi = true;
+            }
                 
-            if ($penghasilan <= 0) {
+            if ($penghasilan <= 0 && ! $isTikTokApiEstimate) {
                 // Estimasi saat data penghasilan/settlement belum ada.
                 $estimatedFeeBase = max((float) $subtotal - (float) $voucherToko, 0);
 
@@ -939,7 +956,11 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                     <div class="od-title">{{ $isEstimasi ? 'Estimasi ' : '' }}Penghasilan Akhir</div>
                     @if($isEstimasi)
                         <div class="od-section-caption">
-                            Berdasarkan rata-rata fee historis toko ini ({{ number_format($estimatedFeePct, 1, ',', '.') }}%).
+                            @if($isTikTokApiEstimate)
+                                Berdasarkan estimasi TikTok Finance API. Nilai dapat berubah sampai order masuk statement final.
+                            @else
+                                Berdasarkan rata-rata fee historis toko ini ({{ number_format($estimatedFeePct, 1, ',', '.') }}%).
+                            @endif
                         </div>
                     @endif
                 </div>
@@ -987,7 +1008,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">-Rp{{ number_format($ongkosJasaKirim, 0, ',', '.') }}</span>
                     </div>
                     <div class="od-finance-row">
-                        <span class="od-muted">Potongan Ongkos Kirim dari Shopee</span>
+                        <span class="od-muted">Potongan Ongkos Kirim dari {{ $platformLabel }}</span>
                         <span class="od-code-cell" style="font-size:.85rem; color:#15803d">Rp{{ number_format($potonganOngkir, 0, ',', '.') }}</span>
                     </div>
                 </div>
@@ -1031,7 +1052,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
                         <span class="od-code-cell" style="font-size:.85rem; color:#94a3b8">—</span>
                     </div>
                     @endforelse
-                    @if($isEstimasi && $sellerFeeBreakdownTotal <= 0)
+                    @if($isEstimasi && ! $isTikTokApiEstimate && $sellerFeeBreakdownTotal <= 0)
                     <div style="display:flex; justify-content:space-between; margin-left:.5rem">
                         <span class="od-muted">Estimasi Fee Marketplace</span>
                         <span class="od-code-cell" style="font-size:.85rem; color:#b91c1c">

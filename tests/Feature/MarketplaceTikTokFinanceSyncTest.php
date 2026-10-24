@@ -103,6 +103,56 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame('tiktok_finance_202507_orders_unsettled', $estimate->raw_json['source']);
     }
 
+    public function test_order_detail_uses_tiktok_estimate_when_settlement_is_not_final(): void
+    {
+        $channel = Channel::create(['code' => 'tt', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-DETAIL-ESTIMATE',
+            'name' => 'TikTok Detail Estimate Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-DETAIL-ESTIMATE-1',
+            'external_order_id' => 'TT-ORDER-DETAIL-ESTIMATE-1',
+            'order_status' => 'SHIPPED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+            'raw_json' => [],
+        ]);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'final_income' => 0,
+            'data_status' => 'incomplete',
+            'raw_json' => ['source' => 'tiktok_finance_202501_order_statement_transactions'],
+        ]);
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'estimated_escrow_amount' => 81234,
+            'status_description' => 'waiting for delivery',
+            'currency' => 'IDR',
+            'synced_at' => now(),
+        ]);
+
+        $response = app(\App\Http\Controllers\Marketplace\MarketplaceOrderController::class)->show($order);
+        $html = $response->render();
+
+        $this->assertStringContainsString('Estimasi Penghasilan Akhir', $html);
+        $this->assertStringContainsString('Berdasarkan estimasi TikTok Finance API', $html);
+        $this->assertStringContainsString('Rp81.234', $html);
+    }
+
     public function test_final_statement_preserves_tiktok_fee_and_tax_breakdown(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
