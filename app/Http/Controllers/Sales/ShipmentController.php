@@ -333,7 +333,8 @@ class ShipmentController extends Controller
         string $orderNo,
         ?\App\Models\Store $store = null,
         ?\App\Models\ShipmentOrderScan $scan = null,
-        ?Shipment $shipment = null
+        ?Shipment $shipment = null,
+        bool $lookupBooking = true,
     ): array {
         $channel = $store?->channel;
         $channelCode = strtolower((string) ($channel?->code ?? ''));
@@ -358,24 +359,27 @@ class ShipmentController extends Controller
             }
         }
 
-        // Cek booking kilat / marketplace bookings
-        $booking = \App\Models\MarketplaceBooking::query()
-            ->where(function ($q) use ($orderNo) {
-                $q->whereRaw('UPPER(TRIM(booking_sn)) = ?', [$orderNo])
-                    ->orWhereRaw('UPPER(TRIM(order_sn)) = ?', [$orderNo])
-                    ->orWhereRaw('UPPER(TRIM(tracking_number)) = ?', [$orderNo]);
-            })
-            ->with('store.channel')
-            ->first();
+        // Lookup booking hanya diperlukan saat cek shipment. Pada tahap scan,
+        // jangan melakukan query tambahan untuk sekadar menentukan platform.
+        if ($lookupBooking) {
+            $booking = \App\Models\MarketplaceBooking::query()
+                ->where(function ($q) use ($orderNo) {
+                    $q->whereRaw('UPPER(TRIM(booking_sn)) = ?', [$orderNo])
+                        ->orWhereRaw('UPPER(TRIM(order_sn)) = ?', [$orderNo])
+                        ->orWhereRaw('UPPER(TRIM(tracking_number)) = ?', [$orderNo]);
+                })
+                ->with('store.channel')
+                ->first();
 
-        if ($booking?->store?->channel) {
-            $bChannelCode = strtolower((string) $booking->store->channel->code);
-            $bChannelName = strtolower((string) $booking->store->channel->name);
-            if (str_contains($bChannelCode, 'shp') || str_contains($bChannelCode, 'shopee') || str_contains($bChannelName, 'shopee')) {
-                return ['key' => 'shopee', 'label' => 'Shopee'];
-            }
-            if (str_contains($bChannelCode, 'ttk') || str_contains($bChannelCode, 'tiktok') || str_contains($bChannelName, 'tiktok')) {
-                return ['key' => 'tiktok', 'label' => 'TikTok'];
+            if ($booking?->store?->channel) {
+                $bChannelCode = strtolower((string) $booking->store->channel->code);
+                $bChannelName = strtolower((string) $booking->store->channel->name);
+                if (str_contains($bChannelCode, 'shp') || str_contains($bChannelCode, 'shopee') || str_contains($bChannelName, 'shopee')) {
+                    return ['key' => 'shopee', 'label' => 'Shopee'];
+                }
+                if (str_contains($bChannelCode, 'ttk') || str_contains($bChannelCode, 'tiktok') || str_contains($bChannelName, 'tiktok')) {
+                    return ['key' => 'tiktok', 'label' => 'TikTok'];
+                }
             }
         }
 
@@ -1340,12 +1344,9 @@ class ShipmentController extends Controller
             );
         }
 
-        // Hitung kekurangan stok secara live agar panel tetap muncul saat reload
-        // dan otomatis hilang begitu stok/qty sudah beres.
-        $warehouse = $this->whRts();
-        $stockInsufficient = $warehouse
-            ? $this->checkStockSufficiency($shipment, $warehouse)
-            : [];
+        // Pemeriksaan stok lengkap ditunda ke halaman Cek Shipment agar reload
+        // dan setiap scan item tetap ringan.
+        $stockInsufficient = [];
 
         $importPreview = session('shipment_import_preview.' . $shipment->id . '.rows') ?? null;
         $importPreviewSummary = session('shipment_import_preview.' . $shipment->id . '.summary') ?? null;
@@ -1401,7 +1402,7 @@ class ShipmentController extends Controller
 
             $shipment->orderScans->each(function ($scan) use ($shipment) {
                 $store = $scan->fulfillment?->marketplaceOrder?->store;
-                $platform = $this->resolveOrderPlatformInfo($scan->order_no, $store, $scan, $shipment);
+                $platform = $this->resolveOrderPlatformInfo($scan->order_no, $store, $scan, $shipment, false);
                 $scan->platform_key = $platform['key'];
                 $scan->platform_label = $platform['label'];
             });
@@ -1432,7 +1433,7 @@ class ShipmentController extends Controller
 
                 $marketplaceOrder = $scan->fulfillment?->marketplaceOrder;
                 $store = $marketplaceOrder?->store;
-                $platformInfo = $this->resolveOrderPlatformInfo($scan->order_no, $store, $scan, $shipment);
+                $platformInfo = $this->resolveOrderPlatformInfo($scan->order_no, $store, $scan, $shipment, false);
 
                 return [
                     'id' => $scan->id,
@@ -1509,76 +1510,11 @@ class ShipmentController extends Controller
             ], 422);
         }
 
-        $lookupMode = (string) $this->salesOperationalSetting('lookup_mode', 'auto_link_on_scan');
-        $marketplaceOrder = null;
-        $salesInvoice = null;
-        $fulfillment = null;
-        $lookupFallbackStatus = null;
+        // Scan hanya mencatat nomor order. Lookup marketplace, status order,
+        // fulfillment, dan duplikat dijalankan saat operator membuka Cek Shipment.
+        $platformInfo = $this->resolveOrderPlatformInfo($orderNo, null, null, $shipment, false);
 
-        // Paket afiliasi memakai nomor referensi/order sebagai pengelompokan
-        // internal. Jangan menautkan atau mengubah status order marketplace
-        // yang kebetulan memiliki nomor sama.
-        if ($lookupMode === 'auto_link_on_scan' && $shipment->shipment_type !== Shipment::TYPE_AFFILIATE) {
-            $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)->first();
-
-            // Pesanan Kilat bisa sudah READY_TO_SHIP/PROCESSED di tabel booking
-            // sebelum order_sn tersinkron ke marketplace_orders. Coba promosikan
-            // booking yang masih eligible agar scan tidak salah dianggap order
-            // yang tidak ditemukan.
-            if (!$marketplaceOrder) {
-                $kilatBooking = $this->marketplaceBookingQuery($orderNo, $shipment)->first();
-                if ($kilatBooking && $this->isReconciliationMarketplaceStatus($kilatBooking->booking_status)) {
-                    $marketplaceOrder = $this->findReconciliationMarketplaceOrder($orderNo, $shipment, true);
-                }
-            }
-
-            if ($marketplaceOrder) {
-                if ($shipment->shipment_type !== 'manual' && !$this->isReconciliationMarketplaceStatus($this->marketplaceOrderStatus($marketplaceOrder))) {
-                    $existingFulfillment = \App\Models\OrderFulfillment::query()
-                        ->where('marketplace_order_id', $marketplaceOrder->id)
-                        ->first();
-                    if ($existingFulfillment?->status === \App\Models\OrderFulfillment::STATUS_CANCELLED) {
-                        return response()->json(['status' => 'error', 'message' => "Order {$orderNo} berstatus Cancelled. Jangan dikirim!"], 422);
-                    }
-
-                    // Di luar tahap Dikemas tetap boleh dicatat sebagai manual/
-                    // belum tertaut. Jangan paksa link ke marketplace.
-                    $lookupFallbackStatus = $this->marketplaceOrderStatus($marketplaceOrder);
-                    $marketplaceOrder = null;
-                } else {
-                    $fulfillment = \App\Models\OrderFulfillment::query()
-                        ->where('marketplace_order_id', $marketplaceOrder->id)
-                        ->first();
-                    if (!$fulfillment) {
-                        $fulfillment = app(\App\Services\OrderFulfillmentService::class)->createDraft($marketplaceOrder);
-                    }
-                    if ($fulfillment->status === \App\Models\OrderFulfillment::STATUS_CANCELLED) {
-                        return response()->json(['status' => 'error', 'message' => "Order {$orderNo} berstatus Cancelled. Jangan dikirim!"], 422);
-                    }
-                }
-            } else {
-                $salesInvoice = $this->salesInvoiceQuery($orderNo, $shipment)->first();
-                if (!$salesInvoice) {
-                    $lookupFallbackStatus = 'not_found';
-                }
-            }
-
-            $duplicate = $this->activeDuplicateScan($fulfillment?->id, $shipment);
-            if ($duplicate) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => "Pesanan sedang diproses di shipment lain: {$duplicate->shipment?->code}.",
-                ], 422);
-            }
-        }
-
-        $linkedStore = $marketplaceOrder?->store ?? $salesInvoice?->store;
-        if ($linkedStore && !$linkedStore->relationLoaded('channel')) {
-            $linkedStore->load('channel');
-        }
-        $platformInfo = $this->resolveOrderPlatformInfo($orderNo, $linkedStore, null, $shipment);
-
-        $scan = DB::transaction(function () use ($shipment, $currentWave, $orderNo, $lookupMode, $lookupFallbackStatus, $marketplaceOrder, $salesInvoice, $fulfillment, $platformInfo) {
+        $scan = DB::transaction(function () use ($shipment, $currentWave, $orderNo, $platformInfo) {
             Shipment::query()
                 ->lockForUpdate()
                 ->findOrFail($shipment->id);
@@ -1594,25 +1530,23 @@ class ShipmentController extends Controller
                     'shipment_id' => $shipment->id,
                     'shipment_wave_id' => $currentWave?->id,
                     'order_no' => $orderNo,
-                    'fulfillment_id' => $fulfillment?->id,
+                    'fulfillment_id' => null,
                     'status' => 'pending',
                     'source' => 'scanner',
-                    'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?: 'order_not_found'),
+                    'match_reason' => null,
                     'raw_payload' => [
-                        'mode' => $lookupMode === 'auto_link_on_scan' && $fulfillment ? 'auto_link' : 'record_only',
+                        'mode' => 'record_only',
                         'no' => $orderNo,
-                        'label' => $fulfillment
-                            ? 'Tertaut otomatis'
-                            : ($lookupFallbackStatus !== null ? 'Belum tertaut' : 'Pencatatan order'),
+                        'label' => 'Pencatatan order',
                         'order' => [
                             'order_no' => $orderNo,
-                            'source' => $fulfillment ? 'marketplace' : 'record_only',
+                            'source' => 'record_only',
                             'status' => 'pending',
                         ],
-                        'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : null),
-                        'lookup_status' => $lookupFallbackStatus,
-                        'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?: 'order_not_found'),
-                        'sales_invoice_id' => $salesInvoice?->id,
+                        'linked_source' => null,
+                        'lookup_status' => null,
+                        'match_reason' => null,
+                        'sales_invoice_id' => null,
                         'duplicate_count' => 0,
                         'platform_key' => $platformInfo['key'],
                         'platform_label' => $platformInfo['label'],
@@ -1623,18 +1557,16 @@ class ShipmentController extends Controller
                 $duplicateCount = (int) ($payload['duplicate_count'] ?? 0) + 1;
                 $scan->update([
                     'shipment_wave_id' => $currentWave?->id ?: $scan->shipment_wave_id,
-                    'fulfillment_id' => $fulfillment?->id,
-                    'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?? ($payload['match_reason'] ?? 'order_not_found')),
+                    'fulfillment_id' => $scan->fulfillment_id,
+                    'match_reason' => $scan->match_reason,
                     'raw_payload' => array_merge($payload, [
                         'no' => $orderNo,
-                        'mode' => $lookupMode === 'auto_link_on_scan' && $fulfillment ? 'auto_link' : ($payload['mode'] ?? 'record_only'),
-                        'label' => $fulfillment
-                            ? 'Tertaut otomatis'
-                            : ($lookupFallbackStatus !== null ? 'Belum tertaut' : ($payload['label'] ?? 'Pencatatan order')),
-                        'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : ($payload['linked_source'] ?? null)),
-                        'lookup_status' => $lookupFallbackStatus ?? ($payload['lookup_status'] ?? null),
-                        'match_reason' => $fulfillment ? null : ($lookupFallbackStatus ?? ($payload['match_reason'] ?? 'order_not_found')),
-                        'sales_invoice_id' => $salesInvoice?->id ?? ($payload['sales_invoice_id'] ?? null),
+                        'mode' => $payload['mode'] ?? 'record_only',
+                        'label' => $payload['label'] ?? 'Pencatatan order',
+                        'linked_source' => $payload['linked_source'] ?? null,
+                        'lookup_status' => $payload['lookup_status'] ?? null,
+                        'match_reason' => $payload['match_reason'] ?? null,
+                        'sales_invoice_id' => $payload['sales_invoice_id'] ?? null,
                         'duplicate_count' => $duplicateCount,
                         'platform_key' => $platformInfo['key'],
                         'platform_label' => $platformInfo['label'],
@@ -1646,55 +1578,30 @@ class ShipmentController extends Controller
                 ]);
             }
 
-            if ($salesInvoice && !$shipment->sales_invoice_id) {
-                $shipment->update(['sales_invoice_id' => $salesInvoice->id]);
-            }
-
             return $scan;
         });
-
-        if ($marketplaceOrder && $fulfillment) {
-            $this->linkMarketplaceOrderGroup(
-                $scan->fresh(),
-                $marketplaceOrder,
-                $this->reconciliationMatchMethod($orderNo, $marketplaceOrder),
-                $orderNo
-            );
-            $this->promoteMarketplaceOrderAfterScan($marketplaceOrder);
-            $this->updateMarketplaceStatusIfAllowed($marketplaceOrder, 'link');
-        }
-
-        $linkedStore = $marketplaceOrder?->store ?? $salesInvoice?->store;
-        if ($linkedStore && !$linkedStore->relationLoaded('channel')) {
-            $linkedStore->load('channel');
-        }
-        $platformInfo = $this->resolveOrderPlatformInfo($orderNo, $linkedStore, $scan, $shipment);
 
         return response()->json([
             'status' => 'ok',
             'created' => $scan->wasRecentlyCreated,
             'duplicate' => !$scan->wasRecentlyCreated,
             'duplicate_count' => (int) data_get($scan->raw_payload, 'duplicate_count', 0),
-            'message' => $lookupFallbackStatus !== null
-                ? "Order {$orderNo} dicatat sebagai manual/belum tertaut."
-                : ($scan->wasRecentlyCreated
-                    ? "Order {$orderNo} dicatat."
-                    : "Order {$orderNo} sudah tercatat."),
+            'message' => $scan->wasRecentlyCreated
+                ? "Order {$orderNo} dicatat."
+                : "Order {$orderNo} sudah tercatat.",
             'order' => [
                 'code' => $orderNo,
                 'order_no' => $orderNo,
-                'label' => $fulfillment
-                    ? 'Tertaut otomatis'
-                    : ($lookupFallbackStatus !== null ? 'Belum tertaut' : 'Pencatatan order'),
-                'linked_source' => $fulfillment ? 'marketplace_order' : ($salesInvoice ? 'sales_invoice' : null),
+                'label' => 'Pencatatan order',
+                'linked_source' => data_get($scan->raw_payload, 'linked_source'),
                 'duplicate_count' => (int) data_get($scan->raw_payload, 'duplicate_count', 0),
                 'platform_key' => $platformInfo['key'],
                 'platform_label' => $platformInfo['label'],
                 'is_unlinked' => empty($scan->fulfillment_id)
                     || (data_get($scan->raw_payload, 'mode') === 'record_only')
                     || (data_get($scan->raw_payload, 'lookup_status') !== null),
-                'store_id' => $linkedStore?->id,
-                'store_label' => $linkedStore?->name ?: $linkedStore?->code,
+                'store_id' => null,
+                'store_label' => null,
             ],
         ]);
     }
@@ -1924,68 +1831,18 @@ class ShipmentController extends Controller
         $autoOrderScan = $this->autoMapItemFirstLines($shipment);
         $autoOrderScanId = $autoOrderScan?->id;
         $fulfillmentId = $autoOrderScan?->fulfillment_id;
-        $scanInfo = null;
-        $recordOnlyOrder = false;
-
         if ($orderNo !== '') {
             $savedOrderScan = ShipmentOrderScan::query()
                 ->where('shipment_id', $shipment->id)
                 ->where('order_no', $orderNo)
-                ->first(['id', 'raw_payload']);
+                ->first(['id', 'fulfillment_id']);
 
-            $savedPayload = is_array($savedOrderScan?->raw_payload) ? $savedOrderScan->raw_payload : [];
-            $recordOnlyOrder = (($savedPayload['mode'] ?? null) === 'record_only');
-
-            if ($shipment->shipment_type === 'marketplace' && !$recordOnlyOrder) {
-                $marketplaceOrder = $this->marketplaceOrderQuery($orderNo, $shipment)
-                    ->first(['id']);
-                
-                if (!$marketplaceOrder) {
-                    $msg = "Order/resi tidak ditemukan di data marketplace.";
-                    if ($request->expectsJson() || $request->ajax()) return response()->json(['status' => 'error', 'message' => $msg], 422);
-                    return redirect()->back()->with('status', 'error')->with('message', $msg);
-                }
-
-                $fulfillment = \App\Models\OrderFulfillment::where('marketplace_order_id', $marketplaceOrder->id)->first(['id', 'status']);
-                if (!$fulfillment) {
-                    $msg = "Order ditemukan tapi tidak ada di data Fulfillment.";
-                    if ($request->expectsJson() || $request->ajax()) return response()->json(['status' => 'error', 'message' => $msg], 422);
-                    return redirect()->back()->with('status', 'error')->with('message', $msg);
-                }
-
-                if ($fulfillment->status === \App\Models\OrderFulfillment::STATUS_CANCELLED) {
-                    $msg = "Order/Resi {$orderNo} berstatus Cancelled. Jangan dikirim!";
-                    if ($request->expectsJson() || $request->ajax()) return response()->json(['status' => 'error', 'message' => $msg], 422);
-                    return redirect()->back()->with('status', 'error')->with('message', $msg);
-                }
-
-                if ($fulfillment->status === 'confirmed') {
-                    $msg = "Order/Resi {$orderNo} sudah dipacking (berada di tab Siap Kirim).";
-                    if ($request->expectsJson() || $request->ajax()) return response()->json(['status' => 'error', 'message' => $msg], 422);
-                    return redirect()->back()->with('status', 'error')->with('message', $msg);
-                }
-
-                $fulfillmentId = $fulfillment->id;
-                
-                // Cek di shipment ini
-                $existsInCurrent = \App\Models\ShipmentOrderScan::where('fulfillment_id', $fulfillmentId)
-                    ->where('shipment_id', $shipment->id)
-                    ->exists();
-                if ($existsInCurrent) {
-                    $scanInfo = "Pesanan sudah discan di shipment ini.";
-                }
-
-                // Cek di shipment lain yang aktif jika kebijakan duplikat aktif.
-                $existingScan = $this->activeDuplicateScan($fulfillmentId, $shipment);
-                if ($existingScan) {
-                    $code = $existingScan->shipment?->code ?? '-';
-                    $msg = "Pesanan sedang diproses di shipment lain: {$code}.";
-                    if ($request->expectsJson() || $request->ajax()) return response()->json(['status' => 'error', 'message' => $msg], 422);
-                    return redirect()->back()->with('status', 'error')->with('message', $msg);
-                }
-            } elseif ($shipment->shipment_type === Shipment::TYPE_MANUAL) {
-                $orderNo = ''; 
-            }
+            // Scan item hanya mengelompokkan line ke nomor order yang sudah
+            // dicatat. Validasi marketplace/fulfillment/duplikat dipindah ke
+            // tahap Cek Shipment.
+            $fulfillmentId = $savedOrderScan?->fulfillment_id ?: $fulfillmentId;
+        } elseif ($shipment->shipment_type === Shipment::TYPE_MANUAL) {
+            $orderNo = '';
         }
 
         if ($shipment->shipment_type === Shipment::TYPE_AFFILIATE
@@ -2100,36 +1957,8 @@ class ShipmentController extends Controller
 
         $line = $result['line'];
 
-        $warehouseId = $shipment->warehouse_id;
-        $stockPhysical = 0;
-        $stockPacking = 0;
-        $stockAvailable = 0;
-        
-        if ($item) {
-            if ($warehouseId) {
-                $invStock = \App\Models\InventoryStock::where('warehouse_id', $warehouseId)
-                    ->where('item_id', $item->id)
-                    ->first();
-                if ($invStock) {
-                    $stockPhysical = (float) $invStock->qty;
-                    $stockPacking = (float) $invStock->allocated_qty;
-                    $stockAvailable = (float) $invStock->available_qty;
-                }
-            } else {
-                $invStock = \App\Models\InventoryStock::where('item_id', $item->id)
-                    ->selectRaw('SUM(qty) as qty, SUM(allocated_qty) as allocated_qty')
-                    ->first();
-                if ($invStock) {
-                    $stockPhysical = (float) $invStock->qty;
-                    $stockPacking = (float) $invStock->allocated_qty;
-                    $stockAvailable = $stockPhysical - $stockPacking;
-                }
-            }
-        }
-
         if ($request->expectsJson() || $request->ajax()) {
             $msg = 'Berhasil scan ' . $item->code . ' (+' . $qty . ')';
-            if ($scanInfo) $msg .= ' ' . $scanInfo;
             
             return response()->json([
                 'status' => 'ok',
@@ -2144,20 +1973,15 @@ class ShipmentController extends Controller
                     'remarks' => $line->remarks ?? null,
                     'qty_scanned' => (int) $line->qty_scanned,
                     'update_qty_url' => route('sales.shipments.update_line_qty', $line),
-                    'stock_physical' => $stockPhysical,
-                    'stock_packing' => $stockPacking,
-                    'stock_available' => $stockAvailable,
                 ],
                 'totals' => [
                     'total_qty' => $result['total_qty'],
                     'total_lines' => $result['total_lines'],
                 ],
-                'stock_insufficient' => $this->stockInsufficientPayload($shipment),
             ]);
         }
 
         $redirectMsg = 'Berhasil scan ' . $item->code . ' (+' . $qty . ')';
-        if ($scanInfo) $redirectMsg .= ' ' . $scanInfo;
 
         return redirect()
             ->route('sales.shipments.edit', $shipment)

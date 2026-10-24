@@ -1891,14 +1891,21 @@ class ShipmentItemFirstWorkflowTest extends TestCase
                 'order_no' => 'ORDER-READY-001',
             ])
             ->assertOk()
-            ->assertJsonPath('order.label', 'Tertaut otomatis');
+            ->assertJsonPath('order.label', 'Pencatatan order');
 
         $this->actingAs($user)
             ->postJson(route('sales.shipments.scan_order_store', $shipment), [
                 'order_no' => $kilatBookingNo,
             ])
             ->assertOk()
-            ->assertJsonPath('order.label', 'Tertaut otomatis');
+            ->assertJsonPath('order.label', 'Pencatatan order');
+
+        $this->assertDatabaseCount('order_fulfillments', 0);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Tertaut');
     }
 
     public function test_auto_link_reconciles_an_existing_awb_and_persists_the_match(): void
@@ -2098,7 +2105,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
                 'order_no' => 'SPXID062189160889',
             ])
             ->assertOk()
-            ->assertJsonPath('order.label', 'Tertaut otomatis');
+            ->assertJsonPath('order.label', 'Pencatatan order');
 
         $matchResponse = $this->actingAs($user)
             ->postJson(route('sales.shipments.rekon_match', $shipment), [
@@ -2181,7 +2188,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
                     'order_no' => $awb,
                 ])
                 ->assertOk()
-                ->assertJsonPath('order.label', 'Tertaut otomatis');
+                ->assertJsonPath('order.label', 'Pencatatan order');
         }
     }
 

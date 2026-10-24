@@ -2112,8 +2112,9 @@ body[data-theme="dark"] .shp-suggest-name { color: #94a3b8; }
         lastScanCode.textContent = line.item_code || '—';
         lastScanName.textContent = line.item_name || '';
         lastScanQtyEl.textContent = FMT.format(line.qty_scanned || 0);
-        if (lastScanPacking) lastScanPacking.textContent = FMT.format(line.stock_packing || 0);
-        if (lastScanAvailable) lastScanAvailable.textContent = FMT.format(line.stock_available || 0);
+        // Posisi stok lengkap ditampilkan saat Cek Shipment, bukan setiap scan.
+        if (lastScanPacking) lastScanPacking.textContent = '—';
+        if (lastScanAvailable) lastScanAvailable.textContent = '—';
         lastScanBox.style.display = 'flex';
         /* re-trigger animation */
         lastScanBox.style.animation = 'none';
