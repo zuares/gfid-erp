@@ -1220,6 +1220,7 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="simulateWebhook(${s.id}, '${esc(s.name)}', 'shopee', '${s.external_shop_id}', 'auth_expiry_push')"><i class="bi bi-broadcast text-warning me-2"></i>Simulasi: Token Expired (Push 12)</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="checkOrderList(${s.id}, '${esc(s.name)}')"><i class="bi bi-list-ul text-primary me-2"></i>Tes API: get_order_list</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testOrderDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-bug text-info me-2"></i>Tes API: get_order_detail</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="testOrderSettlement(${s.id}, '${esc(s.name)}')"><i class="bi bi-cash-coin text-success me-2"></i>Tes API: pencairan per order</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testPackageDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-box text-success me-2"></i>Tes API: get_package_detail</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testReturnList(${s.id}, '${esc(s.name)}')"><i class="bi bi-arrow-return-left text-danger me-2"></i>Tes API: get_return_list</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testBookingDetail(${s.id}, '${esc(s.name)}')"><i class="bi bi-file-earmark-text text-warning me-2"></i>Tes API: get_booking_detail</button></li>
@@ -1229,6 +1230,7 @@
                             ` : ''}
                             ${isTiktok ? `
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testTikTokSettlement(${s.id}, '${esc(s.name)}')"><i class="bi bi-wallet2 text-success me-2"></i>Tes API: settlement statement (pencairan dana)</button></li>
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="testTikTokOrderSettlement(${s.id}, '${esc(s.name)}')"><i class="bi bi-cash-coin text-success me-2"></i>Tes API: pencairan per order</button></li>
                             ` : ''}
                             ${connectUrl ? `<li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>` : ''}
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-secondary me-2"></i>Putuskan Koneksi</button></li>
@@ -1646,6 +1648,19 @@
         new bootstrap.Modal($('apiTestModal')).show();
     };
 
+    window.testOrderSettlement = function(storeId, storeName) {
+        showSettlementApiForm(false);
+        window.testApiStoreId = storeId;
+        window.testApiEndpointType = 'order_settlement';
+        $('apiTestModalTitle').textContent = 'Tes API: pencairan per order — ' + storeName;
+        $('apiTestInputLabel').textContent = 'Order SN';
+        $('apiTestInput').value = '';
+        $('apiTestInput').placeholder = 'Contoh: 2404098R48U37H';
+        $('apiTestOutput').textContent = 'Masukkan Order SN lalu klik Fetch JSON untuk mengambil detail escrow dan pencairan order.';
+
+        new bootstrap.Modal($('apiTestModal')).show();
+    };
+
     window.testPackageDetail = function(storeId, storeName) {
         showSettlementApiForm(false);
         window.testApiStoreId = storeId;
@@ -1706,6 +1721,19 @@
         openSettlementApiTest(storeId, storeName, 'tiktok');
     };
 
+    window.testTikTokOrderSettlement = function(storeId, storeName) {
+        showSettlementApiForm(false);
+        window.testApiStoreId = storeId;
+        window.testApiEndpointType = 'tiktok_order_settlement';
+        $('apiTestModalTitle').textContent = 'Tes API: TikTok pencairan per order — ' + storeName;
+        $('apiTestInputLabel').textContent = 'Order ID';
+        $('apiTestInput').value = '';
+        $('apiTestInput').placeholder = 'Masukkan Order ID TikTok';
+        $('apiTestOutput').textContent = 'Masukkan Order ID lalu klik Fetch JSON untuk mengambil settlement statement per order.';
+
+        new bootstrap.Modal($('apiTestModal')).show();
+    };
+
     $('btnTestApi').onclick = async function() {
         const storeId = window.testApiStoreId;
         const inputVal = $('apiTestInput').value.trim();
@@ -1717,6 +1745,10 @@
         let url = '';
         if (type === 'order') {
             url = '/api/marketplace/stores/' + storeId + '/orders/' + inputVal + '/raw-detail';
+        } else if (type === 'order_settlement') {
+            url = '/api/marketplace/stores/' + storeId + '/escrow-detail?order_sn=' + encodeURIComponent(inputVal);
+        } else if (type === 'tiktok_order_settlement') {
+            url = '/api/marketplace/stores/' + storeId + '/tiktok-orders/' + encodeURIComponent(inputVal) + '/statement-transactions';
         } else if (type === 'package') {
             url = '/api/marketplace/stores/' + storeId + '/packages/' + inputVal + '/raw-detail';
         } else if (type === 'return_list') {

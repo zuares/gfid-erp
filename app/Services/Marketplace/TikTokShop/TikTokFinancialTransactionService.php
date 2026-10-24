@@ -156,6 +156,22 @@ class TikTokFinancialTransactionService
     }
 
     /**
+     * Fetch the final settlement statement transactions for one TikTok order.
+     * This is a read-only diagnostic path used by the store API test tool.
+     *
+     * @return array<string, mixed>
+     */
+    public function fetchOrderStatementTransactions(Store $store, string $orderId): array
+    {
+        $this->assertTikTok($store);
+
+        $response = $this->gateway->getOrderStatementTransactions($store, $orderId);
+        $this->assertSuccessfulResponse($response);
+
+        return Arr::except($response, ['_meta']);
+    }
+
+    /**
      * Fetch all statement pages and their detail transaction pages for a date
      * range. Statement rows are final settlement details, not account-level
      * withdrawals, so they are persisted with a separate source namespace.

@@ -244,6 +244,37 @@ class TikTokFinancialTransactionTest extends TestCase
             ->assertJsonPath('data.items', []);
     }
 
+    public function test_controller_fetches_final_statement_transactions_for_one_order(): void
+    {
+        $store = $this->createStore();
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202501/orders/ORDER-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'message' => 'Success',
+                'data' => [
+                    'order_id' => 'ORDER-1',
+                    'transactions' => [[
+                        'id' => 'ORDER-TX-1',
+                        'type' => 'ORDER',
+                        'order_id' => 'ORDER-1',
+                        'settlement_amount' => '130000',
+                    ]],
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($this->user())
+            ->getJson(route('marketplace.api.tiktok-order-statement', [
+                'store' => $store->id,
+                'orderId' => 'ORDER-1',
+            ]))
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('endpoint', 'get_order_statement_transactions')
+            ->assertJsonPath('data.data.order_id', 'ORDER-1')
+            ->assertJsonPath('data.data.transactions.0.id', 'ORDER-TX-1');
+    }
+
     public function test_controller_page_and_json_endpoint_are_available(): void
     {
         $store = $this->createStore();

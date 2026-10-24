@@ -59,10 +59,15 @@ class MarketplacePayoutTest extends TestCase
             ->assertOk()
             ->assertSee('testSettlement')
             ->assertSee('testTikTokSettlement')
+            ->assertSee('testOrderSettlement')
+            ->assertSee('testTikTokOrderSettlement')
             ->assertSee('Tes API: settlement (pencairan dana)')
             ->assertSee('Tes API: settlement statement (pencairan dana)')
+            ->assertSee('Tes API: pencairan per order')
             ->assertSee('/payout-info')
             ->assertSee('/tiktok-financial-transactions')
+            ->assertSee('/escrow-detail?order_sn=')
+            ->assertSee('/tiktok-orders/')
             ->assertSee('params.source')
             ->assertSee('get_wallet_transaction_list');
     }

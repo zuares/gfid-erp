@@ -176,6 +176,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/shopee-transactions/export', [ShopeeTransactionController::class, 'export'])->name('marketplace.api.shopee-transactions.export');
     Route::get('/stores/{store}/tiktok-financial-transactions', [TikTokFinancialTransactionController::class, 'data'])->name('marketplace.api.tiktok-financial-transactions');
     Route::get('/stores/{store}/tiktok-financial-transactions/export', [TikTokFinancialTransactionController::class, 'export'])->name('marketplace.api.tiktok-financial-transactions.export');
+    Route::get('/stores/{store}/tiktok-orders/{orderId}/statement-transactions', [TikTokFinancialTransactionController::class, 'orderStatement'])->name('marketplace.api.tiktok-order-statement');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
     Route::post('/stores/{store}/sync-orders-background', [MarketplaceController::class, 'syncOrdersBackground'])

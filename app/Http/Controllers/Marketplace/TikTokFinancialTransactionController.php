@@ -96,6 +96,50 @@ class TikTokFinancialTransactionController extends Controller
         }
     }
 
+    public function orderStatement(Store $store, string $orderId): JsonResponse
+    {
+        $orderId = trim($orderId);
+        if ($orderId === '' || mb_strlen($orderId) > 64) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order ID TikTok wajib diisi dan maksimal 64 karakter.',
+            ], 422);
+        }
+
+        try {
+            return response()->json([
+                'success' => true,
+                'source' => 'tiktok_live',
+                'endpoint' => 'get_order_statement_transactions',
+                'data' => $this->service->fetchOrderStatementTransactions($store, $orderId),
+            ]);
+        } catch (RuntimeException $e) {
+            Log::warning('[tiktok-order-statement] API gagal', [
+                'store_id' => $store->id,
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+
+            $rateLimited = preg_match('/too many requests|rate[ _-]?limit/i', $e->getMessage()) === 1;
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], str_contains($e->getMessage(), 'bukan channel') ? 422 : ($rateLimited ? 429 : 502));
+        } catch (\Throwable $e) {
+            Log::error('[tiktok-order-statement] Kesalahan internal', [
+                'store_id' => $store->id,
+                'order_id' => $orderId,
+                'exception' => $e,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan sistem saat mengambil settlement order TikTok.',
+            ], 500);
+        }
+    }
+
     public function export(Request $request, Store $store): StreamedResponse|JsonResponse
     {
         $validated = $request->validate([
