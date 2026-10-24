@@ -1227,6 +1227,9 @@
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="testSettlement(${s.id}, '${esc(s.name)}')"><i class="bi bi-wallet2 text-success me-2"></i>Tes API: settlement (pencairan dana)</button></li>
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="triggerHistoricalBackfill(${s.id}, '${esc(s.name)}')"><i class="bi bi-clock-history text-primary me-2"></i>Tarik Histori (Mesin Waktu)</button></li>
                             ` : ''}
+                            ${isTiktok ? `
+                            <li><button class="dropdown-item py-2 fw-semibold" onclick="testTikTokSettlement(${s.id}, '${esc(s.name)}')"><i class="bi bi-wallet2 text-success me-2"></i>Tes API: settlement statement (pencairan dana)</button></li>
+                            ` : ''}
                             ${connectUrl ? `<li><a class="dropdown-item py-2 fw-semibold text-warning" href="${connectUrl}"><i class="bi bi-key me-2"></i>Otorisasi Ulang (Re-Auth)</a></li>` : ''}
                             <li><button class="dropdown-item py-2 fw-semibold" onclick="disconnectStore(${s.id}, '${esc(s.name)}')"><i class="bi bi-plug text-secondary me-2"></i>Putuskan Koneksi</button></li>
                             <li><button type="button" class="dropdown-item py-2 fw-semibold" data-toggle-active="${s.id}" onclick="toggleActive(${s.id})"><i class="bi bi-power ${inactive ? 'text-success' : 'text-secondary'} me-2"></i>${inactive ? 'Aktifkan Toko' : 'Nonaktifkan Toko (sembunyikan peringatan)'}</button></li>
@@ -1679,16 +1682,28 @@
         new bootstrap.Modal($('apiTestModal')).show();
     };
 
-    window.testSettlement = function(storeId, storeName) {
+    const openSettlementApiTest = function(storeId, storeName, channel) {
         showSettlementApiForm(true);
         window.testApiStoreId = storeId;
-        window.testApiEndpointType = 'settlement';
-        $('apiTestModalTitle').textContent = 'Tes API: settlement / pencairan dana — ' + storeName;
+        window.testApiEndpointType = channel === 'tiktok' ? 'tiktok_settlement' : 'settlement';
+        $('apiTestModalTitle').textContent = channel === 'tiktok'
+            ? 'Tes API: TikTok settlement statement — ' + storeName
+            : 'Tes API: settlement / pencairan dana — ' + storeName;
         $('apiSettlementFrom').value = localDate(-14);
         $('apiSettlementTo').value = localDate();
-        $('apiTestOutput').textContent = 'Pilih rentang tanggal lalu klik Fetch JSON untuk memanggil payout-info (get_wallet_transaction_list).';
+        $('apiTestOutput').textContent = channel === 'tiktok'
+            ? 'Pilih rentang tanggal lalu klik Fetch JSON untuk mengambil settlement statement TikTok.'
+            : 'Pilih rentang tanggal lalu klik Fetch JSON untuk memanggil payout-info (get_wallet_transaction_list).';
 
         new bootstrap.Modal($('apiTestModal')).show();
+    };
+
+    window.testSettlement = function(storeId, storeName) {
+        openSettlementApiTest(storeId, storeName, 'shopee');
+    };
+
+    window.testTikTokSettlement = function(storeId, storeName) {
+        openSettlementApiTest(storeId, storeName, 'tiktok');
     };
 
     $('btnTestApi').onclick = async function() {
@@ -1727,16 +1742,23 @@
         const storeId = window.testApiStoreId;
         const from = $('apiSettlementFrom').value;
         const to = $('apiSettlementTo').value;
+        const type = window.testApiEndpointType;
         if (!from || !to || from > to) return alert('Rentang tanggal settlement tidak valid.');
 
         const days = Math.round((new Date(`${to}T00:00:00`) - new Date(`${from}T00:00:00`)) / 86400000) + 1;
-        if (days > 15) return alert('Rentang tanggal maksimal 15 hari sesuai batas endpoint Shopee.');
+        const maxDays = type === 'tiktok_settlement' ? 60 : 15;
+        if (days > maxDays) return alert(`Rentang tanggal maksimal ${maxDays} hari sesuai batas endpoint marketplace.`);
 
-        const url = '/api/marketplace/stores/' + storeId + '/payout-info?' + new URLSearchParams({
+        const path = type === 'tiktok_settlement'
+            ? '/tiktok-financial-transactions'
+            : '/payout-info';
+        const params = {
             date_from: from,
             date_to: to,
             page_size: '100',
-        }).toString();
+        };
+        if (type === 'tiktok_settlement') params.source = 'statements';
+        const url = '/api/marketplace/stores/' + storeId + path + '?' + new URLSearchParams(params).toString();
         $('apiTestOutput').textContent = 'Memanggil ' + url + ' ...\nTunggu sebentar...';
         $('btnSettlementTest').disabled = true;
 

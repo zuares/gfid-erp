@@ -58,8 +58,12 @@ class MarketplacePayoutTest extends TestCase
         $this->get(route('marketplace.toko'))
             ->assertOk()
             ->assertSee('testSettlement')
+            ->assertSee('testTikTokSettlement')
             ->assertSee('Tes API: settlement (pencairan dana)')
-            ->assertSee('/payout-info?')
+            ->assertSee('Tes API: settlement statement (pencairan dana)')
+            ->assertSee('/payout-info')
+            ->assertSee('/tiktok-financial-transactions')
+            ->assertSee('params.source')
             ->assertSee('get_wallet_transaction_list');
     }
 
