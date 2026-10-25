@@ -2432,6 +2432,20 @@
                                     const label = formatFeeKey(key);
                                     return `${type === 'tax' ? 'Pajak' : 'Fee'} — ${label}`;
                                 };
+                                const tiktokFeeGroup = (key, type) => {
+                                    const normalized = String(key || '').toLowerCase();
+                                    if (type === 'tax') return 'program';
+                                    if (/(platform_commission|referral_fee|refund_administration|transaction_fee|credit_card_handling|infrastructure)/.test(normalized)) {
+                                        return 'administration';
+                                    }
+                                    if (/(service_fee|bonus_cashback|flash_sales|voucher_xtra|shipping_fee_guarantee)/.test(normalized)) {
+                                        return 'service';
+                                    }
+                                    return 'program';
+                                };
+                                const renderTikTokGroup = (label, rows) => (rows.length > 0
+                                    ? sectionLabel(label) + rows.map((item) => renderFeeLine(item.label, item.amount)).join('')
+                                    : '');
                                 const extractTikTokBreakdown = (raw) => {
                                     const normalized = raw.tiktok_fee_breakdown || {};
                                     const result = {
@@ -2483,16 +2497,36 @@
                                     const hasTikTokBreakdown = Object.keys(tiktokFees).length > 0 || Object.keys(tiktokTaxes).length > 0;
                                     if (isTikTokFinance) {
                                         html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
-                                        html += sectionLabel('Komponen Biaya TikTok');
+                                        const tiktokFeeGroups = {
+                                            administration: [],
+                                            service: [],
+                                            program: [],
+                                        };
                                         if (!hasTikTokBreakdown) {
-                                            html += renderFeeLine('Fee & Pajak TikTok (agregat)', Math.abs(Number(r.fee_and_tax_amount || 0)), true);
+                                            tiktokFeeGroups.program.push({
+                                                label: 'Fee & Pajak TikTok (agregat)',
+                                                amount: Math.abs(Number(r.fee_and_tax_amount || 0)),
+                                            });
                                         }
                                         Object.entries(tiktokFees).forEach(([key, value]) => {
-                                            html += renderFeeLine(tiktokFeeLabel(key, 'fee'), value);
+                                            tiktokFeeGroups[tiktokFeeGroup(key, 'fee')].push({
+                                                label: tiktokFeeLabel(key, 'fee'),
+                                                amount: value,
+                                            });
                                         });
                                         Object.entries(tiktokTaxes).forEach(([key, value]) => {
-                                            html += renderFeeLine(tiktokFeeLabel(key, 'tax'), value);
+                                            tiktokFeeGroups.program.push({
+                                                label: tiktokFeeLabel(key, 'tax'),
+                                                amount: value,
+                                            });
                                         });
+                                        const shippingCost = Number(s.shipping_cost_amount || 0);
+                                        if (Number.isFinite(shippingCost) && Math.abs(shippingCost) > 0.001) {
+                                            tiktokFeeGroups.service.push({ label: 'Biaya logistik', amount: shippingCost });
+                                        }
+                                        html += renderTikTokGroup('Biaya Administrasi', tiktokFeeGroups.administration);
+                                        html += renderTikTokGroup('Biaya Layanan', tiktokFeeGroups.service);
+                                        html += renderTikTokGroup('Biaya Program & Lainnya', tiktokFeeGroups.program);
                                     } else {
                                         html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
                                         html += sectionLabel('Biaya Platform');
@@ -2526,7 +2560,6 @@
                                     html += renderFeeLine('Biaya Komisi AMS', s.order_ams_commission_fee ?? s.ams_commission_fee ?? s.activity_fee);
                                 }
                                 if (isTikTokFinance) {
-                                    html += renderFeeLine('Biaya logistik', s.shipping_cost_amount);
                                     html += sectionLabel('Biaya Iklan');
                                     html += renderFeeLine('Biaya Iklan', s.ad_cost);
                                 }
