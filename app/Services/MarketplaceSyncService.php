@@ -1078,6 +1078,7 @@ class MarketplaceSyncService
             : [];
         $hasStatement = $skuTransactions !== [] || (bool) ($data['_is_statement_transaction'] ?? false);
         $shippingAmounts = $this->normalizeTikTokShippingAmounts($data, $skuTransactions);
+        $shippingCostAmount = $this->decimalValue($data['shipping_cost_amount'] ?? null);
 
         $amount = static fn (mixed $value): float => is_numeric($value) ? (float) $value : 0.0;
         $collectBreakdown = static function (array $rows, array &$target, string $prefix = '') use (&$collectBreakdown, $amount): void {
@@ -1188,6 +1189,7 @@ class MarketplaceSyncService
             'escrow_tax' => $this->nn($this->decimalValue($tax)),
             'ad_cost' => $this->nn($this->decimalValue($gmvMaxAdCost)),
             'actual_shipping_fee' => $this->nn($this->decimalValue($shippingAmounts['actual_shipping_fee_amount'])),
+            'shipping_cost_amount' => $shippingCostAmount,
             'shipping_fee_subsidy' => $this->nn($this->decimalValue($shippingAmounts['shipping_fee_discount_amount'])),
             'final_income' => $this->nn($this->decimalValue($settlementAmount)),
             'settlement_time' => $hasStatement ? $statementTime : null,
@@ -1199,6 +1201,7 @@ class MarketplaceSyncService
             'data_quality_flags' => [
                 'source' => $source,
                 'has_sku_transactions' => $hasStatement,
+                'has_shipping_breakdown' => $shippingAmounts['has_breakdown'],
                 'reason' => $hasStatement ? null : 'tiktok_order_not_settled',
             ],
             'data_checked_at' => now(),
@@ -1256,7 +1259,7 @@ class MarketplaceSyncService
      * Values are intentionally read once, not summed across SKU rows, because
      * TikTok can repeat the same order-level breakdown on each transaction.
      *
-     * @return array{actual_shipping_fee_amount:float,shipping_fee_discount_amount:float,shipping_fee_customer:float}
+     * @return array{actual_shipping_fee_amount:?float,shipping_fee_discount_amount:?float,shipping_fee_customer:?float,has_breakdown:bool}
      */
     private function normalizeTikTokShippingAmounts(array $data, array $skuTransactions): array
     {
@@ -1267,7 +1270,7 @@ class MarketplaceSyncService
             }
         }
 
-        $findAmount = static function (array $keys) use ($sources): float {
+        $findAmount = static function (array $keys) use ($sources): ?float {
             $zeroValue = null;
 
             foreach ($sources as $source) {
@@ -1286,38 +1289,36 @@ class MarketplaceSyncService
                 }
             }
 
-            return round($zeroValue ?? 0.0, 2);
+            return $zeroValue === null ? null : round($zeroValue, 2);
         };
 
         $actualShippingFee = $findAmount([
             'shipping_cost_breakdown.actual_shipping_fee_amount',
             'actual_shipping_fee_amount',
         ]);
-        if ($actualShippingFee <= 0) {
-            $actualShippingFee = $findAmount([
-                'shipping_cost_amount',
-                'actual_shipping_fee',
-                'estimated_shipping_fee',
-            ]);
-        }
+        $platformShippingFee = $findAmount([
+            'shipping_fee_discount_amount',
+            'shipping_cost_breakdown.shipping_fee_discount_amount',
+            'shipping_fee_subsidy',
+            'shipping_cost_breakdown.shipping_fee_subsidy',
+        ]);
+        $customerShippingFee = $findAmount([
+            'shipping_fee_customer',
+            'shipping_cost_breakdown.shipping_fee_customer',
+            'customer_paid_shipping_fee_amount',
+            'shipping_cost_breakdown.customer_paid_shipping_fee_amount',
+            'customer_paid_shipping_fee',
+            'shipping_cost_breakdown.customer_paid_shipping_fee',
+            'buyer_paid_shipping_fee',
+        ]);
 
         return [
             'actual_shipping_fee_amount' => $actualShippingFee,
-            'shipping_fee_discount_amount' => $findAmount([
-                'shipping_fee_discount_amount',
-                'shipping_cost_breakdown.shipping_fee_discount_amount',
-                'shipping_fee_subsidy',
-                'shipping_cost_breakdown.shipping_fee_subsidy',
-            ]),
-            'shipping_fee_customer' => $findAmount([
-                'shipping_fee_customer',
-                'shipping_cost_breakdown.shipping_fee_customer',
-                'customer_paid_shipping_fee_amount',
-                'shipping_cost_breakdown.customer_paid_shipping_fee_amount',
-                'customer_paid_shipping_fee',
-                'shipping_cost_breakdown.customer_paid_shipping_fee',
-                'buyer_paid_shipping_fee',
-            ]),
+            'shipping_fee_discount_amount' => $platformShippingFee,
+            'shipping_fee_customer' => $customerShippingFee,
+            'has_breakdown' => $actualShippingFee !== null
+                || $platformShippingFee !== null
+                || $customerShippingFee !== null,
         ];
     }
 

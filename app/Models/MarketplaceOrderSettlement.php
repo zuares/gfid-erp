@@ -27,6 +27,7 @@ class MarketplaceOrderSettlement extends Model
 
         // Ongkir
         'actual_shipping_fee',
+        'shipping_cost_amount',
         'shipping_fee_subsidy',
         'reverse_shipping_fee',
         'shipping_insurance_fee',
@@ -60,6 +61,7 @@ class MarketplaceOrderSettlement extends Model
         'seller_voucher'         => 'decimal:2',
         'seller_coin_cash_back'  => 'decimal:2',
         'actual_shipping_fee'    => 'decimal:2',
+        'shipping_cost_amount'   => 'decimal:2',
         'shipping_fee_subsidy'   => 'decimal:2',
         'reverse_shipping_fee'   => 'decimal:2',
         'shipping_insurance_fee' => 'decimal:2',

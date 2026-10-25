@@ -229,7 +229,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
                     'currency' => 'IDR',
                     'revenue_amount' => '100000',
                     'fee_and_tax_amount' => '-18766',
-                    'shipping_cost_amount' => '0',
+                    'shipping_cost_amount' => '-2220',
                     'settlement_amount' => '81234',
                     'sku_transactions' => [[
                         'sku_id' => 'SKU-1',
@@ -261,6 +261,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame(766.0, (float) $settlement->escrow_tax);
         $this->assertSame(8766.0, $settlement->totalDeductions());
         $this->assertSame(50000.0, (float) $settlement->actual_shipping_fee);
+        $this->assertSame(-2220.0, (float) $settlement->shipping_cost_amount);
         $this->assertSame(50000.0, (float) $settlement->shipping_fee_subsidy);
         $this->assertSame(50000.0, (float) data_get($settlement->raw_json, 'tiktok_shipping_breakdown.actual_shipping_fee_amount'));
         $this->assertSame(50000.0, (float) data_get($settlement->raw_json, 'tiktok_shipping_breakdown.shipping_fee_discount_amount'));

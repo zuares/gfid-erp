@@ -1626,8 +1626,67 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $row = $payload['paginator']['data'][0] ?? [];
 
         $this->assertSame(50000.0, (float) ($row['actual_shipping_fee_amount'] ?? -1));
+        $this->assertSame(0.0, (float) ($row['shipping_cost_amount'] ?? -1));
         $this->assertSame(50000.0, (float) ($row['shipping_fee_discount_amount'] ?? -1));
         $this->assertSame(70000.0, (float) ($row['shipping_fee_customer'] ?? -1));
+    }
+
+    public function test_settlements_endpoint_does_not_infer_tiktok_shipping_breakdown_from_total(): void
+    {
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'TTK-SHIPPING-TOTAL-'.rand(1000, 9999),
+            'name' => 'TikTok Shipping Total Test Store',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => ['access_token' => 'dummy-token'],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TTK-SHIPPING-TOTAL-001',
+            'external_order_id' => 'TTK-SHIPPING-TOTAL-001',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'shipping_cost_amount' => -2220,
+            'actual_shipping_fee' => 0,
+            'shipping_fee_subsidy' => 0,
+            'final_income' => 100000,
+            'settlement_time' => now(),
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_statement_transactions',
+                'shipping_cost_amount' => '-2220',
+                'sku_transactions' => [],
+                'tiktok_shipping_breakdown' => [
+                    'actual_shipping_fee_amount' => null,
+                    'shipping_fee_discount_amount' => null,
+                    'shipping_fee_customer' => null,
+                    'has_breakdown' => false,
+                ],
+            ],
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            ['store_id' => $store->id, 'page' => 1, 'per_page' => 50],
+        ))->getData(true);
+        $row = $payload['paginator']['data'][0] ?? [];
+
+        $this->assertSame(2220.0, (float) ($row['shipping_cost_amount'] ?? -1));
+        $this->assertNull($row['actual_shipping_fee_amount'] ?? null);
+        $this->assertNull($row['shipping_fee_discount_amount'] ?? null);
+        $this->assertNull($row['shipping_fee_customer'] ?? null);
     }
 
     public function test_settlements_endpoint_mendukung_pencarian_nama_produk_dan_sku_item()

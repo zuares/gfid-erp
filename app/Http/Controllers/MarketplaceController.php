@@ -4145,6 +4145,7 @@ class MarketplaceController extends Controller
                 'order_selling_price' => $orderSellingPrice,
                 'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
                 'actual_shipping_fee' => (float) $s->actual_shipping_fee,
+                'shipping_cost_amount' => $logisticsAmounts['shipping_cost_amount'],
                 'shipping_fee_subsidy' => (float) $s->shipping_fee_subsidy,
                 'actual_shipping_fee_amount' => $logisticsAmounts['actual_shipping_fee_amount'],
                 'shipping_fee_discount_amount' => $logisticsAmounts['shipping_fee_discount_amount'],
@@ -4585,6 +4586,9 @@ class MarketplaceController extends Controller
             $sources[] = $normalized;
         }
         $sources[] = $raw;
+        $isTikTokFinance = str_contains(strtolower((string) data_get($raw, 'source', '')), 'tiktok')
+            || array_key_exists('shipping_cost_amount', $raw)
+            || array_key_exists('sku_transactions', $raw);
         $transactions = data_get($raw, 'sku_transactions', []);
         if (is_array($transactions)) {
             foreach ($transactions as $transaction) {
@@ -4616,56 +4620,81 @@ class MarketplaceController extends Controller
             return $zeroValue;
         };
 
-        $actualShippingFee = $findAmount([
-            'actual_shipping_fee_amount',
-            'shipping_cost_breakdown.actual_shipping_fee_amount',
-            'actual_shipping_fee',
-            'estimated_shipping_fee',
+        $shippingCostAmount = $findAmount([
+            'shipping_cost_amount',
         ]);
-        if ($actualShippingFee === null || $actualShippingFee <= 0) {
-            $actualShippingFee = $findAmount([
-                'shipping_cost_amount',
-            ]);
+        if ($shippingCostAmount === null && $s->shipping_cost_amount !== null) {
+            $shippingCostAmount = $this->settlementFeeAmount($s->shipping_cost_amount);
         }
-        if ($actualShippingFee === null || $actualShippingFee <= 0) {
+
+        $actualShippingKeys = $isTikTokFinance
+            ? [
+                'actual_shipping_fee_amount',
+                'shipping_cost_breakdown.actual_shipping_fee_amount',
+            ]
+            : [
+                'actual_shipping_fee_amount',
+                'shipping_cost_breakdown.actual_shipping_fee_amount',
+                'actual_shipping_fee',
+                'estimated_shipping_fee',
+            ];
+        $actualShippingFee = $findAmount($actualShippingKeys);
+        if (!$isTikTokFinance && ($actualShippingFee === null || $actualShippingFee <= 0)) {
             $actualShippingFee = $this->settlementFeeAmount($s->actual_shipping_fee);
         }
 
-        $platformShippingFee = $findAmount([
-            'shipping_fee_discount_amount',
-            'shipping_cost_breakdown.shipping_fee_discount_amount',
-            'shipping_fee_subsidy',
-            'shipping_cost_breakdown.shipping_fee_subsidy',
-            'shopee_shipping_rebate',
-            'shipping_fee_rebate',
-        ]);
-        if ($platformShippingFee === null || $platformShippingFee <= 0) {
+        $platformShippingKeys = $isTikTokFinance
+            ? [
+                'shipping_fee_discount_amount',
+                'shipping_cost_breakdown.shipping_fee_discount_amount',
+            ]
+            : [
+                'shipping_fee_discount_amount',
+                'shipping_cost_breakdown.shipping_fee_discount_amount',
+                'shipping_fee_subsidy',
+                'shipping_cost_breakdown.shipping_fee_subsidy',
+                'shopee_shipping_rebate',
+                'shipping_fee_rebate',
+            ];
+        $platformShippingFee = $findAmount($platformShippingKeys);
+        if (!$isTikTokFinance && ($platformShippingFee === null || $platformShippingFee <= 0)) {
             $platformShippingFee = $this->settlementFeeAmount($s->order?->shipping_discount_platform);
         }
-        if ($platformShippingFee <= 0) {
+        if (!$isTikTokFinance && $platformShippingFee <= 0) {
             $platformShippingFee = $this->settlementFeeAmount($s->shipping_fee_subsidy);
         }
 
-        $customerShippingFee = $findAmount([
-            'shipping_fee_customer',
-            'shipping_cost_breakdown.shipping_fee_customer',
-            'customer_paid_shipping_fee_amount',
-            'shipping_cost_breakdown.customer_paid_shipping_fee_amount',
-            'customer_paid_shipping_fee',
-            'shipping_cost_breakdown.customer_paid_shipping_fee',
-            'buyer_paid_shipping_fee',
-        ]);
-        if ($customerShippingFee === null || $customerShippingFee <= 0) {
+        $customerShippingKeys = $isTikTokFinance
+            ? [
+                'shipping_fee_customer',
+                'shipping_cost_breakdown.shipping_fee_customer',
+                'customer_paid_shipping_fee_amount',
+                'shipping_cost_breakdown.customer_paid_shipping_fee_amount',
+                'customer_paid_shipping_fee',
+                'shipping_cost_breakdown.customer_paid_shipping_fee',
+            ]
+            : [
+                'shipping_fee_customer',
+                'shipping_cost_breakdown.shipping_fee_customer',
+                'customer_paid_shipping_fee_amount',
+                'shipping_cost_breakdown.customer_paid_shipping_fee_amount',
+                'customer_paid_shipping_fee',
+                'shipping_cost_breakdown.customer_paid_shipping_fee',
+                'buyer_paid_shipping_fee',
+            ];
+        $customerShippingFee = $findAmount($customerShippingKeys);
+        if (!$isTikTokFinance && ($customerShippingFee === null || $customerShippingFee <= 0)) {
             $customerShippingFee = $this->settlementFeeAmount($s->order?->shipping_fee_customer);
         }
-        if ($customerShippingFee <= 0) {
+        if (!$isTikTokFinance && ($customerShippingFee === null || $customerShippingFee <= 0)) {
             $customerShippingFee = $actualShippingFee;
         }
 
         return [
-            'actual_shipping_fee_amount' => max(0.0, $actualShippingFee),
-            'shipping_fee_discount_amount' => max(0.0, $platformShippingFee),
-            'shipping_fee_customer' => max(0.0, $customerShippingFee),
+            'shipping_cost_amount' => $shippingCostAmount,
+            'actual_shipping_fee_amount' => $actualShippingFee === null ? null : max(0.0, $actualShippingFee),
+            'shipping_fee_discount_amount' => $platformShippingFee === null ? null : max(0.0, $platformShippingFee),
+            'shipping_fee_customer' => $customerShippingFee === null ? null : max(0.0, $customerShippingFee),
         ];
     }
 
