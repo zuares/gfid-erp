@@ -2489,11 +2489,14 @@
                                             html += renderFeeLine(tiktokFeeLabel(key, 'tax'), value);
                                         });
                                     } else {
-                                        html += sectionLabel('Komisi & Admin');
-                                        html += renderFeeLine('Biaya Administrasi', r.commission_fee);
-                                        html += renderFeeLine('Biaya Layanan', r.service_fee);
-                                        html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee);
-                                        html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee);
+                                        html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
+                                        html += sectionLabel('Breakdown Shopee');
+                                        html += renderFeeLine('Biaya Administrasi', r.commission_fee ?? s.commission_fee);
+                                        html += renderFeeLine('Biaya Layanan', r.service_fee ?? s.service_fee);
+
+                                        html += sectionLabel('Biaya Lainnya');
+                                        html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee ?? s.transaction_fee);
+                                        html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee ?? s.seller_order_processing_fee);
                                         html += renderFeeLine('Biaya Komisi AMS', r.order_ams_commission_fee ?? r.ams_commission_fee ?? s.order_ams_commission_fee);
 
                                         html += sectionLabel('Promo & Affiliate');
@@ -2507,10 +2510,12 @@
                                         html += renderFeeLine('Pajak (Escrow)', r.escrow_tax);
                                     }
                                 } else {
-                                    html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
-                                    html += sectionLabel('Komisi & Admin');
+                                    html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
+                                    html += sectionLabel('Breakdown Shopee');
                                     html += renderFeeLine('Biaya Administrasi', s.commission_fee);
                                     html += renderFeeLine('Biaya Layanan', s.service_fee);
+
+                                    html += sectionLabel('Biaya Lainnya');
                                     html += renderFeeLine('Biaya Transaksi', s.transaction_fee);
                                     html += renderFeeLine('Biaya Proses Pesanan', s.seller_order_processing_fee);
                                     html += renderFeeLine('Biaya Komisi AMS', s.order_ams_commission_fee ?? s.ams_commission_fee ?? s.activity_fee);
