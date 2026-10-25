@@ -2555,6 +2555,7 @@
                             <div class="settlement-breakdown-block">
                                 <div class="settlement-breakdown-title">Penyesuaian</div>
                                 <ul class="fee-list">
+                                    ${!isTikTokFinance ? `<li><span>Pembeli</span> <span class="buyer-val">${Number(s.order?.shipping_fee_customer ?? 0) ? '+'+fmtRp(s.order.shipping_fee_customer) : '-'}</span></li>` : ''}
                                     <li><span>Ongkir balik</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
                                     <li><span>DRC refund</span> <span class="drc-val">${s.drc_adjustable_refund ? (s.drc_adjustable_refund > 0 ? '+' : '') + fmtRp(s.drc_adjustable_refund) : '-'}</span></li>
                                 </ul>
