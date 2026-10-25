@@ -3640,7 +3640,7 @@ class MarketplaceController extends Controller
         $query = MarketplaceOrderSettlement::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
-            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,order_date,subtotal_items,total_paid_customer,shipping_fee_customer,shipping_discount_platform',
+            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,order_date,subtotal_items,total_paid_customer',
             'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,status_description,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
         ]);
@@ -4107,7 +4107,6 @@ class MarketplaceController extends Controller
                 $incomeEstimationSource = 'manual_24';
             }
             $grossProfit = $netIncome - $cogs;
-            $logisticsAmounts = $this->settlementLogisticsAmounts($s);
 
             return [
                 'id' => $s->id,
@@ -4146,9 +4145,6 @@ class MarketplaceController extends Controller
                 'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
                 'actual_shipping_fee' => (float) $s->actual_shipping_fee,
                 'shipping_fee_subsidy' => (float) $s->shipping_fee_subsidy,
-                'actual_shipping_fee_amount' => $logisticsAmounts['actual_shipping_fee_amount'],
-                'shipping_fee_discount_amount' => $logisticsAmounts['shipping_fee_discount_amount'],
-                'shipping_fee_customer' => $logisticsAmounts['shipping_fee_customer'],
                 'reverse_shipping_fee' => (float) $s->reverse_shipping_fee,
                 'premi' => (float) (data_get($s->raw_json, 'premi') ?? data_get($s->raw_json, 'shipping_insurance') ?? data_get($s->raw_json, 'insurance_fee') ?? 0),
                 'seller_transaction_fee' => (float) (data_get($s->raw_json, 'seller_transaction_fee') ?? data_get($s->raw_json, 'transaction_fee') ?? 0),
@@ -4569,96 +4565,6 @@ class MarketplaceController extends Controller
         $normalized = str_replace(',', '', $normalized);
 
         return abs((float) $normalized);
-    }
-
-    /**
-     * Normalize the order-level logistics amounts shown in the settlement UI.
-     * TikTok keeps these values inside shipping_cost_breakdown on one or more
-     * sku_transactions, while legacy Shopee rows use settlement/order fields.
-     */
-    private function settlementLogisticsAmounts(MarketplaceOrderSettlement $s): array
-    {
-        $raw = is_array($s->raw_json) ? $s->raw_json : [];
-        $sources = [$raw];
-        $transactions = data_get($raw, 'sku_transactions', []);
-        if (is_array($transactions)) {
-            foreach ($transactions as $transaction) {
-                if (is_array($transaction)) {
-                    $sources[] = $transaction;
-                }
-            }
-        }
-
-        $findAmount = function (array $keys) use ($sources): ?float {
-            $zeroValue = null;
-
-            foreach ($sources as $source) {
-                foreach ($keys as $key) {
-                    $value = data_get($source, $key);
-                    if ($value === null || $value === '') {
-                        continue;
-                    }
-
-                    $amount = $this->settlementFeeAmount($value);
-                    if ($amount > 0) {
-                        return $amount;
-                    }
-
-                    $zeroValue ??= $amount;
-                }
-            }
-
-            return $zeroValue;
-        };
-
-        $actualShippingFee = $findAmount([
-            'shipping_cost_breakdown.actual_shipping_fee_amount',
-            'actual_shipping_fee_amount',
-            'actual_shipping_fee',
-            'shipping_cost_amount',
-            'estimated_shipping_fee',
-        ]);
-        if ($actualShippingFee === null || $actualShippingFee <= 0) {
-            $actualShippingFee = $this->settlementFeeAmount($s->actual_shipping_fee);
-        }
-
-        $platformShippingFee = $findAmount([
-            'shipping_cost_breakdown.shipping_fee_discount_amount',
-            'shipping_fee_discount_amount',
-            'shipping_fee_subsidy',
-            'shopee_shipping_rebate',
-            'shipping_fee_rebate',
-            'shipping_cost_breakdown.tiktok_shop_shipping_incentive_amount',
-            'tiktok_shop_shipping_incentive_amount',
-        ]);
-        if ($platformShippingFee === null || $platformShippingFee <= 0) {
-            $platformShippingFee = $this->settlementFeeAmount($s->order?->shipping_discount_platform);
-        }
-        if ($platformShippingFee <= 0) {
-            $platformShippingFee = $this->settlementFeeAmount($s->shipping_fee_subsidy);
-        }
-
-        $customerShippingFee = $this->settlementFeeAmount($s->order?->shipping_fee_customer);
-        if ($customerShippingFee <= 0) {
-            $customerShippingFee = $findAmount([
-                'shipping_cost_breakdown.shipping_fee_customer',
-                'shipping_fee_customer',
-                'shipping_cost_breakdown.customer_paid_shipping_fee_amount',
-                'customer_paid_shipping_fee_amount',
-                'shipping_cost_breakdown.customer_paid_shipping_fee',
-                'customer_paid_shipping_fee',
-                'buyer_paid_shipping_fee',
-            ]) ?? 0.0;
-        }
-        if ($customerShippingFee <= 0) {
-            $customerShippingFee = $actualShippingFee;
-        }
-
-        return [
-            'actual_shipping_fee_amount' => max(0.0, $actualShippingFee),
-            'shipping_fee_discount_amount' => max(0.0, $platformShippingFee),
-            'shipping_fee_customer' => max(0.0, $customerShippingFee),
-        ];
     }
 
     private function settlementVoucherPlatformAmount(MarketplaceOrderSettlement $s): float

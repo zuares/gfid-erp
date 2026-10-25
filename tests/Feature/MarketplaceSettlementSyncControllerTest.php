@@ -632,10 +632,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('Auto-sync aktif')
             ->assertSee('Lihat detail')
             ->assertSee('ESTIMASI BELUM TERSEDIA')
-            ->assertSee('Rincian tersedia setelah settlement.')
-            ->assertSee('Biaya ongkir')
-            ->assertSee('Dibayar platform')
-            ->assertSee('Dibayar pembeli');
+            ->assertSee('Rincian tersedia setelah settlement.');
     }
 
     public function test_detail_order_menampilkan_estimasi_bila_income_belum_ada()
@@ -1558,9 +1555,6 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(23391.0, (float) ($row['seller_burden_total'] ?? -1));
         $this->assertSame(12000.0, (float) ($row['buyer_burden_total'] ?? -1));
         $this->assertSame(6000.0, (float) ($row['platform_burden_total'] ?? -1));
-        $this->assertSame(11000.0, (float) ($row['actual_shipping_fee_amount'] ?? -1));
-        $this->assertSame(6000.0, (float) ($row['shipping_fee_discount_amount'] ?? -1));
-        $this->assertSame(11000.0, (float) ($row['shipping_fee_customer'] ?? -1));
         $this->assertSame(5000.0, (float) ($row['voucher_total'] ?? -1));
         $this->assertSame(46391.0, (float) ($row['total_burden_total'] ?? -1));
         $this->assertContains('Biaya Proses Pesanan', $labels);
@@ -1572,62 +1566,6 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertContains('voucher', $categories);
         $this->assertContains('buyer', $categories);
         $this->assertContains('platform', $categories);
-    }
-
-    public function test_settlements_endpoint_memetakan_breakdown_ongkir_tiktok_per_order(): void
-    {
-        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
-        $store = Store::create([
-            'channel_id' => $tiktok->id,
-            'code' => 'TTK-SHIPPING-'.rand(1000, 9999),
-            'name' => 'TikTok Shipping Test Store',
-            'status' => 'active',
-            'is_active' => true,
-            'credentials' => ['access_token' => 'dummy-token'],
-        ]);
-        $order = MarketplaceOrder::create([
-            'store_id' => $store->id,
-            'channel_order_id' => 'TTK-SHIPPING-001',
-            'external_order_id' => 'TTK-SHIPPING-001',
-            'order_status' => 'COMPLETED',
-            'ordered_at' => now()->subDay(),
-            'order_date' => now()->subDay(),
-            'subtotal_items' => 100000,
-            'total_paid_customer' => 170000,
-        ]);
-        MarketplaceOrderSettlement::create([
-            'store_id' => $store->id,
-            'order_id' => $order->id,
-            'channel_order_id' => $order->channel_order_id,
-            'buyer_payment_amount' => 170000,
-            'actual_shipping_fee' => 50000,
-            'shipping_fee_subsidy' => 0,
-            'final_income' => 50000,
-            'settlement_time' => now(),
-            'data_status' => 'complete',
-            'raw_json' => [
-                'source' => 'tiktok_finance_202501_statement_transactions',
-                'shipping_cost_amount' => '-50000',
-                'sku_transactions' => [[
-                    'shipping_cost_breakdown' => [
-                        'actual_shipping_fee_amount' => '-50000',
-                        'shipping_fee_customer' => '70000',
-                        'shipping_fee_discount_amount' => '50000',
-                    ],
-                ]],
-            ],
-        ]);
-
-        $payload = app(MarketplaceController::class)->settlements(Request::create(
-            '/api/marketplace/settlements',
-            'GET',
-            ['store_id' => $store->id, 'page' => 1, 'per_page' => 50],
-        ))->getData(true);
-        $row = $payload['paginator']['data'][0] ?? [];
-
-        $this->assertSame(50000.0, (float) ($row['actual_shipping_fee_amount'] ?? -1));
-        $this->assertSame(50000.0, (float) ($row['shipping_fee_discount_amount'] ?? -1));
-        $this->assertSame(70000.0, (float) ($row['shipping_fee_customer'] ?? -1));
     }
 
     public function test_settlements_endpoint_mendukung_pencarian_nama_produk_dan_sku_item()
