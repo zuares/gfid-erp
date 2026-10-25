@@ -2382,6 +2382,9 @@
                                     return `<li><span>${label}:</span> <span class="fee-val">${sign}${fmtRp(Math.abs(numeric))}${pct}</span></li>`;
                                 };
                                 const sectionLabel = (label) => `<li style="margin-top:.45rem; padding-top:.35rem; border-top:1px dashed rgba(148,163,184,.22); font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#64748b;">${label}</li>`;
+                                const renderShopeeServiceFeeBreakdown = (rows) => (Array.isArray(rows) ? rows : [])
+                                    .map((item) => renderFeeLine(item?.label || 'Program Layanan', item?.amount))
+                                    .join('');
                                 const formatFeeKey = (key) => String(key || '')
                                     .split('.')
                                     .map((part) => part.replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()))
@@ -2486,24 +2489,30 @@
                                         });
                                     } else {
                                         html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
-                                        html += sectionLabel('Breakdown Shopee');
+                                        html += sectionLabel('Biaya Platform');
                                         html += renderFeeLine('Biaya Administrasi', r.commission_fee ?? s.commission_fee);
-                                        html += renderFeeLine('Biaya Layanan', r.service_fee ?? s.service_fee);
+                                        html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee ?? s.seller_order_processing_fee);
+
+                                        html += sectionLabel('Biaya Layanan');
+                                        html += renderFeeLine('Total Biaya Layanan', r.service_fee ?? s.service_fee);
+                                        html += renderShopeeServiceFeeBreakdown(s.shopee_service_fee_breakdown);
 
                                         html += sectionLabel('Biaya Lainnya');
                                         html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee ?? s.transaction_fee);
-                                        html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee ?? s.seller_order_processing_fee);
                                         html += renderFeeLine('Biaya Komisi AMS', r.order_ams_commission_fee ?? r.ams_commission_fee ?? s.order_ams_commission_fee);
                                     }
                                 } else {
                                     html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
-                                    html += sectionLabel('Breakdown Shopee');
+                                    html += sectionLabel('Biaya Platform');
                                     html += renderFeeLine('Biaya Administrasi', s.commission_fee);
-                                    html += renderFeeLine('Biaya Layanan', s.service_fee);
+                                    html += renderFeeLine('Biaya Proses Pesanan', s.seller_order_processing_fee);
+
+                                    html += sectionLabel('Biaya Layanan');
+                                    html += renderFeeLine('Total Biaya Layanan', s.service_fee);
+                                    html += renderShopeeServiceFeeBreakdown(s.shopee_service_fee_breakdown);
 
                                     html += sectionLabel('Biaya Lainnya');
                                     html += renderFeeLine('Biaya Transaksi', s.transaction_fee);
-                                    html += renderFeeLine('Biaya Proses Pesanan', s.seller_order_processing_fee);
                                     html += renderFeeLine('Biaya Komisi AMS', s.order_ams_commission_fee ?? s.ams_commission_fee ?? s.activity_fee);
                                 }
                                 if (isTikTokFinance) {

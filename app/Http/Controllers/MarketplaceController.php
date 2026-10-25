@@ -4153,6 +4153,7 @@ class MarketplaceController extends Controller
                 'premi' => (float) (data_get($s->raw_json, 'premi') ?? data_get($s->raw_json, 'shipping_insurance') ?? data_get($s->raw_json, 'insurance_fee') ?? 0),
                 'seller_transaction_fee' => (float) (data_get($s->raw_json, 'seller_transaction_fee') ?? data_get($s->raw_json, 'transaction_fee') ?? 0),
                 'seller_order_processing_fee' => (float) (data_get($s->raw_json, 'seller_order_processing_fee') ?? 0),
+                'shopee_service_fee_breakdown' => $this->settlementShopeeServiceFeeBreakdown($s),
                 'order_ams_commission_fee' => (float) (data_get($s->raw_json, 'order_ams_commission_fee') ?? data_get($s->raw_json, 'ams_commission_fee') ?? $s->activity_fee ?? 0),
                 'biaya_affiliate' => (float) (data_get($s->raw_json, 'affiliate_fee') ?? data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
                 'affiliate_commission_fee' => (float) (data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
@@ -4565,6 +4566,91 @@ class MarketplaceController extends Controller
         $normalized = str_replace(',', '', $normalized);
 
         return abs((float) $normalized);
+    }
+
+    /**
+     * Ambil rincian biaya layanan Shopee tanpa menjadikan nilai agregat
+     * service_fee sebagai beberapa biaya palsu. Payload baru dapat mengirim
+     * daftar rule layanan, sementara payload lama hanya mengirim field
+     * program layanan individual.
+     *
+     * @return array<int,array{label:string,amount:float,source:string}>
+     */
+    private function settlementShopeeServiceFeeBreakdown(MarketplaceOrderSettlement $s): array
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+        $rows = [];
+        $seen = [];
+
+        $push = function (string $label, mixed $amount, string $source) use (&$rows, &$seen): void {
+            $amount = $this->settlementFeeAmount($amount);
+            $label = trim($label);
+            if ($amount <= 0 || $label === '') {
+                return;
+            }
+
+            $signature = strtolower($source.'|'.$label.'|'.number_format($amount, 2, '.', ''));
+            if (isset($seen[$signature])) {
+                return;
+            }
+
+            $seen[$signature] = true;
+            $rows[] = [
+                'label' => $label,
+                'amount' => $amount,
+                'source' => $source,
+            ];
+        };
+
+        $readServiceRule = function (mixed $value, string $source) use (&$readServiceRule, $push): void {
+            if (! is_array($value)) {
+                return;
+            }
+
+            $amount = $value['fee_amount']
+                ?? $value['service_fee_amount']
+                ?? $value['amount']
+                ?? $value['value']
+                ?? null;
+            if ($amount !== null && $amount !== '') {
+                $label = $value['rule_display_name']
+                    ?? $value['fee_name']
+                    ?? $value['program_name']
+                    ?? $value['name']
+                    ?? $value['category']
+                    ?? 'Biaya Layanan';
+                $push((string) $label, $amount, $source);
+                return;
+            }
+
+            foreach ($value as $nested) {
+                $readServiceRule($nested, $source);
+            }
+        };
+
+        foreach ([
+            'net_service_fee_info_list',
+            'final_seller_service_fee_list',
+            'seller_service_fee_list',
+            'service_fee_info_list',
+            'service_fee_breakdown',
+        ] as $key) {
+            $readServiceRule(data_get($raw, $key), $key);
+        }
+
+        // Fallback untuk response lama yang tidak mengirim daftar rule.
+        foreach ([
+            'shipping_seller_protection_fee_amount' => 'Biaya Logistik',
+            'delivery_seller_protection_fee_premium_amount' => 'Premi Proteksi Logistik',
+            'overseas_return_service_fee' => 'Program Overseas Return',
+            'fbs_fee' => 'Program Fulfilled by Shopee',
+            'campaign_fee' => 'Biaya Program Campaign',
+            'ads_escrow_top_up_fee_or_technical_support_fee' => 'Biaya Dukungan Teknis / Ads',
+        ] as $key => $label) {
+            $push($label, data_get($raw, $key), $key);
+        }
+
+        return $rows;
     }
 
     /**

@@ -633,7 +633,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('Lihat detail')
             ->assertSee('ESTIMASI BELUM TERSEDIA')
             ->assertSee('Rincian tersedia setelah settlement.')
-            ->assertSee('Breakdown Shopee')
+            ->assertSee('Biaya Platform')
             ->assertSee('Biaya Administrasi')
             ->assertSee('Biaya Layanan')
             ->assertSee('Biaya ongkir')
@@ -1346,6 +1346,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'raw_json' => [
                 'seller_order_processing_fee' => 1250,
                 'order_ams_commission_fee' => 4754,
+                'net_service_fee_info_list' => [
+                    'fee_amount' => 2200,
+                    'rule_display_name' => 'Biaya Logistik',
+                    'category' => 'logistics',
+                ],
             ],
         ]);
 
@@ -1371,6 +1376,8 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(24641.0, (float) ($row['marketplace_fee_after_affiliate'] ?? -1));
         $this->assertSame(23.0, (float) ($row['marketplace_fee_percent'] ?? -1));
         $this->assertContains('Biaya Komisi AMS', $labels);
+        $this->assertSame('Biaya Logistik', $row['shopee_service_fee_breakdown'][0]['label'] ?? null);
+        $this->assertSame(2200.0, (float) ($row['shopee_service_fee_breakdown'][0]['amount'] ?? -1));
         $this->assertContains('Voucher Toko', $labels);
         $this->assertContains('voucher', $categories);
         $this->assertSame(5000.0, (float) ($row['voucher_total'] ?? -1));
