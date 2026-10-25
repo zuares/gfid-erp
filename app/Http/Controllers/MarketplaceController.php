@@ -4107,6 +4107,14 @@ class MarketplaceController extends Controller
             }
             $grossProfit = $netIncome - $cogs;
             $logisticsAmounts = $this->settlementLogisticsAmounts($s);
+            $shopeeServiceFeeBreakdown = $this->settlementShopeeServiceFeeBreakdown($s);
+            $shopeeServiceFeeBreakdownTotal = round(array_sum(array_map(
+                static fn (array $row): float => (float) ($row['amount'] ?? 0),
+                $shopeeServiceFeeBreakdown
+            )), 2);
+            $shopeeServiceFeeBreakdownDifference = $shopeeServiceFeeBreakdown !== []
+                ? round(abs((float) $s->service_fee) - $shopeeServiceFeeBreakdownTotal, 2)
+                : null;
 
             return [
                 'id' => $s->id,
@@ -4153,7 +4161,10 @@ class MarketplaceController extends Controller
                 'premi' => (float) (data_get($s->raw_json, 'premi') ?? data_get($s->raw_json, 'shipping_insurance') ?? data_get($s->raw_json, 'insurance_fee') ?? 0),
                 'seller_transaction_fee' => (float) (data_get($s->raw_json, 'seller_transaction_fee') ?? data_get($s->raw_json, 'transaction_fee') ?? 0),
                 'seller_order_processing_fee' => (float) (data_get($s->raw_json, 'seller_order_processing_fee') ?? 0),
-                'shopee_service_fee_breakdown' => $this->settlementShopeeServiceFeeBreakdown($s),
+                'shopee_service_fee_breakdown' => $shopeeServiceFeeBreakdown,
+                'shopee_service_fee_breakdown_total' => $shopeeServiceFeeBreakdownTotal,
+                'shopee_service_fee_breakdown_difference' => $shopeeServiceFeeBreakdownDifference,
+                'shopee_other_fee_breakdown' => $this->settlementShopeeOtherFeeBreakdown($s),
                 'order_ams_commission_fee' => (float) (data_get($s->raw_json, 'order_ams_commission_fee') ?? data_get($s->raw_json, 'ams_commission_fee') ?? $s->activity_fee ?? 0),
                 'biaya_affiliate' => (float) (data_get($s->raw_json, 'affiliate_fee') ?? data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
                 'affiliate_commission_fee' => (float) (data_get($s->raw_json, 'affiliate_commission_fee') ?? data_get($s->raw_json, 'seller_affiliate_fee') ?? 0),
@@ -4638,9 +4649,42 @@ class MarketplaceController extends Controller
             $readServiceRule(data_get($raw, $key), $key);
         }
 
-        // Fallback untuk response lama yang tidak mengirim daftar rule.
+        return $rows;
+    }
+
+    /**
+     * Fees that reduce escrow separately from Shopee's aggregate service_fee.
+     * Keep these outside the service-fee total so the UI does not imply that
+     * they are children of service_fee or add them twice to marketplace fees.
+     */
+    private function settlementShopeeOtherFeeBreakdown(MarketplaceOrderSettlement $s): array
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+        $rows = [];
+        $seen = [];
+
+        $push = function (string $label, mixed $amount, string $source) use (&$rows, &$seen): void {
+            $amount = $this->settlementFeeAmount($amount);
+            $label = trim($label);
+            if ($amount <= 0 || $label === '') {
+                return;
+            }
+
+            $signature = strtolower($source.'|'.$label.'|'.number_format($amount, 2, '.', ''));
+            if (isset($seen[$signature])) {
+                return;
+            }
+
+            $seen[$signature] = true;
+            $rows[] = [
+                'label' => $label,
+                'amount' => $amount,
+                'source' => $source,
+            ];
+        };
+
         foreach ([
-            'shipping_seller_protection_fee_amount' => 'Biaya Logistik',
+            'shipping_seller_protection_fee_amount' => 'Biaya Logistik / Proteksi',
             'delivery_seller_protection_fee_premium_amount' => 'Premi Proteksi Logistik',
             'overseas_return_service_fee' => 'Program Overseas Return',
             'fbs_fee' => 'Program Fulfilled by Shopee',

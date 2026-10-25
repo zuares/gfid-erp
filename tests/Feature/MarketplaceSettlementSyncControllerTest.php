@@ -1351,6 +1351,8 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
                     'rule_display_name' => 'Biaya Logistik',
                     'category' => 'logistics',
                 ],
+                'campaign_fee' => 750,
+                'shipping_seller_protection_fee_amount' => 500,
             ],
         ]);
 
@@ -1373,16 +1375,21 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(4754.0, (float) ($row['order_ams_commission_fee'] ?? -1));
         $this->assertSame(0.0, (float) ($row['affiliate_display'] ?? -1));
         $this->assertSame(0.0, (float) ($row['affiliate_percent'] ?? -1));
-        $this->assertSame(24641.0, (float) ($row['marketplace_fee_after_affiliate'] ?? -1));
-        $this->assertSame(23.0, (float) ($row['marketplace_fee_percent'] ?? -1));
+        $this->assertSame(25891.0, (float) ($row['marketplace_fee_after_affiliate'] ?? -1));
+        $this->assertSame(24.2, (float) ($row['marketplace_fee_percent'] ?? -1));
         $this->assertContains('Biaya Komisi AMS', $labels);
         $this->assertSame('Biaya Logistik', $row['shopee_service_fee_breakdown'][0]['label'] ?? null);
         $this->assertSame(2200.0, (float) ($row['shopee_service_fee_breakdown'][0]['amount'] ?? -1));
+        $this->assertSame(2200.0, (float) ($row['shopee_service_fee_breakdown_total'] ?? -1));
+        $this->assertSame(7106.0, (float) ($row['shopee_service_fee_breakdown_difference'] ?? -1));
+        $otherLabels = array_column($row['shopee_other_fee_breakdown'] ?? [], 'label');
+        $this->assertContains('Biaya Program Campaign', $otherLabels);
+        $this->assertContains('Biaya Logistik / Proteksi', $otherLabels);
         $this->assertContains('Voucher Toko', $labels);
         $this->assertContains('voucher', $categories);
         $this->assertSame(5000.0, (float) ($row['voucher_total'] ?? -1));
         $this->assertSame(0.0, (float) ($row['platform_burden_total'] ?? -1));
-        $this->assertSame(29641.0, (float) ($row['total_burden_total'] ?? -1));
+        $this->assertSame(30891.0, (float) ($row['total_burden_total'] ?? -1));
     }
 
     public function test_settlements_endpoint_mengurangkan_voucher_platform_dan_toko_dari_gross_setelah_voucher()
