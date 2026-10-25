@@ -2435,7 +2435,7 @@
                                 const tiktokFeeGroup = (key, type) => {
                                     const normalized = String(key || '').toLowerCase();
                                     if (type === 'tax') return 'program';
-                                    if (/(platform_commission|referral_fee|refund_administration|transaction_fee|credit_card_handling|infrastructure)/.test(normalized)) {
+                                    if (/(platform_commission|referral_fee|refund_administration|transaction_fee|credit_card_handling|infrastructure|dynamic_commission)/.test(normalized)) {
                                         return 'administration';
                                     }
                                     if (/(service_fee|bonus_cashback|flash_sales|voucher_xtra|shipping_fee_guarantee)/.test(normalized)) {
