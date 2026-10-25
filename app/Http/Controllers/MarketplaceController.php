@@ -4061,7 +4061,6 @@ class MarketplaceController extends Controller
                 ?? data_get($s->raw_json, 'affiliate_fee')
                 ?? data_get($s->raw_json, 'affiliate_commission_fee')
                 ?? data_get($s->raw_json, 'seller_affiliate_fee')
-                ?? $s->activity_fee
                 ?? 0
             );
             $feePercent = $grossAfterVoucherToko > 0 ? round(($sellerBurdenTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
@@ -4402,7 +4401,6 @@ class MarketplaceController extends Controller
                         ?? data_get($s->raw_json, 'affiliate_fee')
                         ?? data_get($s->raw_json, 'affiliate_commission_fee')
                         ?? data_get($s->raw_json, 'seller_affiliate_fee')
-                        ?? $s->activity_fee
                         ?? 0
                     );
                     $impliedMarketplaceFee = max($grossAfterVT - $payoutAmount - $affiliateCommission, 0);
@@ -4426,7 +4424,6 @@ class MarketplaceController extends Controller
                         ?? data_get($s->raw_json, 'affiliate_fee')
                         ?? data_get($s->raw_json, 'affiliate_commission_fee')
                         ?? data_get($s->raw_json, 'seller_affiliate_fee')
-                        ?? $s->activity_fee
                         ?? 0
                     );
                     $impliedMarketplaceFee = max($grossAfterVT - $estimatedEscrowAmount - $affiliateCommission, 0);
@@ -4448,7 +4445,6 @@ class MarketplaceController extends Controller
                         ?? data_get($s->raw_json, 'affiliate_fee')
                         ?? data_get($s->raw_json, 'affiliate_commission_fee')
                         ?? data_get($s->raw_json, 'seller_affiliate_fee')
-                        ?? $s->activity_fee
                         ?? 0
                     );
 
@@ -4466,7 +4462,6 @@ class MarketplaceController extends Controller
                         ?? data_get($s->raw_json, 'affiliate_fee')
                         ?? data_get($s->raw_json, 'affiliate_commission_fee')
                         ?? data_get($s->raw_json, 'seller_affiliate_fee')
-                        ?? $s->activity_fee
                         ?? 0
                     );
                     $feeSeller = (float) ($feeTots['seller'] ?? 0);
@@ -4861,7 +4856,6 @@ class MarketplaceController extends Controller
                 ?? data_get($s->raw_json, 'affiliate_fee')
                 ?? data_get($s->raw_json, 'affiliate_commission_fee')
                 ?? data_get($s->raw_json, 'seller_affiliate_fee')
-                ?? $s->activity_fee
                 ?? 0
             );
 

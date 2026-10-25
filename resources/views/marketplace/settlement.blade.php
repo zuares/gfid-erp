@@ -2494,6 +2494,7 @@
                                         html += renderFeeLine('Biaya Layanan', r.service_fee);
                                         html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee);
                                         html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee);
+                                        html += renderFeeLine('Biaya Komisi AMS', r.order_ams_commission_fee ?? r.ams_commission_fee ?? s.order_ams_commission_fee);
 
                                         html += sectionLabel('Promo & Affiliate');
                                         html += renderFeeLine('Premi', premi, true);
@@ -2512,10 +2513,11 @@
                                     html += renderFeeLine('Biaya Layanan', s.service_fee);
                                     html += renderFeeLine('Biaya Transaksi', s.transaction_fee);
                                     html += renderFeeLine('Biaya Proses Pesanan', s.seller_order_processing_fee);
+                                    html += renderFeeLine('Biaya Komisi AMS', s.order_ams_commission_fee ?? s.ams_commission_fee ?? s.activity_fee);
 
                                     html += sectionLabel('Promo & Affiliate');
                                     html += renderFeeLine('Premi', s.premi, true);
-                                    html += renderFeeLine('Biaya Kampanye', s.activity_fee);
+                                    html += renderFeeLine('Biaya Kampanye', s.campaign_fee);
                                     html += renderFeeLine('Biaya Affiliate', s.biaya_affiliate ?? s.affiliate_fee, true);
                                     html += renderFeeLine('Affiliate', s.affiliate, true);
 

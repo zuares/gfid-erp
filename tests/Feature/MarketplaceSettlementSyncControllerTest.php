@@ -1363,10 +1363,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         $this->assertSame(1250.0, (float) ($row['seller_order_processing_fee'] ?? -1));
         $this->assertSame(4754.0, (float) ($row['order_ams_commission_fee'] ?? -1));
-        $this->assertSame(4754.0, (float) ($row['affiliate_display'] ?? -1));
-        $this->assertSame(4.4, (float) ($row['affiliate_percent'] ?? -1));
-        $this->assertSame(19887.0, (float) ($row['marketplace_fee_after_affiliate'] ?? -1));
-        $this->assertSame(18.6, (float) ($row['marketplace_fee_percent'] ?? -1));
+        $this->assertSame(0.0, (float) ($row['affiliate_display'] ?? -1));
+        $this->assertSame(0.0, (float) ($row['affiliate_percent'] ?? -1));
+        $this->assertSame(24641.0, (float) ($row['marketplace_fee_after_affiliate'] ?? -1));
+        $this->assertSame(23.0, (float) ($row['marketplace_fee_percent'] ?? -1));
+        $this->assertContains('Biaya Komisi AMS', $labels);
         $this->assertContains('Voucher Toko', $labels);
         $this->assertContains('voucher', $categories);
         $this->assertSame(5000.0, (float) ($row['voucher_total'] ?? -1));

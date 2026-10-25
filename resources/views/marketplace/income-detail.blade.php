@@ -2425,9 +2425,9 @@
 
         html += '<li class="income-sect">Promo & Affiliate</li>';
         html += renderFeeLine('Premi', s.premi, true);
-        html += renderFeeLine('Biaya Komisi AMS', s.activity_fee);
+        html += renderFeeLine('Biaya Komisi AMS', s.order_ams_commission_fee ?? s.ams_commission_fee ?? s.activity_fee);
         html += renderFeeLine('Biaya Affiliate', s.biaya_affiliate ?? s.affiliate_commission_fee ?? s.seller_affiliate_fee, true);
-        const affiliateCommissionValue = Number(s.affiliate_display ?? s.affiliate ?? s.affiliate_fee ?? s.affiliate_commission_fee ?? s.seller_affiliate_fee ?? s.activity_fee ?? 0);
+        const affiliateCommissionValue = Number(s.affiliate_display ?? s.affiliate ?? s.affiliate_fee ?? s.affiliate_commission_fee ?? s.seller_affiliate_fee ?? 0);
         html += affiliateCommissionValue > 0
             ? renderFeeLine('Komisi Affiliate', affiliateCommissionValue, true)
             : '<li><span>Komisi Affiliate:</span><span class="income-fee-val" style="color:#64748b;">—</span></li>';
@@ -2496,7 +2496,7 @@
                 const voucherPlatform = Number(s.voucher_platform_total ?? 0);
                 const voucherToko = Number(s.voucher_toko_total ?? s.seller_voucher ?? 0);
                 const grossAfterVoucherToko = Number(s.gross_after_voucher_toko || Math.max(gross - voucherToko, 0));
-                const affiliateCommission = Number(s.affiliate_display ?? s.affiliate ?? s.affiliate_fee ?? s.affiliate_commission_fee ?? s.seller_affiliate_fee ?? s.activity_fee ?? s.biaya_affiliate ?? 0);
+                const affiliateCommission = Number(s.affiliate_display ?? s.affiliate ?? s.affiliate_fee ?? s.affiliate_commission_fee ?? s.seller_affiliate_fee ?? s.biaya_affiliate ?? 0);
                 const affiliateCommissionPercent = Number.isFinite(Number(s.affiliate_percent))
                     ? Number(s.affiliate_percent)
                     : (grossAfterVoucherToko > 0 ? (affiliateCommission / grossAfterVoucherToko) * 100 : 0);
