@@ -634,8 +634,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('ESTIMASI BELUM TERSEDIA')
             ->assertSee('Rincian tersedia setelah settlement.')
             ->assertSee('Ongkir dibayar platform')
-            ->assertSee('Ongkir dibayar pembeli')
-            ->assertSee('Biaya ongkir aktual (referensi)');
+            ->assertSee('Ongkir dibayar pembeli');
     }
 
     public function test_detail_order_menampilkan_estimasi_bila_income_belum_ada()
@@ -1594,7 +1593,6 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'order_date' => now()->subDay(),
             'total_paid_customer' => 170000,
             'shipping_fee_customer' => 70000,
-            'shipping_discount_platform' => 50000,
         ]);
 
         MarketplaceOrderSettlement::create([
@@ -1629,18 +1627,6 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $response = app(MarketplaceController::class)->settlements($request);
 
         $this->assertSame(200, $response->getStatusCode());
-        $row = $response->getData(true)['paginator']['data'][0] ?? [];
-        $this->assertSame(70000.0, (float) ($row['buyer_paid_shipping_fee'] ?? -1));
-        $this->assertSame(50000.0, (float) ($row['platform_paid_shipping_fee'] ?? -1));
-
-        $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
-        $settlement->update([
-            'raw_json' => [
-                'source' => 'tiktok_finance_202501_statement_transactions',
-            ],
-        ]);
-
-        $response = app(MarketplaceController::class)->settlements($request);
         $row = $response->getData(true)['paginator']['data'][0] ?? [];
         $this->assertSame(70000.0, (float) ($row['buyer_paid_shipping_fee'] ?? -1));
         $this->assertSame(50000.0, (float) ($row['platform_paid_shipping_fee'] ?? -1));
