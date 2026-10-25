@@ -68,6 +68,52 @@
             line-height:1.2;
             margin-top:.1rem;
         }
+        .settlement-auto-sync-banner{
+            display:flex;
+            align-items:center;
+            gap:.7rem;
+            margin:.75rem 0 .9rem;
+            padding:.7rem .85rem;
+            border:1px solid rgba(148,163,184,.24);
+            border-radius:12px;
+            background:rgba(248,250,252,.9);
+            color:var(--shp-text);
+            min-height:52px;
+        }
+        .settlement-auto-sync-banner-icon{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:30px;
+            height:30px;
+            flex:0 0 30px;
+            border-radius:10px;
+            background:rgba(100,116,139,.13);
+            color:#475569;
+        }
+        .settlement-auto-sync-banner-copy{ min-width:0; flex:1 1 auto; }
+        .settlement-auto-sync-banner-title{ display:block; font-size:.76rem; font-weight:900; line-height:1.2; }
+        .settlement-auto-sync-banner-message{ display:block; margin-top:.12rem; color:var(--shp-muted); font-size:.7rem; line-height:1.35; }
+        .settlement-auto-sync-banner-meta{ display:block; margin-top:.12rem; color:var(--shp-muted); font-size:.64rem; }
+        .settlement-auto-sync-banner-action{ flex:0 0 auto; white-space:nowrap; }
+        .settlement-auto-sync-banner.running{ border-color:rgba(59,130,246,.28); background:rgba(239,246,255,.95); }
+        .settlement-auto-sync-banner.running .settlement-auto-sync-banner-icon{ background:rgba(59,130,246,.14); color:#2563eb; }
+        .settlement-auto-sync-banner.success{ border-color:rgba(34,197,94,.25); background:rgba(240,253,244,.92); }
+        .settlement-auto-sync-banner.success .settlement-auto-sync-banner-icon{ background:rgba(34,197,94,.14); color:#16a34a; }
+        .settlement-auto-sync-banner.warn{ border-color:rgba(245,158,11,.28); background:rgba(255,251,235,.95); }
+        .settlement-auto-sync-banner.warn .settlement-auto-sync-banner-icon{ background:rgba(245,158,11,.16); color:#d97706; }
+        .settlement-auto-sync-banner.error{ border-color:rgba(239,68,68,.24); background:rgba(254,242,242,.95); }
+        .settlement-auto-sync-banner.error .settlement-auto-sync-banner-icon{ background:rgba(239,68,68,.14); color:#dc2626; }
+        body[data-theme="dark"] .settlement-auto-sync-banner{ background:rgba(15,23,42,.72); }
+        body[data-theme="dark"] .settlement-auto-sync-banner.running{ background:rgba(30,64,175,.2); }
+        body[data-theme="dark"] .settlement-auto-sync-banner.success{ background:rgba(20,83,45,.2); }
+        body[data-theme="dark"] .settlement-auto-sync-banner.warn{ background:rgba(120,53,15,.2); }
+        body[data-theme="dark"] .settlement-auto-sync-banner.error{ background:rgba(127,29,29,.2); }
+        @media (max-width: 640px){
+            .settlement-auto-sync-banner{ align-items:flex-start; }
+            .settlement-auto-sync-banner-action{ margin-left:auto; }
+            .settlement-auto-sync-banner-action span{ display:none; }
+        }
         .settlement-sync-actions-row{
             display:flex;
             gap:.5rem;
@@ -632,6 +678,20 @@
         </div>
     </div>
 
+    <div id="settlementAutoSyncBanner" class="settlement-auto-sync-banner" role="status" aria-live="polite">
+        <span id="settlementAutoSyncBannerIcon" class="settlement-auto-sync-banner-icon" aria-hidden="true">
+            <i class="bi bi-broadcast-pin"></i>
+        </span>
+        <div class="settlement-auto-sync-banner-copy">
+            <strong id="settlementAutoSyncBannerTitle" class="settlement-auto-sync-banner-title">Auto-sync aktif</strong>
+            <span id="settlementAutoSyncBannerMessage" class="settlement-auto-sync-banner-message">Memeriksa status sync Shopee dan TikTok…</span>
+            <small id="settlementAutoSyncBannerMeta" class="settlement-auto-sync-banner-meta"></small>
+        </div>
+        <button type="button" class="btn btn-sm btn-ship-outline btn-pill settlement-auto-sync-banner-action" onclick="switchSettlementTab('sync')" title="Lihat detail sync">
+            <i class="bi bi-activity"></i><span class="ms-1">Lihat detail</span>
+        </button>
+    </div>
+
     <div class="settlement-tabs" role="tablist" aria-label="Tabs settlement">
         <button type="button" id="settlementTabDataBtn" class="settlement-tab-btn active" role="tab" aria-selected="true" aria-controls="settlementTabData" onclick="switchSettlementTab('data')">
             <i class="bi bi-receipt"></i> Settlement
@@ -926,6 +986,10 @@
     let paginationData = null;
     let activeTab = sessionStorage.getItem('settlementActiveTab') || 'data';
     let syncPollTimer = null;
+    let autoSyncPollTimer = null;
+    let autoSyncRefreshInFlight = false;
+    let autoSyncInitialized = false;
+    let autoSyncLastActivityKey = '';
     let lastSettlementProgressKey = 'idle:idle';
     let settlementSyncViewVersion = 0;
     let settlementSyncRunId = null;
@@ -1349,6 +1413,162 @@
         const dot = $('settlementSyncDot');
         if (!dot) return;
         dot.style.display = visible ? 'inline-block' : 'none';
+    }
+
+    function setAutomaticSyncBanner(variant, title, message, meta = '') {
+        const banner = $('settlementAutoSyncBanner');
+        const icon = $('settlementAutoSyncBannerIcon');
+        const titleNode = $('settlementAutoSyncBannerTitle');
+        const messageNode = $('settlementAutoSyncBannerMessage');
+        const metaNode = $('settlementAutoSyncBannerMeta');
+        if (!banner || !icon || !titleNode || !messageNode || !metaNode) return;
+
+        const safeVariant = ['running', 'success', 'warn', 'error'].includes(variant) ? variant : '';
+        const iconClass = safeVariant === 'running'
+            ? 'bi-arrow-repeat'
+            : (safeVariant === 'success'
+                ? 'bi-check-circle'
+                : (safeVariant === 'warn' ? 'bi-exclamation-triangle' : (safeVariant === 'error' ? 'bi-x-circle' : 'bi-broadcast-pin')));
+
+        banner.className = 'settlement-auto-sync-banner' + (safeVariant ? ` ${safeVariant}` : '');
+        icon.innerHTML = `<i class="bi ${iconClass}"></i>`;
+        titleNode.textContent = title || 'Auto-sync marketplace';
+        messageNode.textContent = message || '';
+        metaNode.textContent = meta || '';
+    }
+
+    function autoSyncStoreLabel(progress) {
+        const store = stores.find(item => String(item.id) === String(progress?.store_id || ''));
+        return {
+            platform: progress?.platform || store?.channel?.name || 'Marketplace',
+            store: progress?.store_name || store?.name || 'Toko marketplace',
+        };
+    }
+
+    function autoSyncLogSummary(log) {
+        const payload = log?.payload || {};
+        return [
+            payload.synced !== undefined ? `Settlement ${payload.synced}` : null,
+            payload.pending !== undefined ? `Pending ${payload.pending}` : null,
+            payload.estimates_updated !== undefined ? `Estimasi ${payload.estimates_updated}` : null,
+            payload.errors !== undefined ? `Error ${payload.errors}` : null,
+        ].filter(Boolean).join(' · ');
+    }
+
+    function renderAutomaticSyncStatus(logs, progressRows) {
+        const activeProgress = progressRows
+            .filter(progress => ['queued', 'running'].includes(String(progress?.status || '').toLowerCase()))
+            .sort((a, b) => Number(b?.percent || 0) - Number(a?.percent || 0));
+        const latestLog = [...logs].sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0))[0] || null;
+        const latestProgress = [...progressRows]
+            .filter(progress => ['success', 'warn', 'error'].includes(String(progress?.status || '').toLowerCase()))
+            .sort((a, b) => new Date(b?.updated_at || 0) - new Date(a?.updated_at || 0))[0] || null;
+
+        if (activeProgress.length) {
+            const progress = activeProgress[0];
+            const labels = autoSyncStoreLabel(progress);
+            const status = String(progress.status || '').toLowerCase();
+            const progressText = progress.percent !== undefined && progress.percent !== null
+                ? `Progress ${Math.max(0, Math.min(100, Number(progress.percent)))}%`
+                : 'Sedang diproses';
+            const key = `progress:${progress.run_id || progress.store_id}:${status}:${progress.updated_at || progress.label || ''}`;
+            setAutomaticSyncBanner(
+                'running',
+                status === 'queued' ? 'Sync otomatis sedang antre' : 'Sync otomatis sedang berjalan',
+                `${labels.platform} · ${labels.store}: ${progress.label || 'data sedang disinkronkan.'}`,
+                `${progressText} · halaman akan memperbarui data setelah proses selesai`,
+            );
+            return { key, active: true, progress };
+        }
+
+        const logStatus = String(latestLog?.status || '').toLowerCase();
+        const logTime = latestLog?.created_at ? new Date(latestLog.created_at) : null;
+        const logIsActive = logStatus === 'processing'
+            && logTime
+            && !Number.isNaN(logTime.getTime())
+            && (Date.now() - logTime.getTime()) <= 60 * 60 * 1000;
+        if (logIsActive) {
+            const labels = autoSyncStoreLabel(latestLog);
+            const key = `log:${latestLog.id || latestLog.store_id || 'all'}:processing:${latestLog.created_at || ''}`;
+            setAutomaticSyncBanner(
+                'running',
+                'Sync otomatis sedang berjalan',
+                `${labels.platform} · ${labels.store}: ${latestLog.message || 'sedang memproses data.'}`,
+                'Progress detail sedang dikumpulkan dari worker.',
+            );
+            return { key, active: true };
+        }
+        const progressTime = latestProgress?.updated_at ? new Date(latestProgress.updated_at) : null;
+        const latestTime = [logTime, progressTime]
+            .filter(date => date && !Number.isNaN(date.getTime()))
+            .sort((a, b) => b.getTime() - a.getTime())[0] || null;
+        const ageMinutes = latestTime ? (Date.now() - latestTime.getTime()) / 60000 : Infinity;
+        const terminalProgressIsRecent = latestProgress && progressTime && ageMinutes <= 15;
+        const source = terminalProgressIsRecent ? latestProgress : latestLog;
+        const sourceStatus = String(source?.status || '').toLowerCase();
+        const labels = autoSyncStoreLabel(source || {});
+        const sourceTime = source?.updated_at || source?.created_at || null;
+        const summary = source === latestProgress
+            ? [
+                source.synced !== undefined ? `Settlement ${source.synced}` : null,
+                source.pending !== undefined ? `Pending ${source.pending}` : null,
+                source.errors !== undefined ? `Error ${source.errors}` : null,
+            ].filter(Boolean).join(' · ')
+            : autoSyncLogSummary(source);
+        const key = source
+            ? `terminal:${source.run_id || source.id || source.store_id || 'all'}:${sourceStatus}:${sourceTime || ''}`
+            : 'idle';
+
+        if (!source) {
+            setAutomaticSyncBanner('', 'Auto-sync aktif', 'Menunggu jadwal sync Shopee dan TikTok berikutnya.', 'Status diperiksa otomatis setiap 10 detik.');
+            return { key, active: false };
+        }
+
+        if (sourceStatus === 'error' || sourceStatus === 'failed') {
+            setAutomaticSyncBanner('error', 'Sync otomatis perlu diperiksa', `${labels.platform} · ${labels.store}: proses terakhir gagal.`, summary || 'Buka tab Sync untuk melihat detail error.');
+        } else if (sourceStatus === 'warn' || sourceStatus === 'partial_success') {
+            setAutomaticSyncBanner('warn', 'Sync otomatis selesai dengan catatan', `${labels.platform} · ${labels.store}: sebagian data selesai diproses.`, summary || 'Buka tab Sync untuk melihat detail.');
+        } else {
+            setAutomaticSyncBanner('success', 'Sync otomatis selesai', `${labels.platform} · ${labels.store}: data settlement sudah diperbarui.`, summary || `Terakhir diperbarui ${fmtDateTime(sourceTime)}.`);
+        }
+
+        return { key, active: false, terminal: true, sourceTime };
+    }
+
+    async function refreshAutomaticSyncStatus() {
+        if (autoSyncRefreshInFlight || document.visibilityState === 'hidden') return;
+        autoSyncRefreshInFlight = true;
+
+        try {
+            const logRequests = [
+                api('/api/marketplace/sync-logs?action=sync_settlements&all=1').catch(() => []),
+                api('/api/marketplace/sync-logs?action=sync_finance').catch(() => []),
+            ];
+            const progressRequests = stores
+                .filter(store => isFinanceStore(store))
+                .map(store => api(`/api/marketplace/stores/${store.id}/sync-settlements-progress`).catch(() => null));
+            const [settlementLogs, financeLogs, ...progressRows] = await Promise.all([...logRequests, ...progressRequests]);
+            const logs = [...(settlementLogs || []), ...(financeLogs || [])]
+                .filter(log => ['sync_settlements', 'sync_finance'].includes(log.action));
+            const rendered = renderAutomaticSyncStatus(logs, progressRows.filter(Boolean));
+
+            if (autoSyncInitialized && rendered.terminal && rendered.key !== autoSyncLastActivityKey) {
+                currentPage = 1;
+                loadSettlements();
+            }
+            autoSyncLastActivityKey = rendered.key;
+            autoSyncInitialized = true;
+        } catch (_) {
+            setAutomaticSyncBanner('warn', 'Status auto-sync belum terbaca', 'Halaman belum bisa memeriksa proses Shopee/TikTok.', 'Coba refresh halaman atau buka tab Sync untuk detail.');
+        } finally {
+            autoSyncRefreshInFlight = false;
+        }
+    }
+
+    function startAutomaticSyncPolling() {
+        if (autoSyncPollTimer) return;
+        refreshAutomaticSyncStatus();
+        autoSyncPollTimer = setInterval(refreshAutomaticSyncStatus, 10000);
     }
 
     function renderSettlementProgress(progress) {
@@ -1920,6 +2140,7 @@
 
         switchSettlementTab(activeTab, true);
         loadSettlements();
+        startAutomaticSyncPolling();
     }
 
     window.resetFilters = function() {

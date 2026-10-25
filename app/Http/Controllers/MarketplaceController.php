@@ -6635,6 +6635,7 @@ class MarketplaceController extends Controller
         $data = $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
             'action' => ['nullable', 'string', 'max:80'],
+            'all' => ['nullable', 'boolean'],
         ]);
 
         $query = MarketplaceSyncLog::with('store:id,name');
@@ -6648,7 +6649,9 @@ class MarketplaceController extends Controller
 
         // Settlement history is store-specific. Do not fall back to exposing
         // every store's settlement log when the page has no selected store.
-        if (($data['action'] ?? null) === 'sync_settlements' && empty($data['store_id'])) {
+        if (($data['action'] ?? null) === 'sync_settlements'
+            && empty($data['store_id'])
+            && ! ($data['all'] ?? false)) {
             return response()->json([]);
         }
 

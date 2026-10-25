@@ -629,6 +629,8 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertOk()
             ->assertSee('Dana Cair (Final)')
             ->assertSee('Perbarui Estimasi')
+            ->assertSee('Auto-sync aktif')
+            ->assertSee('Lihat detail')
             ->assertSee('ESTIMASI BELUM TERSEDIA')
             ->assertSee('Rincian tersedia setelah settlement.');
     }
@@ -1061,6 +1063,13 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             'action' => 'sync_settlements',
         ]);
         $this->assertSame([], app(MarketplaceController::class)->syncLogs($emptyRequest)->getData(true));
+
+        $allRequest = Request::create('/api/marketplace/sync-logs', 'GET', [
+            'action' => 'sync_settlements',
+            'all' => '1',
+        ]);
+        $allPayload = app(MarketplaceController::class)->syncLogs($allRequest)->getData(true);
+        $this->assertCount(2, $allPayload);
     }
 
     public function test_backfill_settlement_background_menggunakan_mode_backfill()
