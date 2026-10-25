@@ -3640,7 +3640,7 @@ class MarketplaceController extends Controller
         $query = MarketplaceOrderSettlement::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
-            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,order_date,subtotal_items,total_paid_customer,shipping_fee_customer,shipping_discount_platform',
+            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,order_date,subtotal_items,total_paid_customer,shipping_fee_customer,shipping_discount_platform,raw_json',
             'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,status_description,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
         ]);
@@ -4659,6 +4659,31 @@ class MarketplaceController extends Controller
             $sellerDiscountRefund += $this->settlementSignedAbsAmount(data_get($raw, 'seller_discount_refund_amount'));
             $platformDiscount += $this->settlementSignedAbsAmount(data_get($raw, 'platform_discount_amount'));
             $platformDiscountRefund += $this->settlementSignedAbsAmount(data_get($raw, 'platform_discount_refund_amount'));
+
+            // Some completed orders have an empty Finance sku_transactions
+            // array, while the Order API snapshot still contains the exact
+            // seller/platform product discounts under payment.
+            $orderRaw = is_array($settlement->order?->raw_json) ? $settlement->order->raw_json : [];
+            $payment = is_array(data_get($orderRaw, 'payment')) ? data_get($orderRaw, 'payment') : [];
+            $paymentSellerDiscount = $this->settlementSignedAbsAmount($payment['seller_discount'] ?? null);
+            $paymentPlatformDiscount = $this->settlementSignedAbsAmount($payment['platform_discount'] ?? null);
+
+            if ($paymentSellerDiscount > 0 || $paymentPlatformDiscount > 0) {
+                $sellerDiscount += $paymentSellerDiscount;
+                $platformDiscount += $paymentPlatformDiscount;
+            } else {
+                $lineItems = data_get($orderRaw, 'line_items', data_get($orderRaw, 'item_list', []));
+                if (is_array($lineItems)) {
+                    foreach ($lineItems as $lineItem) {
+                        if (! is_array($lineItem)) {
+                            continue;
+                        }
+
+                        $sellerDiscount += $this->settlementSignedAbsAmount($lineItem['seller_discount'] ?? null);
+                        $platformDiscount += $this->settlementSignedAbsAmount($lineItem['platform_discount'] ?? null);
+                    }
+                }
+            }
         }
 
         return [

@@ -1385,6 +1385,59 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(110000.0, (float) ($payload['meta']['kpi_gross'] ?? -1));
     }
 
+    public function test_tiktok_voucher_discount_fallback_ke_order_payment_saat_sku_transactions_kosong(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'TTK-VOUCHER-FALLBACK-'.rand(1000, 9999),
+            'name' => 'TikTok Voucher Fallback Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'TT-VOUCHER-FALLBACK-001',
+            'channel_order_id' => 'TT-VOUCHER-FALLBACK-001',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 224850,
+            'total_paid_customer' => 226716,
+            'raw_json' => [
+                'payment' => [
+                    'seller_discount' => '17628',
+                    'platform_discount' => '14506',
+                ],
+            ],
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 226716,
+            'final_income' => 166451,
+            'settlement_time' => now(),
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_statement_transactions',
+                'revenue_amount' => '207222',
+                'seller_discount' => 32134,
+                'sku_transactions' => [],
+            ],
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            ['store_id' => $store->id, 'page' => 1, 'per_page' => 50],
+        ))->getData(true);
+        $row = $payload['paginator']['data'][0] ?? [];
+
+        $this->assertSame(17628.0, (float) ($row['tiktok_seller_discount_amount'] ?? -1));
+        $this->assertSame(14506.0, (float) ($row['tiktok_platform_discount_amount'] ?? -1));
+    }
+
     public function test_settlements_endpoint_mengembalikan_rincian_potongan_dinamis()
     {
         $admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADM-BREAKDOWN']);
