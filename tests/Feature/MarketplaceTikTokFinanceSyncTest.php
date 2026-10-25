@@ -233,6 +233,11 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
                     'settlement_amount' => '81234',
                     'sku_transactions' => [[
                         'sku_id' => 'SKU-1',
+                        'shipping_cost_breakdown' => [
+                            'actual_shipping_fee_amount' => '-50000',
+                            'shipping_fee_customer' => '70000',
+                            'shipping_fee_discount_amount' => '50000',
+                        ],
                         'fee_tax_breakdown' => [
                             'fee' => [
                                 'platform_commission_fee' => '-5000',
@@ -255,6 +260,13 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame(8000.0, (float) $settlement->commission_fee);
         $this->assertSame(766.0, (float) $settlement->escrow_tax);
         $this->assertSame(8766.0, $settlement->totalDeductions());
+        $this->assertSame(50000.0, (float) $settlement->actual_shipping_fee);
+        $this->assertSame(50000.0, (float) $settlement->shipping_fee_subsidy);
+        $this->assertSame(50000.0, (float) data_get($settlement->raw_json, 'tiktok_shipping_breakdown.actual_shipping_fee_amount'));
+        $this->assertSame(50000.0, (float) data_get($settlement->raw_json, 'tiktok_shipping_breakdown.shipping_fee_discount_amount'));
+        $this->assertSame(70000.0, (float) data_get($settlement->raw_json, 'tiktok_shipping_breakdown.shipping_fee_customer'));
+        $this->assertSame(70000.0, (float) $order->fresh()->shipping_fee_customer);
+        $this->assertSame(50000.0, (float) $order->fresh()->shipping_discount_platform);
         $this->assertNull($settlement->settlement_time);
         $this->assertSame(5000.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.platform_commission_fee'));
         $this->assertSame(1000.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.transaction_fee'));

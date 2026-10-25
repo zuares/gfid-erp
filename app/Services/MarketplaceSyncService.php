@@ -1077,6 +1077,7 @@ class MarketplaceSyncService
             ? array_values($data['sku_transactions'])
             : [];
         $hasStatement = $skuTransactions !== [] || (bool) ($data['_is_statement_transaction'] ?? false);
+        $shippingAmounts = $this->normalizeTikTokShippingAmounts($data, $skuTransactions);
 
         $amount = static fn (mixed $value): float => is_numeric($value) ? (float) $value : 0.0;
         $collectBreakdown = static function (array $rows, array &$target, string $prefix = '') use (&$collectBreakdown, $amount): void {
@@ -1151,6 +1152,7 @@ class MarketplaceSyncService
             'escrow_amount' => $hasStatement ? ($data['settlement_amount'] ?? null) : null,
             'fee_tax_amount' => $tax,
             'tiktok_fee_breakdown' => $tiktokFeeBreakdown,
+            'tiktok_shipping_breakdown' => $shippingAmounts,
             'sku_transactions' => $skuTransactions,
         ]);
         foreach (['statement_id', 'statement_transaction_id', 'statement_time', 'payment_time', 'paid_time'] as $key) {
@@ -1185,7 +1187,8 @@ class MarketplaceSyncService
             'affiliate_fee' => '0.00',
             'escrow_tax' => $this->nn($this->decimalValue($tax)),
             'ad_cost' => $this->nn($this->decimalValue($gmvMaxAdCost)),
-            'actual_shipping_fee' => $this->nn($this->decimalValue(abs($amount($data['shipping_cost_amount'] ?? 0)))),
+            'actual_shipping_fee' => $this->nn($this->decimalValue($shippingAmounts['actual_shipping_fee_amount'])),
+            'shipping_fee_subsidy' => $this->nn($this->decimalValue($shippingAmounts['shipping_fee_discount_amount'])),
             'final_income' => $this->nn($this->decimalValue($settlementAmount)),
             'settlement_time' => $hasStatement ? $statementTime : null,
             'raw_json' => $raw,
@@ -1228,6 +1231,12 @@ class MarketplaceSyncService
         if ($hasStatement && $statementTime && empty($order->settlement_time)) {
             $orderUpdate['settlement_time'] = $statementTime;
         }
+        if ($shippingAmounts['shipping_fee_customer'] > 0) {
+            $orderUpdate['shipping_fee_customer'] = $this->nn($this->decimalValue($shippingAmounts['shipping_fee_customer']));
+        }
+        if ($shippingAmounts['shipping_fee_discount_amount'] > 0) {
+            $orderUpdate['shipping_discount_platform'] = $this->nn($this->decimalValue($shippingAmounts['shipping_fee_discount_amount']));
+        }
         $order->update($orderUpdate);
 
         return [
@@ -1237,6 +1246,78 @@ class MarketplaceSyncService
             'ad_cost' => $gmvMaxAdCost,
             'has_statement' => $hasStatement,
             'response' => $response,
+        ];
+    }
+
+    /**
+     * Normalize TikTok shipping values at order level. The API may put the
+     * order-level breakdown inside sku_transactions, while shipping_cost_amount
+     * remains the preferred aggregate when it is present and non-zero.
+     * Values are intentionally read once, not summed across SKU rows, because
+     * TikTok can repeat the same order-level breakdown on each transaction.
+     *
+     * @return array{actual_shipping_fee_amount:float,shipping_fee_discount_amount:float,shipping_fee_customer:float}
+     */
+    private function normalizeTikTokShippingAmounts(array $data, array $skuTransactions): array
+    {
+        $sources = [$data];
+        foreach ($skuTransactions as $transaction) {
+            if (is_array($transaction)) {
+                $sources[] = $transaction;
+            }
+        }
+
+        $findAmount = static function (array $keys) use ($sources): float {
+            $zeroValue = null;
+
+            foreach ($sources as $source) {
+                foreach ($keys as $key) {
+                    $value = data_get($source, $key);
+                    if ($value === null || $value === '' || ! is_numeric($value)) {
+                        continue;
+                    }
+
+                    $amount = abs((float) $value);
+                    if ($amount > 0) {
+                        return round($amount, 2);
+                    }
+
+                    $zeroValue ??= $amount;
+                }
+            }
+
+            return round($zeroValue ?? 0.0, 2);
+        };
+
+        $actualShippingFee = $findAmount([
+            'shipping_cost_breakdown.actual_shipping_fee_amount',
+            'actual_shipping_fee_amount',
+        ]);
+        if ($actualShippingFee <= 0) {
+            $actualShippingFee = $findAmount([
+                'shipping_cost_amount',
+                'actual_shipping_fee',
+                'estimated_shipping_fee',
+            ]);
+        }
+
+        return [
+            'actual_shipping_fee_amount' => $actualShippingFee,
+            'shipping_fee_discount_amount' => $findAmount([
+                'shipping_fee_discount_amount',
+                'shipping_cost_breakdown.shipping_fee_discount_amount',
+                'shipping_fee_subsidy',
+                'shipping_cost_breakdown.shipping_fee_subsidy',
+            ]),
+            'shipping_fee_customer' => $findAmount([
+                'shipping_fee_customer',
+                'shipping_cost_breakdown.shipping_fee_customer',
+                'customer_paid_shipping_fee_amount',
+                'shipping_cost_breakdown.customer_paid_shipping_fee_amount',
+                'customer_paid_shipping_fee',
+                'shipping_cost_breakdown.customer_paid_shipping_fee',
+                'buyer_paid_shipping_fee',
+            ]),
         ];
     }
 
