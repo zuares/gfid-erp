@@ -258,6 +258,10 @@ class MarketplaceOrderSettlement extends Model
             }
         }
 
+        [$reverseShipping, $reverseShippingKey] = $consumeFirst(['reverse_shipping_fee'], $this->reverse_shipping_fee);
+        $push('Ongkir balik', $reverseShipping, 'adjustment', $reverseShippingKey);
+        $usedKeys['reverse_shipping_fee'] = true;
+
         [$adCost, $adCostKey] = $consumeFirst(['ad_cost'], $this->ad_cost);
         $push('Biaya Iklan', $adCost, 'seller', $adCostKey);
         $usedKeys['ad_cost'] = true;

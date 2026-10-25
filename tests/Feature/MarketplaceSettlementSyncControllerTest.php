@@ -1578,6 +1578,47 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertContains('platform', $categories);
     }
 
+    public function test_settlements_endpoint_mengkategorikan_ongkir_balik_sebagai_adjustment(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADM-REVERSE-SHIPPING']);
+        $store = $this->createStore();
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'ORDER-REVERSE-SHIPPING-001',
+            'buyer_payment_amount' => 100000,
+            'commission_fee' => 5000,
+            'reverse_shipping_fee' => 4200,
+            'drc_adjustable_refund' => 1000,
+            'final_income' => 89800,
+            'synced_at' => now(),
+            'raw_json' => [
+                'reverse_shipping_fee' => 4200,
+            ],
+        ]);
+
+        $request = Request::create('/api/marketplace/settlements', 'GET', [
+            'store_id' => $store->id,
+            'page' => 1,
+            'per_page' => 50,
+        ]);
+        $request->setUserResolver(fn () => $admin);
+
+        $payload = app(MarketplaceController::class)->settlements($request)->getData(true);
+        $row = $payload['paginator']['data'][0] ?? [];
+        $reverseRows = array_values(array_filter(
+            $row['fee_breakdown'] ?? [],
+            fn (array $fee): bool => ($fee['label'] ?? null) === 'Ongkir balik',
+        ));
+
+        $this->assertCount(1, $reverseRows);
+        $this->assertSame('adjustment', $reverseRows[0]['category']);
+        $this->assertSame(4200.0, (float) $reverseRows[0]['amount']);
+        $this->assertSame(5000.0, (float) ($row['seller_burden_total'] ?? -1));
+        $this->assertSame(5200.0, (float) ($row['adjustment_total'] ?? -1));
+        $this->assertSame(10200.0, (float) ($row['total_burden_total'] ?? -1));
+    }
+
     public function test_settlements_endpoint_memetakan_breakdown_ongkir_tiktok_per_order(): void
     {
         $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
