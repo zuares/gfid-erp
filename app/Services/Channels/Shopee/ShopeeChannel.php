@@ -488,6 +488,7 @@ class ShopeeChannel implements MarketplaceChannel
                 'buyer_username',
                 'recipient_address',
                 'actual_shipping_fee',
+                'buyer_paid_shipping_fee',
                 'item_list',
                 'pay_time',
                 'package_list',

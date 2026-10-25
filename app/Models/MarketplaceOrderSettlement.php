@@ -275,9 +275,20 @@ class MarketplaceOrderSettlement extends Model
         }
 
         // Buyer-side charges.
-        [$buyerShipping, $buyerShippingKey] = $consumeFirst(['buyer_paid_shipping_fee', 'actual_shipping_fee', 'estimated_shipping_fee'], null);
+        [$buyerShipping, $buyerShippingKey] = $consumeFirst(['buyer_paid_shipping_fee', 'customer_paid_shipping_fee_amount'], null);
         if ($buyerShipping !== null && $buyerShipping !== '') {
             $push('Ongkos Kirim Dibayar Pembeli', $buyerShipping, 'buyer', $buyerShippingKey);
+        }
+        // These are logistics display fields, not seller/buyer fee rows. Keep
+        // them out of the generic fee scan so actual and estimated shipping
+        // are never counted as buyer burden when buyer-paid shipping is absent.
+        foreach ([
+            'actual_shipping_fee',
+            'estimated_shipping_fee',
+            'buyer_paid_shipping_fee',
+            'customer_paid_shipping_fee_amount',
+        ] as $shippingKey) {
+            $usedKeys[$shippingKey] = true;
         }
 
         [$buyerPaymentFee, $buyerPaymentFeeKey] = $consumeFirst(['credit_card_transaction_fee', 'buyer_transaction_fee'], null);

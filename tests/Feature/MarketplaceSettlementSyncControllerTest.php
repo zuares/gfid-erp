@@ -1556,16 +1556,16 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         $this->assertSame(23391.0, (float) ($row['fee_total'] ?? -1));
         $this->assertSame(23391.0, (float) ($row['seller_burden_total'] ?? -1));
-        $this->assertSame(12000.0, (float) ($row['buyer_burden_total'] ?? -1));
+        $this->assertSame(1000.0, (float) ($row['buyer_burden_total'] ?? -1));
         $this->assertSame(6000.0, (float) ($row['platform_burden_total'] ?? -1));
         $this->assertSame(11000.0, (float) ($row['actual_shipping_fee_amount'] ?? -1));
         $this->assertSame(6000.0, (float) ($row['shipping_fee_discount_amount'] ?? -1));
-        $this->assertSame(11000.0, (float) ($row['shipping_fee_customer'] ?? -1));
+        $this->assertNull($row['shipping_fee_customer'] ?? null);
         $this->assertSame(5000.0, (float) ($row['voucher_total'] ?? -1));
-        $this->assertSame(46391.0, (float) ($row['total_burden_total'] ?? -1));
+        $this->assertSame(35391.0, (float) ($row['total_burden_total'] ?? -1));
         $this->assertContains('Biaya Proses Pesanan', $labels);
         $this->assertContains('Biaya Komisi AMS', $labels);
-        $this->assertContains('Ongkos Kirim Dibayar Pembeli', $labels);
+        $this->assertNotContains('Ongkos Kirim Dibayar Pembeli', $labels);
         $this->assertContains('Biaya Pembayaran Pembeli', $labels);
         $this->assertContains('Subsidi Ongkir Platform', $labels);
         $this->assertContains('Voucher Toko', $labels);

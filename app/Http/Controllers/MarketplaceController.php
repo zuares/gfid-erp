@@ -4683,13 +4683,6 @@ class MarketplaceController extends Controller
                 'buyer_paid_shipping_fee',
             ];
         $customerShippingFee = $findAmount($customerShippingKeys);
-        if (!$isTikTokFinance && ($customerShippingFee === null || $customerShippingFee <= 0)) {
-            $customerShippingFee = $this->settlementFeeAmount($s->order?->shipping_fee_customer);
-        }
-        if (!$isTikTokFinance && ($customerShippingFee === null || $customerShippingFee <= 0)) {
-            $customerShippingFee = $actualShippingFee;
-        }
-
         return [
             'shipping_cost_amount' => $shippingCostAmount,
             'actual_shipping_fee_amount' => $actualShippingFee === null ? null : max(0.0, $actualShippingFee),

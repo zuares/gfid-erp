@@ -4528,10 +4528,10 @@ class MarketplaceSyncService
 
                 // ── Finansial ─────────────────────────────────────────────────
                 $totalAmount       = (float) ($detail['total_amount'] ?? 0);
-                $shippingFee       = (float) ($detail['actual_shipping_fee']
-                    ?? $detail['buyer_paid_shipping_fee']
-                    ?? $detail['estimated_shipping_fee']
-                    ?? 0);
+                // `actual_shipping_fee` adalah biaya aktual carrier, bukan
+                // otomatis ongkir yang dibayar pembeli. Simpan kolom customer
+                // hanya jika Shopee benar-benar mengirim field buyer-paid.
+                $shippingFee       = (float) ($detail['buyer_paid_shipping_fee'] ?? 0);
                 $subtotalItems     = collect($detail['item_list'] ?? [])->sum(function ($item) {
                     return (float) ($item['model_original_price'] ?? $item['model_discounted_price'] ?? 0)
                         * (int) ($item['model_quantity_purchased'] ?? $item['active_qty'] ?? 0);
