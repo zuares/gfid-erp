@@ -2539,11 +2539,9 @@
                             <div class="settlement-breakdown-block">
                                 <div class="settlement-breakdown-title">Logistik</div>
                                 <ul class="fee-list">
-                                    <li><span>Total ongkir settlement</span> <span class="fee-val">${s.shipping_cost_amount !== null && s.shipping_cost_amount !== undefined ? '−'+fmtRp(Math.abs(Number(s.shipping_cost_amount))) : '-'}</span></li>
-                                    <li><span>Biaya ongkir</span> <span class="fee-val">${s.actual_shipping_fee_amount !== null && s.actual_shipping_fee_amount !== undefined ? '−'+fmtRp(s.actual_shipping_fee_amount) : '-'}</span></li>
-                                    <li><span>Dibayar platform</span> <span class="subsidy-val">${s.shipping_fee_discount_amount !== null && s.shipping_fee_discount_amount !== undefined ? '+'+fmtRp(s.shipping_fee_discount_amount) : '-'}</span></li>
-                                    <li><span>Dibayar pembeli</span> <span class="buyer-val">${s.shipping_fee_customer !== null && s.shipping_fee_customer !== undefined ? fmtRp(s.shipping_fee_customer) : '-'}</span></li>
+                                    <li><span>Ongkir aktual</span> <span class="fee-val">${s.actual_shipping_fee ? '−'+fmtRp(s.actual_shipping_fee) : '-'}</span></li>
                                     <li><span>Ongkir balik</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
+                                    <li><span>Subsidi</span> <span class="subsidy-val">${s.shipping_fee_subsidy ? '+'+fmtRp(s.shipping_fee_subsidy) : '-'}</span></li>
                                 </ul>
                             </div>
                             <div class="settlement-breakdown-block">
