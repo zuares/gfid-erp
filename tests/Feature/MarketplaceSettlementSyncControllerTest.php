@@ -635,7 +635,8 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('Rincian tersedia setelah settlement.')
             ->assertSee('Ongkir aktual')
             ->assertSee('Ongkir balik')
-            ->assertSee('Subsidi');
+            ->assertSee('Subsidi')
+            ->assertSee('Dibayar pembeli');
     }
 
     public function test_detail_order_menampilkan_estimasi_bila_income_belum_ada()

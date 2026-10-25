@@ -2542,6 +2542,7 @@
                                     <li><span>Ongkir aktual</span> <span class="fee-val">${s.actual_shipping_fee ? '−'+fmtRp(s.actual_shipping_fee) : '-'}</span></li>
                                     <li><span>Ongkir balik</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
                                     <li><span>Subsidi</span> <span class="subsidy-val">${s.shipping_fee_subsidy ? '+'+fmtRp(s.shipping_fee_subsidy) : '-'}</span></li>
+                                    ${isTikTokFinance ? `<li><span>Dibayar pembeli</span> <span class="buyer-val">${Number(s.shipping_fee_customer ?? s.order?.shipping_fee_customer ?? 0) ? '+'+fmtRp(s.shipping_fee_customer ?? s.order?.shipping_fee_customer) : '-'}</span></li>` : ''}
                                 </ul>
                             </div>
                             <div class="settlement-breakdown-block">
