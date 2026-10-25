@@ -2523,7 +2523,7 @@
                                     html += renderFeeLine('Pajak (Escrow)', s.escrow_tax);
                                 }
                                 if (isTikTokFinance) {
-                                    html += renderFeeLine('Dibayar penjual', s.shipping_cost_amount);
+                                    html += renderFeeLine('Biaya logistik', s.shipping_cost_amount);
                                 }
                                 html += sectionLabel('Biaya Iklan');
                                 html += renderFeeLine('Biaya Iklan', s.ad_cost);
