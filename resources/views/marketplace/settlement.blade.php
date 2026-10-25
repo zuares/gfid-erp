@@ -2481,8 +2481,8 @@
                                         || Object.keys(tiktokTaxes).length > 0
                                         || Array.isArray(r.sku_transactions);
                                     const hasTikTokBreakdown = Object.keys(tiktokFees).length > 0 || Object.keys(tiktokTaxes).length > 0;
-                                    html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
                                     if (isTikTokFinance) {
+                                        html += renderFeeLine('Total Fee Marketplace', feeTotal, true, feePercent);
                                         html += sectionLabel('Komponen Biaya TikTok');
                                         if (!hasTikTokBreakdown) {
                                             html += renderFeeLine('Fee & Pajak TikTok (agregat)', Math.abs(Number(r.fee_and_tax_amount || 0)), true);
