@@ -2382,6 +2382,17 @@
                                     return `<li><span>${label}:</span> <span class="fee-val">${sign}${fmtRp(Math.abs(numeric))}${pct}</span></li>`;
                                 };
                                 const sectionLabel = (label) => `<li style="margin-top:.45rem; padding-top:.35rem; border-top:1px dashed rgba(148,163,184,.22); font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#64748b;">${label}</li>`;
+                                const sumFeeRows = (rows) => (Array.isArray(rows) ? rows : [])
+                                    .reduce((total, item) => total + Math.abs(Number(item?.amount || 0)), 0);
+                                const renderFeeSectionLabel = (label, amount, base) => {
+                                    const numericAmount = Math.abs(Number(amount || 0));
+                                    const numericBase = Math.abs(Number(base || 0));
+                                    const percent = numericBase > 0 ? (numericAmount / numericBase) * 100 : null;
+                                    const suffix = percent === null
+                                        ? ''
+                                        : ` <span style="font-size:.68rem; color:var(--shp-muted);">(${percent.toFixed(1)}%)</span>`;
+                                    return sectionLabel(`${label}${suffix}`);
+                                };
                                 const renderShopeeFeeRows = (rows) => (Array.isArray(rows) ? rows : [])
                                     .map((item) => renderFeeLine(item?.label || 'Program Layanan', item?.amount))
                                     .join('');
@@ -2446,8 +2457,8 @@
                                     }
                                     return 'program';
                                 };
-                                const renderTikTokGroup = (label, rows) => (rows.length > 0
-                                    ? sectionLabel(label) + rows.map((item) => renderFeeLine(item.label, item.amount)).join('')
+                                const renderTikTokGroup = (label, rows, base) => (rows.length > 0
+                                    ? renderFeeSectionLabel(label, sumFeeRows(rows), base) + rows.map((item) => renderFeeLine(item.label, item.amount)).join('')
                                     : '');
                                 const extractTikTokBreakdown = (raw) => {
                                     const normalized = raw.tiktok_fee_breakdown || {};
@@ -2528,44 +2539,57 @@
                                         if (Number.isFinite(shippingCost) && Math.abs(shippingCost) > 0.001) {
                                             tiktokFeeGroups.service.push({ label: 'Biaya logistik', amount: shippingCost });
                                         }
-                                        html += renderTikTokGroup('Biaya Administrasi', tiktokFeeGroups.administration);
-                                        html += renderTikTokGroup('Biaya Layanan', tiktokFeeGroups.service);
-                                        html += renderTikTokGroup('Komisi Affiliate', tiktokFeeGroups.affiliate);
-                                        html += renderTikTokGroup('Biaya Program & Lainnya', tiktokFeeGroups.program);
+                                        html += renderTikTokGroup('Biaya Platform', tiktokFeeGroups.administration, feeTotal);
+                                        html += renderTikTokGroup('Biaya Layanan', tiktokFeeGroups.service, feeTotal);
+                                        html += renderTikTokGroup('Komisi Affiliate', tiktokFeeGroups.affiliate, feeTotal);
+                                        html += renderTikTokGroup('Biaya Program & Lainnya', tiktokFeeGroups.program, feeTotal);
                                     } else {
                                         html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
-                                        html += sectionLabel('Biaya Platform');
-                                        html += renderFeeLine('Biaya Administrasi', r.commission_fee ?? s.commission_fee);
-                                        html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee ?? s.seller_order_processing_fee);
+                                        const shopeeCommissionFee = r.commission_fee ?? s.commission_fee;
+                                        const shopeeProcessingFee = r.seller_order_processing_fee ?? s.seller_order_processing_fee;
+                                        const shopeeServiceFee = r.service_fee ?? s.service_fee;
+                                        const shopeeTransactionFee = r.seller_transaction_fee ?? r.transaction_fee ?? s.transaction_fee;
+                                        const shopeeAmsFee = r.order_ams_commission_fee ?? r.ams_commission_fee ?? s.order_ams_commission_fee;
+                                        const shopeeOtherFeeTotal = sumFeeRows(s.shopee_other_fee_breakdown)
+                                            + Math.abs(Number(shopeeTransactionFee || 0))
+                                            + Math.abs(Number(shopeeAmsFee || 0));
 
-                                        html += sectionLabel('Biaya Layanan');
-                                        html += renderFeeLine('Total Biaya Layanan', r.service_fee ?? s.service_fee);
+                                        html += renderFeeSectionLabel('Biaya Platform', Math.abs(Number(shopeeCommissionFee || 0)) + Math.abs(Number(shopeeProcessingFee || 0)), feeTotal);
+                                        html += renderFeeLine('Biaya Administrasi', shopeeCommissionFee);
+                                        html += renderFeeLine('Biaya Proses Pesanan', shopeeProcessingFee);
+
+                                        html += renderFeeSectionLabel('Biaya Layanan', shopeeServiceFee, feeTotal);
+                                        html += renderFeeLine('Total Biaya Layanan', shopeeServiceFee);
                                         html += renderShopeeFeeRows(s.shopee_service_fee_breakdown);
                                         html += renderShopeeFeeDifference(s.shopee_service_fee_breakdown_difference);
 
-                                        html += sectionLabel('Biaya Program & Lainnya');
+                                        html += renderFeeSectionLabel('Biaya Program & Lainnya', shopeeOtherFeeTotal, feeTotal);
                                         html += renderShopeeFeeRows(s.shopee_other_fee_breakdown);
-                                        html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee ?? s.transaction_fee);
-                                        html += renderFeeLine('Biaya Komisi AMS', r.order_ams_commission_fee ?? r.ams_commission_fee ?? s.order_ams_commission_fee);
+                                        html += renderFeeLine('Biaya Transaksi', shopeeTransactionFee);
+                                        html += renderFeeLine('Biaya Komisi AMS', shopeeAmsFee);
                                     }
                                 } else {
                                     html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
-                                    html += sectionLabel('Biaya Platform');
+                                    const shopeeOtherFeeTotal = sumFeeRows(s.shopee_other_fee_breakdown)
+                                        + Math.abs(Number(s.transaction_fee || 0))
+                                        + Math.abs(Number(s.order_ams_commission_fee ?? s.ams_commission_fee ?? s.activity_fee ?? 0));
+
+                                    html += renderFeeSectionLabel('Biaya Platform', Math.abs(Number(s.commission_fee || 0)) + Math.abs(Number(s.seller_order_processing_fee || 0)), feeTotal);
                                     html += renderFeeLine('Biaya Administrasi', s.commission_fee);
                                     html += renderFeeLine('Biaya Proses Pesanan', s.seller_order_processing_fee);
 
-                                    html += sectionLabel('Biaya Layanan');
+                                    html += renderFeeSectionLabel('Biaya Layanan', s.service_fee, feeTotal);
                                     html += renderFeeLine('Total Biaya Layanan', s.service_fee);
                                     html += renderShopeeFeeRows(s.shopee_service_fee_breakdown);
                                     html += renderShopeeFeeDifference(s.shopee_service_fee_breakdown_difference);
 
-                                    html += sectionLabel('Biaya Program & Lainnya');
+                                    html += renderFeeSectionLabel('Biaya Program & Lainnya', shopeeOtherFeeTotal, feeTotal);
                                     html += renderShopeeFeeRows(s.shopee_other_fee_breakdown);
                                     html += renderFeeLine('Biaya Transaksi', s.transaction_fee);
                                     html += renderFeeLine('Biaya Komisi AMS', s.order_ams_commission_fee ?? s.ams_commission_fee ?? s.activity_fee);
                                 }
                                 if (isTikTokFinance) {
-                                    html += sectionLabel('Biaya Iklan');
+                                    html += renderFeeSectionLabel('Biaya Iklan', s.ad_cost, feeTotal);
                                     html += renderFeeLine('Biaya Iklan', s.ad_cost);
                                 }
                                 return html || '<li><span style="color:var(--shp-muted)">Tidak ada potongan</span></li>';
