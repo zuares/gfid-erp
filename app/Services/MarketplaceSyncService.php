@@ -1098,7 +1098,13 @@ class MarketplaceSyncService
             $breakdown = is_array($transaction['fee_tax_breakdown'] ?? null)
                 ? $transaction['fee_tax_breakdown']
                 : [];
-            $collectBreakdown(is_array($breakdown['fee'] ?? null) ? $breakdown['fee'] : [], $tiktokFeeBreakdown['fees']);
+            $feeRows = is_array($breakdown['fee'] ?? null) ? $breakdown['fee'] : [];
+            // TikTok currently returns affiliate_commission_amount_before_pit
+            // as a duplicate of affiliate_commission_amount. Keep the actual
+            // affiliate fee once; the duplicate is informational and must not
+            // inflate commission_fee.
+            $feeRows = $this->withoutDuplicateTikTokAffiliateFee($feeRows);
+            $collectBreakdown($feeRows, $tiktokFeeBreakdown['fees']);
             $collectBreakdown(is_array($breakdown['tax'] ?? null) ? $breakdown['tax'] : [], $tiktokFeeBreakdown['taxes']);
         }
 
@@ -1427,6 +1433,148 @@ class MarketplaceSyncService
         }
 
         return $stats;
+    }
+
+    /**
+     * Remove TikTok's duplicated affiliate fee field from historical
+     * normalized payloads and repair the canonical commission projection.
+     *
+     * This is intentionally separate from the Finance API sync: it only
+     * touches rows whose stored normalized breakdown proves the two affiliate
+     * fields are equal. The default command mode is dry-run.
+     *
+     * @return array{scanned:int,candidates:int,updated:int,unchanged:int,overcount_total:float,errors:int,examples:array<int,array<string,mixed>>}
+     */
+    public function backfillTikTokAffiliateFeeDuplicates(
+        Store $store,
+        bool $apply = false,
+        int $limit = 5000,
+    ): array {
+        $store->loadMissing('channel');
+        $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
+            return [
+                'scanned' => 0,
+                'candidates' => 0,
+                'updated' => 0,
+                'unchanged' => 0,
+                'overcount_total' => 0.0,
+                'errors' => 1,
+                'examples' => [],
+            ];
+        }
+
+        $settlements = MarketplaceOrderSettlement::query()
+            ->where('store_id', $store->id)
+            ->orderBy('id')
+            ->limit(max(1, $limit))
+            ->get();
+
+        $stats = [
+            'scanned' => $settlements->count(),
+            'candidates' => 0,
+            'updated' => 0,
+            'unchanged' => 0,
+            'overcount_total' => 0.0,
+            'errors' => 0,
+            'examples' => [],
+        ];
+
+        foreach ($settlements as $settlement) {
+            $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+            $source = strtolower((string) ($raw['source'] ?? ''));
+            if (! str_starts_with($source, 'tiktok_finance_')) {
+                continue;
+            }
+
+            $fees = data_get($raw, 'tiktok_fee_breakdown.fees');
+            if (! is_array($fees)) {
+                continue;
+            }
+
+            $normalizedFees = $this->withoutDuplicateTikTokAffiliateFee($fees, $duplicateAmount);
+            if ($duplicateAmount <= 0) {
+                continue;
+            }
+
+            $stats['candidates']++;
+            $stats['overcount_total'] = round($stats['overcount_total'] + $duplicateAmount, 2);
+            if (count($stats['examples']) < 20) {
+                $stats['examples'][] = [
+                    'settlement_id' => $settlement->id,
+                    'order_id' => $settlement->channel_order_id,
+                    'duplicate_amount' => $duplicateAmount,
+                    'commission_fee' => (float) $settlement->commission_fee,
+                    'corrected_commission_fee' => round(max(0, (float) $settlement->commission_fee - $duplicateAmount), 2),
+                ];
+            }
+
+            $stats['updated']++;
+            if (! $apply) {
+                continue;
+            }
+
+            try {
+                $breakdown = is_array($raw['tiktok_fee_breakdown'] ?? null)
+                    ? $raw['tiktok_fee_breakdown']
+                    : [];
+                $breakdown['fees'] = $normalizedFees;
+                $breakdown['fee_total'] = round(max(0, (float) ($breakdown['fee_total'] ?? array_sum($fees)) - $duplicateAmount), 2);
+                $breakdown['non_ad_fee_total'] = round(max(0, (float) ($breakdown['non_ad_fee_total'] ?? $settlement->commission_fee) - $duplicateAmount), 2);
+                $raw['tiktok_fee_breakdown'] = $breakdown;
+                $raw['tiktok_affiliate_fee_backfill'] = [
+                    'source' => 'tiktok_finance_duplicate_affiliate_fee',
+                    'removed_amount' => $duplicateAmount,
+                    'backfilled_at' => now()->toIso8601String(),
+                ];
+
+                $settlement->commission_fee = $this->nn($this->decimalValue(
+                    max(0, (float) $settlement->commission_fee - $duplicateAmount),
+                ));
+                $settlement->raw_json = $raw;
+                $settlement->data_checked_at = now();
+                $settlement->save();
+
+                try {
+                    $this->financeBackfill->syncOrderSettlement($settlement->fresh(['store.channel', 'order.store.channel']));
+                } catch (\Throwable $e) {
+                    $stats['errors']++;
+                    Log::warning('[TikTok Finance] Gagal memproyeksikan backfill affiliate fee ke Marketplace Finance', [
+                        'store_id' => $store->id,
+                        'order_id' => $settlement->channel_order_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $stats['errors']++;
+                Log::warning('[TikTok Finance] Gagal backfill duplicate affiliate fee', [
+                    'store_id' => $store->id,
+                    'order_id' => $settlement->channel_order_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * TikTok may send the affiliate commission and its before-PIT display
+     * field with the same amount. Return only one of them for fee aggregation.
+     */
+    private function withoutDuplicateTikTokAffiliateFee(array $fees, ?float &$duplicateAmount = null): array
+    {
+        $duplicateAmount = 0.0;
+        $affiliate = $fees['affiliate_commission_amount'] ?? null;
+        $beforePit = $fees['affiliate_commission_amount_before_pit'] ?? null;
+
+        if (is_numeric($affiliate) && is_numeric($beforePit)
+            && abs((float) $affiliate - (float) $beforePit) < 0.01) {
+            $duplicateAmount = abs((float) $beforePit);
+            unset($fees['affiliate_commission_amount_before_pit']);
+        }
+
+        return $fees;
     }
 
     private function isTikTokFinanceScopeError(array $response): bool
@@ -2063,6 +2211,10 @@ class MarketplaceSyncService
             $totals['statement_ad_costs_total'] = (float) ($statementBatch['ad_costs_total'] ?? 0);
             $totals['statement_ad_cost_errors'] = (int) ($statementBatch['errors'] ?? 0);
             $totals['synced'] += $totals['statement_settlements_synced'];
+            // A failed authoritative statement scan must be visible as a
+            // failed sync; otherwise the per-order fallback can report
+            // success while completed payouts were never checked.
+            $totals['errors'] += $totals['statement_settlement_errors'];
             $effectiveMissingOnly = (int) ($statementBatch['errors'] ?? 0) === 0;
         }
 
@@ -2132,7 +2284,8 @@ class MarketplaceSyncService
 
         $totals['batches'] = $batchNumber;
         $totals['message'] = "Finance TikTok selesai: {$totals['synced']} settled, {$totals['pending']} belum settled, "
-            . "{$totals['estimates_updated']} estimasi diperbarui, {$totals['errors']} error.";
+            . "{$totals['estimates_updated']} estimasi diperbarui, "
+            . "{$totals['statement_settlements_synced']} dari statement, {$totals['errors']} error.";
 
         return $totals;
     }

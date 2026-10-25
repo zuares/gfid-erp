@@ -3641,7 +3641,7 @@ class MarketplaceController extends Controller
             'store:id,name,channel_id',
             'store.channel:id,code,name',
             'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,order_date,subtotal_items,total_paid_customer',
-            'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
+            'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,status_description,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
         ]);
 
@@ -3922,7 +3922,7 @@ class MarketplaceController extends Controller
         if ($includeMissingPending) {
             $pendingOrdersQuery = MarketplaceOrder::with([
                 'store:id,name,channel_id',
-                'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,synced_at',
+                'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,status_description,synced_at',
                 'items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
             ])
                 ->whereDoesntHave('settlement')
@@ -4031,6 +4031,7 @@ class MarketplaceController extends Controller
                 && (string) $orderChannelId === (string) $bookingSn;
             $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt', 'tt'], true)
                 && $s->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
+            $isTikTokFinance = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt', 'tt'], true);
             $isFinalSettlement = (bool) $s->settlement_time || $isTikTokFinanceFinal;
             $breakdown = $s->marketplaceFeeBreakdown();
             $feeTotals = $s->marketplaceFeeCategoryTotals($breakdown);
@@ -4173,6 +4174,12 @@ class MarketplaceController extends Controller
                 'has_income_estimate' => ! $isFinalSettlement && $estimatedEscrowAmount !== null,
                 'is_estimated_income' => $isEstimatedIncome,
                 'income_estimation_source' => $incomeEstimationSource,
+                'finance_pending_reason' => ! $isFinalSettlement
+                    ? $s->order?->incomeEstimate?->status_description
+                    : null,
+                'finance_pending_cancelled' => $isTikTokFinance
+                    && ! $isFinalSettlement
+                    && $isCancelledOrReturned,
                 'is_finance_final' => $isTikTokFinanceFinal,
                 'fee_is_final' => $isFinalSettlement,
                 'data_status' => $s->data_status,

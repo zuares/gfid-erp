@@ -122,7 +122,7 @@ class MarketplaceFinanceController extends Controller
             'store:id,name,channel_id',
             'store.channel:id,code,name',
             'order:id,channel_order_id,booking_sn,order_status,ordered_at,subtotal_items,total_paid_customer',
-            'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
+            'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,status_description,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id,price',
         ]);
 
@@ -164,7 +164,7 @@ class MarketplaceFinanceController extends Controller
         $pendingOrdersQuery = MarketplaceOrder::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
-            'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,synced_at',
+            'incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,status_description,synced_at',
             'items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id,price',
         ])
             ->whereDoesntHave('settlement')

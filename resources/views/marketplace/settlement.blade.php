@@ -2090,9 +2090,15 @@
                     : (estimateSource === 'estimated_escrow'
                         ? 'EST. ESCROW'
                         : (estimateSource === 'manual_24' ? 'EST. MANUAL 24%' : 'ESTIMASI BELUM TERSEDIA'));
+                const pendingReason = String(s.finance_pending_reason || '').trim().toUpperCase();
+                const pendingReasonLabel = pendingReason === 'WAITING_FOR_PACKAGE_DELIVERY'
+                    ? 'Menunggu paket diterima TikTok'
+                    : (pendingReason === 'ORDER_DELIVERED_AND_AWAITING_SETTLEMENT'
+                        ? 'Order sudah diterima, menunggu settlement TikTok'
+                        : 'Menunggu statement Finance TikTok');
                 const pendingDetailPlaceholder = isTikTokFinance ? `
                     <div class="settlement-pending-note">
-                        <strong>Belum final</strong><br>Menunggu statement Finance TikTok.
+                        <strong>${s.finance_pending_cancelled ? 'Status TikTok belum final' : 'Belum final'}</strong><br>${pendingReasonLabel}.
                     </div>` : `
                     <div class="settlement-pending-note">
                         <strong>Belum final</strong><br>Rincian tersedia setelah settlement.
@@ -2231,6 +2237,12 @@
                                     const affiliate = r.affiliate ?? r.affiliate_commission ?? r.affiliate_commission_amount ?? r.seller_affiliate_fee ?? s.affiliate ?? 0;
                                     const tiktokBreakdown = extractTikTokBreakdown(r);
                                     const tiktokFees = tiktokBreakdown.fees;
+                                    const affiliateAmount = Number(tiktokFees.affiliate_commission_amount);
+                                    const affiliateBeforePit = Number(tiktokFees.affiliate_commission_amount_before_pit);
+                                    if (Number.isFinite(affiliateAmount) && Number.isFinite(affiliateBeforePit)
+                                        && Math.abs(affiliateAmount - affiliateBeforePit) < 0.01) {
+                                        delete tiktokFees.affiliate_commission_amount_before_pit;
+                                    }
                                     const tiktokTaxes = tiktokBreakdown.taxes;
                                     const isTikTokFinance = String(r.source || '').toLowerCase().includes('tiktok')
                                         || Object.keys(tiktokFees).length > 0

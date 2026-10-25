@@ -1248,6 +1248,58 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(0.0, (float) $payload['meta']['kpi_net']);
     }
 
+    public function test_tiktok_pending_exposes_unsettled_reason_and_cancelled_marker(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'TTK-PENDING-'.rand(1000, 9999),
+            'name' => 'TikTok Pending Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'TT-PENDING-001',
+            'channel_order_id' => 'TT-PENDING-001',
+            'order_status' => 'CANCELLED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'data_status' => 'incomplete',
+            'final_income' => 0,
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'sku_transactions' => [],
+            ],
+        ]);
+        MarketplaceOrderIncomeEstimate::create([
+            'store_id' => $store->id,
+            'marketplace_order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'estimated_escrow_amount' => 0,
+            'status_description' => 'ORDER_DELIVERED_AND_AWAITING_SETTLEMENT',
+            'synced_at' => now(),
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            ['store_id' => $store->id, 'page' => 1, 'per_page' => 50],
+        ))->getData(true);
+        $row = $payload['paginator']['data'][0];
+
+        $this->assertSame('ORDER_DELIVERED_AND_AWAITING_SETTLEMENT', $row['finance_pending_reason']);
+        $this->assertTrue($row['finance_pending_cancelled']);
+        $this->assertFalse($row['is_finance_final']);
+    }
+
     public function test_settlements_endpoint_mengembalikan_rincian_potongan_dinamis()
     {
         $admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADM-BREAKDOWN']);

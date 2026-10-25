@@ -278,6 +278,128 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertStringContainsString('payout final TikTok', $html);
     }
 
+    public function test_equal_affiliate_before_pit_field_is_not_counted_twice(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-AFFILIATE-DEDUPE',
+            'name' => 'TikTok Affiliate Dedupe Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-AFFILIATE-DEDUPE-1',
+            'external_order_id' => 'TT-ORDER-AFFILIATE-DEDUPE-1',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202501/orders/*/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'order_id' => 'TT-ORDER-AFFILIATE-DEDUPE-1',
+                    'currency' => 'IDR',
+                    'revenue_amount' => '100000',
+                    'fee_and_tax_amount' => '-22416',
+                    'settlement_amount' => '77584',
+                    'sku_transactions' => [[
+                        'fee_tax_breakdown' => [
+                            'fee' => [
+                                'platform_commission_amount' => '-5000',
+                                'affiliate_commission_amount' => '-17416',
+                                'affiliate_commission_amount_before_pit' => '-17416',
+                            ],
+                            'tax' => [],
+                        ],
+                    ]],
+                ],
+            ]),
+        ]);
+
+        $result = app(MarketplaceSyncService::class)->syncTikTokOrderFinance($store, $order);
+
+        $this->assertSame('synced', $result['status']);
+        $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame(22416.0, (float) $settlement->commission_fee);
+        $this->assertSame(17416.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.affiliate_commission_amount'));
+        $this->assertNull(data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.affiliate_commission_amount_before_pit'));
+    }
+
+    public function test_historical_affiliate_fee_backfill_is_dry_run_by_default_and_idempotent(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-AFFILIATE-BACKFILL',
+            'name' => 'TikTok Affiliate Backfill Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-AFFILIATE-BACKFILL-1',
+            'external_order_id' => 'TT-ORDER-AFFILIATE-BACKFILL-1',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        $settlement = MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'commission_fee' => 34832,
+            'escrow_tax' => 0,
+            'final_income' => 65168,
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'tiktok_fee_breakdown' => [
+                    'fees' => [
+                        'affiliate_commission_amount' => 17416,
+                        'affiliate_commission_amount_before_pit' => 17416,
+                    ],
+                    'fee_total' => 34832,
+                    'non_ad_fee_total' => 34832,
+                ],
+            ],
+        ]);
+
+        $service = app(MarketplaceSyncService::class);
+        $dryRun = $service->backfillTikTokAffiliateFeeDuplicates($store);
+        $this->assertSame(1, $dryRun['candidates']);
+        $this->assertSame(1, $dryRun['updated']);
+        $this->assertSame(34832.0, (float) MarketplaceOrderSettlement::findOrFail($settlement->id)->commission_fee);
+
+        $applied = $service->backfillTikTokAffiliateFeeDuplicates($store, true);
+        $this->assertSame(1, $applied['updated']);
+        $settlement->refresh();
+        $this->assertSame(17416.0, (float) $settlement->commission_fee);
+        $this->assertNull(data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.affiliate_commission_amount_before_pit'));
+        $this->assertSame(17416.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fee_total'));
+
+        $secondApply = $service->backfillTikTokAffiliateFeeDuplicates($store, true);
+        $this->assertSame(0, $secondApply['candidates']);
+    }
+
     public function test_batched_sync_uses_statement_transactions_for_final_order_settlement(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');

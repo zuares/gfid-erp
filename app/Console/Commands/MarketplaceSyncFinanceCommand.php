@@ -483,11 +483,15 @@ class MarketplaceSyncFinanceCommand extends Command
             ];
             foreach ([
                 'found', 'processed', 'synced', 'pending', 'estimates_updated',
-                'estimate_errors', 'statement_ad_costs_updated', 'statement_ad_cost_errors',
+                'estimate_errors', 'statement_settlements_synced', 'statement_settlement_errors',
+                'statement_ad_costs_updated', 'statement_ad_cost_errors',
             ] as $key) {
                 if (array_key_exists($key, $storeFinanceSummary)) {
                     $storePayload[$key] = (int) $storeFinanceSummary[$key];
                 }
+            }
+            if (array_key_exists('statement_ad_costs_total', $storeFinanceSummary)) {
+                $storePayload['statement_ad_costs_total'] = round((float) $storeFinanceSummary['statement_ad_costs_total'], 2);
             }
             $this->logFinanceRun(
                 $store,
