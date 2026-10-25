@@ -29,6 +29,12 @@ use Illuminate\Support\Facades\Log;
 
 class MarketplaceSyncService
 {
+    private const TIKTOK_FINAL_PAYMENT_STATUSES = [
+        'SETTLED',
+        'PAID',
+        'COMPLETED',
+    ];
+
     private const PROCESSED_API_ADVANCED_STATUSES = [
         'READY_TO_HANDOVER',
         'SHIPPED',
@@ -1075,7 +1081,10 @@ class MarketplaceSyncService
      */
     private function hydrateTikTokStatementMetadata(Store $store, array $data): array
     {
-        if ($this->resolveTikTokSettlementTime($data, (array) ($data['sku_transactions'] ?? []))) {
+        $skuTransactions = (array) ($data['sku_transactions'] ?? []);
+        $paymentStatus = $this->resolveTikTokPaymentStatus($data, $skuTransactions);
+        if ($this->isTikTokFinalPaymentStatus($paymentStatus)
+            && $this->resolveTikTokSettlementTime($data, $skuTransactions)) {
             return $data;
         }
 
@@ -1096,8 +1105,8 @@ class MarketplaceSyncService
             }
 
             $statement = is_array($response['data'] ?? null) ? $response['data'] : [];
-            $status = strtoupper(trim((string) ($statement['status'] ?? $statement['payment_status'] ?? '')));
-            if (! in_array($status, ['SETTLED', 'PAID', 'COMPLETED'], true)) {
+            $status = $this->resolveTikTokPaymentStatus($statement);
+            if (! $this->isTikTokFinalPaymentStatus($status)) {
                 return $data;
             }
 
@@ -1148,6 +1157,8 @@ class MarketplaceSyncService
             ? array_values($data['sku_transactions'])
             : [];
         $hasStatement = $skuTransactions !== [] || (bool) ($data['_is_statement_transaction'] ?? false);
+        $paymentStatus = $this->resolveTikTokPaymentStatus($data, $skuTransactions);
+        $isFinalPayment = $this->isTikTokFinalPaymentStatus($paymentStatus);
         $shippingAmounts = $this->normalizeTikTokShippingAmounts($data, $skuTransactions);
         $shippingCostAmount = $this->decimalValue($data['shipping_cost_amount'] ?? null);
 
@@ -1241,17 +1252,26 @@ class MarketplaceSyncService
             }
         }
 
-        $statementTime = $this->resolveTikTokSettlementTime($data, $skuTransactions);
+        $statementTime = $isFinalPayment
+            ? $this->resolveTikTokSettlementTime($data, $skuTransactions)
+            : null;
 
         // Tanggal saat proses sync berjalan bukan tanggal pencairan. Jangan
         // mengisi settlement_time dengan now() ketika Finance TikTok tidak
         // mengirim timestamp statement; tanggal palsu tersebut merusak audit
         // dan membuat payout terlihat cair pada hari sync.
-        if (! $statementTime) {
-            $statementTime = $this->resolveTikTokSettlementTime(
-                (array) data_get($order->settlement?->raw_json, 'tiktok_statement', []),
-                [],
-            );
+        if (! $statementTime && $isFinalPayment) {
+            $storedStatement = (array) data_get($order->settlement?->raw_json, 'tiktok_statement', []);
+            if ($this->isTikTokFinalPaymentStatus($this->resolveTikTokPaymentStatus($storedStatement))) {
+                $statementTime = $this->resolveTikTokSettlementTime($storedStatement, []);
+            }
+        }
+
+        $settlementTime = $order->settlement?->settlement_time;
+        if ($hasStatement && $isFinalPayment && $statementTime) {
+            $settlementTime = $statementTime;
+        } elseif ($paymentStatus !== '' && ! $isFinalPayment) {
+            $settlementTime = null;
         }
 
         $settlement = MarketplaceOrderSettlement::firstOrNew([
@@ -1271,7 +1291,7 @@ class MarketplaceSyncService
             'shipping_cost_amount' => $shippingCostAmount,
             'shipping_fee_subsidy' => $this->nn($this->decimalValue($shippingAmounts['shipping_fee_discount_amount'])),
             'final_income' => $this->nn($this->decimalValue($settlementAmount)),
-            'settlement_time' => $hasStatement ? $statementTime : null,
+            'settlement_time' => $settlementTime,
             'raw_json' => $raw,
             'synced_at' => now(),
             'data_status' => $hasStatement
@@ -1310,9 +1330,6 @@ class MarketplaceSyncService
             'financial_issue_reason' => $hasStatement ? null : 'tiktok_order_not_settled',
             'financial_checked_at' => now(),
         ];
-        if ($hasStatement && $statementTime && empty($order->settlement_time)) {
-            $orderUpdate['settlement_time'] = $statementTime;
-        }
         if ($shippingAmounts['shipping_fee_customer'] > 0) {
             $orderUpdate['shipping_fee_customer'] = $this->nn($this->decimalValue($shippingAmounts['shipping_fee_customer']));
         }
@@ -1322,7 +1339,7 @@ class MarketplaceSyncService
         $order->update($orderUpdate);
 
         return [
-            'status' => $hasStatement ? 'synced' : 'pending',
+            'status' => $hasStatement && $isFinalPayment ? 'synced' : 'pending',
             'order_id' => $orderId,
             'settlement_amount' => $settlementAmount,
             'ad_cost' => $gmvMaxAdCost,
@@ -1438,11 +1455,11 @@ class MarketplaceSyncService
             ->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
             ->where(function ($query): void {
                 // Include rows that have complete per-order finance data but
-                // never received the authoritative statement payment time.
-                // These rows are pending payout metadata, not incomplete
-                // financial amounts, and must be eligible for backfill.
+                // never received authoritative payout metadata. Older rows
+                // can already have statement_time but no verified status.
                 $query->whereNull('settlement_time')
-                    ->orWhereColumn('settlement_time', 'synced_at');
+                    ->orWhereColumn('settlement_time', 'synced_at')
+                    ->orWhereNull('raw_json->tiktok_statement->payment_status');
             })
             ->orderBy('id')
             ->limit(max(1, $limit))
@@ -1498,7 +1515,10 @@ class MarketplaceSyncService
                     }
 
                     $statementId = trim((string) ($statement['id'] ?? $statement['statement_id'] ?? ''));
-                    if ($statementId !== '' && isset($statementIds[$statementId])) {
+                    $status = strtoupper(trim((string) ($statement['payment_status'] ?? $statement['status'] ?? '')));
+                    if ($statementId !== ''
+                        && isset($statementIds[$statementId])
+                        && in_array($status, self::TIKTOK_FINAL_PAYMENT_STATUSES, true)) {
                         $statementsById[$statementId] = $statement;
                     }
                 }
@@ -1532,7 +1552,7 @@ class MarketplaceSyncService
 
                 $detail = is_array($detailResponse['data'] ?? null) ? $detailResponse['data'] : [];
                 $status = strtoupper(trim((string) ($detail['status'] ?? $detail['payment_status'] ?? '')));
-                if (! in_array($status, ['SETTLED', 'PAID', 'COMPLETED'], true)) {
+                if (! in_array($status, self::TIKTOK_FINAL_PAYMENT_STATUSES, true)) {
                     continue;
                 }
 
@@ -1601,7 +1621,21 @@ class MarketplaceSyncService
                 $stats['examples'][] = $example;
             }
 
-            if ($settlement->settlement_time?->equalTo($settlementTime)) {
+            $currentStatement = is_array($raw['tiktok_statement'] ?? null)
+                ? $raw['tiktok_statement']
+                : [];
+            $statementMetadata = array_filter([
+                'statement_id' => $statement['id'] ?? $statement['statement_id'] ?? $statementId,
+                'payment_id' => $statement['payment_id'] ?? null,
+                'statement_time' => $statement['statement_time'] ?? null,
+                'payment_time' => $statement['payment_time'] ?? null,
+                'payment_status' => $statement['payment_status'] ?? $statement['status'] ?? null,
+            ], static fn (mixed $value): bool => $value !== null && $value !== '');
+            $mergedStatement = array_merge($currentStatement, $statementMetadata);
+            $timeUnchanged = $settlement->settlement_time?->equalTo($settlementTime) ?? false;
+            $metadataUnchanged = $mergedStatement === $currentStatement;
+
+            if ($timeUnchanged && $metadataUnchanged) {
                 $stats['unchanged']++;
                 continue;
             }
@@ -1611,16 +1645,7 @@ class MarketplaceSyncService
                 continue;
             }
 
-            $raw['tiktok_statement'] = array_merge(
-                is_array($raw['tiktok_statement'] ?? null) ? $raw['tiktok_statement'] : [],
-                array_filter([
-                    'statement_id' => $statement['id'] ?? $statement['statement_id'] ?? $statementId,
-                    'payment_id' => $statement['payment_id'] ?? null,
-                    'statement_time' => $statement['statement_time'] ?? null,
-                    'payment_time' => $statement['payment_time'] ?? null,
-                    'payment_status' => $statement['payment_status'] ?? $statement['status'] ?? null,
-                ], static fn (mixed $value): bool => $value !== null && $value !== ''),
-            );
+            $raw['tiktok_statement'] = $mergedStatement;
             $raw['tiktok_settlement_backfill'] = [
                 'source' => 'tiktok_finance_202309_statements',
                 'settlement_time_source' => $example['source'],
@@ -1913,6 +1938,22 @@ class MarketplaceSyncService
                         $transactions = is_array($transactionData['transactions'] ?? null)
                             ? $transactionData['transactions']
                             : [];
+                        $paymentStatus = strtoupper(trim((string) (
+                            $transactionData['payment_status']
+                                ?? $transactionData['status']
+                                ?? $statement['payment_status']
+                                ?? $statement['status']
+                                ?? ''
+                        )));
+
+                        // Statement dapat dibuat sebelum payout dibayarkan.
+                        // create_time/statement_time pada status non-final
+                        // bukan tanggal cair dan tidak boleh dipersist sebagai
+                        // settlement_time.
+                        if (! in_array($paymentStatus, self::TIKTOK_FINAL_PAYMENT_STATUSES, true)) {
+                            $summary['skipped'] += count($transactions);
+                            break;
+                        }
 
                         foreach ($transactions as $transaction) {
                             if (! is_array($transaction)) {
@@ -1952,9 +1993,7 @@ class MarketplaceSyncService
                                 'statement_id' => $statementId,
                                 'statement_transaction_id' => $transaction['id'] ?? null,
                                 'payment_id' => $statement['payment_id'] ?? null,
-                                'payment_status' => $statement['payment_status']
-                                    ?? $statement['status']
-                                    ?? null,
+                                'payment_status' => $paymentStatus,
                                 'payment_time' => $statement['payment_time']
                                     ?? $statement['paid_time']
                                     ?? $transactionData['payment_time']
@@ -2611,8 +2650,7 @@ class MarketplaceSyncService
                     }
 
                     $settlement = $order->settlement;
-                    if ($settlement?->settlement_time
-                        || $settlement?->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE) {
+                    if ($settlement?->settlement_time) {
                         continue;
                     }
 
@@ -5105,6 +5143,28 @@ class MarketplaceSyncService
         }
 
         return null;
+    }
+
+    private function resolveTikTokPaymentStatus(array $data, array $skuTransactions = []): string
+    {
+        foreach ([
+            $data['payment_status'] ?? null,
+            $data['status'] ?? null,
+            data_get($skuTransactions, '0.payment_status'),
+            data_get($skuTransactions, '0.status'),
+        ] as $value) {
+            $status = strtoupper(trim((string) $value));
+            if ($status !== '') {
+                return $status;
+            }
+        }
+
+        return '';
+    }
+
+    private function isTikTokFinalPaymentStatus(string $status): bool
+    {
+        return in_array($status, self::TIKTOK_FINAL_PAYMENT_STATUSES, true);
     }
 
     private function normalizeOrderEventTimestamp(mixed $value): ?Carbon

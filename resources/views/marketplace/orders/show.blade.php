@@ -151,11 +151,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
     $isTikTok = in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true);
     $platformLabel = $isTikTok ? 'TikTok' : 'Shopee';
     $settlementRaw = is_array($settlement?->raw_json ?? null) ? $settlement->raw_json : [];
-    $isTikTokFinalSettlement = $isTikTok && $settlement && (
-        $settlement->data_status === \App\Services\Marketplace\MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
-        || $settlement->settlement_time
-        || (float) $settlement->final_income > 0
-    );
+    $isTikTokFinalSettlement = $isTikTok && $settlement && (bool) $settlement->settlement_time;
     $tiktokEstimateRaw = is_array($incomeEstimate?->raw_json ?? null) ? $incomeEstimate->raw_json : [];
     $tiktokEstimateTransaction = is_array($tiktokEstimateRaw['transaction'] ?? null)
         ? $tiktokEstimateRaw['transaction']
@@ -773,10 +769,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
         $estimatedMarketplaceFee = 0.0;
         $estimatedFeeBase = 0.0;
 
-        $hasFinalSettlement = $settlement && (! $isTikTok
-            || $settlement->data_status === \App\Services\Marketplace\MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE
-            || $settlement->settlement_time
-            || (float) $settlement->final_income > 0);
+        $hasFinalSettlement = $settlement && (! $isTikTok || (bool) $settlement->settlement_time);
         
         if ($hasFinalSettlement) {
             $biayaAdmin = abs((float)($settlement->commission_fee ?? 0)) + abs((float)($settlement->transaction_fee ?? 0));
@@ -789,6 +782,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             $biayaLainnya = $biayaLainnyaLuar;
             $penghasilan = (float)$settlement->final_income;
         } else {
+            $isEstimasi = true;
             $biayaAdmin = abs((float)($inc['commission_fee'] ?? 0)) + abs((float)($inc['seller_transaction_fee'] ?? 0));
             $biayaLayananSeller = abs((float)($inc['service_fee'] ?? 0));
             $biayaAffiliate = abs((float)($inc['affiliate_fee'] ?? $inc['affiliate_commission_fee'] ?? $inc['affiliate_commission'] ?? $inc['seller_affiliate_fee'] ?? 0));
@@ -981,7 +975,7 @@ body[data-theme="dark"] .od-finance-tabs,body[data-theme="dark"] .od-fee-panel{b
             && ($isTikTok || $orderAdCostBeforeTax !== null)
             ? round($grossProfitBeforeAds - ($orderAdCostBeforeTax ?? 0) - ($orderAdTax ?? 0), 2)
             : null;
-        $grossProfitIsEstimate = $isTikTokApiEstimate && $grossProfitBeforeAds !== null
+        $grossProfitIsEstimate = $isTikTok && $isEstimasi && $grossProfitBeforeAds !== null
             && $orderAdCostBeforeTax === null;
         $grossProfitBeforeAdsOnly = $isTikTok && $grossProfitBeforeAds !== null
             && $orderAdCostBeforeTax === null;

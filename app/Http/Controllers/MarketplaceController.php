@@ -22,7 +22,6 @@ use App\Models\Store;
 use App\Models\Warehouse;
 use App\Services\Marketplace\Ads\ItemHppResolver;
 use App\Services\Marketplace\MarketplaceApiGateway;
-use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\MarketplaceIssueService;
 use App\Services\MarketplaceSyncService;
 use App\Services\OrderFulfillmentService;
@@ -3654,13 +3653,6 @@ class MarketplaceController extends Controller
         }
         $includeMissingPending = $settlementStatus === 'belum_cair'
             || $request->input('tab') === 'belum_cair';
-        $isTikTokFinanceChannel = static function ($channelQuery): void {
-            $channelQuery->whereIn('code', ['tiktok', 'ttk', 'tkt', 'tt']);
-        };
-        $isTikTokFinanceFinal = static function ($settlementQuery) use ($isTikTokFinanceChannel): void {
-            $settlementQuery->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
-                ->whereHas('store.channel', $isTikTokFinanceChannel);
-        };
         $applyOrderDateRange = static function ($orderQuery, ?string $from, ?string $to): void {
             if ($from !== null && $from !== '') {
                 $orderQuery->where(function ($dateQuery) use ($from) {
@@ -3682,27 +3674,17 @@ class MarketplaceController extends Controller
                 });
             }
         };
-        $applyFinalSettlementDateRange = function ($settlementQuery, ?string $from, ?string $to) use ($isTikTokFinanceFinal, $applyOrderDateRange): void {
-            $settlementQuery->where(function ($dateQuery) use ($from, $to, $isTikTokFinanceFinal, $applyOrderDateRange) {
-                $dateQuery->where(function ($finalQuery) use ($from, $to) {
-                    $finalQuery->whereNotNull('settlement_time');
-                    if ($from !== null && $from !== '') {
-                        $finalQuery->whereDate('settlement_time', '>=', $from);
-                    }
-                    if ($to !== null && $to !== '') {
-                        $finalQuery->whereDate('settlement_time', '<=', $to);
-                    }
-                })->orWhere(function ($legacyTikTokQuery) use ($from, $to, $isTikTokFinanceFinal, $applyOrderDateRange) {
-                    // Data TikTok lama dapat berstatus final tanpa settlement_time.
-                    // Fallback tanggal order hanya boleh berlaku untuk baris legacy
-                    // tersebut, bukan untuk settlement pending biasa.
-                    $isTikTokFinanceFinal($legacyTikTokQuery);
-                    $legacyTikTokQuery->whereNull('settlement_time')
-                        ->whereHas('order', function ($orderQuery) use ($from, $to, $applyOrderDateRange) {
-                            $applyOrderDateRange($orderQuery, $from, $to);
-                        });
-                });
-            });
+        $applyFinalSettlementDateRange = static function ($settlementQuery, ?string $from, ?string $to): void {
+            // Tanggal order dan status kelengkapan finance bukan bukti dana
+            // sudah dicairkan. Baris final wajib memiliki settlement_time dari
+            // statement/payment TikTok atau settlement resmi marketplace.
+            $settlementQuery->whereNotNull('settlement_time');
+            if ($from !== null && $from !== '') {
+                $settlementQuery->whereDate('settlement_time', '>=', $from);
+            }
+            if ($to !== null && $to !== '') {
+                $settlementQuery->whereDate('settlement_time', '<=', $to);
+            }
         };
         $applyEstimatedSettlementDateRange = static function ($settlementQuery, ?string $from, ?string $to): void {
             $settlementQuery->whereHas('order.incomeEstimate', function ($estimateQuery) use ($from, $to) {
@@ -3804,12 +3786,7 @@ class MarketplaceController extends Controller
 
         if ($request->filled('tab')) {
             if ($request->tab === 'cair') {
-                $query->where(function ($q) use ($isTikTokFinanceFinal) {
-                        $q->whereNotNull('settlement_time')
-                            ->orWhere(function ($financeQuery) use ($isTikTokFinanceFinal) {
-                                $isTikTokFinanceFinal($financeQuery);
-                            });
-                    })
+                $query->whereNotNull('settlement_time')
                     ->where(function ($q) {
                         $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                     })
@@ -3818,11 +3795,6 @@ class MarketplaceController extends Controller
                     });
             } elseif ($request->tab === 'belum_cair') {
                 $query->whereNull('settlement_time')
-                    ->where(function ($q) use ($isTikTokFinanceChannel) {
-                        $q->where('data_status', '!=', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
-                            ->orWhereNull('data_status')
-                            ->orWhereDoesntHave('store.channel', $isTikTokFinanceChannel);
-                    })
                     ->where(function ($q) {
                         $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                     });
@@ -3870,12 +3842,7 @@ class MarketplaceController extends Controller
         // Tetap pisahkan dari tab lama agar keduanya dapat dipakai tanpa
         // mengubah perilaku filter tab yang sudah ada.
         if ($settlementStatus === 'cair') {
-            $query->where(function ($q) use ($isTikTokFinanceFinal) {
-                    $q->whereNotNull('settlement_time')
-                        ->orWhere(function ($financeQuery) use ($isTikTokFinanceFinal) {
-                            $isTikTokFinanceFinal($financeQuery);
-                        });
-                })
+            $query->whereNotNull('settlement_time')
                 ->where(function ($q) {
                     $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                 })
@@ -3884,11 +3851,6 @@ class MarketplaceController extends Controller
                 });
         } elseif ($settlementStatus === 'belum_cair') {
             $query->whereNull('settlement_time')
-                ->where(function ($q) use ($isTikTokFinanceChannel) {
-                    $q->where('data_status', '!=', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
-                        ->orWhereNull('data_status')
-                        ->orWhereDoesntHave('store.channel', $isTikTokFinanceChannel);
-                })
                 ->where(function ($q) {
                     $q->whereNull('drc_adjustable_refund')->orWhere('drc_adjustable_refund', 0);
                 })
@@ -4029,10 +3991,9 @@ class MarketplaceController extends Controller
             $isBookingOnly = filled($bookingSn)
                 && filled($orderChannelId)
                 && (string) $orderChannelId === (string) $bookingSn;
-            $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt', 'tt'], true)
-                && $s->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
             $isTikTokFinance = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt', 'tt'], true);
-            $isFinalSettlement = (bool) $s->settlement_time || $isTikTokFinanceFinal;
+            $isFinalSettlement = (bool) $s->settlement_time;
+            $isTikTokFinanceFinal = $isTikTokFinance && $isFinalSettlement;
             $breakdown = $s->marketplaceFeeBreakdown();
             $feeTotals = $s->marketplaceFeeCategoryTotals($breakdown);
             $sellerBurdenTotal = (float) ($feeTotals['seller'] ?? 0);
@@ -4379,9 +4340,7 @@ class MarketplaceController extends Controller
                 }) : 0;
                 $isCancelledOrReturned = in_array($st, ['CANCELLED', 'BATAL', 'RETURNED', 'REFUND']);
                 $isReturning = in_array($st, ['TO_RETURN', 'RETURNING']);
-                $isTikTokFinanceFinal = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt', 'tt'], true)
-                    && $s->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
-                $isFinalSettlement = (bool) $s->settlement_time || $isTikTokFinanceFinal;
+                $isFinalSettlement = (bool) $s->settlement_time;
 
                 if (! $isFinalSettlement && ! $isCancelledOrReturned) {
                     $countUnsettled++;

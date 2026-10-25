@@ -56,6 +56,7 @@ class MarketplaceSalesDashboardTikTokEstimateTest extends TestCase
             'buyer_payment_amount' => 100000,
             'final_income' => 76000,
             'data_status' => 'complete',
+            'settlement_time' => '2026-09-12 08:00:00',
         ]);
         MarketplaceOrderIncomeEstimate::create([
             'store_id' => $store->id,

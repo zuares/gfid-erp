@@ -231,6 +231,9 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
                     'fee_and_tax_amount' => '-18766',
                     'shipping_cost_amount' => '-2220',
                     'settlement_amount' => '81234',
+                    // statement_time without a final payment status is not
+                    // sufficient proof that the payout was disbursed.
+                    'statement_time' => now()->subHour()->timestamp,
                     'sku_transactions' => [[
                         'sku_id' => 'SKU-1',
                         'shipping_cost_breakdown' => [
@@ -255,7 +258,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
 
         $result = app(MarketplaceSyncService::class)->syncTikTokOrderFinance($store, $order);
 
-        $this->assertSame('synced', $result['status']);
+        $this->assertSame('pending', $result['status']);
         $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
         $this->assertSame(8000.0, (float) $settlement->commission_fee);
         $this->assertSame(766.0, (float) $settlement->escrow_tax);
@@ -284,11 +287,10 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         ]);
         $html = app(\App\Http\Controllers\Marketplace\MarketplaceOrderController::class)->show($order)->render();
 
-        $this->assertStringContainsString('Penghasilan Akhir', $html);
-        $this->assertStringNotContainsString('Estimasi Penghasilan Akhir', $html);
-        $this->assertStringNotContainsString('Laba Kotor Estimasi', $html);
+        $this->assertStringContainsString('Estimasi Penghasilan Akhir', $html);
+        $this->assertStringContainsString('Laba Kotor Estimasi', $html);
         $this->assertStringContainsString('Rp51.234', $html);
-        $this->assertStringContainsString('payout final TikTok', $html);
+        $this->assertStringContainsString('Estimasi laba kotor dihitung dari estimasi penghasilan TikTok', $html);
     }
 
     public function test_per_order_statement_id_hydrates_missing_settlement_time_from_statement_detail(): void
@@ -419,7 +421,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
 
         $result = app(MarketplaceSyncService::class)->syncTikTokOrderFinance($store, $order);
 
-        $this->assertSame('synced', $result['status']);
+        $this->assertSame('pending', $result['status']);
         $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
         $this->assertSame(22416.0, (float) $settlement->commission_fee);
         $this->assertSame(17416.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.affiliate_commission_amount'));
@@ -619,6 +621,95 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.payment_time'));
     }
 
+    public function test_batched_sync_does_not_use_pending_statement_time_as_payout_date(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-PENDING-STATEMENT',
+            'name' => 'TikTok Pending Statement Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-PENDING-STATEMENT-1',
+            'external_order_id' => 'TT-ORDER-PENDING-STATEMENT-1',
+            'order_status' => 'TO_CONFIRM_RECEIVE',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        $statementCreatedAt = now()->subHour()->timestamp;
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'statements' => [[
+                        'id' => 'STATEMENT-PENDING-1',
+                        'payment_status' => 'PENDING',
+                        'statement_time' => $statementCreatedAt,
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202501/statements/STATEMENT-PENDING-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'status' => 'PENDING',
+                    'create_time' => $statementCreatedAt,
+                    'next_page_token' => '',
+                    'transactions' => [[
+                        'id' => 'TX-PENDING-1',
+                        'type' => 'ORDER',
+                        'order_id' => $order->channel_order_id,
+                        'settlement_amount' => '90000',
+                    ]],
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202501/orders/*/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'order_id' => $order->channel_order_id,
+                    'settlement_amount' => '90000',
+                    'sku_transactions' => [],
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202507/orders/unsettled*' => Http::response([
+                'code' => 0,
+                'data' => ['transactions' => [], 'next_page_token' => ''],
+            ]),
+        ]);
+
+        $result = app(MarketplaceSyncService::class)->syncTikTokFinanceBatched(
+            $store,
+            now()->subDays(2)->timestamp,
+            now()->timestamp,
+            false,
+            null,
+            200,
+            now()->subDays(7)->timestamp,
+        );
+
+        $this->assertSame(0, $result['statement_settlements_synced']);
+        $this->assertSame(1, $result['pending']);
+        $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
+        $this->assertNull($settlement->settlement_time);
+        $this->assertSame('incomplete', $settlement->data_status);
+    }
+
     public function test_backfill_replaces_legacy_sync_timestamp_with_statement_payment_time(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
@@ -697,6 +788,27 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.payment_time'));
         $this->assertTrue((bool) data_get($settlement->raw_json, 'tiktok_settlement_backfill'));
         $this->assertTrue((bool) data_get($settlement->data_quality_flags, 'settlement_time_backfilled'));
+
+        // Rows from an older sync can already have the correct date while
+        // payment_status is absent. Backfill must enrich that metadata instead
+        // of treating an equal timestamp as fully unchanged.
+        $raw = $settlement->raw_json;
+        unset($raw['tiktok_statement']['payment_status']);
+        $settlement->raw_json = $raw;
+        $settlement->save();
+
+        $metadataStats = app(MarketplaceSyncService::class)->backfillTikTokSettlementTimes(
+            $store,
+            Carbon::create(2026, 9, 1, 0, 0, 0, config('app.timezone')),
+            Carbon::create(2026, 10, 1, 23, 59, 59, config('app.timezone')),
+            true,
+        );
+
+        $this->assertSame(1, $metadataStats['updated']);
+        $this->assertSame(
+            'SETTLED',
+            data_get($settlement->fresh()->raw_json, 'tiktok_statement.payment_status'),
+        );
     }
 
     public function test_backfill_fills_missing_statement_time_for_complete_per_order_row(): void
@@ -783,6 +895,88 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame('2026-10-25 08:36:47', $settlement->settlement_time?->toDateTimeString());
         $this->assertSame('SETTLED', data_get($settlement->raw_json, 'tiktok_statement.payment_status'));
         $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.statement_time'));
+    }
+
+    public function test_backfill_does_not_use_pending_statement_time_as_payout_date(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-BACKFILL-PENDING-DATE',
+            'name' => 'TikTok Pending Backfill Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-BACKFILL-PENDING-1',
+            'external_order_id' => 'TT-ORDER-BACKFILL-PENDING-1',
+            'order_status' => 'TO_CONFIRM_RECEIVE',
+            'ordered_at' => now()->subDays(2),
+            'order_date' => now()->subDays(2),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'final_income' => 76534,
+            'settlement_time' => null,
+            'synced_at' => now()->subHour(),
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'order_id' => $order->channel_order_id,
+                'sku_transactions' => [['statement_id' => 'STATEMENT-PENDING-BACKFILL-1']],
+            ],
+        ]);
+        $statementCreatedAt = now()->subHour()->timestamp;
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'statements' => [[
+                        'id' => 'STATEMENT-PENDING-BACKFILL-1',
+                        'payment_status' => 'PENDING',
+                        'statement_time' => $statementCreatedAt,
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/finance/202501/statements/STATEMENT-PENDING-BACKFILL-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'id' => 'STATEMENT-PENDING-BACKFILL-1',
+                    'status' => 'PENDING',
+                    'create_time' => $statementCreatedAt,
+                    'transactions' => [],
+                ],
+            ]),
+        ]);
+
+        $stats = app(MarketplaceSyncService::class)->backfillTikTokSettlementTimes(
+            $store,
+            now()->subDays(7),
+            now(),
+            true,
+        );
+
+        $this->assertSame(0, $stats['matched']);
+        $this->assertSame(0, $stats['updated']);
+        $this->assertSame(1, $stats['missing_statement']);
+        $this->assertNull(MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail()->settlement_time);
     }
 
     public function test_statement_transactions_supply_gmv_max_cost_from_settlement(): void

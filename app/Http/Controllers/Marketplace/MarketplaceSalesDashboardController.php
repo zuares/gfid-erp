@@ -3695,13 +3695,13 @@ SQL;
      * Select the most authoritative per-order payout value for dashboard
      * projections. TikTok pending orders must use Get Unsettled Transactions;
      * its value is more current than an incomplete order statement. A final
-     * TikTok statement wins once the settlement is marked complete.
+     * TikTok statement wins once its actual payout timestamp is available.
      */
     private function salesOrderPayoutExpression(string $settlementAlias, string $estimateAlias): string
     {
         return "CASE
             WHEN UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT', 'TT')
-                AND COALESCE({$settlementAlias}.data_status, '') = 'complete'
+                AND {$settlementAlias}.settlement_time IS NOT NULL
                 THEN COALESCE({$settlementAlias}.final_income, NULLIF(o.net_payout_estimated, 0), {$estimateAlias}.estimated_escrow_amount, 0)
             WHEN UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT', 'TT')
                 THEN COALESCE({$estimateAlias}.estimated_escrow_amount, NULLIF(o.net_payout_estimated, 0), NULLIF({$settlementAlias}.final_income, 0), 0)
@@ -3710,16 +3710,13 @@ SQL;
     }
 
     /**
-     * TikTok's final order statement is authoritative even though the
-     * v202501 endpoint does not provide the legacy settlement_time column.
-     * Keep the old settlement-time rule for Shopee and other channels.
+     * A settlement is final only after its actual payout timestamp exists.
+     * Finance-detail completeness alone does not prove that TikTok has paid
+     * the statement.
      */
     private function salesFinalIncomeCondition(string $settlementAlias): string
     {
-        return "({$settlementAlias}.settlement_time IS NOT NULL OR (
-            UPPER(COALESCE(ch.code, '')) IN ('TIKTOK', 'TTK', 'TKT', 'TT')
-            AND COALESCE({$settlementAlias}.data_status, '') = 'complete'
-        ))";
+        return "{$settlementAlias}.settlement_time IS NOT NULL";
     }
 
     private function firstPayloadAmount(array $payloads, array $keys): float

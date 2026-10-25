@@ -2341,7 +2341,7 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertNotNull($payload['meta']['estimate_last_synced_at']);
     }
 
-    public function test_filter_tanggal_cair_tiktok_memakai_tanggal_order_sebagai_fallback(): void
+    public function test_tiktok_complete_tanpa_settlement_time_tetap_belum_cair(): void
     {
         $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
         $store = Store::create([
@@ -2381,7 +2381,9 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
                 'channel_order_id' => $order->channel_order_id,
                 'buyer_payment_amount' => 100000,
                 'final_income' => 80000,
-                'settlement_time' => null,
+                'settlement_time' => $order->is($inside)
+                    ? Carbon::parse('2026-09-25 08:00:00')
+                    : null,
                 'data_status' => 'complete',
                 'raw_json' => ['source' => 'tiktok_finance_202501_order_statement_transactions'],
             ]);
@@ -2401,7 +2403,23 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
 
         $this->assertSame(['ORDER-TTK-DATE-IN'], $ids);
         $this->assertTrue($payload['paginator']['data'][0]['is_finance_final']);
-        $this->assertNull($payload['paginator']['data'][0]['settlement_time']);
+        $this->assertNotNull($payload['paginator']['data'][0]['settlement_time']);
+
+        $pendingPayload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            [
+                'store_id' => $store->id,
+                'settlement_status' => 'belum_cair',
+                'page' => 1,
+                'per_page' => 50,
+            ],
+        ))->getData(true);
+
+        $this->assertSame(['ORDER-TTK-DATE-OUT'], collect($pendingPayload['paginator']['data'])->pluck('channel_order_id')->all());
+        $this->assertFalse($pendingPayload['paginator']['data'][0]['is_finance_final']);
+        $this->assertFalse($pendingPayload['paginator']['data'][0]['fee_is_final']);
+        $this->assertSame('belum_cair', $pendingPayload['paginator']['data'][0]['settlement_status']);
     }
 
     public function test_filter_tanggal_order_memakai_order_date_sebagai_fallback(): void

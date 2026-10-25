@@ -19,7 +19,7 @@ class MarketplaceFinanceTikTokProjectionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_final_tiktok_order_statement_is_projected_to_generic_finance_idempotently(): void
+    public function test_tiktok_finance_detail_without_payout_date_remains_pending_in_generic_finance(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
 
@@ -79,8 +79,8 @@ class MarketplaceFinanceTikTokProjectionTest extends TestCase
             'order_sn' => $order->channel_order_id,
             'gross_amount' => '100000.00',
             'net_amount' => '91234.00',
-            'escrow_status' => EscrowStatus::FINALIZED->value,
-            'income_status' => IncomeStatus::RELEASED->value,
+            'escrow_status' => EscrowStatus::SYNCED->value,
+            'income_status' => IncomeStatus::PENDING->value,
         ]);
         $this->assertSame(1, MarketplaceFinancialTransaction::count());
         $this->assertSame(2, MarketplaceFinancialComponent::count());

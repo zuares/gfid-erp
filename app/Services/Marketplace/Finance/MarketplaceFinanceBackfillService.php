@@ -253,11 +253,13 @@ class MarketplaceFinanceBackfillService
         // from the raw response when it is available.
         $gross = $this->settlementGross($row);
         $net = $this->nullableAmount($row->final_income);
+        $isTikTok = in_array($context['channel'], ['tiktok', 'ttk', 'tkt', 'tt'], true);
+        $isReleased = (bool) $row->settlement_time || (! $isTikTok && $net !== null && $net > 0);
         $transaction = $this->transaction($context, [
             'gross_amount' => $gross,
             'net_amount' => $net,
-            'escrow_status' => $row->settlement_time || ($net !== null && $net > 0) ? EscrowStatus::FINALIZED : EscrowStatus::SYNCED,
-            'income_status' => $row->settlement_time || ($net !== null && $net > 0) ? IncomeStatus::RELEASED : IncomeStatus::PENDING,
+            'escrow_status' => $isReleased ? EscrowStatus::FINALIZED : EscrowStatus::SYNCED,
+            'income_status' => $isReleased ? IncomeStatus::RELEASED : IncomeStatus::PENDING,
             'released_at' => $row->settlement_time,
             'synced_at' => $row->synced_at,
             'raw_payload' => $this->legacyPayload('marketplace_order_settlements', $row->id, $row->raw_json),
