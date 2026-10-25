@@ -3640,7 +3640,7 @@ class MarketplaceController extends Controller
         $query = MarketplaceOrderSettlement::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
-            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,order_date,subtotal_items,total_paid_customer',
+            'order:id,channel_order_id,external_order_id,booking_sn,order_status,ordered_at,order_date,subtotal_items,total_paid_customer,shipping_fee_customer,shipping_discount_platform',
             'order.incomeEstimate:id,marketplace_order_id,estimated_escrow_amount,estimated_payout_at,income_status,payment_method,status_description,synced_at',
             'order.items:id,marketplace_order_id,hpp_snapshot,qty,item_name,variant_name,model_sku,item_sku,image_url,mapping_status,internal_item_id',
         ]);

@@ -587,6 +587,7 @@
         .settlement-ledger-table .fee-list .fee-val,
         .settlement-ledger-table .fee-list .subsidy-val,
         .settlement-ledger-table .fee-list .buyer-val,
+        .settlement-ledger-table .fee-list .reference-val,
         .settlement-ledger-table .fee-list .drc-val{ flex:0 0 auto; white-space:nowrap; text-align:right; }
         .settlement-pending-note{ padding:.5rem .6rem; border:1px dashed rgba(217,119,6,.38); border-radius:9px; background:rgba(245,158,11,.07); color:#92400e; font-size:.68rem; line-height:1.35; }
         .settlement-pagination{ display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.7rem .9rem; border-top:1px solid var(--shp-border); color:var(--shp-muted); font-size:.72rem; }
@@ -2541,7 +2542,7 @@
                                 <ul class="fee-list">
                                     <li><span>Ongkir dibayar platform</span> <span class="subsidy-val">${s.platform_paid_shipping_fee ? '+'+fmtRp(s.platform_paid_shipping_fee) : '-'}</span></li>
                                     <li><span>Ongkir dibayar pembeli</span> <span class="buyer-val">${s.buyer_paid_shipping_fee ? fmtRp(s.buyer_paid_shipping_fee) : '-'}</span></li>
-                                    <li><span>Ongkir aktual</span> <span class="fee-val">${s.actual_shipping_fee ? '−'+fmtRp(s.actual_shipping_fee) : '-'}</span></li>
+                                    <li><span>Biaya ongkir aktual (referensi)</span> <span class="reference-val">${s.actual_shipping_fee ? fmtRp(s.actual_shipping_fee) : '-'}</span></li>
                                     <li><span>Ongkir balik</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
                                 </ul>
                             </div>
