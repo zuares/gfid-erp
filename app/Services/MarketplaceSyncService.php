@@ -1051,13 +1051,84 @@ class MarketplaceSyncService
 
         $this->setTikTokFinanceScopeStatus($store, 'granted');
 
+        $financeData = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $financeData = $this->hydrateTikTokStatementMetadata($store, $financeData);
+
         return $this->persistTikTokFinancePayload(
             $store,
             $order,
             $response,
-            is_array($response['data'] ?? null) ? $response['data'] : [],
+            $financeData,
             'tiktok_finance_202501_order_statement_transactions',
         );
+    }
+
+    /**
+     * The per-order v202501 response can contain a statement_id without the
+     * statement/payment timestamp. Resolve that ID against the authoritative
+     * statement detail endpoint before persisting the settlement snapshot.
+     *
+     * TikTok's statement detail response exposes create_time (and status),
+     * while the statement list may omit the same ID because of its pagination
+     * window. create_time is used as statement_time only for a SETTLED
+     * statement; it is never used for an unsettled order.
+     */
+    private function hydrateTikTokStatementMetadata(Store $store, array $data): array
+    {
+        if ($this->resolveTikTokSettlementTime($data, (array) ($data['sku_transactions'] ?? []))) {
+            return $data;
+        }
+
+        $statementId = trim((string) (
+            $data['statement_id']
+                ?? data_get($data, 'sku_transactions.0.statement_id')
+                ?? ''
+        ));
+        if ($statementId === '') {
+            return $data;
+        }
+
+        try {
+            $response = $this->gateway->getTransactionsByStatement($store, $statementId, '', 100);
+            if (! empty($response['error'])
+                || (($response['code'] ?? null) !== null && (string) $response['code'] !== '0')) {
+                return $data;
+            }
+
+            $statement = is_array($response['data'] ?? null) ? $response['data'] : [];
+            $status = strtoupper(trim((string) ($statement['status'] ?? $statement['payment_status'] ?? '')));
+            if (! in_array($status, ['SETTLED', 'PAID', 'COMPLETED'], true)) {
+                return $data;
+            }
+
+            $statementTime = $statement['payment_time']
+                ?? $statement['paid_time']
+                ?? $statement['statement_time']
+                ?? $statement['create_time']
+                ?? null;
+            if ($statementTime === null || $statementTime === '') {
+                return $data;
+            }
+
+            $data['statement_id'] = $statementId;
+            $data['payment_status'] = $status;
+            if (! array_key_exists('payment_time', $data) && ! empty($statement['payment_time'])) {
+                $data['payment_time'] = $statement['payment_time'];
+            }
+            if (! array_key_exists('statement_time', $data)) {
+                $data['statement_time'] = $statementTime;
+            }
+
+            return $data;
+        } catch (\Throwable $e) {
+            Log::warning('[TikTok Finance] Gagal mengambil metadata statement dari statement_id', [
+                'store_id' => $store->id,
+                'statement_id' => $statementId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $data;
+        }
     }
 
     /**
@@ -1437,6 +1508,44 @@ class MarketplaceSyncService
                     break;
                 }
                 $statementToken = $nextToken;
+            }
+
+            // Fallback: the statement list can omit a statement_id that is
+            // already present in the per-order response. Fetch the exact
+            // statement detail so a settled order is not left without a
+            // settlement_time merely because list pagination missed it.
+            foreach ($statementIds->keys() as $statementId) {
+                if (isset($statementsById[$statementId])) {
+                    continue;
+                }
+
+                $detailResponse = $this->gateway->getTransactionsByStatement(
+                    $store,
+                    (string) $statementId,
+                    '',
+                    100,
+                );
+                if (! empty($detailResponse['error'])
+                    || (($detailResponse['code'] ?? null) !== null && (string) $detailResponse['code'] !== '0')) {
+                    continue;
+                }
+
+                $detail = is_array($detailResponse['data'] ?? null) ? $detailResponse['data'] : [];
+                $status = strtoupper(trim((string) ($detail['status'] ?? $detail['payment_status'] ?? '')));
+                if (! in_array($status, ['SETTLED', 'PAID', 'COMPLETED'], true)) {
+                    continue;
+                }
+
+                $statementsById[$statementId] = array_merge($detail, [
+                    'id' => $detail['id'] ?? $statementId,
+                    'payment_status' => $status,
+                    // Statement detail v202501 exposes create_time rather
+                    // than payment_time. Treat it as statement_time only
+                    // after the status proves the statement is final.
+                    'statement_time' => $detail['statement_time']
+                        ?? $detail['create_time']
+                        ?? null,
+                ]);
             }
         } catch (\Throwable $e) {
             $errors++;
