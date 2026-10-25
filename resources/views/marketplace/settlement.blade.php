@@ -2304,7 +2304,7 @@
             <tbody>
             ${settlements.map(s => {
                 const isPending = !s.settlement_time && !s.is_finance_final;
-                const isTikTokFinance = ['tiktok', 'ttk', 'tkt'].includes(String(s.store?.channel?.code || '').toLowerCase())
+                const isTikTokFinance = ['tiktok', 'ttk', 'tkt', 'tt'].includes(String(s.store?.channel?.code || '').toLowerCase())
                     || String(s.finance_source || '').toLowerCase().includes('tiktok_finance');
                 const tiktokShippingCost = Number(s.actual_shipping_fee_amount ?? s.actual_shipping_fee ?? 0);
                 const tiktokBuyerShipping = Number(s.shipping_fee_customer ?? s.order?.shipping_fee_customer ?? 0);
@@ -2359,6 +2359,12 @@
                                 <span class="settlement-money-label">Gross sales</span>
                                 <strong class="settlement-money-value">${fmtRp(s.gross_amount || 0)}</strong>
                             </div>
+                            ${isTikTokFinance && s.net_sales_amount !== null && s.net_sales_amount !== undefined ? `
+                            <div class="settlement-money-item">
+                                <span class="settlement-money-label">Net sales</span>
+                                <strong class="settlement-money-value">${fmtRp(s.net_sales_amount)}</strong>
+                                <span class="settlement-money-source">TikTok Finance</span>
+                            </div>` : ''}
                             <div class="settlement-money-item">
                                 <span class="settlement-money-label">${isPending ? 'Estimasi net' : 'Net settlement'}</span>
                                 <strong class="settlement-money-value ${isPending ? 'pending' : 'net'}">${fmtRp(s.final_income)}</strong>

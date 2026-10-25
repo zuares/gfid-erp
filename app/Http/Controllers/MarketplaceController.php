@@ -4044,9 +4044,8 @@ class MarketplaceController extends Controller
             $status = strtoupper($s->order?->order_status ?? '');
             $isCancelledOrReturned = in_array($status, ['CANCELLED', 'CANCELED', 'BATAL', 'RETURNED', 'REFUND']);
             $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
-            $grossAmount = $isCancelledOrReturned
-                ? 0.0
-                : (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
+            $grossAmount = $this->settlementGrossSalesAmount($s);
+            $netSalesAmount = $this->settlementTikTokNetSalesAmount($s);
             $buyerPaidAmount = $this->settlementBuyerPaidAmount($s);
             $voucherPlatformAmount = $this->settlementVoucherPlatformAmount($s);
             $voucherExternalAmount = $this->settlementVoucherExternalAmount($s);
@@ -4138,6 +4137,8 @@ class MarketplaceController extends Controller
                 'total_paid_customer' => (float) ($s->order?->total_paid_customer ?? $s->buyer_payment_amount),
                 'seller_discount' => $sellerDiscount,
                 'gross_amount' => $grossAmount,
+                'gross_sales_source' => $this->settlementGrossSalesSource($s),
+                'net_sales_amount' => $netSalesAmount,
                 'buyer_paid_amount' => $buyerPaidAmount,
                 'commission_fee' => (float) $s->commission_fee,
                 'service_fee' => (float) $s->service_fee,
@@ -4318,16 +4319,7 @@ class MarketplaceController extends Controller
             $voucherFeeTotal = (float) ($feeTotals['voucher'] ?? 0);
             $adjustmentFeeTotal = (float) ($feeTotals['adjustment'] ?? 0);
             $allFeeTotal = (float) ($feeTotals['total'] ?? 0);
-            $grossTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
-                $status = strtoupper($settlement->order?->order_status ?? '');
-                if (in_array($status, ['CANCELLED', 'CANCELED', 'BATAL', 'RETURNED', 'REFUND'])) {
-                    return 0.0;
-                }
-
-                $sellerDiscount = (float) data_get($settlement->raw_json, 'seller_discount', 0);
-
-                return (float) ($settlement->order?->subtotal_items ?? $settlement->buyer_payment_amount) - $sellerDiscount;
-            });
+            $grossTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement): float => $this->settlementGrossSalesAmount($settlement));
             $buyerPaidTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
                 return (float) ($settlement->order?->total_paid_customer ?? $settlement->buyer_payment_amount);
             });
@@ -4403,8 +4395,7 @@ class MarketplaceController extends Controller
                 if ($isCancelledOrReturned || $isReturning) {
                     // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
                 } elseif (! $isFinalSettlement && $payoutAmount !== null) {
-                    $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount)
-                        - (float) data_get($s->raw_json, 'seller_discount', 0);
+                    $grossAmt = $this->settlementGrossSalesAmount($s);
                     $tokoVoucher = $this->settlementVoucherTokoAmount($s);
                     $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
                     $affiliateCommission = (float) (
@@ -4426,8 +4417,7 @@ class MarketplaceController extends Controller
                     if ($estimateSyncedAt && (! $estimateLastSyncedAt || $estimateSyncedAt->gt($estimateLastSyncedAt))) {
                         $estimateLastSyncedAt = $estimateSyncedAt;
                     }
-                    $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
-                    $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
+                    $grossAmt = $this->settlementGrossSalesAmount($s);
                     $tokoVoucher = $this->settlementVoucherTokoAmount($s);
                     $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
                     $affiliateCommission = (float) (
@@ -4446,8 +4436,7 @@ class MarketplaceController extends Controller
                     $kpiNet += $estimatedEscrowAmount;
                 } elseif (! $isFinalSettlement && (float) $s->final_income <= 0) {
                     $estimatedManualCount++;
-                    $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
-                    $grossAmt = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
+                    $grossAmt = $this->settlementGrossSalesAmount($s);
                     $tokoVoucher = $this->settlementVoucherTokoAmount($s);
                     $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
 
@@ -4541,6 +4530,108 @@ class MarketplaceController extends Controller
         return filled($bookingSn)
             && filled($orderChannelId)
             && (string) $orderChannelId === (string) $bookingSn;
+    }
+
+    private function isTikTokFinanceSettlement(MarketplaceOrderSettlement $settlement): bool
+    {
+        $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+        $channelCode = strtolower(trim((string) ($settlement->store?->channel?->code ?? '')));
+        $source = strtolower((string) data_get($raw, 'source', ''));
+
+        return in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true)
+            || str_contains($source, 'tiktok')
+            || array_key_exists('sku_transactions', $raw);
+    }
+
+    /**
+     * Gross sales TikTok berasal dari subtotal sebelum diskon seller/platform
+     * pada revenue breakdown Finance. Refund subtotal mengurangi gross sales.
+     * Baris lama yang belum memiliki breakdown tetap memakai subtotal order.
+     */
+    private function settlementGrossSalesAmount(MarketplaceOrderSettlement $settlement): float
+    {
+        $status = strtoupper((string) ($settlement->order?->order_status ?? ''));
+        if (in_array($status, ['CANCELLED', 'CANCELED', 'BATAL', 'RETURNED', 'REFUND'], true)) {
+            return 0.0;
+        }
+
+        $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+        if ($this->isTikTokFinanceSettlement($settlement)) {
+            $transactions = data_get($raw, 'sku_transactions', []);
+            $breakdowns = [];
+            if (is_array($transactions)) {
+                foreach ($transactions as $transaction) {
+                    if (is_array($transaction) && is_array($transaction['revenue_breakdown'] ?? null)) {
+                        $breakdowns[] = $transaction['revenue_breakdown'];
+                    }
+                }
+            }
+
+            $topLevelBreakdown = data_get($raw, 'revenue_breakdown');
+            if (is_array($topLevelBreakdown)) {
+                $breakdowns[] = $topLevelBreakdown;
+            }
+
+            $gross = 0.0;
+            $hasFinanceGross = false;
+            foreach ($breakdowns as $breakdown) {
+                $subtotal = $breakdown['subtotal_before_discount_amount'] ?? null;
+                if ($subtotal !== null && $subtotal !== '' && is_numeric($subtotal)) {
+                    $gross += (float) $subtotal;
+                    $hasFinanceGross = true;
+                }
+
+                $refund = $breakdown['refund_subtotal_before_discount_amount'] ?? null;
+                if ($refund !== null && $refund !== '' && is_numeric($refund)) {
+                    $refund = (float) $refund;
+                    $gross += $refund <= 0 ? $refund : -$refund;
+                    $hasFinanceGross = true;
+                }
+            }
+
+            if ($hasFinanceGross) {
+                return max(round($gross, 2), 0.0);
+            }
+        }
+
+        $sellerDiscount = (float) data_get($raw, 'seller_discount', 0);
+
+        return (float) ($settlement->order?->subtotal_items ?? $settlement->buyer_payment_amount) - $sellerDiscount;
+    }
+
+    private function settlementTikTokNetSalesAmount(MarketplaceOrderSettlement $settlement): ?float
+    {
+        if (! $this->isTikTokFinanceSettlement($settlement)) {
+            return null;
+        }
+
+        $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+        $value = data_get($raw, 'revenue_amount');
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return null;
+        }
+
+        return round((float) $value, 2);
+    }
+
+    private function settlementGrossSalesSource(MarketplaceOrderSettlement $settlement): string
+    {
+        if ($this->isTikTokFinanceSettlement($settlement)) {
+            $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+            $transactions = data_get($raw, 'sku_transactions', []);
+            $hasBreakdown = is_array($transactions) && collect($transactions)->contains(
+                static fn (mixed $transaction): bool => is_array($transaction)
+                    && is_array($transaction['revenue_breakdown'] ?? null)
+                    && (array_key_exists('subtotal_before_discount_amount', $transaction['revenue_breakdown'])
+                        || array_key_exists('refund_subtotal_before_discount_amount', $transaction['revenue_breakdown'])),
+            );
+
+            if ($hasBreakdown || is_array(data_get($raw, 'revenue_breakdown'))) {
+                return 'tiktok_finance';
+            }
+        }
+
+        return $settlement->order?->subtotal_items !== null ? 'order_subtotal' : 'buyer_payment';
     }
 
     /**
@@ -4976,8 +5067,7 @@ class MarketplaceController extends Controller
 
         $finalIncome = (float) $s->final_income;
         if (! $s->settlement_time && $finalIncome <= 0) {
-            $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
-            $grossAmount = (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount) - $sellerDiscount;
+            $grossAmount = $this->settlementGrossSalesAmount($s);
             $voucherToko = $this->settlementVoucherTokoAmount($s);
             $grossAfterVoucherToko = max($grossAmount - $voucherToko, 0);
             $affiliate = (float) (

@@ -1318,6 +1318,67 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertFalse($row['is_finance_final']);
     }
 
+    public function test_tiktok_gross_sales_berasal_dari_revenue_breakdown_dan_refund_mengurangi_gross(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'TTK-GROSS-'.rand(1000, 9999),
+            'name' => 'TikTok Gross Sales Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'TT-GROSS-001',
+            'channel_order_id' => 'TT-GROSS-001',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 99999,
+            'total_paid_customer' => 99999,
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 99999,
+            'final_income' => 85000,
+            'settlement_time' => now(),
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_statement_transactions',
+                'revenue_amount' => '85000',
+                'sku_transactions' => [
+                    [
+                        'revenue_breakdown' => [
+                            'subtotal_before_discount_amount' => '100000',
+                            'refund_subtotal_before_discount_amount' => '-10000',
+                        ],
+                    ],
+                    [
+                        'revenue_breakdown' => [
+                            'subtotal_before_discount_amount' => '20000',
+                            'refund_subtotal_before_discount_amount' => '0',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            ['store_id' => $store->id, 'page' => 1, 'per_page' => 50],
+        ))->getData(true);
+        $row = $payload['paginator']['data'][0] ?? [];
+
+        $this->assertSame(110000.0, (float) ($row['gross_amount'] ?? -1));
+        $this->assertSame(85000.0, (float) ($row['net_sales_amount'] ?? -1));
+        $this->assertSame('tiktok_finance', $row['gross_sales_source'] ?? null);
+        $this->assertSame(110000.0, (float) ($payload['meta']['kpi_gross'] ?? -1));
+    }
+
     public function test_settlements_endpoint_mengembalikan_rincian_potongan_dinamis()
     {
         $admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADM-BREAKDOWN']);
