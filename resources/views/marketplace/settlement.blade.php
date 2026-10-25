@@ -2522,6 +2522,9 @@
                                     html += renderFeeLine('Biaya Asuransi Pengiriman', s.shipping_insurance_fee, true);
                                     html += renderFeeLine('Pajak (Escrow)', s.escrow_tax);
                                 }
+                                if (isTikTokFinance) {
+                                    html += renderFeeLine('Dibayar penjual', s.shipping_cost_amount);
+                                }
                                 html += sectionLabel('Biaya Iklan');
                                 html += renderFeeLine('Biaya Iklan', s.ad_cost);
                                 return html || '<li><span style="color:var(--shp-muted)">Tidak ada potongan</span></li>';

@@ -638,7 +638,8 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('Subsidi')
             ->assertSee('Pembeli')
             ->assertSee('Platform')
-            ->assertSee('Selisih Ongkir');
+            ->assertSee('Selisih Ongkir')
+            ->assertSee('Dibayar penjual');
     }
 
     public function test_detail_order_menampilkan_estimasi_bila_income_belum_ada()
