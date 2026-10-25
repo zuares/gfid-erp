@@ -2310,6 +2310,7 @@
                 const tiktokBuyerShipping = Number(s.shipping_fee_customer ?? s.order?.shipping_fee_customer ?? 0);
                 const tiktokPlatformShipping = Number(s.shipping_fee_discount_amount ?? s.shipping_fee_subsidy ?? 0);
                 const tiktokShippingDifference = tiktokShippingCost - tiktokBuyerShipping - tiktokPlatformShipping;
+                const buyerShipping = isTikTokFinance ? tiktokBuyerShipping : Number(s.order?.shipping_fee_customer ?? 0);
                 const estimateSource = String(s.income_estimation_source || '');
                 const estimateSourceLabel = estimateSource === 'payout'
                     ? 'PAYOUT AKTUAL'
@@ -2547,15 +2548,14 @@
                                 <div class="settlement-breakdown-title">Logistik</div>
                                 <ul class="fee-list">
                                     <li><span>Biaya ongkir</span> <span class="fee-val">${isTikTokFinance ? (tiktokShippingCost ? '−'+fmtRp(tiktokShippingCost) : '-') : (s.actual_shipping_fee ? '−'+fmtRp(s.actual_shipping_fee) : '-')}</span></li>
-                                    ${isTikTokFinance ? `<li><span>Pembeli</span> <span class="buyer-val">${tiktokBuyerShipping ? '+'+fmtRp(tiktokBuyerShipping) : '-'}</span></li>` : ''}
-                                    <li><span>${isTikTokFinance ? 'Platform' : 'Subsidi'}</span> <span class="subsidy-val">${isTikTokFinance ? (tiktokPlatformShipping ? '+'+fmtRp(tiktokPlatformShipping) : '-') : (s.shipping_fee_subsidy ? '+'+fmtRp(s.shipping_fee_subsidy) : '-')}</span></li>
+                                    <li><span>Pembeli</span> <span class="buyer-val">${buyerShipping ? '+'+fmtRp(buyerShipping) : '-'}</span></li>
+                                    <li><span>Platform</span> <span class="subsidy-val">${isTikTokFinance ? (tiktokPlatformShipping ? '+'+fmtRp(tiktokPlatformShipping) : '-') : (s.shipping_fee_subsidy ? '+'+fmtRp(s.shipping_fee_subsidy) : '-')}</span></li>
                                     ${isTikTokFinance ? `<li><span>Selisih Ongkir</span> <span class="fee-val">${tiktokShippingDifference ? (tiktokShippingDifference > 0 ? '−' : '+')+fmtRp(Math.abs(tiktokShippingDifference)) : '-'}</span></li>` : ''}
                                 </ul>
                             </div>
                             <div class="settlement-breakdown-block">
                                 <div class="settlement-breakdown-title">Penyesuaian</div>
                                 <ul class="fee-list">
-                                    ${!isTikTokFinance ? `<li><span>Pembeli</span> <span class="buyer-val">${Number(s.order?.shipping_fee_customer ?? 0) ? '+'+fmtRp(s.order.shipping_fee_customer) : '-'}</span></li>` : ''}
                                     <li><span>Ongkir balik</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
                                     <li><span>DRC refund</span> <span class="drc-val">${s.drc_adjustable_refund ? (s.drc_adjustable_refund > 0 ? '+' : '') + fmtRp(s.drc_adjustable_refund) : '-'}</span></li>
                                 </ul>

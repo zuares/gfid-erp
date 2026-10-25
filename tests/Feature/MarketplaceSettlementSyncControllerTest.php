@@ -635,7 +635,6 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('Rincian tersedia setelah settlement.')
             ->assertSee('Biaya ongkir')
             ->assertSee('Ongkir balik')
-            ->assertSee('Subsidi')
             ->assertSee('Pembeli')
             ->assertSee('Platform')
             ->assertSee('Selisih Ongkir')
