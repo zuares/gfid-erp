@@ -4046,6 +4046,7 @@ class MarketplaceController extends Controller
             $sellerDiscount = (float) data_get($s->raw_json, 'seller_discount', 0);
             $grossAmount = $this->settlementGrossSalesAmount($s);
             $netSalesAmount = $this->settlementTikTokNetSalesAmount($s);
+            $tiktokVoucherDiscounts = $this->settlementTikTokVoucherDiscounts($s);
             $buyerPaidAmount = $this->settlementBuyerPaidAmount($s);
             $voucherPlatformAmount = $this->settlementVoucherPlatformAmount($s);
             $voucherExternalAmount = $this->settlementVoucherExternalAmount($s);
@@ -4139,6 +4140,8 @@ class MarketplaceController extends Controller
                 'gross_amount' => $grossAmount,
                 'gross_sales_source' => $this->settlementGrossSalesSource($s),
                 'net_sales_amount' => $netSalesAmount,
+                'tiktok_seller_discount_amount' => $tiktokVoucherDiscounts['seller'],
+                'tiktok_platform_discount_amount' => $tiktokVoucherDiscounts['platform'],
                 'buyer_paid_amount' => $buyerPaidAmount,
                 'commission_fee' => (float) $s->commission_fee,
                 'service_fee' => (float) $s->service_fee,
@@ -4612,6 +4615,65 @@ class MarketplaceController extends Controller
         }
 
         return round((float) $value, 2);
+    }
+
+    /**
+     * TikTok menaruh diskon produk di dua komponen Finance yang berbeda:
+     * seller_discount_amount pada revenue_breakdown dan platform_discount_amount
+     * pada supplementary_component. Nilai refund diskon dikurangkan agar yang
+     * tampil adalah diskon bersih untuk order tersebut.
+     *
+     * @return array{seller:float,platform:float}
+     */
+    private function settlementTikTokVoucherDiscounts(MarketplaceOrderSettlement $settlement): array
+    {
+        if (! $this->isTikTokFinanceSettlement($settlement)) {
+            return ['seller' => 0.0, 'platform' => 0.0];
+        }
+
+        $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+        $transactions = data_get($raw, 'sku_transactions', []);
+        $transactions = is_array($transactions) ? array_values(array_filter($transactions, 'is_array')) : [];
+        $sources = $transactions !== [] ? $transactions : [$raw];
+        $sellerDiscount = 0.0;
+        $sellerDiscountRefund = 0.0;
+        $platformDiscount = 0.0;
+        $platformDiscountRefund = 0.0;
+
+        foreach ($sources as $source) {
+            $revenueBreakdown = is_array($source['revenue_breakdown'] ?? null)
+                ? $source['revenue_breakdown']
+                : [];
+            $supplementary = is_array($source['supplementary_component'] ?? null)
+                ? $source['supplementary_component']
+                : [];
+
+            $sellerDiscount += $this->settlementSignedAbsAmount($revenueBreakdown['seller_discount_amount'] ?? null);
+            $sellerDiscountRefund += $this->settlementSignedAbsAmount($revenueBreakdown['seller_discount_refund_amount'] ?? null);
+            $platformDiscount += $this->settlementSignedAbsAmount($supplementary['platform_discount_amount'] ?? null);
+            $platformDiscountRefund += $this->settlementSignedAbsAmount($supplementary['platform_discount_refund_amount'] ?? null);
+        }
+
+        if ($transactions === []) {
+            $sellerDiscount += $this->settlementSignedAbsAmount(data_get($raw, 'seller_discount_amount'));
+            $sellerDiscountRefund += $this->settlementSignedAbsAmount(data_get($raw, 'seller_discount_refund_amount'));
+            $platformDiscount += $this->settlementSignedAbsAmount(data_get($raw, 'platform_discount_amount'));
+            $platformDiscountRefund += $this->settlementSignedAbsAmount(data_get($raw, 'platform_discount_refund_amount'));
+        }
+
+        return [
+            'seller' => max(round($sellerDiscount - $sellerDiscountRefund, 2), 0.0),
+            'platform' => max(round($platformDiscount - $platformDiscountRefund, 2), 0.0),
+        ];
+    }
+
+    private function settlementSignedAbsAmount(mixed $value): float
+    {
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return 0.0;
+        }
+
+        return abs((float) $value);
     }
 
     private function settlementGrossSalesSource(MarketplaceOrderSettlement $settlement): string

@@ -1353,7 +1353,11 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
                     [
                         'revenue_breakdown' => [
                             'subtotal_before_discount_amount' => '100000',
+                            'seller_discount_amount' => '-17628',
                             'refund_subtotal_before_discount_amount' => '-10000',
+                        ],
+                        'supplementary_component' => [
+                            'platform_discount_amount' => '14506',
                         ],
                     ],
                     [
@@ -1376,6 +1380,8 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertSame(110000.0, (float) ($row['gross_amount'] ?? -1));
         $this->assertSame(85000.0, (float) ($row['net_sales_amount'] ?? -1));
         $this->assertSame('tiktok_finance', $row['gross_sales_source'] ?? null);
+        $this->assertSame(17628.0, (float) ($row['tiktok_seller_discount_amount'] ?? -1));
+        $this->assertSame(14506.0, (float) ($row['tiktok_platform_discount_amount'] ?? -1));
         $this->assertSame(110000.0, (float) ($payload['meta']['kpi_gross'] ?? -1));
     }
 

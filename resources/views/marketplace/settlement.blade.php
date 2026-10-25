@@ -2310,6 +2310,8 @@
                 const tiktokBuyerShipping = Number(s.shipping_fee_customer ?? s.order?.shipping_fee_customer ?? 0);
                 const tiktokPlatformShipping = Number(s.shipping_fee_discount_amount ?? s.shipping_fee_subsidy ?? 0);
                 const tiktokShippingDifference = tiktokShippingCost - tiktokBuyerShipping - tiktokPlatformShipping;
+                const tiktokSellerDiscount = Number(s.tiktok_seller_discount_amount || 0);
+                const tiktokPlatformDiscount = Number(s.tiktok_platform_discount_amount || 0);
                 const buyerShipping = isTikTokFinance ? tiktokBuyerShipping : Number(s.order?.shipping_fee_customer ?? 0);
                 const estimateSource = String(s.income_estimation_source || '');
                 const estimateSourceLabel = estimateSource === 'payout'
@@ -2610,6 +2612,9 @@
                             <div class="settlement-breakdown-block">
                                 <div class="settlement-breakdown-title">Promosi</div>
                                 <ul class="fee-list">
+                                    ${isTikTokFinance ? `
+                                    <li><span>Diskon produk dari penjual</span> <span class="fee-val">${tiktokSellerDiscount ? '−'+fmtRp(tiktokSellerDiscount) : '-'}</span></li>
+                                    <li><span>Diskon produk dari platform</span> <span class="fee-val">${tiktokPlatformDiscount ? '−'+fmtRp(tiktokPlatformDiscount) : '-'}</span></li>` : ''}
                                     <li><span>Voucher</span> <span class="fee-val">${s.seller_voucher ? '−'+fmtRp(s.seller_voucher) : '-'}</span></li>
                                     <li><span>Koin CB</span> <span class="fee-val">${s.seller_coin_cash_back ? '−'+fmtRp(s.seller_coin_cash_back) : '-'}</span></li>
                                 </ul>
