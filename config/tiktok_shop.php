@@ -16,6 +16,10 @@ return [
     'rate_limit_max_attempts' => (int) env('TIKTOK_RATE_LIMIT_MAX_ATTEMPTS', 3),
     'rate_limit_backoff_seconds' => (int) env('TIKTOK_RATE_LIMIT_BACKOFF_SECONDS', 1),
     'rate_limit_max_sleep_seconds' => (int) env('TIKTOK_RATE_LIMIT_MAX_SLEEP_SECONDS', 4),
+    // Statement payment can arrive after the order date window. Keep this
+    // wider than the scheduled order scan so older payouts are still
+    // reconciled without pulling every historical order each run.
+    'finance_statement_lookback_days' => (int) env('TIKTOK_FINANCE_STATEMENT_LOOKBACK_DAYS', 7),
     'logistics' => [
         // TikTok needs package attributes before it can return eligible
         // shipping services. These are fallbacks only; values from the

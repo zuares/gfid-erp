@@ -167,7 +167,10 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-finance', [
 ]))
     ->everyFifteenMinutes()
     ->name('sync-recent-tiktok-finance')
-    ->withoutOverlapping(20);
+    // The finance command has a 45-minute runtime guard. Keep the scheduler
+    // mutex alive longer than that guard so a slow statement scan cannot be
+    // started again while the previous run is still finishing.
+    ->withoutOverlapping(60);
 
 // Refresh audit kualitas setelah finance sync selesai. Perintah ini hanya
 // membaca settlement/item lokal dan memperbarui status kualitas; tidak memanggil

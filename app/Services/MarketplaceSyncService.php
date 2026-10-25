@@ -2288,6 +2288,7 @@ class MarketplaceSyncService
         bool $missingOnly = false,
         ?callable $progress = null,
         int $limit = 200,
+        ?int $statementTimeFrom = null,
     ): array {
         $limit = max(1, min($limit, 1000));
         $totals = [
@@ -2320,8 +2321,9 @@ class MarketplaceSyncService
             // The UI range is primarily an order range. A completed order can
             // enter a statement after that range, so scan statements through
             // today and match them back to local order IDs.
+            $statementScanFrom = $statementTimeFrom ?? $timeFrom;
             $statementTimeTo = max($timeTo, now()->timestamp);
-            $statementBatch = $this->syncTikTokStatementSettlements($store, $timeFrom, $statementTimeTo);
+            $statementBatch = $this->syncTikTokStatementSettlements($store, $statementScanFrom, $statementTimeTo);
             $totals['statement_settlements_synced'] = (int) ($statementBatch['synced'] ?? 0);
             $totals['statement_settlement_errors'] = (int) ($statementBatch['errors'] ?? 0);
             $totals['statement_ad_costs_updated'] = (int) ($statementBatch['ad_costs_updated'] ?? 0);

@@ -481,7 +481,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
                         'id' => 'STATEMENT-BATCH-1',
                         'payment_id' => 'PAYMENT-BATCH-1',
                         'payment_status' => 'SETTLED',
-                        'statement_time' => now()->timestamp,
+                        'statement_time' => now()->subDays(5)->timestamp,
                         'payment_time' => $paymentTime,
                     ]],
                     'next_page_token' => '',
@@ -523,6 +523,7 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
             false,
             null,
             200,
+            now()->subDays(7)->timestamp,
         );
 
         $this->assertSame(1, $result['statement_settlements_synced']);

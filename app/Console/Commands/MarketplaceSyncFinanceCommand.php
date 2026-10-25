@@ -292,6 +292,8 @@ class MarketplaceSyncFinanceCommand extends Command
                     'date_from' => date('Y-m-d', $targetDate),
                     'date_to' => date('Y-m-d', $syncEndTimestamp),
                 ];
+                $statementLookbackDays = max(0, (int) config('tiktok_shop.finance_statement_lookback_days', 7));
+                $statementTimeFrom = max(0, $targetDate - ($statementLookbackDays * 86400));
                 $tiktokResult = $syncService->syncTikTokFinanceBatched(
                     $store,
                     $targetDate,
@@ -305,6 +307,7 @@ class MarketplaceSyncFinanceCommand extends Command
                         ], $syncContext), 1800);
                     },
                     self::SETTLEMENT_BATCH_LIMIT,
+                    $statementTimeFrom,
                 );
                 $storeFinanceSummary = $tiktokResult;
 
