@@ -4053,6 +4053,7 @@ class MarketplaceController extends Controller
             $escrowAmount = $this->settlementEscrowAmount($s);
             $orderSellingPrice = $this->settlementOrderSellingPrice($s);
             $voucherAmount = $voucherTokoAmount + $voucherPlatformAmount;
+            $shippingAmounts = $this->settlementShippingAmounts($s);
             $grossAfterVoucherTotal = max($grossAmount - $voucherAmount, 0);
             $grossAfterVoucherToko = max($grossAmount - $voucherTokoAmount, 0);
             $affiliateDisplay = (float) (
@@ -4145,6 +4146,8 @@ class MarketplaceController extends Controller
                 'seller_coin_cash_back' => (float) $s->seller_coin_cash_back,
                 'actual_shipping_fee' => (float) $s->actual_shipping_fee,
                 'shipping_fee_subsidy' => (float) $s->shipping_fee_subsidy,
+                'buyer_paid_shipping_fee' => $shippingAmounts['buyer_paid_shipping_fee'],
+                'platform_paid_shipping_fee' => $shippingAmounts['platform_paid_shipping_fee'],
                 'reverse_shipping_fee' => (float) $s->reverse_shipping_fee,
                 'premi' => (float) (data_get($s->raw_json, 'premi') ?? data_get($s->raw_json, 'shipping_insurance') ?? data_get($s->raw_json, 'insurance_fee') ?? 0),
                 'seller_transaction_fee' => (float) (data_get($s->raw_json, 'seller_transaction_fee') ?? data_get($s->raw_json, 'transaction_fee') ?? 0),
@@ -4565,6 +4568,91 @@ class MarketplaceController extends Controller
         $normalized = str_replace(',', '', $normalized);
 
         return abs((float) $normalized);
+    }
+
+    /**
+     * Normalize the two shipping payer amounts used by the settlement UI.
+     * TikTok can provide them inside each sku transaction, while Shopee and
+     * older rows commonly expose them as top-level settlement fields.
+     *
+     * These amounts are display-only and intentionally remain outside the
+     * seller fee totals calculated by MarketplaceOrderSettlement.
+     *
+     * @return array{buyer_paid_shipping_fee: float, platform_paid_shipping_fee: float}
+     */
+    private function settlementShippingAmounts(MarketplaceOrderSettlement $s): array
+    {
+        $raw = is_array($s->raw_json) ? $s->raw_json : [];
+        $sources = [$raw];
+        $skuTransactions = data_get($raw, 'sku_transactions', []);
+
+        if (is_array($skuTransactions)) {
+            foreach ($skuTransactions as $transaction) {
+                if (is_array($transaction)) {
+                    $sources[] = $transaction;
+                }
+            }
+        }
+
+        $firstAmount = function (array $keys) use ($sources): ?float {
+            foreach ($sources as $source) {
+                foreach ($keys as $key) {
+                    $value = data_get($source, $key);
+                    if ($value === null || $value === '' || ! is_scalar($value)) {
+                        continue;
+                    }
+
+                    return $this->settlementFeeAmount($value);
+                }
+            }
+
+            return null;
+        };
+
+        $buyerPaidShipping = $firstAmount([
+            'buyer_paid_shipping_fee',
+            'customer_paid_shipping_fee_amount',
+            'customer_paid_shipping_fee',
+            'shipping_cost_breakdown.customer_paid_shipping_fee_amount',
+            'shipping_cost_breakdown.customer_paid_shipping_fee',
+            'shipping_fee_after_discount',
+            'promotion_breakdown.shipping_fee_after_discount',
+            'actual_shipping_fee',
+            'estimated_shipping_fee',
+        ]);
+
+        if ($buyerPaidShipping === null) {
+            $orderShipping = (float) ($s->order?->shipping_fee_customer ?? 0);
+            $buyerPaidShipping = $orderShipping > 0
+                ? $orderShipping
+                : (float) $s->actual_shipping_fee;
+        }
+
+        $platformPaidShipping = $firstAmount([
+            'shipping_fee_platform_discount',
+            'shipping_discount_platform',
+            'shipping_fee_subsidy',
+            'shopee_shipping_rebate',
+            'shipping_fee_rebate',
+            'tiktok_shop_shipping_incentive_amount',
+            'shipping_cost_breakdown.shipping_fee_platform_discount_amount',
+            'shipping_cost_breakdown.shipping_fee_discount_amount',
+            'shipping_cost_breakdown.tiktok_shop_shipping_incentive_amount',
+            'promotion_breakdown.shipping_discount_platform',
+            'promotion_breakdown.shipping_fee_platform_discount',
+        ]);
+
+        if ($platformPaidShipping === null) {
+            $orderPlatformShipping = (float) ($s->order?->shipping_discount_platform ?? 0);
+            $platformPaidShipping = $orderPlatformShipping > 0
+                ? $orderPlatformShipping
+                : (float) $s->shipping_fee_subsidy;
+        }
+
+        return [
+            'buyer_paid_shipping_fee' => max(0.0, $buyerPaidShipping),
+            'platform_paid_shipping_fee' => max(0.0, $platformPaidShipping),
+        ];
     }
 
     private function settlementVoucherPlatformAmount(MarketplaceOrderSettlement $s): float
