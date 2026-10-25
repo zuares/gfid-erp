@@ -586,6 +586,7 @@
         .settlement-ledger-table .fee-list li > span:first-child{ min-width:0; flex:1 1 auto; overflow-wrap:anywhere; }
         .settlement-ledger-table .fee-list .fee-val,
         .settlement-ledger-table .fee-list .subsidy-val,
+        .settlement-ledger-table .fee-list .buyer-val,
         .settlement-ledger-table .fee-list .drc-val{ flex:0 0 auto; white-space:nowrap; text-align:right; }
         .settlement-pending-note{ padding:.5rem .6rem; border:1px dashed rgba(217,119,6,.38); border-radius:9px; background:rgba(245,158,11,.07); color:#92400e; font-size:.68rem; line-height:1.35; }
         .settlement-pagination{ display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.7rem .9rem; border-top:1px solid var(--shp-border); color:var(--shp-muted); font-size:.72rem; }
@@ -2538,9 +2539,10 @@
                             <div class="settlement-breakdown-block">
                                 <div class="settlement-breakdown-title">Logistik</div>
                                 <ul class="fee-list">
-                                    <li><span>Ongkir aktual</span> <span class="fee-val">${s.actual_shipping_fee ? '−'+fmtRp(s.actual_shipping_fee) : '-'}</span></li>
+                                    <li><span>Biaya ongkir</span> <span class="fee-val">${s.actual_shipping_fee_amount ? '−'+fmtRp(s.actual_shipping_fee_amount) : '-'}</span></li>
+                                    <li><span>Dibayar platform</span> <span class="subsidy-val">${s.shipping_fee_discount_amount ? '+'+fmtRp(s.shipping_fee_discount_amount) : '-'}</span></li>
+                                    <li><span>Dibayar pembeli</span> <span class="buyer-val">${s.shipping_fee_customer ? fmtRp(s.shipping_fee_customer) : '-'}</span></li>
                                     <li><span>Ongkir balik</span> <span class="fee-val">${s.reverse_shipping_fee ? '−'+fmtRp(s.reverse_shipping_fee) : '-'}</span></li>
-                                    <li><span>Subsidi</span> <span class="subsidy-val">${s.shipping_fee_subsidy ? '+'+fmtRp(s.shipping_fee_subsidy) : '-'}</span></li>
                                 </ul>
                             </div>
                             <div class="settlement-breakdown-block">
