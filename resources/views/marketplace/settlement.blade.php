@@ -2435,6 +2435,9 @@
                                 const tiktokFeeGroup = (key, type) => {
                                     const normalized = String(key || '').toLowerCase();
                                     if (type === 'tax') return 'program';
+                                    if (/(affiliate_commission|affiliate_partner|tsp_commission)/.test(normalized)) {
+                                        return 'affiliate';
+                                    }
                                     if (/(platform_commission|referral_fee|refund_administration|transaction_fee|credit_card_handling|infrastructure|dynamic_commission)/.test(normalized)) {
                                         return 'administration';
                                     }
@@ -2500,6 +2503,7 @@
                                         const tiktokFeeGroups = {
                                             administration: [],
                                             service: [],
+                                            affiliate: [],
                                             program: [],
                                         };
                                         if (!hasTikTokBreakdown) {
@@ -2526,6 +2530,7 @@
                                         }
                                         html += renderTikTokGroup('Biaya Administrasi', tiktokFeeGroups.administration);
                                         html += renderTikTokGroup('Biaya Layanan', tiktokFeeGroups.service);
+                                        html += renderTikTokGroup('Komisi Affiliate', tiktokFeeGroups.affiliate);
                                         html += renderTikTokGroup('Biaya Program & Lainnya', tiktokFeeGroups.program);
                                     } else {
                                         html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
