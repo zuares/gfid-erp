@@ -444,6 +444,23 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
             'total_amount' => 100000,
             'currency' => 'IDR',
         ]);
+        // A per-order response can already be data-complete while the
+        // statement payment timestamp is still missing. The statement sync
+        // must still count this as a newly finalized payout.
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'final_income' => 94000,
+            'settlement_time' => null,
+            'synced_at' => now()->subHours(2),
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'order_id' => $order->channel_order_id,
+                'sku_transactions' => [['statement_id' => 'STATEMENT-BATCH-1']],
+            ],
+        ]);
 
         Http::fake([
             'https://open-api.tiktokglobalshop.com/finance/202507/orders/unsettled*' => Http::response([
@@ -462,6 +479,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
                 'data' => [
                     'statements' => [[
                         'id' => 'STATEMENT-BATCH-1',
+                        'payment_id' => 'PAYMENT-BATCH-1',
+                        'payment_status' => 'SETTLED',
                         'statement_time' => now()->timestamp,
                         'payment_time' => $paymentTime,
                     ]],
@@ -518,6 +537,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
         $this->assertSame('STATEMENT-BATCH-1', data_get($settlement->raw_json, 'tiktok_statement.statement_id'));
         $this->assertSame('TX-ORDER-BATCH-1', data_get($settlement->raw_json, 'tiktok_statement.statement_transaction_id'));
+        $this->assertSame('PAYMENT-BATCH-1', data_get($settlement->raw_json, 'tiktok_statement.payment_id'));
+        $this->assertSame('SETTLED', data_get($settlement->raw_json, 'tiktok_statement.payment_status'));
         $this->assertSame(
             Carbon::createFromTimestamp($paymentTime, config('app.timezone'))->toDateTimeString(),
             $settlement->settlement_time?->toDateTimeString(),
@@ -603,6 +624,84 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.payment_time'));
         $this->assertTrue((bool) data_get($settlement->raw_json, 'tiktok_settlement_backfill'));
         $this->assertTrue((bool) data_get($settlement->data_quality_flags, 'settlement_time_backfilled'));
+    }
+
+    public function test_backfill_fills_missing_statement_time_for_complete_per_order_row(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-BACKFILL-MISSING-DATE',
+            'name' => 'TikTok Missing Date Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-BACKFILL-MISSING-DATE-1',
+            'external_order_id' => 'TT-ORDER-BACKFILL-MISSING-DATE-1',
+            'order_status' => 'TO_CONFIRM_RECEIVE',
+            'ordered_at' => now()->subDays(2),
+            'order_date' => now()->subDays(2),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'final_income' => 76534,
+            'settlement_time' => null,
+            'synced_at' => now()->subHour(),
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'order_id' => $order->channel_order_id,
+                'sku_transactions' => [['statement_id' => 'STATEMENT-MISSING-DATE-1']],
+            ],
+        ]);
+        $paymentTime = Carbon::create(2026, 10, 25, 8, 36, 47, config('app.timezone'))->timestamp;
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'statements' => [[
+                        'id' => 'STATEMENT-MISSING-DATE-1',
+                        'statement_time' => $paymentTime - 3600,
+                        'payment_time' => $paymentTime,
+                        'payment_status' => 'SETTLED',
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ]),
+        ]);
+
+        $stats = app(MarketplaceSyncService::class)->backfillTikTokSettlementTimes(
+            $store,
+            Carbon::create(2026, 10, 25, 0, 0, 0, config('app.timezone')),
+            Carbon::create(2026, 10, 26, 23, 59, 59, config('app.timezone')),
+            true,
+        );
+
+        $this->assertSame(1, $stats['candidates']);
+        $this->assertSame(1, $stats['matched']);
+        $this->assertSame(1, $stats['updated']);
+
+        $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('2026-10-25 08:36:47', $settlement->settlement_time?->toDateTimeString());
+        $this->assertSame('SETTLED', data_get($settlement->raw_json, 'tiktok_statement.payment_status'));
+        $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.payment_time'));
     }
 
     public function test_statement_transactions_supply_gmv_max_cost_from_settlement(): void

@@ -1156,7 +1156,15 @@ class MarketplaceSyncService
             'tiktok_shipping_breakdown' => $shippingAmounts,
             'sku_transactions' => $skuTransactions,
         ]);
-        foreach (['statement_id', 'statement_transaction_id', 'statement_time', 'payment_time', 'paid_time'] as $key) {
+        foreach ([
+            'statement_id',
+            'statement_transaction_id',
+            'payment_id',
+            'payment_status',
+            'statement_time',
+            'payment_time',
+            'paid_time',
+        ] as $key) {
             if (array_key_exists($key, $data)) {
                 $raw['tiktok_statement'][$key] = $data[$key];
             }
@@ -1357,8 +1365,14 @@ class MarketplaceSyncService
         $settlements = MarketplaceOrderSettlement::query()
             ->where('store_id', $store->id)
             ->where('data_status', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
-            ->whereNotNull('settlement_time')
-            ->whereColumn('settlement_time', 'synced_at')
+            ->where(function ($query): void {
+                // Include rows that have complete per-order finance data but
+                // never received the authoritative statement payment time.
+                // These rows are pending payout metadata, not incomplete
+                // financial amounts, and must be eligible for backfill.
+                $query->whereNull('settlement_time')
+                    ->orWhereColumn('settlement_time', 'synced_at');
+            })
             ->orderBy('id')
             ->limit(max(1, $limit))
             ->get();
@@ -1492,6 +1506,7 @@ class MarketplaceSyncService
                 is_array($raw['tiktok_statement'] ?? null) ? $raw['tiktok_statement'] : [],
                 array_filter([
                     'statement_id' => $statement['id'] ?? $statement['statement_id'] ?? $statementId,
+                    'payment_id' => $statement['payment_id'] ?? null,
                     'statement_time' => $statement['statement_time'] ?? null,
                     'payment_time' => $statement['payment_time'] ?? null,
                     'payment_status' => $statement['payment_status'] ?? $statement['status'] ?? null,
@@ -1827,6 +1842,10 @@ class MarketplaceSyncService
                                 'order_id' => $orderId,
                                 'statement_id' => $statementId,
                                 'statement_transaction_id' => $transaction['id'] ?? null,
+                                'payment_id' => $statement['payment_id'] ?? null,
+                                'payment_status' => $statement['payment_status']
+                                    ?? $statement['status']
+                                    ?? null,
                                 'payment_time' => $statement['payment_time']
                                     ?? $statement['paid_time']
                                     ?? $transactionData['payment_time']
@@ -1838,8 +1857,12 @@ class MarketplaceSyncService
                                     ?? null,
                                 '_is_statement_transaction' => true,
                             ]);
-                            $wasFinal = (bool) ($order->settlement?->settlement_time)
-                                || $order->settlement?->data_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE;
+                            // A complete finance payload is not necessarily a
+                            // confirmed payout date. The per-order endpoint
+                            // can provide SKU statement data without the
+                            // statement payment timestamp, so only a populated
+                            // settlement_time means this row was already final.
+                            $wasFinal = (bool) $order->settlement?->settlement_time;
                             $previousAdCost = round((float) ($order->settlement?->ad_cost ?? 0), 2);
                             $result = $this->persistTikTokFinancePayload(
                                 $store,
@@ -1938,11 +1961,23 @@ class MarketplaceSyncService
             ->when($fromDate !== null, fn ($query) => $query->whereRaw("{$orderDateExpression} >= ?", [$fromDate]))
             ->when($toDate !== null, fn ($query) => $query->whereRaw("{$orderDateExpression} <= ?", [$toDate]))
             ->when($missingOnly, function ($query): void {
-                $query->where(function ($nested): void {
+                $pendingRefreshAt = now()->subMinutes(self::PENDING_SETTLEMENT_REFRESH_COOLDOWN_MINUTES);
+
+                $query->where(function ($nested) use ($pendingRefreshAt): void {
                     $nested->whereDoesntHave('settlement')
-                        ->orWhereHas('settlement', function ($settlement): void {
-                            $settlement->where('data_status', '!=', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
-                                ->orWhereNull('data_status');
+                        ->orWhereHas('settlement', function ($settlement) use ($pendingRefreshAt): void {
+                            $settlement->where(function ($pending): void {
+                                $pending->where('data_status', '!=', MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE)
+                                    ->orWhereNull('data_status')
+                                    // TikTok may have complete SKU finance
+                                    // data before the statement payment time
+                                    // is available. Keep it eligible so the
+                                    // statement endpoint can fill the date.
+                                    ->orWhereNull('settlement_time');
+                            })->where(function ($cooldown) use ($pendingRefreshAt): void {
+                                $cooldown->whereNull('synced_at')
+                                    ->orWhere('synced_at', '<=', $pendingRefreshAt);
+                            });
                         });
                 });
             })
