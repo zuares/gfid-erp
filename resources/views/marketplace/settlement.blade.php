@@ -2458,10 +2458,6 @@
                                 const feeBase = Number(s.gross_after_voucher || 0);
                                 if (s.raw_json) {
                                     const r = s.raw_json;
-                                    const premi = r.premi ?? r.shipping_insurance ?? r.insurance_fee ?? s.premi ?? 0;
-                                    const shippingInsuranceFee = r.shipping_insurance_fee ?? r.shipping_insurance ?? r.insurance_fee ?? s.shipping_insurance_fee ?? 0;
-                                    const biayaAffiliate = r.biaya_affiliate ?? r.affiliate_fee ?? r.affiliate_commission_fee ?? s.biaya_affiliate ?? s.affiliate_fee ?? 0;
-                                    const affiliate = r.affiliate ?? r.affiliate_commission ?? r.affiliate_commission_amount ?? r.seller_affiliate_fee ?? s.affiliate ?? 0;
                                     const tiktokBreakdown = extractTikTokBreakdown(r);
                                     const tiktokFees = tiktokBreakdown.fees;
                                     const affiliateAmount = Number(tiktokFees.affiliate_commission_amount);
@@ -2498,16 +2494,6 @@
                                         html += renderFeeLine('Biaya Transaksi', r.seller_transaction_fee ?? r.transaction_fee ?? s.transaction_fee);
                                         html += renderFeeLine('Biaya Proses Pesanan', r.seller_order_processing_fee ?? s.seller_order_processing_fee);
                                         html += renderFeeLine('Biaya Komisi AMS', r.order_ams_commission_fee ?? r.ams_commission_fee ?? s.order_ams_commission_fee);
-
-                                        html += sectionLabel('Promo & Affiliate');
-                                        html += renderFeeLine('Premi', premi, true);
-                                        html += renderFeeLine('Biaya Kampanye', r.campaign_fee);
-                                        html += renderFeeLine('Biaya Affiliate', biayaAffiliate, true);
-                                        html += renderFeeLine('Affiliate', affiliate, true);
-
-                                        html += sectionLabel('Asuransi & Pajak');
-                                        html += renderFeeLine('Biaya Asuransi Pengiriman', shippingInsuranceFee, true);
-                                        html += renderFeeLine('Pajak (Escrow)', r.escrow_tax);
                                     }
                                 } else {
                                     html += renderFeeLine('Total Biaya Marketplace', feeTotal, true, feePercent);
@@ -2519,22 +2505,12 @@
                                     html += renderFeeLine('Biaya Transaksi', s.transaction_fee);
                                     html += renderFeeLine('Biaya Proses Pesanan', s.seller_order_processing_fee);
                                     html += renderFeeLine('Biaya Komisi AMS', s.order_ams_commission_fee ?? s.ams_commission_fee ?? s.activity_fee);
-
-                                    html += sectionLabel('Promo & Affiliate');
-                                    html += renderFeeLine('Premi', s.premi, true);
-                                    html += renderFeeLine('Biaya Kampanye', s.campaign_fee);
-                                    html += renderFeeLine('Biaya Affiliate', s.biaya_affiliate ?? s.affiliate_fee, true);
-                                    html += renderFeeLine('Affiliate', s.affiliate, true);
-
-                                    html += sectionLabel('Asuransi & Pajak');
-                                    html += renderFeeLine('Biaya Asuransi Pengiriman', s.shipping_insurance_fee, true);
-                                    html += renderFeeLine('Pajak (Escrow)', s.escrow_tax);
                                 }
                                 if (isTikTokFinance) {
                                     html += renderFeeLine('Biaya logistik', s.shipping_cost_amount);
+                                    html += sectionLabel('Biaya Iklan');
+                                    html += renderFeeLine('Biaya Iklan', s.ad_cost);
                                 }
-                                html += sectionLabel('Biaya Iklan');
-                                html += renderFeeLine('Biaya Iklan', s.ad_cost);
                                 return html || '<li><span style="color:var(--shp-muted)">Tidak ada potongan</span></li>';
                             })()}
                         </ul>
