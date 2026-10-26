@@ -649,19 +649,10 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             'store_id' => $store->id,
             'external_order_id' => 'ORDER-TODAY-001',
             'buyer_username' => 'repeat-buyer',
-            'order_status' => 'PROCESSED',
-            'status' => 'PROCESSED',
-            'order_date' => now(),
-            'ordered_at' => now(),
-        ]);
-        MarketplaceOrder::create([
-            'store_id' => $store->id,
-            'external_order_id' => 'ORDER-READY-TO-SHIP-001',
-            'buyer_username' => 'repeat-buyer',
             'order_status' => 'READY_TO_SHIP',
             'status' => 'READY_TO_SHIP',
-            'order_date' => now()->addMinute(),
-            'ordered_at' => now()->addMinute(),
+            'order_date' => now(),
+            'ordered_at' => now(),
         ]);
 
         MarketplaceOrderItem::create([
@@ -682,8 +673,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
         $this->actingAs($owner)
             ->get(route('sales.shipments.index'))
             ->assertOk()
-            ->assertSee('Repeat order pesanan')
-            ->assertDontSee('ORDER-READY-TO-SHIP-001')
+            ->assertSee('Repeat order pesanan hari ini')
             ->assertSee('Permintaan belum dikirim per item internal')
             ->assertSee('<details class="dpanel shipment-accordion">', false)
             ->assertSee('<summary class="dpanel-head">', false)

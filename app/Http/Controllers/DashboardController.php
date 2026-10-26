@@ -832,7 +832,7 @@ class DashboardController extends Controller
         }, []);
     }
 
-    /** Order terbaru dari pembeli repeat, kecuali yang masih READY_TO_SHIP. */
+    /** Order terbaru dari pembeli yang sudah pernah menyelesaikan order. */
     private function mpRepeatOrderList(int $limit): array
     {
         return (array) $this->safe(function () use ($limit) {
@@ -840,6 +840,7 @@ class DashboardController extends Controller
                 return [];
             }
 
+            $today = Carbon::today();
             $dateColumn = $this->mpDateCol();
             $buyerKey = "COALESCE(NULLIF(buyer_username, ''), NULLIF(buyer_name, ''))";
             $currentBuyerKey = "COALESCE(NULLIF(current.buyer_username, ''), NULLIF(current.buyer_name, ''))";
@@ -862,10 +863,11 @@ class DashboardController extends Controller
                     $join->on('repeat_history.store_id', '=', 'current.store_id')
                         ->on('repeat_history.buyer_key', '=', DB::raw($currentBuyerKey));
                 })
-                ->whereRaw("UPPER(COALESCE(NULLIF(current.order_status, ''), current.status, '')) <> 'READY_TO_SHIP'")
+                ->whereIn('current.order_status', self::DASHBOARD_PENDING_ORDER_STATUSES)
                 ->whereNull('current.cancelled_at')
                 ->whereRaw("UPPER(COALESCE(current.status, '')) NOT IN ('CANCELLED', 'CANCELED')")
                 ->whereRaw("UPPER(COALESCE(current.order_status, '')) NOT IN ('CANCELLED', 'IN_CANCEL', 'CANCELLED_BEFORE_SHIPPING')")
+                ->whereBetween('current.' . $dateColumn, [$today->copy()->startOfDay(), $today->copy()->endOfDay()])
                 ->orderByDesc('current.' . $dateColumn)
                 ->limit($limit);
 
