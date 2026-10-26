@@ -1010,7 +1010,7 @@
 
     <section class="shipment-worklist" aria-label="Prioritas order untuk diproses">
         @include('dashboard.partials._list_repeat_orders', [
-            'title' => 'Repeat order pesanan hari ini',
+            'title' => 'Repeat order pesanan',
             'rows' => $repeatOrders ?? [],
             'link' => null,
         ])

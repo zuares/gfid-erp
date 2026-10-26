@@ -61,7 +61,7 @@
 <section class="dash-priority-stack" aria-labelledby="dash-priority-title">
     <h2 id="dash-priority-title" class="visually-hidden">Prioritas kerja hari ini</h2>
     <div class="dash-panels">
-        @include('dashboard.partials._list_repeat_orders', ['title' => 'Repeat order pesanan hari ini', 'rows' => $d['repeat_orders'] ?? [], 'link' => $r('marketplace.orders')])
+        @include('dashboard.partials._list_repeat_orders', ['title' => 'Repeat order pesanan', 'rows' => $d['repeat_orders'] ?? [], 'link' => $r('marketplace.orders')])
     </div>
 
     <div class="dash-panels">
