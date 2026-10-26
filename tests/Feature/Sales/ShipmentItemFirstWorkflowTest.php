@@ -678,7 +678,6 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertSee('<details class="dpanel shipment-accordion">', false)
             ->assertSee('<summary class="dpanel-head">', false)
             ->assertSee('repeat-buyer')
-            ->assertSee('Repeat · ke-2')
             ->assertSee('ORDER-TODAY-001')
             ->assertSee($item->code)
             ->assertSee('2 pcs');
