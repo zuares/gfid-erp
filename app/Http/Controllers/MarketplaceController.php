@@ -4308,6 +4308,11 @@ class MarketplaceController extends Controller
             $estimatedShopeeCount = 0;
             $estimatedManualCount = 0;
             $estimateLastSyncedAt = null;
+            $feeAnalysisComponents = [];
+            $feeAnalysisPlatforms = [];
+            $feeAnalysisOrdersWithFee = 0;
+            $feeAnalysisGrossWithFee = 0.0;
+            $feeAnalysisTotal = 0.0;
             foreach ($metaRows as $s) {
                 $st = strtoupper($s->order?->order_status ?? '');
                 $isCompleted = $st === 'COMPLETED';
@@ -4331,6 +4336,58 @@ class MarketplaceController extends Controller
                 }
                 $breakdown = $s->marketplaceFeeBreakdown();
                 $feeTots = $s->marketplaceFeeCategoryTotals($breakdown);
+                $analysisGross = max(
+                    $this->settlementGrossSalesAmount($s) - $this->settlementVoucherTokoAmount($s),
+                    0,
+                );
+                $platformCode = strtolower(trim((string) ($s->store?->channel?->code ?? 'marketplace')));
+                $platformName = trim((string) ($s->store?->channel?->name ?? 'Marketplace')) ?: 'Marketplace';
+                if (! isset($feeAnalysisPlatforms[$platformCode])) {
+                    $feeAnalysisPlatforms[$platformCode] = [
+                        'code' => $platformCode,
+                        'name' => $platformName,
+                        'order_count' => 0,
+                        'orders_with_fee' => 0,
+                        'gross_with_fee' => 0.0,
+                        'fee_total' => 0.0,
+                    ];
+                }
+                $feeAnalysisPlatforms[$platformCode]['order_count']++;
+
+                $analysisOrderFee = 0.0;
+                $analysisOrderKey = (string) ($s->id ?: $s->channel_order_id);
+                foreach ($breakdown as $feeRow) {
+                    if (($feeRow['category'] ?? 'seller') !== 'seller') {
+                        continue;
+                    }
+
+                    $amount = (float) ($feeRow['amount'] ?? 0);
+                    if ($amount <= 0) {
+                        continue;
+                    }
+
+                    $label = trim((string) ($feeRow['label'] ?? 'Biaya Marketplace')) ?: 'Biaya Marketplace';
+                    if (! isset($feeAnalysisComponents[$label])) {
+                        $feeAnalysisComponents[$label] = [
+                            'label' => $label,
+                            'amount' => 0.0,
+                            'orders' => [],
+                        ];
+                    }
+
+                    $feeAnalysisComponents[$label]['amount'] += $amount;
+                    $feeAnalysisComponents[$label]['orders'][$analysisOrderKey] = true;
+                    $analysisOrderFee += $amount;
+                }
+
+                if ($analysisOrderFee > 0) {
+                    $feeAnalysisOrdersWithFee++;
+                    $feeAnalysisGrossWithFee += $analysisGross;
+                    $feeAnalysisTotal += $analysisOrderFee;
+                    $feeAnalysisPlatforms[$platformCode]['orders_with_fee']++;
+                    $feeAnalysisPlatforms[$platformCode]['gross_with_fee'] += $analysisGross;
+                    $feeAnalysisPlatforms[$platformCode]['fee_total'] += $analysisOrderFee;
+                }
                 if (($feeTots['adjustment'] ?? 0) < 0) {
                     $countPenyesuaian++;
                 }
@@ -4437,6 +4494,45 @@ class MarketplaceController extends Controller
 
             $feePercent = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
+            $feeAnalysisComponentRows = collect($feeAnalysisComponents)
+                ->map(function (array $component) use ($feeAnalysisTotal, $feeAnalysisGrossWithFee): array {
+                    $amount = round((float) $component['amount'], 2);
+
+                    return [
+                        'label' => $component['label'],
+                        'amount' => $amount,
+                        'order_count' => count($component['orders']),
+                        'share_pct' => $feeAnalysisTotal > 0
+                            ? round(($amount / $feeAnalysisTotal) * 100, 1)
+                            : 0.0,
+                        'gross_pct' => $feeAnalysisGrossWithFee > 0
+                            ? round(($amount / $feeAnalysisGrossWithFee) * 100, 1)
+                            : 0.0,
+                    ];
+                })
+                ->sortByDesc('amount')
+                ->values()
+                ->all();
+            $feeAnalysisPlatformRows = collect($feeAnalysisPlatforms)
+                ->map(function (array $platform): array {
+                    $grossWithFee = round((float) $platform['gross_with_fee'], 2);
+                    $feeTotal = round((float) $platform['fee_total'], 2);
+
+                    return [
+                        'code' => $platform['code'],
+                        'name' => $platform['name'],
+                        'order_count' => (int) $platform['order_count'],
+                        'orders_with_fee' => (int) $platform['orders_with_fee'],
+                        'gross_with_fee' => $grossWithFee,
+                        'fee_total' => $feeTotal,
+                        'effective_fee_pct' => $grossWithFee > 0
+                            ? round(($feeTotal / $grossWithFee) * 100, 1)
+                            : 0.0,
+                    ];
+                })
+                ->sortByDesc('fee_total')
+                ->values()
+                ->all();
 
             $meta = [
                 'kpi_count' => (int) $metaRows->count(),
@@ -4472,6 +4568,23 @@ class MarketplaceController extends Controller
                 'estimate_shopee_count' => $estimatedShopeeCount,
                 'estimate_manual_count' => $estimatedManualCount,
                 'estimate_last_synced_at' => $estimateLastSyncedAt?->toISOString(),
+                'fee_analysis' => [
+                    'order_count' => (int) $metaRows->count(),
+                    'orders_with_fee' => $feeAnalysisOrdersWithFee,
+                    'coverage_pct' => $metaRows->count() > 0
+                        ? round(($feeAnalysisOrdersWithFee / $metaRows->count()) * 100, 1)
+                        : 0.0,
+                    'gross_with_fee' => round($feeAnalysisGrossWithFee, 2),
+                    'fee_total' => round($feeAnalysisTotal, 2),
+                    'effective_fee_pct' => $feeAnalysisGrossWithFee > 0
+                        ? round(($feeAnalysisTotal / $feeAnalysisGrossWithFee) * 100, 1)
+                        : 0.0,
+                    'average_fee_per_order' => $feeAnalysisOrdersWithFee > 0
+                        ? round($feeAnalysisTotal / $feeAnalysisOrdersWithFee, 2)
+                        : 0.0,
+                    'components' => $feeAnalysisComponentRows,
+                    'platforms' => $feeAnalysisPlatformRows,
+                ],
             ];
         } else {
             $meta = null; // Frontend can preserve previous KPI state on page change

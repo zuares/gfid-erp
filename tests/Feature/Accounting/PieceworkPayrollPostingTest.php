@@ -10,6 +10,7 @@ use App\Models\EmployeeSavingsTransaction;
 use App\Models\Journal;
 use App\Models\PieceworkPayrollLine;
 use App\Models\PieceworkPayrollPeriod;
+use App\Services\Accounting\JournalService;
 use App\Services\Payroll\PieceworkPayrollPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -98,7 +99,7 @@ class PieceworkPayrollPostingTest extends TestCase
     {
         [$period, $bank] = $this->makePayroll();
         $employee = Employee::where('code', 'EMP-PAYROLL-TEST')->firstOrFail();
-        $receivable = Account::firstOrCreate(['code' => '1307'], [
+        $receivable = Account::firstOrCreate(['code' => JournalService::CODE_EMPLOYEE_LOAN], [
             'name' => 'Piutang Pinjaman Karyawan',
             'type' => 'asset',
             'is_cash' => false,
@@ -141,7 +142,7 @@ class PieceworkPayrollPostingTest extends TestCase
     {
         [$period, $bank] = $this->makePayroll();
         $employee = Employee::where('code', 'EMP-PAYROLL-TEST')->firstOrFail();
-        $receivable = Account::firstOrCreate(['code' => '1307'], [
+        $receivable = Account::firstOrCreate(['code' => JournalService::CODE_EMPLOYEE_LOAN], [
             'name' => 'Piutang Pinjaman Karyawan',
             'type' => 'asset',
             'is_cash' => false,

@@ -1446,6 +1446,35 @@
         };
     }
 
+    // Progress queued/running harus punya batas waktu. Jika queue worker mati
+    // atau request terputus, cache lama tidak boleh terus terlihat sebagai
+    // sync aktif di halaman.
+    function normalizeSettlementProgress(progress) {
+        if (!progress || typeof progress !== 'object') return progress;
+
+        const status = String(progress.status || '').toLowerCase();
+        if (!['queued', 'running'].includes(status) || !progress.updated_at) return progress;
+
+        const updatedAt = Date.parse(progress.updated_at);
+        if (Number.isNaN(updatedAt)) return progress;
+
+        const staleAfterMs = status === 'queued'
+            ? 15 * 60 * 1000
+            : 60 * 60 * 1000;
+        if (Date.now() - updatedAt <= staleAfterMs) return progress;
+
+        return {
+            ...progress,
+            status: 'stale',
+            phase: 'stale',
+            stale: true,
+            percent: null,
+            label: status === 'queued'
+                ? 'Sync masih antre tetapi belum diambil worker.'
+                : 'Tidak ada pembaruan sync dalam waktu yang ditentukan.',
+        };
+    }
+
     function autoSyncLogSummary(log) {
         const payload = log?.payload || {};
         return [
@@ -1457,12 +1486,15 @@
     }
 
     function renderAutomaticSyncStatus(logs, progressRows) {
-        const activeProgress = progressRows
+        const normalizedProgressRows = progressRows
+            .map(normalizeSettlementProgress)
+            .filter(Boolean);
+        const activeProgress = normalizedProgressRows
             .filter(progress => ['queued', 'running'].includes(String(progress?.status || '').toLowerCase()))
             .sort((a, b) => Number(b?.percent || 0) - Number(a?.percent || 0));
         const latestLog = [...logs].sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0))[0] || null;
-        const latestProgress = [...progressRows]
-            .filter(progress => ['success', 'warn', 'error'].includes(String(progress?.status || '').toLowerCase()))
+        const latestProgress = [...normalizedProgressRows]
+            .filter(progress => ['success', 'warn', 'error', 'stale'].includes(String(progress?.status || '').toLowerCase()))
             .sort((a, b) => new Date(b?.updated_at || 0) - new Date(a?.updated_at || 0))[0] || null;
 
         if (activeProgress.length) {
@@ -1525,7 +1557,9 @@
             return { key, active: false };
         }
 
-        if (sourceStatus === 'error' || sourceStatus === 'failed') {
+        if (sourceStatus === 'stale') {
+            setAutomaticSyncBanner('warn', 'Sync otomatis tidak berjalan', `${labels.platform} · ${labels.store}: progress lama sudah kedaluwarsa.`, 'Jalankan ulang sync dari tab Sync untuk memulai proses baru.');
+        } else if (sourceStatus === 'error' || sourceStatus === 'failed') {
             setAutomaticSyncBanner('error', 'Sync otomatis perlu diperiksa', `${labels.platform} · ${labels.store}: proses terakhir gagal.`, summary || 'Buka tab Sync untuk melihat detail error.');
         } else if (sourceStatus === 'warn' || sourceStatus === 'partial_success') {
             setAutomaticSyncBanner('warn', 'Sync otomatis selesai dengan catatan', `${labels.platform} · ${labels.store}: sebagian data selesai diproses.`, summary || 'Buka tab Sync untuk melihat detail.');
@@ -1573,6 +1607,7 @@
     }
 
     function renderSettlementProgress(progress) {
+        progress = normalizeSettlementProgress(progress);
         const wrap = $('settlementSyncProgressWrap');
         const bar = $('settlementSyncProgressBar');
         const label = $('settlementSyncProgressLabel');
@@ -1583,6 +1618,7 @@
 
         const status = String(progress?.status || 'idle').toLowerCase();
         const isActive = ['queued', 'running'].includes(status);
+        const isStale = status === 'stale';
 
         if (status === 'idle' || progress === null) {
             wrap.classList.add('d-none');
@@ -1610,12 +1646,13 @@
             : (visualStatus === 'queued' ? '#2563eb' : '#3b82f6')));
 
         wrap.classList.remove('d-none');
-        bar.style.width = percent + '%';
+        bar.style.width = isStale ? '0%' : percent + '%';
         bar.style.background = color;
         bar.classList.toggle('progress-bar-striped', isActive);
         bar.classList.toggle('progress-bar-animated', isActive);
         label.textContent = statusLabel;
-        pct.textContent = percent + '%';
+        pct.textContent = isStale ? '—' : percent + '%';
+        pct.style.color = color;
 
         const selectedStore = stores.find(store => String(store.id) === String(progress?.store_id || getSyncStoreId()));
         const platform = progress?.platform || selectedStore?.channel?.name || 'Platform marketplace';
@@ -1651,7 +1688,7 @@
 
         return {
             status,
-            terminal: ['success', 'warn', 'error'].includes(status),
+            terminal: ['success', 'warn', 'error', 'stale'].includes(status),
             percent,
             label: statusLabel,
         };
@@ -1665,6 +1702,19 @@
         const pending = Number(progress?.pending || 0);
         const estimates = Number(progress?.estimates_updated || 0);
         const errors = Number(progress?.errors || 0) + Number(progress?.statement_ad_cost_errors || 0);
+
+        if (baseStatus === 'stale') {
+            const platform = progress?.platform || 'Platform marketplace';
+            const storeName = progress?.store_name || 'Toko terpilih';
+
+            return {
+                level: 'warn',
+                state: 'Tidak berjalan',
+                title: 'Sync tidak berjalan',
+                message: progress?.label || 'Progress sync sudah kedaluwarsa dan tidak lagi dianggap aktif. Jalankan ulang sync.',
+                meta: [`${platform} · ${storeName}`, 'Progress lama tidak dihitung sebagai proses aktif.'],
+            };
+        }
 
         if (baseStatus === 'error') {
             return {
@@ -1912,10 +1962,11 @@
                 const params = new URLSearchParams({ action, store_id: String(storeId) });
                 return api('/api/marketplace/sync-logs?' + params.toString()).catch(() => []);
             });
-            const [settlementLogs, financeLogs, progress] = await Promise.all([
+            const [settlementLogs, financeLogs, rawProgress] = await Promise.all([
                 ...logRequests,
                 api('/api/marketplace/stores/' + storeId + '/sync-settlements-progress').catch(() => null),
             ]);
+            const progress = normalizeSettlementProgress(rawProgress);
 
             // Polling lama dapat selesai setelah user memulai run baru. Jangan
             // izinkan response lama mengembalikan feedback/status run sebelumnya.
@@ -2730,6 +2781,7 @@
             label: busyText,
             store_id: storeId,
             store_name: storeName,
+            updated_at: new Date().toISOString(),
         });
 
         try {

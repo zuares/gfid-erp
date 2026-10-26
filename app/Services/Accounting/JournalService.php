@@ -45,6 +45,8 @@ class JournalService
 
     public const CODE_SUPPLIER_LOAN = '1306'; // Piutang Pinjaman Supplier
 
+    public const CODE_EMPLOYEE_LOAN = '1308'; // Piutang Pinjaman Karyawan
+
     public const CODE_EXP_OPEX = '6101'; // Biaya Operasional Umum
 
     public const CODE_EXP_DAILY_PAYROLL = '6103'; // Biaya Gaji Operasional

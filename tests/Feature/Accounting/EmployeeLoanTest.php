@@ -8,6 +8,7 @@ use App\Models\EmployeeLoan;
 use App\Models\EmployeeLoanRepayment;
 use App\Models\User;
 use App\Services\Accounting\EmployeeLoanService;
+use App\Services\Accounting\JournalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -23,7 +24,7 @@ class EmployeeLoanTest extends TestCase
             'payment_type' => 'fixed', 'active' => true,
         ]);
         $bank = Account::create(['code' => '1199', 'name' => 'Bank Pinjaman Test', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]);
-        $receivable = Account::firstOrCreate(['code' => '1307'], ['name' => 'Piutang Pinjaman Karyawan', 'type' => 'asset', 'is_cash' => false, 'is_active' => true]);
+        $receivable = Account::firstOrCreate(['code' => JournalService::CODE_EMPLOYEE_LOAN], ['name' => 'Piutang Pinjaman Karyawan', 'type' => 'asset', 'is_cash' => false, 'is_active' => true]);
 
         $loan = EmployeeLoan::create([
             'employee_id' => $employee->id, 'date' => '2026-09-19', 'principal_amount' => 1000000,
@@ -47,5 +48,15 @@ class EmployeeLoanTest extends TestCase
         $this->assertSame('settled', $loan->fresh()->status);
         $this->assertSame('posted', $repayment->fresh()->status);
         $this->assertSame(0.0, $loan->fresh()->outstanding_amount);
+    }
+
+    public function test_employee_loan_form_defaults_to_the_dedicated_receivable_account(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'LOAN-FORM-OWNER']);
+
+        $this->actingAs($user)
+            ->get(route('accounting.employee-loans.create'))
+            ->assertOk()
+            ->assertSee('1308 · Piutang Pinjaman Karyawan');
     }
 }
