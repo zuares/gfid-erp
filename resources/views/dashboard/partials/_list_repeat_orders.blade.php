@@ -37,7 +37,13 @@
                             @php($status = $statusMap[$row['order_status'] ?? ''] ?? [$row['order_status'] ?? '—', 'slate'])
                             <tr>
                                 <td class="numeric ditem-number">{{ $loop->iteration }}</td>
-                                <td class="drepeat-buyer">{{ $row['buyer_label'] ?: 'Tanpa username' }}</td>
+                                <td class="drepeat-buyer">
+                                    <div>{{ $row['buyer_label'] ?: 'Tanpa username' }}</div>
+                                    @php($previousOrderCount = (int) ($row['previous_order_count'] ?? $row['buyer_previous_order_count'] ?? 0))
+                                    @if($previousOrderCount > 0)
+                                        <span class="drepeat-badge">🔁 Repeat · ke-{{ $previousOrderCount + 1 }}</span>
+                                    @endif
+                                </td>
                                 <td class="drepeat-order">
                                     @if(!empty($row['id']))
                                         <a class="drepeat-order-link" href="{{ route('marketplace.orders.show', ['order' => $row['id']]) }}">{{ $row['order_number'] ?: '—' }}</a>

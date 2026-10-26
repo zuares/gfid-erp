@@ -283,6 +283,8 @@
     .drepeat-table tr:last-child td { border-bottom: 0; }
     .drepeat-table .numeric { text-align: right; white-space: nowrap; }
     .drepeat-buyer { color: var(--text, #0f172a); font-weight: 650; }
+    .drepeat-badge { display: inline-flex; align-items: center; margin-top: .18rem; padding: .1rem .34rem; border: 1px solid #c4b5fd; border-radius: 999px; color: #6d28d9; background: #f5f3ff; font-size: .57rem; font-weight: 800; line-height: 1.25; white-space: nowrap; }
+    body[data-theme="dark"] .drepeat-badge { color: #ddd6fe; background: rgba(109, 40, 217, .22); border-color: rgba(167, 139, 250, .35); }
     .drepeat-order { color: var(--dsh-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .69rem !important; }
     .drepeat-order-link { color: var(--dsh-accent); text-decoration: none; }
     .drepeat-order-link:hover { text-decoration: underline; }
