@@ -6,9 +6,11 @@ use App\Models\Channel;
 use App\Models\MarketplaceTikTokFinancialTransaction;
 use App\Models\Store;
 use App\Models\User;
+use App\Jobs\SyncTikTokFinancialTransactionsJob;
 use App\Services\Marketplace\TikTokShop\TikTokFinancialTransactionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class TikTokFinancialTransactionTest extends TestCase
@@ -279,9 +281,20 @@ class TikTokFinancialTransactionTest extends TestCase
     {
         $store = $this->createStore();
         $user = $this->user();
-        Http::fake([
-            'https://open-api.tiktokglobalshop.com/finance/202309/withdrawals*' => Http::response($this->response(), 200),
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'TT-WITHDRAW-1',
+            'source' => 'withdrawals',
+            'transaction_type' => 'WITHDRAW',
+            'amount' => 100000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_OUT',
+            'status' => 'COMPLETED',
+            'transaction_created_at' => now()->subDay(),
+            'source_payload' => ['reason' => 'Payout test'],
+            'synced_at' => now()->subHour(),
         ]);
+        Http::fake();
 
         $this->actingAs($user)
             ->get(route('marketplace.tiktok.financial-transactions'))
@@ -298,7 +311,34 @@ class TikTokFinancialTransactionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('source', 'tiktok_financial_transactions')
+            ->assertJsonPath('storage', 'local_database')
             ->assertJsonPath('data.items.0.transaction_id', 'TT-WITHDRAW-1');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_controller_can_queue_local_financial_transaction_sync(): void
+    {
+        Queue::fake();
+        $store = $this->createStore();
+
+        $response = $this->actingAs($this->user())->postJson(
+            route('marketplace.api.tiktok-financial-transactions.sync', ['store' => $store->id]),
+            [
+                'date_from' => now()->subDays(3)->toDateString(),
+                'date_to' => now()->toDateString(),
+                'source' => 'all',
+            ],
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('status', 'queued');
+
+        Queue::assertPushed(SyncTikTokFinancialTransactionsJob::class, function (SyncTikTokFinancialTransactionsJob $job) use ($store): bool {
+            return $job->storeId === $store->id
+                && $job->source === 'all';
+        });
     }
 
     public function test_controller_rejects_date_window_over_sixty_days(): void

@@ -21,6 +21,8 @@
     .tt-finance-actions .btn { border-radius:9px; font-size:.78rem; font-weight:750; }
     .tt-finance-alert { display:none; padding:.7rem .85rem; margin-bottom:.9rem; border:1px solid #fecaca; border-radius:10px; color:#991b1b; background:#fef2f2; font-size:.78rem; }
     .tt-finance-alert.show { display:block; }
+    .tt-finance-alert.success { border-color:#bbf7d0; color:#166534; background:#f0fdf4; }
+    .tt-finance-storage-status { color:#64748b; font-size:.72rem; }
     .tt-finance-kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.7rem; margin-bottom:.9rem; }
     .tt-finance-kpi { padding:.85rem 1rem; }
     .tt-finance-kpi small { display:block; color:#64748b; font-size:.68rem; font-weight:750; }
@@ -97,17 +99,18 @@
         </div>
 
         <div class="tt-finance-actions">
-            <small class="text-muted">Maksimal rentang 60 hari per permintaan. Pagination memakai cursor TikTok.</small>
+            <small id="ttStorageStatus" class="tt-finance-storage-status">Sumber: database lokal · Belum ada sinkronisasi</small>
             <div class="d-flex gap-2">
                 <button id="ttReset" type="button" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
                 <button id="ttExport" type="button" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV</button>
-                <button id="ttLoad" type="button" class="btn btn-primary"><i class="bi bi-cloud-arrow-down me-1"></i>Tarik Data</button>
+                <button id="ttSync" type="button" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Sync sekarang</button>
+                <button id="ttLoad" type="button" class="btn btn-primary"><i class="bi bi-database me-1"></i>Muat Data Lokal</button>
             </div>
         </div>
     </section>
 
     <section class="tt-finance-kpis" aria-label="Ringkasan halaman">
-        <div class="tt-finance-card tt-finance-kpi"><small>Transaksi halaman</small><strong id="ttCount">0</strong></div>
+        <div class="tt-finance-card tt-finance-kpi"><small>Total transaksi</small><strong id="ttCount">0</strong></div>
         <div class="tt-finance-card tt-finance-kpi in"><small>Dana masuk</small><strong id="ttIn">—</strong></div>
         <div class="tt-finance-card tt-finance-kpi out"><small>Dana keluar</small><strong id="ttOut">—</strong></div>
         <div class="tt-finance-card tt-finance-kpi"><small>Net terpetakan</small><strong id="ttNet">—</strong></div>
@@ -116,7 +119,7 @@
 
     <section class="tt-finance-card">
         <div id="ttTableWrap" class="tt-finance-table-wrap">
-            <div class="tt-finance-empty"><i class="bi bi-cash-stack"></i>Pilih toko dan periode, lalu tarik data transaksi finansial TikTok.</div>
+            <div class="tt-finance-empty"><i class="bi bi-database"></i>Pilih toko dan periode, lalu muat transaksi dari database lokal.</div>
         </div>
         <div class="tt-finance-pagination">
             <span id="ttPageInfo">Belum ada data</span>
@@ -128,7 +131,7 @@
 <script>
 (() => {
     const $ = (id) => document.getElementById(id);
-    const state = { token: '', hasMore: false, items: [], loading: false, pages: 0 };
+    const state = { page: 1, lastPage: 1, hasMore: false, items: [], loading: false, syncing: false };
     const today = new Date();
     const iso = (date) => date.toISOString().slice(0, 10);
     const from = new Date(today); from.setDate(from.getDate() - 14);
@@ -137,8 +140,9 @@
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
     const selectedTypes = () => [...document.querySelectorAll('.tt-type:checked')].map((input) => input.value);
     const money = (value, currency = 'IDR') => value === null || value === undefined || Number.isNaN(Number(value)) ? '—' : `${currency} ${Number(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const showError = (message) => { $('ttAlert').textContent = message; $('ttAlert').classList.add('show'); };
-    const clearError = () => { $('ttAlert').textContent = ''; $('ttAlert').classList.remove('show'); };
+    const showMessage = (message, success = false) => { $('ttAlert').textContent = message; $('ttAlert').classList.toggle('success', success); $('ttAlert').classList.add('show'); };
+    const showError = (message) => showMessage(message, false);
+    const clearError = () => { $('ttAlert').textContent = ''; $('ttAlert').classList.remove('show', 'success'); };
 
     const validate = () => {
         if (!$('ttStore').value) return 'Belum ada toko TikTok Shop yang aktif.';
@@ -154,7 +158,7 @@
         const path = `/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/tiktok-financial-transactions${exportMode ? '/export' : ''}`;
         const query = new URLSearchParams({ date_from: $('ttFrom').value, date_to: $('ttTo').value, source: $('ttSource').value, types: selectedTypes().join(',') });
         if ($('ttStatus').value) query.set('status', $('ttStatus').value);
-        if (!exportMode && state.token) query.set('page_token', state.token);
+        if (!exportMode) { query.set('page', String(state.page)); query.set('page_size', '100'); }
         return `${path}?${query.toString()}`;
     };
 
@@ -179,27 +183,61 @@
         const error = validate();
         if (error) { showError(error); return; }
         state.loading = true; $('ttLoad').disabled = true; $('ttNext').disabled = true;
-        $('ttTableWrap').innerHTML = '<div class="tt-finance-empty"><i class="bi bi-arrow-repeat"></i>Mengambil data dari TikTok Shop…</div>';
+        $('ttTableWrap').innerHTML = '<div class="tt-finance-empty"><i class="bi bi-database"></i>Membaca database lokal…</div>';
         try {
             const response = await fetch(buildUrl(), { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
             const json = await response.json().catch(() => ({}));
             if (!response.ok || json.success === false) throw new Error(json.message || `Gagal mengambil data (${response.status})`);
             const data = json.data || {}; const summary = data.summary || {}; const pagination = data.pagination || {};
-            state.items = data.items || []; state.token = pagination.next_page_token || ''; state.hasMore = Boolean(pagination.has_more); state.pages++;
+            state.items = data.items || []; state.lastPage = Number(pagination.last_page || 1); state.hasMore = Boolean(pagination.has_more);
             $('ttCount').textContent = Number(summary.total_count || 0).toLocaleString('id-ID');
             $('ttIn').textContent = money(summary.total_money_in); $('ttOut').textContent = money(summary.total_money_out); $('ttNet').textContent = money(summary.net_amount); $('ttUnknown').textContent = Number(summary.unknown_flow_count || 0).toLocaleString('id-ID');
-            render(state.items); $('ttNext').disabled = !state.hasMore; $('ttPrev').disabled = state.pages <= 1; $('ttPageInfo').textContent = $('ttSource').value === 'statements'
-                ? `${pagination.statements_fetched || 0} statement · ${state.items.length} detail transaksi`
-                : `Halaman ${state.pages} · ${state.items.length} transaksi${state.hasMore ? ' · tersedia halaman berikutnya' : ''}`;
+            render(state.items); $('ttNext').disabled = !state.hasMore; $('ttPrev').disabled = state.page <= 1; $('ttPageInfo').textContent = `Halaman ${state.page} dari ${state.lastPage} · ${state.items.length} baris dari ${Number(pagination.total || summary.total_count || 0).toLocaleString('id-ID')} transaksi`;
+            $('ttStorageStatus').textContent = data.last_synced_at ? `Sumber: database lokal · Sync terakhir ${new Date(data.last_synced_at).toLocaleString('id-ID')}` : 'Sumber: database lokal · Belum ada sinkronisasi untuk periode ini';
         } catch (error) {
-            showError(error.message); $('ttTableWrap').innerHTML = `<div class="tt-finance-empty text-danger"><i class="bi bi-exclamation-triangle"></i>${escapeHtml(error.message)}</div>`; $('ttPageInfo').textContent = 'Gagal mengambil data';
+            showError(error.message); $('ttTableWrap').innerHTML = `<div class="tt-finance-empty text-danger"><i class="bi bi-exclamation-triangle"></i>${escapeHtml(error.message)}</div>`; $('ttPageInfo').textContent = 'Gagal membaca database lokal';
         } finally { state.loading = false; $('ttLoad').disabled = false; }
     };
 
-    const reset = () => { state.token = ''; state.hasMore = false; state.items = []; state.pages = 0; $('ttStatus').value = ''; document.querySelectorAll('.tt-type').forEach((input) => { input.checked = true; }); load(); };
-    $('ttLoad').addEventListener('click', () => { state.token = ''; state.pages = 0; load(); });
-    $('ttNext').addEventListener('click', () => { if (!state.loading && state.hasMore) load(); });
-    $('ttPrev').addEventListener('click', reset);
+    const syncStatusUrl = () => `/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/tiktok-financial-transactions/sync-status`;
+    const pollSync = async () => {
+        for (let attempt = 0; attempt < 40; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            try {
+                const response = await fetch(syncStatusUrl(), { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                const status = await response.json();
+                if (status.label) $('ttStorageStatus').textContent = status.label;
+                if (status.status === 'success') { showMessage('Sinkronisasi selesai. Data lokal diperbarui.', true); await load(); return; }
+                if (status.status === 'error') { showError(status.message || status.label || 'Sinkronisasi gagal.'); return; }
+            } catch (error) { /* polling berikutnya mencoba lagi */ }
+        }
+        showMessage('Sinkronisasi masih berjalan di background. Muat ulang beberapa saat lagi.', true);
+    };
+
+    const syncNow = async () => {
+        clearError();
+        const error = validate();
+        if (error) { showError(error); return; }
+        state.syncing = true; $('ttSync').disabled = true; $('ttSync').innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Masuk antrean…';
+        try {
+            const response = await fetch(`/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/tiktok-financial-transactions/sync`, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+                body: JSON.stringify({ date_from: $('ttFrom').value, date_to: $('ttTo').value, source: $('ttSource').value }),
+            });
+            const json = await response.json().catch(() => ({}));
+            if (!response.ok || json.success === false) throw new Error(json.message || `Gagal memasukkan sync (${response.status})`);
+            showMessage('Sinkronisasi masuk antrean. Halaman akan membaca hasil terbaru setelah selesai.', true);
+            pollSync();
+        } catch (error) { showError(error.message); }
+        finally { state.syncing = false; $('ttSync').disabled = false; $('ttSync').innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Sync sekarang'; }
+    };
+
+    const reset = () => { state.page = 1; state.lastPage = 1; state.hasMore = false; state.items = []; $('ttStatus').value = ''; document.querySelectorAll('.tt-type').forEach((input) => { input.checked = true; }); load(); };
+    $('ttLoad').addEventListener('click', () => { state.page = 1; load(); });
+    $('ttSync').addEventListener('click', syncNow);
+    $('ttNext').addEventListener('click', () => { if (!state.loading && state.hasMore) { state.page++; load(); } });
+    $('ttPrev').addEventListener('click', () => { if (!state.loading && state.page > 1) { state.page--; load(); } });
     $('ttReset').addEventListener('click', reset);
     $('ttExport').addEventListener('click', () => { const error = validate(); if (error) { showError(error); return; } window.location.href = buildUrl(true); });
     const updateSourceControls = () => {
@@ -207,11 +245,12 @@
         $('ttTypesField').style.opacity = accountSource ? '1' : '.62';
         document.querySelectorAll('.tt-type').forEach((input) => { input.disabled = !accountSource; });
         $('ttSourceHint').textContent = accountSource
-            ? 'Pagination memakai cursor TikTok untuk transaksi level akun.'
-            : 'TikTok akan mengambil daftar statement dalam periode ini lalu detail transaksi setiap statement. Nilai statement adalah settlement final.';
+            ? 'Data ditampilkan dari tabel lokal; Sync sekarang mengambil mutasi akun dari TikTok.'
+            : 'Data ditampilkan dari tabel lokal; Sync sekarang mengambil statement final dari TikTok.';
     };
-    ['ttStore', 'ttFrom', 'ttTo', 'ttStatus', 'ttSource'].forEach((id) => $(id).addEventListener('change', () => { state.token = ''; state.pages = 0; if (id === 'ttSource') updateSourceControls(); }));
+    ['ttStore', 'ttFrom', 'ttTo', 'ttStatus', 'ttSource'].forEach((id) => $(id).addEventListener('change', () => { state.page = 1; if (id === 'ttSource') updateSourceControls(); }));
     updateSourceControls();
+    if ($('ttStore').value) load();
 })();
 </script>
 @endsection

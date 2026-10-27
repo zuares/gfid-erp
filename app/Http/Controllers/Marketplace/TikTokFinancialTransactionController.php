@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncTikTokFinancialTransactionsJob;
 use App\Models\Store;
 use App\Services\Marketplace\TikTokShop\TikTokFinancialTransactionService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -43,7 +45,7 @@ class TikTokFinancialTransactionController extends Controller
             'status' => ['nullable', 'string', 'max:40'],
             'source' => ['nullable', 'in:account,statements'],
             'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'page_token' => ['nullable', 'string', 'max:2000'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         [$from, $to, $error] = $this->parseDateWindow($validated['date_from'], $validated['date_to']);
@@ -53,21 +55,18 @@ class TikTokFinancialTransactionController extends Controller
 
         try {
             $source = $validated['source'] ?? 'account';
-            $result = $source === 'statements'
-                ? $this->service->fetchStatementTransactions($store, $from, $to, [
-                    'status' => $validated['status'] ?? '',
-                    'page_size' => $validated['page_size'] ?? 100,
-                ])
-                : $this->service->fetchTransactions($store, $from, $to, [
-                    'types' => $validated['types'] ?? '',
-                    'status' => $validated['status'] ?? '',
-                    'page_size' => $validated['page_size'] ?? 100,
-                    'page_token' => $validated['page_token'] ?? '',
-                ]);
+            $result = $this->service->storedTransactions($store, $from, $to, [
+                'source' => $source,
+                'types' => $validated['types'] ?? '',
+                'status' => $validated['status'] ?? '',
+                'page_size' => $validated['page_size'] ?? 100,
+                'page' => $validated['page'] ?? 1,
+            ]);
 
             return response()->json([
                 'success' => true,
                 'source' => 'tiktok_financial_transactions',
+                'storage' => 'local_database',
                 'data_source' => $source,
                 'data' => $result,
             ]);
@@ -94,6 +93,120 @@ class TikTokFinancialTransactionController extends Controller
                 'message' => 'Terjadi kesalahan sistem saat mengambil transaksi finansial TikTok.',
             ], 500);
         }
+    }
+
+    public function sync(Request $request, Store $store): JsonResponse
+    {
+        $validated = $request->validate([
+            'date_from' => ['required', 'date_format:Y-m-d'],
+            'date_to' => ['required', 'date_format:Y-m-d'],
+            'source' => ['nullable', 'in:account,statements,all'],
+        ]);
+
+        [$from, $to, $error] = $this->parseDateWindow($validated['date_from'], $validated['date_to']);
+        if ($error !== null) {
+            return response()->json(['success' => false, 'message' => $error], 422);
+        }
+
+        $store->loadMissing('channel');
+        $channelCode = strtolower((string) ($store->channel?->code ?? ''));
+        if (! in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'NOT_TIKTOK_STORE',
+                'message' => 'Toko yang dipilih bukan channel TikTok Shop.',
+            ], 422);
+        }
+
+        if ($store->connection_status !== 'CONNECTED') {
+            return response()->json([
+                'success' => false,
+                'code' => 'TIKTOK_AUTH_REQUIRED',
+                'message' => 'Koneksi TikTok Shop belum aktif. Hubungkan ulang toko sebelum sinkronisasi.',
+            ], 401);
+        }
+
+        $store->loadMissing('channel');
+        $source = $validated['source'] ?? 'all';
+        $activeKey = SyncTikTokFinancialTransactionsJob::activeKey((int) $store->id);
+        $progressKey = SyncTikTokFinancialTransactionsJob::progressKey((int) $store->id);
+        if (! Cache::add($activeKey, [
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+            'source' => $source,
+            'date_from' => $from->toDateString(),
+            'date_to' => $to->toDateString(),
+            'queued_at' => now()->toISOString(),
+        ], 3600)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'TIKTOK_FINANCIAL_SYNC_BUSY',
+                'message' => "Sinkronisasi Finance TikTok untuk toko {$store->name} sedang berjalan atau masih antre.",
+                'progress' => Cache::get($progressKey),
+            ], 429);
+        }
+
+        Cache::put($progressKey, [
+            'status' => 'queued',
+            'phase' => 'queued',
+            'percent' => 2,
+            'label' => "Sinkronisasi Finance TikTok {$store->name} masuk antrean…",
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+            'source' => $source,
+            'date_from' => $from->toDateString(),
+            'date_to' => $to->toDateString(),
+            'updated_at' => now()->toISOString(),
+        ], 3600);
+
+        try {
+            SyncTikTokFinancialTransactionsJob::dispatch(
+                (int) $store->id,
+                $from->toDateString(),
+                $to->toDateString(),
+                $source,
+                'manual',
+            );
+        } catch (\Throwable $e) {
+            Cache::forget($activeKey);
+            Cache::put($progressKey, [
+                'status' => 'error',
+                'phase' => 'dispatch_failed',
+                'percent' => 100,
+                'label' => 'Sinkronisasi gagal dimasukkan ke antrean.',
+                'store_id' => $store->id,
+                'store_name' => $store->name,
+                'source' => $source,
+                'updated_at' => now()->toISOString(),
+            ], 3600);
+            Log::error('[tiktok-financial-transactions] Dispatch sync gagal', [
+                'store_id' => $store->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'code' => 'TIKTOK_FINANCIAL_SYNC_QUEUE_ERROR',
+                'message' => 'Sinkronisasi gagal dimasukkan ke antrean. Periksa queue worker lalu coba lagi.',
+            ], 503);
+        }
+
+        return response()->json([
+            'success' => true,
+            'status' => 'queued',
+            'storage' => 'local_database',
+            'message' => 'Sinkronisasi Finance TikTok masuk antrean.',
+            'progress' => Cache::get($progressKey),
+        ]);
+    }
+
+    public function syncStatus(Store $store): JsonResponse
+    {
+        return response()->json(array_merge([
+            'status' => 'idle',
+            'store_id' => $store->id,
+            'store_name' => $store->name,
+        ], Cache::get(SyncTikTokFinancialTransactionsJob::progressKey((int) $store->id), [])));
     }
 
     public function orderStatement(Store $store, string $orderId): JsonResponse
@@ -148,6 +261,7 @@ class TikTokFinancialTransactionController extends Controller
             'types' => ['nullable', 'string', 'max:200'],
             'status' => ['nullable', 'string', 'max:40'],
             'source' => ['nullable', 'in:account,statements'],
+            'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         [$from, $to, $error] = $this->parseDateWindow($validated['date_from'], $validated['date_to']);
@@ -157,14 +271,13 @@ class TikTokFinancialTransactionController extends Controller
 
         try {
             $source = $validated['source'] ?? 'account';
-            $result = $source === 'statements'
-                ? $this->service->fetchStatementTransactions($store, $from, $to, [
-                    'status' => $validated['status'] ?? '',
-                ])
-                : $this->service->fetchAllTransactions($store, $from, $to, [
-                    'types' => $validated['types'] ?? '',
-                    'status' => $validated['status'] ?? '',
-                ]);
+            $result = $this->service->storedTransactions($store, $from, $to, [
+                'source' => $source,
+                'types' => $validated['types'] ?? '',
+                'status' => $validated['status'] ?? '',
+                'page_size' => $validated['page_size'] ?? 100,
+                'all' => true,
+            ]);
             $filename = sprintf(
                 'tiktok_%s_%s_%s_%s.csv',
                 $source,

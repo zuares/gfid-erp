@@ -156,6 +156,124 @@ class TikTokFinancialTransactionService
     }
 
     /**
+     * Read the normalized transaction listing from the local database.
+     *
+     * API calls belong to the sync job; page requests must stay read-only and
+     * remain available when TikTok is slow, rate-limited, or temporarily down.
+     *
+     * @return array<string, mixed>
+     */
+    public function storedTransactions(Store $store, Carbon $from, Carbon $to, array $options = []): array
+    {
+        $this->assertTikTok($store);
+
+        $source = strtolower(trim((string) ($options['source'] ?? 'account')));
+        $sourceValue = match ($source) {
+            'account' => 'withdrawals',
+            'statements' => 'statement_transactions',
+            default => throw new RuntimeException('Sumber data TikTok tidak valid.'),
+        };
+        $types = $this->normalizeTypes($options['types'] ?? []);
+        $statusFilter = strtoupper(trim((string) ($options['status'] ?? '')));
+        $pageSize = min(100, max(1, (int) ($options['page_size'] ?? 100)));
+        $page = max(1, (int) ($options['page'] ?? 1));
+
+        $baseQuery = MarketplaceTikTokFinancialTransaction::query()
+            ->where('store_id', $store->id)
+            ->where('source', $sourceValue)
+            ->whereBetween('transaction_created_at', [$from, $to]);
+        $query = (clone $baseQuery)
+            ->when($statusFilter !== '', fn ($query) => $query->where('status', $statusFilter))
+            ->when($source === 'account', fn ($query) => $query->whereIn('transaction_type', $types));
+
+        $summary = $this->storedSummary(clone $query);
+        $lastSyncedAt = (clone $baseQuery)->max('synced_at');
+
+        if (($options['all'] ?? false) === true) {
+            $rows = $query
+                ->orderByDesc('transaction_created_at')
+                ->orderByDesc('id')
+                ->get();
+
+            $items = $rows->map(fn (MarketplaceTikTokFinancialTransaction $row): array => $this->presentStoredRow($row, $store->name))->all();
+
+            return [
+                'items' => $items,
+                'summary' => $summary,
+                'pagination' => [
+                    'page_size' => count($items),
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'total' => $summary['total_count'],
+                    'has_more' => false,
+                ],
+                'last_synced_at' => $this->formatSyncTime($lastSyncedAt),
+            ];
+        }
+
+        $paginator = $query
+            ->orderByDesc('transaction_created_at')
+            ->orderByDesc('id')
+            ->paginate($pageSize, ['*'], 'page', $page);
+
+        return [
+            'items' => collect($paginator->items())
+                ->map(fn (MarketplaceTikTokFinancialTransaction $row): array => $this->presentStoredRow($row, $store->name))
+                ->all(),
+            'summary' => $summary,
+            'pagination' => [
+                'page_size' => $paginator->perPage(),
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+            'last_synced_at' => $this->formatSyncTime($lastSyncedAt),
+        ];
+    }
+
+    /**
+     * Sync both local listing sources. This is called by the queue job and
+     * scheduler command, never by the listing request.
+     *
+     * @return array<string, mixed>
+     */
+    public function syncStoredTransactions(Store $store, Carbon $from, Carbon $to, string $source = 'all'): array
+    {
+        $source = strtolower(trim($source));
+        if (! in_array($source, ['account', 'statements', 'all'], true)) {
+            throw new RuntimeException('Sumber sync TikTok tidak valid.');
+        }
+
+        $result = [
+            'account' => ['count' => 0],
+            'statements' => ['count' => 0],
+            'total' => 0,
+        ];
+
+        if (in_array($source, ['account', 'all'], true)) {
+            $account = $this->fetchAllTransactions($store, $from, $to);
+            $result['account'] = [
+                'count' => count($account['items'] ?? []),
+                'pages' => (int) data_get($account, 'pagination.pages_fetched', 1),
+            ];
+        }
+
+        if (in_array($source, ['statements', 'all'], true)) {
+            $statements = $this->fetchStatementTransactions($store, $from, $to);
+            $result['statements'] = [
+                'count' => count($statements['items'] ?? []),
+                'statements' => (int) data_get($statements, 'pagination.statements_fetched', 0),
+                'pages' => (int) data_get($statements, 'pagination.transaction_pages_fetched', 0),
+            ];
+        }
+
+        $result['total'] = $result['account']['count'] + $result['statements']['count'];
+
+        return $result;
+    }
+
+    /**
      * Fetch the final settlement statement transactions for one TikTok order.
      * This is a read-only diagnostic path used by the store API test tool.
      *
@@ -484,6 +602,112 @@ class TikTokFinancialTransactionService
                 'synced_at' => now(),
             ],
         );
+    }
+
+    /** @return array<string, mixed> */
+    private function storedSummary($query): array
+    {
+        $moneyIn = (float) (clone $query)->where('money_flow', 'MONEY_IN')->sum('amount');
+        $moneyOut = (float) (clone $query)->where('money_flow', 'MONEY_OUT')->sum('amount');
+        $unknown = (int) (clone $query)->where(function ($query): void {
+            $query->whereNull('money_flow')->orWhereNotIn('money_flow', ['MONEY_IN', 'MONEY_OUT']);
+        })->count();
+
+        $breakdown = (clone $query)
+            ->select('transaction_type')
+            ->selectRaw('COUNT(*) as count, SUM(amount) as total_amount')
+            ->groupBy('transaction_type')
+            ->orderByDesc('count')
+            ->get()
+            ->map(function ($row): array {
+                $meta = $this->typeMeta((string) $row->transaction_type);
+
+                return [
+                    'type' => (string) $row->transaction_type,
+                    'label' => $meta['label'],
+                    'count' => (int) $row->count,
+                    'total_amount' => round((float) $row->total_amount, 2),
+                    'badge' => $meta['badge'],
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'total_count' => (int) (clone $query)->count(),
+            'total_money_in' => round($moneyIn, 2),
+            'total_money_out' => round($moneyOut, 2),
+            'net_amount' => round($moneyIn - $moneyOut, 2),
+            'unknown_flow_count' => $unknown,
+            'type_breakdown' => $breakdown,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function presentStoredRow(MarketplaceTikTokFinancialTransaction $row, ?string $storeName = null): array
+    {
+        $createdAt = $row->transaction_created_at;
+        $amount = (float) $row->amount;
+        $flow = (string) ($row->money_flow ?: 'UNKNOWN');
+        $type = strtoupper((string) $row->transaction_type);
+        $meta = $this->typeMeta($type);
+        $payload = is_array($row->source_payload) ? $row->source_payload : [];
+
+        return [
+            'transaction_id' => (string) $row->external_transaction_id,
+            'store_id' => (int) $row->store_id,
+            'store_name' => $storeName,
+            'source' => (string) $row->source,
+            'create_time' => $createdAt?->timestamp,
+            'date_formatted' => $createdAt?->format('Y-m-d H:i:s') ?? '—',
+            'date_human' => $createdAt?->translatedFormat('d M Y, H:i') ?? '—',
+            'amount' => round($amount, 2),
+            'signed_amount' => $flow === 'MONEY_OUT' ? -$amount : ($flow === 'MONEY_IN' ? $amount : $amount),
+            'formatted_amount' => $this->formatAmount($amount, (string) $row->currency),
+            'signed_formatted_amount' => $this->formatSignedAmount($flow, $amount, (string) $row->currency),
+            'currency' => (string) $row->currency,
+            'money_flow' => $flow,
+            'transaction_type' => $type,
+            'transaction_type_label' => $meta['label'],
+            'badge' => $meta['badge'],
+            'status' => strtoupper((string) ($row->status ?: 'UNKNOWN')),
+            'reason' => trim((string) ($payload['reason'] ?? $payload['description'] ?? $payload['adjustment_type'] ?? '')) ?: null,
+            'statement_id' => $row->statement_id,
+            'order_id' => $row->order_id,
+            'adjustment_id' => $row->adjustment_id,
+            'settlement_amount' => $row->settlement_amount !== null ? (float) $row->settlement_amount : null,
+            'revenue_amount' => $row->revenue_amount !== null ? (float) $row->revenue_amount : null,
+            'shipping_cost_amount' => $row->shipping_cost_amount !== null ? (float) $row->shipping_cost_amount : null,
+            'fee_tax_amount' => $row->fee_tax_amount !== null ? (float) $row->fee_tax_amount : null,
+            'adjustment_amount' => $row->adjustment_amount !== null ? (float) $row->adjustment_amount : null,
+            'reserve_amount' => $row->reserve_amount !== null ? (float) $row->reserve_amount : null,
+            'raw_payload' => $payload,
+        ];
+    }
+
+    /** @return array{label:string,flow:string,badge:string} */
+    private function typeMeta(string $type): array
+    {
+        if (isset(self::TYPES[$type])) {
+            return self::TYPES[$type];
+        }
+
+        $statementMeta = $this->statementTypeMeta($type);
+
+        return [
+            'label' => $statementMeta['label'],
+            'flow' => 'UNKNOWN',
+            'badge' => $statementMeta['badge'],
+        ];
+    }
+
+    private function formatSyncTime(mixed $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        return Carbon::parse((string) $value, config('app.timezone'))->toIso8601String();
     }
 
     private function assertTikTok(Store $store): void

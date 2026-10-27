@@ -177,6 +177,10 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/shopee-transactions/export', [ShopeeTransactionController::class, 'export'])->name('marketplace.api.shopee-transactions.export');
     Route::get('/stores/{store}/tiktok-financial-transactions', [TikTokFinancialTransactionController::class, 'data'])->name('marketplace.api.tiktok-financial-transactions');
     Route::get('/stores/{store}/tiktok-financial-transactions/export', [TikTokFinancialTransactionController::class, 'export'])->name('marketplace.api.tiktok-financial-transactions.export');
+    Route::post('/stores/{store}/tiktok-financial-transactions/sync', [TikTokFinancialTransactionController::class, 'sync'])
+        ->name('marketplace.api.tiktok-financial-transactions.sync');
+    Route::get('/stores/{store}/tiktok-financial-transactions/sync-status', [TikTokFinancialTransactionController::class, 'syncStatus'])
+        ->name('marketplace.api.tiktok-financial-transactions.sync-status');
     Route::get('/stores/{store}/tiktok-orders/{orderId}/statement-transactions', [TikTokFinancialTransactionController::class, 'orderStatement'])->name('marketplace.api.tiktok-order-statement');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
