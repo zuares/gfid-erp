@@ -930,7 +930,7 @@
                                 inputmode="decimal" size="sm" placeholder="Qty" class="bundle-qty-pcs bundle-qty" />
                         </td>
                         <td>
-                            {{-- qty_used_fabric: auto-fill dari pemakaian terakhir (fallback BOM), bisa diedit --}}
+                            {{-- qty_used_fabric: auto-fill dari BOM aktif (fallback pemakaian terakhir), bisa diedit --}}
                             <input type="text" inputmode="decimal" autocomplete="off"
                                 name="bundles[__INDEX__][qty_used_fabric]"
                                 class="form-control form-control-sm text-end bundle-qty-fabric"
@@ -1393,7 +1393,7 @@
                 }
 
                 // Hitung estimasi standar BOM + total pemakaian dari INPUT kain
-                // (input = autofill pemakaian terakhir / BOM, bisa diedit user).
+                // (input = autofill BOM aktif / pemakaian terakhir, bisa diedit user).
                 // Ringkasan & cek stok pakai nilai INPUT — itu yang benar-benar
                 // akan dipotong dari stok. Standar BOM tampil sebagai pembanding.
                 let totalBomFabric = 0;
@@ -1835,7 +1835,7 @@
                 return qtyPcs * bomQty * (1 + scrap_pct / 100);
             }
 
-            // ── Hitung & isi qty_used_fabric: prioritas PEMAKAIAN TERAKHIR → BOM ──
+            // ── Hitung & isi qty_used_fabric: prioritas BOM AKTIF → pemakaian terakhir ──
             function autofillFabricQtyForRow(tr) {
                 const hiddenItemId   = tr.querySelector('[name*="finished_item_id"]');
                 const qtyFabricInput = tr.querySelector('.bundle-qty-fabric');
@@ -1845,15 +1845,17 @@
                 const qtyPcs         = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0');
 
                 if (finishedItemId && fabricItemId && qtyPcs > 0) {
-                    const usage = lastUsage[finishedItemId]?.[fabricItemId];
-                    if (usage && usage.qty_per_pcs > 0) {
-                        // Pemakaian aktual cutting terakhir
-                        qtyFabricInput.value = (qtyPcs * usage.qty_per_pcs).toFixed(4);
+                    // BOM aktif adalah standar produksi. Pemakaian terakhir hanya
+                    // dipakai bila belum ada BOM untuk kombinasi FG + bahan ini;
+                    // jika tidak, histori lama dapat menimpa standar BOM baru.
+                    const maxKg = bomMaxKg(finishedItemId, fabricItemId, qtyPcs);
+                    if (maxKg !== null) {
+                        qtyFabricInput.value = maxKg.toFixed(4);
                         qtyFabricInput.dataset.auto = '1';
                     } else {
-                        const maxKg = bomMaxKg(finishedItemId, fabricItemId, qtyPcs);
-                        if (maxKg !== null) {
-                            qtyFabricInput.value = maxKg.toFixed(4);
+                        const usage = lastUsage[finishedItemId]?.[fabricItemId];
+                        if (usage && usage.qty_per_pcs > 0) {
+                            qtyFabricInput.value = (qtyPcs * usage.qty_per_pcs).toFixed(4);
                             qtyFabricInput.dataset.auto = '1';
                         }
                     }
