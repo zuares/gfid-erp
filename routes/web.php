@@ -25,6 +25,7 @@ require __DIR__ . '/web/social-media.php';
 require __DIR__ . '/web/master.php';
 require __DIR__ . '/web/sales.php';
 require __DIR__ . '/web/accounting.php';
+require __DIR__ . '/web/standalone-accounting.php';
 require __DIR__ . '/web/shipments.php';
 require __DIR__ . '/web/imports.php';
 require __DIR__ . '/web/settings.php';

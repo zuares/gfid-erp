@@ -535,6 +535,10 @@
     $hasTrialBalanceIndex       = $router->has('accounting.trial-balance.index');
     $hasProfitLossIndex         = $router->has('accounting.profit-loss.index');
     $hasBukuBesarIndex          = $router->has('accounting.buku-besar.index');
+    $hasStandaloneAccounting =
+        $router->has('standalone-accounting.trial-balance.index') &&
+        $router->has('standalone-accounting.journals.index') &&
+        $router->has('standalone-accounting.accounts.index');
     $hasJournalsIndex = $router->has('accounting.journals.index');
     $hasAccountsIndex = $router->has('accounting.accounts.index');
     $hasOpeningBalancesIndex = $router->has('accounting.opening-balances.index');
@@ -555,6 +559,7 @@
     $canModule = fn (string $module) => $user ? $user->canAccessModule($module) : false;
     $hasDashboardRoute = $hasDashboardRoute && $canModule('dashboard');
     $hasCashExpensesIndex = $hasCashExpensesIndex && $canModule('cash-expenses');
+    $hasStandaloneAccounting = $hasStandaloneAccounting && $isAdmin;
 
     if (!$canModule('master')) {
         // Admin hanya mendapat akses CRUD Master Item, bukan seluruh Master Data.
@@ -778,6 +783,8 @@
         request()->routeIs('accounting.trial-balance.*') ||
         request()->routeIs('accounting.profit-loss.*') ||
         request()->routeIs('accounting.ap-report.*');
+
+    $standaloneAccountingOpen = request()->routeIs('standalone-accounting.*');
 
     $payrollOpen =
         request()->routeIs('payroll.dashboard*') ||
@@ -1540,6 +1547,8 @@
                     @endif
 
                     {{-- Keuangan (admin / operating) --}}
+                    @include('layouts.partials.mobile-sidebar-standalone-accounting')
+
                     @if ($hasAccountingIndex || $hasCashExpensesIndex || $hasCashTransfersIndex || $hasCashReceiptsIndex || $hasSupplierLoansIndex || $hasEmployeeSavingsIndex || $hasCashBasisReportIndex || $hasJournalsIndex || $hasAccountsIndex || $hasOpeningBalancesIndex || $hasOpeningBalancesBatchIndex || $hasSupplierApOpeningsIndex)
                         <div class="mobile-sidebar-section-label">{{ $isAdmin ? 'Akuntansi' : 'Keuangan' }}</div>
                         <li class="mb-1">
@@ -2677,6 +2686,8 @@
                     </li>
 
                     {{-- FINANCE --}}
+                    @include('layouts.partials.mobile-sidebar-standalone-accounting')
+
                     <div class="mobile-sidebar-section-label">Keuangan</div>
 
                     {{-- Akuntansi --}}

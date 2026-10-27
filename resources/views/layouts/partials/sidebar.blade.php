@@ -219,6 +219,10 @@
     $hasTrialBalanceIndex       = $router->has('accounting.trial-balance.index');
     $hasProfitLossIndex         = $router->has('accounting.profit-loss.index');
     $hasBukuBesarIndex          = $router->has('accounting.buku-besar.index');
+    $hasStandaloneAccounting =
+        $router->has('standalone-accounting.trial-balance.index') &&
+        $router->has('standalone-accounting.journals.index') &&
+        $router->has('standalone-accounting.accounts.index');
 
     // Penggajian (owner)
     $hasPayrollDashboard = $router->has('payroll.dashboard');
@@ -233,6 +237,7 @@
     $canModule = fn (string $module) => $user ? $user->canAccessModule($module) : false;
     $hasDashboardRoute = $hasDashboardRoute && $canModule('dashboard');
     $hasCashExpensesIndex = $hasCashExpensesIndex && $canModule('cash-expenses');
+    $hasStandaloneAccounting = $hasStandaloneAccounting && $isAdmin;
 
     if (!$canModule('inventory')) {
         $hasInvStocksItems = $hasInvStocksLots = $hasInvStockCard = false;
@@ -468,6 +473,8 @@
         $open('accounting.supplier-ap-openings.*') ||
         $open('accounting.journals.*') ||
         $open('accounting.accounts.*');
+
+    $openStandaloneAccounting = request()->routeIs('standalone-accounting.*');
 
     $openPayroll =
         $open('payroll.dashboard*') ||
@@ -1959,6 +1966,8 @@
             @endif
 
             {{-- Keuangan --}}
+            @include('layouts.partials.sidebar-standalone-accounting')
+
             @if ($canShow(
                 $hasCashExpensesIndex,
                 $hasCashTransfersIndex,
@@ -2963,6 +2972,8 @@
             @endif
 
             {{-- FINANCE --}}
+            @include('layouts.partials.sidebar-standalone-accounting')
+
             @if ($canShow($hasAccountingIndex, $hasOpeningBalancesIndex, $hasOpeningBalancesBatchIndex, $hasSupplierApOpeningsIndex, $hasCashExpensesIndex, $hasCashReceiptsIndex, $hasLoansIndex, $hasEmployeeLoansIndex, $hasEmployeeSavingsIndex, $hasSupplierLoansIndex, $hasCashTransfersIndex, $hasCashBasisReportIndex, $hasJournalsIndex, $hasAccountsIndex, $hasMarketplacePayoutsIndex, $hasApReportIndex, $hasTrialBalanceIndex, $hasProfitLossIndex, $hasBukuBesarIndex))
                 <x-sidebar.label text="Keuangan" />
                 <li class="mb-1">

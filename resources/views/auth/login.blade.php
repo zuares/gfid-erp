@@ -411,7 +411,7 @@
 
 	        <div class="admin-info" style="margin-top:18px;">
 	            <p style="margin:0;">
-	                Login admin hanya memakai email dan password internal. Jika ingin masuk ke toko website, gunakan halaman storefront.
+	                Login admin memakai employee code atau email dan password internal. Jika ingin masuk ke toko website, gunakan halaman storefront.
 	            </p>
 	        </div>
 
@@ -419,7 +419,7 @@
 	            @csrf
 
 	            <div class="field">
-	                <label for="employee_code">Employee Code</label>
+	                <label for="employee_code">Employee Code atau Email</label>
                 <input type="text" id="employee_code" name="employee_code"
                     value="{{ old('employee_code') }}"
                     class="{{ $errors->has('employee_code') ? 'is-invalid' : '' }}"

@@ -20,13 +20,24 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $employeeCode = strtoupper(trim((string) $credentials['employee_code']));
+        $loginIdentifier = trim((string) $credentials['employee_code']);
+        $employeeCode = strtoupper($loginIdentifier);
 
-        // Login pakai employee_code + password
-        if (Auth::attempt([
+        // Kompatibel dengan login lama memakai employee_code, sekaligus
+        // menerima email karena itu yang ditampilkan di halaman login.
+        $authenticated = Auth::attempt([
             'employee_code' => $employeeCode,
             'password' => $credentials['password'],
-        ], $request->boolean('remember'))) {
+        ], $request->boolean('remember'));
+
+        if (!$authenticated && filter_var($loginIdentifier, FILTER_VALIDATE_EMAIL)) {
+            $authenticated = Auth::attempt([
+                'email' => strtolower($loginIdentifier),
+                'password' => $credentials['password'],
+            ], $request->boolean('remember'));
+        }
+
+        if ($authenticated) {
 
             $request->session()->regenerate();
 
