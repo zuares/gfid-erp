@@ -1086,7 +1086,7 @@
         });
     }
 
-    function fmtDate(value) {
+    function fmtSettlementDate(value) {
         if (!value) return '—';
         const d = new Date(value);
         if (Number.isNaN(d.getTime())) return String(value);
@@ -2399,7 +2399,7 @@
                     || String(s.finance_source || '').toLowerCase().includes('tiktok_finance');
                 const settlementDateOnly = isTikTokFinance && s.settlement_time_precision === 'date';
                 const settlementTimeLabel = s.settlement_time
-                    ? (settlementDateOnly ? fmtDate(s.settlement_time) : fmtDateTime(s.settlement_time))
+                    ? (settlementDateOnly ? fmtSettlementDate(s.settlement_time) : fmtDateTime(s.settlement_time))
                     : 'Tanggal final belum tersedia';
                 const tiktokShippingCost = Number(s.actual_shipping_fee_amount ?? s.actual_shipping_fee ?? 0);
                 const tiktokBuyerShipping = Number(s.shipping_fee_customer ?? s.order?.shipping_fee_customer ?? 0);

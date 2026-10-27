@@ -644,6 +644,8 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('Biaya logistik')
             ->assertSee("params.append('include_meta', 0)", false)
             ->assertSee("params.set('summary_only', '1')", false)
+            ->assertSee('function fmtSettlementDate(value)', false)
+            ->assertDontSee('function fmtDate(value)', false)
             ->assertSee('Menghitung ringkasan…');
     }
 
