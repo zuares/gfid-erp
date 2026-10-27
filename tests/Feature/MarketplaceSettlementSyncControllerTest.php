@@ -641,7 +641,10 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
             ->assertSee('Pembeli')
             ->assertSee('Platform')
             ->assertSee('Selisih Ongkir')
-            ->assertSee('Biaya logistik');
+            ->assertSee('Biaya logistik')
+            ->assertSee("params.append('include_meta', 0)", false)
+            ->assertSee("params.set('summary_only', '1')", false)
+            ->assertSee('Menghitung ringkasan…');
     }
 
     public function test_detail_order_menampilkan_estimasi_bila_income_belum_ada()
@@ -1226,6 +1229,31 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertEquals(90000.0, (float) $payload['paginator']['data'][0]['gross_after_voucher']);
         $this->assertEquals(18.3, (float) $payload['paginator']['data'][0]['fee_percent']);
         $this->assertEquals(18.3, (float) $payload['meta']['kpi_fee_pct']);
+
+        $listOnly = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            [
+                'store_id' => $store->id,
+                'page' => 1,
+                'per_page' => 50,
+                'include_meta' => 0,
+            ],
+        ))->getData(true);
+        $this->assertCount(1, $listOnly['paginator']['data']);
+        $this->assertNull($listOnly['meta']);
+
+        $summaryOnly = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            [
+                'store_id' => $store->id,
+                'page' => 1,
+                'summary_only' => 1,
+            ],
+        ))->getData(true);
+        $this->assertNull($summaryOnly['paginator']);
+        $this->assertEquals(18.3, (float) $summaryOnly['meta']['kpi_fee_pct']);
     }
 
     public function test_order_cancelled_has_zero_gross_and_net_settlement(): void

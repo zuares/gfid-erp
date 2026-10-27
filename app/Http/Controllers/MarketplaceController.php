@@ -3636,6 +3636,9 @@ class MarketplaceController extends Controller
 
     public function settlements(Request $request): JsonResponse
     {
+        $summaryOnly = $request->boolean('summary_only');
+        $includeMeta = $summaryOnly || $request->boolean('include_meta', true);
+
         $query = MarketplaceOrderSettlement::with([
             'store:id,name,channel_id',
             'store.channel:id,code,name',
@@ -4085,6 +4088,25 @@ class MarketplaceController extends Controller
             $shopeeServiceFeeBreakdownDifference = $shopeeServiceFeeBreakdown !== []
                 ? round(abs((float) $s->service_fee) - $shopeeServiceFeeBreakdownTotal, 2)
                 : null;
+            $rawJson = is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json;
+            $rawJson = is_array($rawJson) ? $rawJson : [];
+            $displayRawJson = array_filter([
+                'source' => data_get($rawJson, 'source'),
+                'fee_and_tax_amount' => data_get($rawJson, 'fee_and_tax_amount'),
+                'tiktok_fee_breakdown' => data_get($rawJson, 'tiktok_fee_breakdown'),
+            ], static fn ($value) => $value !== null && $value !== []);
+            if (! isset($displayRawJson['tiktok_fee_breakdown']) && is_array(data_get($rawJson, 'sku_transactions'))) {
+                $displayRawJson['sku_transactions'] = collect(data_get($rawJson, 'sku_transactions'))
+                    ->filter(static fn ($transaction): bool => is_array($transaction))
+                    ->map(static fn (array $transaction): array => [
+                        'fee_tax_breakdown' => is_array($transaction['fee_tax_breakdown'] ?? null)
+                            ? $transaction['fee_tax_breakdown']
+                            : [],
+                    ])
+                    ->filter(static fn (array $transaction): bool => $transaction['fee_tax_breakdown'] !== [])
+                    ->values()
+                    ->all();
+            }
 
             return [
                 'id' => $s->id,
@@ -4102,7 +4124,7 @@ class MarketplaceController extends Controller
                     ?? data_get($s->raw_json, 'payment_info.payment_method'),
                 'ordered_at' => $s->order?->ordered_at?->toISOString(),
                 'store' => $s->store,
-                'order' => $s->order,
+                'order' => $s->order?->makeHidden(['raw_json']),
                 'buyer_payment_amount' => (float) $s->buyer_payment_amount,
                 'subtotal_items' => (float) ($s->order?->subtotal_items ?? $s->buyer_payment_amount),
                 'total_paid_customer' => (float) ($s->order?->total_paid_customer ?? $s->buyer_payment_amount),
@@ -4199,51 +4221,63 @@ class MarketplaceController extends Controller
                     ? ($settlementTimePrecision ?: 'datetime')
                     : null,
                 'synced_at' => $s->synced_at?->toISOString(),
-                'raw_json' => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
+                'raw_json' => $displayRawJson,
             ];
         };
 
         if ($includeMissingPending || $sortBy === 'final_income') {
             $allRows = $query->get()->concat($pendingRows);
-            $payoutLookup = $this->settlementPayoutLookup($allRows);
-            $sortValue = function ($s) use ($sortBy) {
-                if ($sortBy === 'ordered_at') {
-                    return $s->order?->ordered_at?->timestamp ?? 0;
-                }
-                if ($sortBy === 'final_income') {
-                    return $this->settlementSortIncome($s);
-                }
-                if ($sortBy === 'buyer_payment_amount') {
-                    return (float) $s->buyer_payment_amount;
-                }
+            if (! $summaryOnly) {
+                $payoutLookup = $this->settlementPayoutLookup(
+                    $allRows->filter(fn ($settlement) => ! $settlement->settlement_time)
+                );
+                $sortValue = function ($s) use ($sortBy) {
+                    if ($sortBy === 'ordered_at') {
+                        return $s->order?->ordered_at?->timestamp ?? 0;
+                    }
+                    if ($sortBy === 'final_income') {
+                        return $this->settlementSortIncome($s);
+                    }
+                    if ($sortBy === 'buyer_payment_amount') {
+                        return (float) $s->buyer_payment_amount;
+                    }
 
-                return $s->settlement_time?->timestamp
-                    ?? $s->order?->incomeEstimate?->estimated_payout_at?->timestamp
-                    ?? $s->order?->ordered_at?->timestamp
-                    ?? 0;
-            };
-            $allRows = ($sortDir === 'asc' ? $allRows->sortBy($sortValue) : $allRows->sortByDesc($sortValue))->values();
+                    return $s->settlement_time?->timestamp
+                        ?? $s->order?->incomeEstimate?->estimated_payout_at?->timestamp
+                        ?? $s->order?->ordered_at?->timestamp
+                        ?? 0;
+                };
+                $allRows = ($sortDir === 'asc' ? $allRows->sortBy($sortValue) : $allRows->sortByDesc($sortValue))->values();
 
-            $perPage = (int) $request->input('per_page', 50);
-            $page = max((int) $request->input('page', 1), 1);
-            $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
-                $allRows->forPage($page, $perPage)->values()->map($formatSettlement),
-                $allRows->count(),
-                $perPage,
-                $page,
-                ['path' => $request->url(), 'query' => $request->query()]
-            );
+                $perPage = (int) $request->input('per_page', 50);
+                $page = max((int) $request->input('page', 1), 1);
+                $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+                    $allRows->forPage($page, $perPage)->values()->map($formatSettlement),
+                    $allRows->count(),
+                    $perPage,
+                    $page,
+                    ['path' => $request->url(), 'query' => $request->query()]
+                );
+            } else {
+                $paginator = null;
+            }
             $metaRowsForSettlement = $allRows
                 ->reject(fn ($settlement) => $this->isBookingOnlySettlement($settlement))
                 ->values();
+        } elseif ($summaryOnly) {
+            // Ringkasan tidak perlu mengambil dan memformat baris tabel.
+            $paginator = null;
+            $metaRowsForSettlement = null;
         } else {
             $paginator = $query->paginate($request->input('per_page', 50));
-            $payoutLookup = $this->settlementPayoutLookup($paginator->getCollection());
+            $payoutLookup = $this->settlementPayoutLookup(
+                $paginator->getCollection()->filter(fn ($settlement) => ! $settlement->settlement_time)
+            );
             $paginator->setCollection($paginator->getCollection()->map($formatSettlement));
             $metaRowsForSettlement = null;
         }
 
-        if ($request->input('page', 1) == 1) {
+        if ($includeMeta && $request->input('page', 1) == 1) {
             if ($includeMissingPending || $sortBy === 'final_income') {
                 $metaRows = $metaRowsForSettlement;
             } else {
@@ -4274,38 +4308,18 @@ class MarketplaceController extends Controller
                     'raw_json',
                 ]);
                 // KPI menghitung seluruh hasil filter, bukan hanya halaman aktif.
-                $payoutLookup = $this->settlementPayoutLookup($metaRows);
+                $payoutLookup = $this->settlementPayoutLookup(
+                    $metaRows->filter(fn ($settlement) => ! $settlement->settlement_time)
+                );
             }
             $metaRows = $metaRows
                 ->reject(fn ($settlement) => $this->isBookingOnlySettlement($settlement))
                 ->values();
-            $feeTotals = $metaRows->reduce(function (array $carry, MarketplaceOrderSettlement $settlement) {
-                $totals = $settlement->marketplaceFeeCategoryTotals($settlement->marketplaceFeeBreakdown());
-                $carry['seller'] += (float) ($totals['seller'] ?? 0);
-                $carry['buyer'] += (float) ($totals['buyer'] ?? 0);
-                $carry['platform'] += (float) ($totals['platform'] ?? 0);
-                $carry['voucher'] += (float) ($totals['voucher'] ?? 0);
-                $carry['adjustment'] += (float) ($totals['adjustment'] ?? 0);
-                $carry['total'] += (float) ($totals['total'] ?? 0);
-
-                return $carry;
-            }, ['seller' => 0.0, 'buyer' => 0.0, 'platform' => 0.0, 'voucher' => 0.0, 'adjustment' => 0.0, 'total' => 0.0]);
-            $sellerFeeTotal = (float) ($feeTotals['seller'] ?? 0);
-            $buyerFeeTotal = (float) ($feeTotals['buyer'] ?? 0);
-            $platformFeeTotal = (float) ($feeTotals['platform'] ?? 0);
-            $voucherFeeTotal = (float) ($feeTotals['voucher'] ?? 0);
-            $adjustmentFeeTotal = (float) ($feeTotals['adjustment'] ?? 0);
-            $allFeeTotal = (float) ($feeTotals['total'] ?? 0);
-            $grossTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement): float => $this->settlementGrossSalesAmount($settlement));
-            $buyerPaidTotal = (float) $metaRows->sum(function (MarketplaceOrderSettlement $settlement) {
-                return (float) ($settlement->order?->total_paid_customer ?? $settlement->buyer_payment_amount);
-            });
-            $voucherTokoTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => $this->settlementVoucherTokoAmount($settlement));
-            $voucherPlatformTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => $this->settlementVoucherPlatformAmount($settlement));
-            $buyerPaidTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => $this->settlementBuyerPaidAmount($settlement));
-            $grossAfterVoucher = max($grossTotal - ($voucherTokoTotal + $voucherPlatformTotal), 0);
-            $grossAfterVoucherToko = max($grossTotal - $voucherTokoTotal, 0);
-            $adCostTotal = (float) $metaRows->sum(fn (MarketplaceOrderSettlement $settlement) => (float) $settlement->ad_cost);
+            $grossTotal = 0.0;
+            $buyerPaidTotal = 0.0;
+            $voucherTokoTotal = 0.0;
+            $voucherPlatformTotal = 0.0;
+            $adCostTotal = 0.0;
             $countSelesai = 0;
             $countBatal = 0;
             $countPenyesuaian = 0;
@@ -4314,6 +4328,10 @@ class MarketplaceController extends Controller
             $countReturning = 0;
             $countUnsettled = 0;
             $sellerFeeTotal = 0.0;
+            $buyerFeeTotal = 0.0;
+            $platformFeeTotal = 0.0;
+            $adjustmentFeeTotal = 0.0;
+            $allFeeTotal = 0.0;
             $kpiNet = 0.0;
             $kpiCogs = 0.0;
             $kpiAffiliate = 0.0;
@@ -4321,13 +4339,15 @@ class MarketplaceController extends Controller
             $estimatedShopeeCount = 0;
             $estimatedManualCount = 0;
             $estimateLastSyncedAt = null;
-            $feeAnalysisComponents = [];
-            $feeAnalysisPlatforms = [];
-            $feeAnalysisOrdersWithFee = 0;
-            $feeAnalysisGrossWithFee = 0.0;
-            $feeAnalysisTotal = 0.0;
             foreach ($metaRows as $s) {
                 $st = strtoupper($s->order?->order_status ?? '');
+                $grossAmount = $this->settlementGrossSalesAmount($s);
+                $voucherTokoAmount = $this->settlementVoucherTokoAmount($s);
+                $grossTotal += $grossAmount;
+                $buyerPaidTotal += $this->settlementBuyerPaidAmount($s);
+                $voucherTokoTotal += $voucherTokoAmount;
+                $voucherPlatformTotal += $this->settlementVoucherPlatformAmount($s);
+                $adCostTotal += (float) $s->ad_cost;
                 $isCompleted = $st === 'COMPLETED';
                 $isShipped = in_array($st, ['SHIPPED', 'DIKIRIM']);
                 $isToConfirm = in_array($st, ['TO_CONFIRM_RECEIVE', 'COMPLETED']);
@@ -4349,58 +4369,10 @@ class MarketplaceController extends Controller
                 }
                 $breakdown = $s->marketplaceFeeBreakdown();
                 $feeTots = $s->marketplaceFeeCategoryTotals($breakdown);
-                $analysisGross = max(
-                    $this->settlementGrossSalesAmount($s) - $this->settlementVoucherTokoAmount($s),
-                    0,
-                );
-                $platformCode = strtolower(trim((string) ($s->store?->channel?->code ?? 'marketplace')));
-                $platformName = trim((string) ($s->store?->channel?->name ?? 'Marketplace')) ?: 'Marketplace';
-                if (! isset($feeAnalysisPlatforms[$platformCode])) {
-                    $feeAnalysisPlatforms[$platformCode] = [
-                        'code' => $platformCode,
-                        'name' => $platformName,
-                        'order_count' => 0,
-                        'orders_with_fee' => 0,
-                        'gross_with_fee' => 0.0,
-                        'fee_total' => 0.0,
-                    ];
-                }
-                $feeAnalysisPlatforms[$platformCode]['order_count']++;
-
-                $analysisOrderFee = 0.0;
-                $analysisOrderKey = (string) ($s->id ?: $s->channel_order_id);
-                foreach ($breakdown as $feeRow) {
-                    if (($feeRow['category'] ?? 'seller') !== 'seller') {
-                        continue;
-                    }
-
-                    $amount = (float) ($feeRow['amount'] ?? 0);
-                    if ($amount <= 0) {
-                        continue;
-                    }
-
-                    $label = trim((string) ($feeRow['label'] ?? 'Biaya Marketplace')) ?: 'Biaya Marketplace';
-                    if (! isset($feeAnalysisComponents[$label])) {
-                        $feeAnalysisComponents[$label] = [
-                            'label' => $label,
-                            'amount' => 0.0,
-                            'orders' => [],
-                        ];
-                    }
-
-                    $feeAnalysisComponents[$label]['amount'] += $amount;
-                    $feeAnalysisComponents[$label]['orders'][$analysisOrderKey] = true;
-                    $analysisOrderFee += $amount;
-                }
-
-                if ($analysisOrderFee > 0) {
-                    $feeAnalysisOrdersWithFee++;
-                    $feeAnalysisGrossWithFee += $analysisGross;
-                    $feeAnalysisTotal += $analysisOrderFee;
-                    $feeAnalysisPlatforms[$platformCode]['orders_with_fee']++;
-                    $feeAnalysisPlatforms[$platformCode]['gross_with_fee'] += $analysisGross;
-                    $feeAnalysisPlatforms[$platformCode]['fee_total'] += $analysisOrderFee;
-                }
+                $buyerFeeTotal += (float) ($feeTots['buyer'] ?? 0);
+                $platformFeeTotal += (float) ($feeTots['platform'] ?? 0);
+                $adjustmentFeeTotal += (float) ($feeTots['adjustment'] ?? 0);
+                $allFeeTotal += (float) ($feeTots['total'] ?? 0);
                 if (($feeTots['adjustment'] ?? 0) < 0) {
                     $countPenyesuaian++;
                 }
@@ -4427,9 +4399,7 @@ class MarketplaceController extends Controller
                 if ($isCancelledOrReturned || $isReturning) {
                     // Jika batal/return atau sedang dikembalikan, maka tidak ada pendapatan dan potongan.
                 } elseif (! $isFinalSettlement && $payoutAmount !== null) {
-                    $grossAmt = $this->settlementGrossSalesAmount($s);
-                    $tokoVoucher = $this->settlementVoucherTokoAmount($s);
-                    $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
+                    $grossAfterVT = max($grossAmount - $voucherTokoAmount, 0);
                     $affiliateCommission = (float) (
                         data_get($s->raw_json, 'affiliate_commission')
                         ?? data_get($s->raw_json, 'affiliate_commission_amount')
@@ -4449,9 +4419,7 @@ class MarketplaceController extends Controller
                     if ($estimateSyncedAt && (! $estimateLastSyncedAt || $estimateSyncedAt->gt($estimateLastSyncedAt))) {
                         $estimateLastSyncedAt = $estimateSyncedAt;
                     }
-                    $grossAmt = $this->settlementGrossSalesAmount($s);
-                    $tokoVoucher = $this->settlementVoucherTokoAmount($s);
-                    $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
+                    $grossAfterVT = max($grossAmount - $voucherTokoAmount, 0);
                     $affiliateCommission = (float) (
                         data_get($s->raw_json, 'affiliate_commission')
                         ?? data_get($s->raw_json, 'affiliate_commission_amount')
@@ -4468,9 +4436,7 @@ class MarketplaceController extends Controller
                     $kpiNet += $estimatedEscrowAmount;
                 } elseif (! $isFinalSettlement && (float) $s->final_income <= 0) {
                     $estimatedManualCount++;
-                    $grossAmt = $this->settlementGrossSalesAmount($s);
-                    $tokoVoucher = $this->settlementVoucherTokoAmount($s);
-                    $grossAfterVT = max($grossAmt - $tokoVoucher, 0);
+                    $grossAfterVT = max($grossAmount - $voucherTokoAmount, 0);
 
                     $affiliateCommission = (float) (
                         data_get($s->raw_json, 'affiliate_commission')
@@ -4505,47 +4471,10 @@ class MarketplaceController extends Controller
                 }
             }
 
+            $grossAfterVoucher = max($grossTotal - ($voucherTokoTotal + $voucherPlatformTotal), 0);
+            $grossAfterVoucherToko = max($grossTotal - $voucherTokoTotal, 0);
             $feePercent = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
             $feePercentToko = $grossAfterVoucherToko > 0 ? round(($sellerFeeTotal / $grossAfterVoucherToko) * 100, 1) : 0.0;
-            $feeAnalysisComponentRows = collect($feeAnalysisComponents)
-                ->map(function (array $component) use ($feeAnalysisTotal, $feeAnalysisGrossWithFee): array {
-                    $amount = round((float) $component['amount'], 2);
-
-                    return [
-                        'label' => $component['label'],
-                        'amount' => $amount,
-                        'order_count' => count($component['orders']),
-                        'share_pct' => $feeAnalysisTotal > 0
-                            ? round(($amount / $feeAnalysisTotal) * 100, 1)
-                            : 0.0,
-                        'gross_pct' => $feeAnalysisGrossWithFee > 0
-                            ? round(($amount / $feeAnalysisGrossWithFee) * 100, 1)
-                            : 0.0,
-                    ];
-                })
-                ->sortByDesc('amount')
-                ->values()
-                ->all();
-            $feeAnalysisPlatformRows = collect($feeAnalysisPlatforms)
-                ->map(function (array $platform): array {
-                    $grossWithFee = round((float) $platform['gross_with_fee'], 2);
-                    $feeTotal = round((float) $platform['fee_total'], 2);
-
-                    return [
-                        'code' => $platform['code'],
-                        'name' => $platform['name'],
-                        'order_count' => (int) $platform['order_count'],
-                        'orders_with_fee' => (int) $platform['orders_with_fee'],
-                        'gross_with_fee' => $grossWithFee,
-                        'fee_total' => $feeTotal,
-                        'effective_fee_pct' => $grossWithFee > 0
-                            ? round(($feeTotal / $grossWithFee) * 100, 1)
-                            : 0.0,
-                    ];
-                })
-                ->sortByDesc('fee_total')
-                ->values()
-                ->all();
 
             $meta = [
                 'kpi_count' => (int) $metaRows->count(),
@@ -4581,23 +4510,6 @@ class MarketplaceController extends Controller
                 'estimate_shopee_count' => $estimatedShopeeCount,
                 'estimate_manual_count' => $estimatedManualCount,
                 'estimate_last_synced_at' => $estimateLastSyncedAt?->toISOString(),
-                'fee_analysis' => [
-                    'order_count' => (int) $metaRows->count(),
-                    'orders_with_fee' => $feeAnalysisOrdersWithFee,
-                    'coverage_pct' => $metaRows->count() > 0
-                        ? round(($feeAnalysisOrdersWithFee / $metaRows->count()) * 100, 1)
-                        : 0.0,
-                    'gross_with_fee' => round($feeAnalysisGrossWithFee, 2),
-                    'fee_total' => round($feeAnalysisTotal, 2),
-                    'effective_fee_pct' => $feeAnalysisGrossWithFee > 0
-                        ? round(($feeAnalysisTotal / $feeAnalysisGrossWithFee) * 100, 1)
-                        : 0.0,
-                    'average_fee_per_order' => $feeAnalysisOrdersWithFee > 0
-                        ? round($feeAnalysisTotal / $feeAnalysisOrdersWithFee, 2)
-                        : 0.0,
-                    'components' => $feeAnalysisComponentRows,
-                    'platforms' => $feeAnalysisPlatformRows,
-                ],
             ];
         } else {
             $meta = null; // Frontend can preserve previous KPI state on page change

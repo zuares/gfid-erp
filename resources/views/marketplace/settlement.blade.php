@@ -993,6 +993,7 @@
     let autoSyncLastActivityKey = '';
     let lastSettlementProgressKey = 'idle:idle';
     let settlementSyncViewVersion = 0;
+    let settlementRequestVersion = 0;
     let settlementSyncRunId = null;
     let settlementSyncLastPercent = 0;
     let settlementSyncRefreshInFlight = false;
@@ -2281,7 +2282,40 @@
 
     window.purgeAllSettlements = window.purgeAllMarketplaceData;
 
+    function applySettlementMeta(meta) {
+        if (!meta) return;
+
+        $('kpiCount').textContent = meta.kpi_count;
+        $('kpiBuyerTotal').textContent = fmtRp(meta.kpi_gross);
+        $('kpiFeeTotal').textContent = fmtRp(meta.kpi_fees);
+        $('kpiAdCost').textContent = fmtRp(meta.kpi_ad_cost || 0);
+        $('kpiFeePercent').textContent = Number.isFinite(Number(meta.kpi_fee_pct))
+            ? `${Number(meta.kpi_fee_pct).toFixed(1)}% dari gross setelah voucher`
+            : '—';
+        $('kpiNetPayout').textContent = fmtRp(meta.kpi_net);
+        updateSettlementModeLabels(meta);
+    }
+
+    async function loadSettlementSummary(listParams, requestVersion) {
+        const params = new URLSearchParams(listParams);
+        params.set('page', '1');
+        params.set('include_meta', '1');
+        params.set('summary_only', '1');
+        params.delete('per_page');
+
+        try {
+            const res = await api('/api/marketplace/settlements?' + params.toString());
+            if (requestVersion !== settlementRequestVersion) return;
+            applySettlementMeta(res?.meta);
+        } catch (error) {
+            if (requestVersion !== settlementRequestVersion) return;
+            $('kpiFeePercent').textContent = 'Ringkasan gagal dimuat';
+            console.error('Gagal memuat ringkasan settlement', error);
+        }
+    }
+
     window.loadSettlements = async function () {
+        const requestVersion = ++settlementRequestVersion;
         saveSettlementFilterState();
         updateSettlementModeLabels();
         $('settlementBody').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--shp-muted);font-size:.85rem;"><span class="spinner-border spinner-border-sm"></span> Memuat data...</div>';
@@ -2294,6 +2328,7 @@
         if ($('filterSearch').value) params.append('search', $('filterSearch').value);
         params.append('page', currentPage);
         params.append('per_page', 50);
+        params.append('include_meta', 0);
 
         if (fpOrderDate && fpOrderDate.selectedDates && fpOrderDate.selectedDates.length === 2) {
             const orderFrom = fpOrderDate.formatDate(fpOrderDate.selectedDates[0], 'Y-m-d');
@@ -2311,27 +2346,21 @@
 
         try {
             const res = await api('/api/marketplace/settlements?' + params.toString());
+            if (requestVersion !== settlementRequestVersion) return;
             if (!res || !res.paginator) {
                 throw new Error("Invalid response format from server.");
             }
 
             settlements = res.paginator.data || [];
             paginationData = res.paginator;
-
-            if (res.meta) {
-                $('kpiCount').textContent = res.meta.kpi_count;
-                $('kpiBuyerTotal').textContent = fmtRp(res.meta.kpi_gross);
-                $('kpiFeeTotal').textContent = fmtRp(res.meta.kpi_fees);
-                $('kpiAdCost').textContent = fmtRp(res.meta.kpi_ad_cost || 0);
-                $('kpiFeePercent').textContent = Number.isFinite(Number(res.meta.kpi_fee_pct))
-                    ? `${Number(res.meta.kpi_fee_pct).toFixed(1)}% dari gross setelah voucher`
-                    : '—';
-                $('kpiNetPayout').textContent = fmtRp(res.meta.kpi_net);
-                updateSettlementModeLabels(res.meta);
-            }
-
             renderTable();
+
+            if (params.get('page') === '1') {
+                $('kpiFeePercent').textContent = 'Menghitung ringkasan…';
+                void loadSettlementSummary(params, requestVersion);
+            }
         } catch (e) {
+            if (requestVersion !== settlementRequestVersion) return;
             $('settlementBody').innerHTML = '<div style="padding:2rem;text-align:center;color:#b91c1c;">Gagal memuat data: ' + e.message + '</div>';
         }
     };
