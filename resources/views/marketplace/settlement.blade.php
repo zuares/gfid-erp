@@ -1085,6 +1085,17 @@
         });
     }
 
+    function fmtDate(value) {
+        if (!value) return '—';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return String(value);
+        return d.toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    }
+
     function fmtRelativeTime(value) {
         if (!value) return 'belum pernah diperbarui';
         const date = new Date(value);
@@ -2357,6 +2368,10 @@
                 const isPending = !s.settlement_time && !s.is_finance_final;
                 const isTikTokFinance = ['tiktok', 'ttk', 'tkt', 'tt'].includes(String(s.store?.channel?.code || '').toLowerCase())
                     || String(s.finance_source || '').toLowerCase().includes('tiktok_finance');
+                const settlementDateOnly = isTikTokFinance && s.settlement_time_precision === 'date';
+                const settlementTimeLabel = s.settlement_time
+                    ? (settlementDateOnly ? fmtDate(s.settlement_time) : fmtDateTime(s.settlement_time))
+                    : 'Tanggal final belum tersedia';
                 const tiktokShippingCost = Number(s.actual_shipping_fee_amount ?? s.actual_shipping_fee ?? 0);
                 const tiktokBuyerShipping = Number(s.shipping_fee_customer ?? s.order?.shipping_fee_customer ?? 0);
                 const tiktokPlatformShipping = Number(s.shipping_fee_discount_amount ?? s.shipping_fee_subsidy ?? 0);
@@ -2383,7 +2398,9 @@
                     <div class="settlement-pending-note">
                         <strong>Belum final</strong><br>Rincian tersedia setelah settlement.
                     </div>`;
-                const finalSourceLabel = isTikTokFinance ? 'TIKTOK FINANCE API' : 'CAIR • FINAL';
+                const finalSourceLabel = settlementDateOnly
+                    ? 'TIKTOK • JAM TIDAK DISEDIAKAN'
+                    : (isTikTokFinance ? 'TIKTOK FINANCE API' : 'CAIR • FINAL');
                 return `<tr>
                     <td class="settlement-order-cell">
                         <a href="/marketplace/orders/${s.order?.id || ''}" class="code-link settlement-order-id">${esc(s.channel_order_id)}</a>
@@ -2401,7 +2418,7 @@
                             ${isPending
                                 ? `<strong class="settlement-timeline-value muted">${s.estimated_payout_at ? 'Est. ' + fmtDateTime(s.estimated_payout_at) : 'Belum tersedia'}</strong>
                                    <span class="oc-badge oc-badge-amber" style="width:max-content;font-size:.6rem">${isTikTokFinance ? 'Menunggu statement' : estimateSourceLabel}</span>`
-                                : `<strong class="settlement-timeline-value">${s.settlement_time ? fmtDateTime(s.settlement_time) : 'Tanggal final belum tersedia'}</strong>
+                                : `<strong class="settlement-timeline-value">${settlementTimeLabel}</strong>
                                    <span class="oc-badge oc-badge-green" style="width:max-content;font-size:.6rem">${finalSourceLabel}</span>`}
                         </div>
                     </td>

@@ -1119,6 +1119,12 @@ class MarketplaceSyncService
                 return $data;
             }
 
+            $statementTimeSource = ! empty($statement['payment_time'])
+                ? 'payment_time'
+                : (! empty($statement['paid_time'])
+                    ? 'paid_time'
+                    : (! empty($statement['statement_time']) ? 'statement_time' : 'create_time'));
+
             $data['statement_id'] = $statementId;
             $data['payment_status'] = $status;
             if (! array_key_exists('payment_time', $data) && ! empty($statement['payment_time'])) {
@@ -1127,6 +1133,10 @@ class MarketplaceSyncService
             if (! array_key_exists('statement_time', $data)) {
                 $data['statement_time'] = $statementTime;
             }
+            $data['_settlement_time_source'] = $statementTimeSource;
+            $data['_settlement_time_precision'] = in_array($statementTimeSource, ['payment_time', 'paid_time'], true)
+                ? 'datetime'
+                : 'date';
 
             return $data;
         } catch (\Throwable $e) {
@@ -1252,9 +1262,16 @@ class MarketplaceSyncService
             }
         }
 
-        $statementTime = $isFinalPayment
-            ? $this->resolveTikTokSettlementTime($data, $skuTransactions)
+        $statementTimeMetadata = $isFinalPayment
+            ? $this->resolveTikTokSettlementTimeMetadata($data, $skuTransactions)
             : null;
+        $statementTime = $statementTimeMetadata['time'] ?? null;
+        $statementTimeSource = $data['_settlement_time_source']
+            ?? $statementTimeMetadata['source']
+            ?? null;
+        $statementTimePrecision = $data['_settlement_time_precision']
+            ?? $statementTimeMetadata['precision']
+            ?? null;
 
         // Tanggal saat proses sync berjalan bukan tanggal pencairan. Jangan
         // mengisi settlement_time dengan now() ketika Finance TikTok tidak
@@ -1263,7 +1280,10 @@ class MarketplaceSyncService
         if (! $statementTime && $isFinalPayment) {
             $storedStatement = (array) data_get($order->settlement?->raw_json, 'tiktok_statement', []);
             if ($this->isTikTokFinalPaymentStatus($this->resolveTikTokPaymentStatus($storedStatement))) {
-                $statementTime = $this->resolveTikTokSettlementTime($storedStatement, []);
+                $storedTimeMetadata = $this->resolveTikTokSettlementTimeMetadata($storedStatement, []);
+                $statementTime = $storedTimeMetadata['time'] ?? null;
+                $statementTimeSource ??= $storedTimeMetadata['source'] ?? null;
+                $statementTimePrecision ??= $storedTimeMetadata['precision'] ?? null;
             }
         }
 
@@ -1302,6 +1322,8 @@ class MarketplaceSyncService
                 'has_sku_transactions' => $hasStatement,
                 'has_shipping_breakdown' => $shippingAmounts['has_breakdown'],
                 'reason' => $hasStatement ? null : 'tiktok_order_not_settled',
+                'settlement_time_source' => $statementTimeSource,
+                'settlement_time_precision' => $statementTimePrecision,
             ],
             'data_checked_at' => now(),
         ])->save();
@@ -1565,6 +1587,10 @@ class MarketplaceSyncService
                     'statement_time' => $detail['statement_time']
                         ?? $detail['create_time']
                         ?? null,
+                    '_settlement_time_source' => ! empty($detail['statement_time'])
+                        ? 'statement_time'
+                        : 'create_time',
+                    '_settlement_time_precision' => 'date',
                 ]);
             }
         } catch (\Throwable $e) {
@@ -1602,7 +1628,10 @@ class MarketplaceSyncService
             }
             $stats['matched']++;
 
-            $settlementTime = $this->resolveTikTokSettlementTime($statement, []);
+            $settlementTimeMetadata = $this->resolveTikTokSettlementTimeMetadata($statement, []);
+            $settlementTime = $settlementTimeMetadata['time'] ?? null;
+            $settlementTimeSource = $settlementTimeMetadata['source'] ?? 'unknown';
+            $settlementTimePrecision = $settlementTimeMetadata['precision'] ?? 'date';
             if (! $settlementTime) {
                 $stats['missing_date']++;
                 continue;
@@ -1613,9 +1642,8 @@ class MarketplaceSyncService
                 'order_id' => $settlement->channel_order_id,
                 'old_time' => $settlement->settlement_time?->toIso8601String(),
                 'new_time' => $settlementTime->toIso8601String(),
-                'source' => ($statement['payment_time'] ?? $statement['paid_time'] ?? null) !== null
-                    ? 'payment_time'
-                    : (data_get($statement, 'statement_time') !== null ? 'statement_time' : 'create_time'),
+                'source' => $settlementTimeSource,
+                'precision' => $settlementTimePrecision,
             ];
             if (count($stats['examples']) < 20) {
                 $stats['examples'][] = $example;
@@ -1649,11 +1677,13 @@ class MarketplaceSyncService
             $raw['tiktok_settlement_backfill'] = [
                 'source' => 'tiktok_finance_202309_statements',
                 'settlement_time_source' => $example['source'],
+                'settlement_time_precision' => $example['precision'],
                 'backfilled_at' => now()->toIso8601String(),
             ];
 
             $flags = is_array($settlement->data_quality_flags) ? $settlement->data_quality_flags : [];
             $flags['settlement_time_source'] = $example['source'];
+            $flags['settlement_time_precision'] = $example['precision'];
             $flags['settlement_time_backfilled'] = true;
 
             $settlement->settlement_time = $settlementTime;
@@ -5126,19 +5156,31 @@ class MarketplaceSyncService
      */
     private function resolveTikTokSettlementTime(array $data, array $skuTransactions = []): ?Carbon
     {
+        return $this->resolveTikTokSettlementTimeMetadata($data, $skuTransactions)['time'] ?? null;
+    }
+
+    /**
+     * @return array{time:Carbon,source:string,precision:string}|null
+     */
+    private function resolveTikTokSettlementTimeMetadata(array $data, array $skuTransactions = []): ?array
+    {
         foreach ([
-            $data['payment_time'] ?? null,
-            $data['paid_time'] ?? null,
-            $data['statement_time'] ?? null,
-            $data['settlement_time'] ?? null,
-            data_get($skuTransactions, '0.payment_time'),
-            data_get($skuTransactions, '0.paid_time'),
-            data_get($skuTransactions, '0.statement_time'),
-            data_get($skuTransactions, '0.settlement_time'),
-        ] as $value) {
+            ['payment_time', $data['payment_time'] ?? null, 'datetime'],
+            ['paid_time', $data['paid_time'] ?? null, 'datetime'],
+            ['statement_time', $data['statement_time'] ?? null, 'date'],
+            ['settlement_time', $data['settlement_time'] ?? null, 'date'],
+            ['payment_time', data_get($skuTransactions, '0.payment_time'), 'datetime'],
+            ['paid_time', data_get($skuTransactions, '0.paid_time'), 'datetime'],
+            ['statement_time', data_get($skuTransactions, '0.statement_time'), 'date'],
+            ['settlement_time', data_get($skuTransactions, '0.settlement_time'), 'date'],
+        ] as [$source, $value, $precision]) {
             $timestamp = $this->normalizeOrderEventTimestamp($value);
             if ($timestamp) {
-                return $timestamp;
+                return [
+                    'time' => $timestamp,
+                    'source' => $data['_settlement_time_source'] ?? $source,
+                    'precision' => $data['_settlement_time_precision'] ?? $precision,
+                ];
             }
         }
 

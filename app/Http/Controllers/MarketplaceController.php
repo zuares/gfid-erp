@@ -3994,6 +3994,15 @@ class MarketplaceController extends Controller
             $isTikTokFinance = in_array(strtolower((string) ($s->store?->channel?->code ?? '')), ['tiktok', 'ttk', 'tkt', 'tt'], true);
             $isFinalSettlement = (bool) $s->settlement_time;
             $isTikTokFinanceFinal = $isTikTokFinance && $isFinalSettlement;
+            $settlementTimeSource = data_get($s->data_quality_flags, 'settlement_time_source');
+            $settlementTimePrecision = data_get($s->data_quality_flags, 'settlement_time_precision');
+            if ($isTikTokFinance && $isFinalSettlement && ! $settlementTimePrecision) {
+                $hasActualPaymentTime = filled(data_get($s->raw_json, 'tiktok_statement.payment_time'))
+                    || filled(data_get($s->raw_json, 'tiktok_statement.paid_time'));
+                $settlementTimeSource = $settlementTimeSource
+                    ?: ($hasActualPaymentTime ? 'payment_time' : 'statement_time');
+                $settlementTimePrecision = $hasActualPaymentTime ? 'datetime' : 'date';
+            }
             $breakdown = $s->marketplaceFeeBreakdown();
             $feeTotals = $s->marketplaceFeeCategoryTotals($breakdown);
             $sellerBurdenTotal = (float) ($feeTotals['seller'] ?? 0);
@@ -4185,6 +4194,10 @@ class MarketplaceController extends Controller
                 'settlement_status' => $isFinalSettlement ? 'cair' : 'belum_cair',
                 'settlement_recorded' => ! (bool) $s->getAttribute('is_missing_settlement'),
                 'settlement_time' => $s->settlement_time?->toISOString(),
+                'settlement_time_source' => $settlementTimeSource,
+                'settlement_time_precision' => $isFinalSettlement
+                    ? ($settlementTimePrecision ?: 'datetime')
+                    : null,
                 'synced_at' => $s->synced_at?->toISOString(),
                 'raw_json' => is_string($s->raw_json) ? json_decode($s->raw_json, true) : $s->raw_json,
             ];

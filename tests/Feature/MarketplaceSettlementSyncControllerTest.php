@@ -1318,6 +1318,57 @@ class MarketplaceSettlementSyncControllerTest extends TestCase
         $this->assertFalse($row['is_finance_final']);
     }
 
+    public function test_tiktok_daily_statement_time_is_exposed_as_date_only(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'TTK-DATE-ONLY-'.rand(1000, 9999),
+            'name' => 'TikTok Date Only Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'TT-DATE-ONLY-001',
+            'channel_order_id' => 'TT-DATE-ONLY-001',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'data_status' => 'complete',
+            'final_income' => 90000,
+            'settlement_time' => Carbon::create(2026, 10, 27, 7, 0, 0, config('app.timezone')),
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'tiktok_statement' => [
+                    'payment_status' => 'SETTLED',
+                    'statement_time' => 1793059200,
+                ],
+            ],
+        ]);
+
+        $payload = app(MarketplaceController::class)->settlements(Request::create(
+            '/api/marketplace/settlements',
+            'GET',
+            ['store_id' => $store->id, 'page' => 1, 'per_page' => 50],
+        ))->getData(true);
+        $row = $payload['paginator']['data'][0];
+
+        $this->assertSame('statement_time', $row['settlement_time_source']);
+        $this->assertSame('date', $row['settlement_time_precision']);
+        $this->assertStringContainsString(
+            'TIKTOK • JAM TIDAK DISEDIAKAN',
+            app(MarketplaceFinanceController::class)->settlement()->render(),
+        );
+    }
+
     public function test_tiktok_gross_sales_berasal_dari_revenue_breakdown_dan_refund_mengurangi_gross(): void
     {
         $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);

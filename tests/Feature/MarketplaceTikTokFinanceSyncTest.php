@@ -363,6 +363,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame('STATEMENT-ID-FALLBACK-1', data_get($settlement->raw_json, 'tiktok_statement.statement_id'));
         $this->assertSame('SETTLED', data_get($settlement->raw_json, 'tiktok_statement.payment_status'));
         $this->assertSame($statementTime, data_get($settlement->raw_json, 'tiktok_statement.statement_time'));
+        $this->assertSame('create_time', data_get($settlement->data_quality_flags, 'settlement_time_source'));
+        $this->assertSame('date', data_get($settlement->data_quality_flags, 'settlement_time_precision'));
     }
 
     public function test_equal_affiliate_before_pit_field_is_not_counted_twice(): void
@@ -619,6 +621,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
             $settlement->settlement_time?->toDateTimeString(),
         );
         $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.payment_time'));
+        $this->assertSame('payment_time', data_get($settlement->data_quality_flags, 'settlement_time_source'));
+        $this->assertSame('datetime', data_get($settlement->data_quality_flags, 'settlement_time_precision'));
     }
 
     public function test_batched_sync_does_not_use_pending_statement_time_as_payout_date(): void
@@ -788,6 +792,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.payment_time'));
         $this->assertTrue((bool) data_get($settlement->raw_json, 'tiktok_settlement_backfill'));
         $this->assertTrue((bool) data_get($settlement->data_quality_flags, 'settlement_time_backfilled'));
+        $this->assertSame('payment_time', data_get($settlement->data_quality_flags, 'settlement_time_source'));
+        $this->assertSame('datetime', data_get($settlement->data_quality_flags, 'settlement_time_precision'));
 
         // Rows from an older sync can already have the correct date while
         // payment_status is absent. Backfill must enrich that metadata instead
@@ -895,6 +901,8 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
         $this->assertSame('2026-10-25 08:36:47', $settlement->settlement_time?->toDateTimeString());
         $this->assertSame('SETTLED', data_get($settlement->raw_json, 'tiktok_statement.payment_status'));
         $this->assertSame($paymentTime, data_get($settlement->raw_json, 'tiktok_statement.statement_time'));
+        $this->assertSame('create_time', data_get($settlement->data_quality_flags, 'settlement_time_source'));
+        $this->assertSame('date', data_get($settlement->data_quality_flags, 'settlement_time_precision'));
     }
 
     public function test_backfill_does_not_use_pending_statement_time_as_payout_date(): void
