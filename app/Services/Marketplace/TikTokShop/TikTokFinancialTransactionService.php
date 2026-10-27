@@ -45,14 +45,14 @@ class TikTokFinancialTransactionService
     {
         return [
             [
-                'code' => 'account',
-                'label' => 'Mutasi akun seller',
-                'description' => 'WITHDRAW, SETTLE, TRANSFER, REVERSE, PAYMENT, dan REFUND',
-            ],
-            [
                 'code' => 'statements',
                 'label' => 'Detail settlement statement',
                 'description' => 'ORDER, RESERVE, dan adjustment dengan rincian revenue, fee, pajak, dan ongkir',
+            ],
+            [
+                'code' => 'account',
+                'label' => 'Mutasi akun seller',
+                'description' => 'WITHDRAW, SETTLE, TRANSFER, REVERSE, PAYMENT, dan REFUND',
             ],
         ];
     }
@@ -167,7 +167,7 @@ class TikTokFinancialTransactionService
     {
         $this->assertTikTok($store);
 
-        $source = strtolower(trim((string) ($options['source'] ?? 'account')));
+        $source = strtolower(trim((string) ($options['source'] ?? 'statements')));
         $sourceValue = match ($source) {
             'account' => 'withdrawals',
             'statements' => 'statement_transactions',
@@ -437,9 +437,17 @@ class TikTokFinancialTransactionService
     /** @return array<string, mixed> */
     public function normalizeStatementTransactionRow(array $row, Store $store, array $statement = []): array
     {
-        $statementId = trim((string) ($statement['id'] ?? $statement['statement_id'] ?? ''));
-        $id = trim((string) ($row['id'] ?? $row['transaction_id'] ?? $row['adjustment_id'] ?? $row['order_id'] ?? ''));
-        if ($id === '') {
+        $statementId = $this->firstNonEmptyString(
+            $statement['id'] ?? null,
+            $statement['statement_id'] ?? null,
+        );
+        $id = $this->firstNonEmptyString(
+            $row['id'] ?? null,
+            $row['transaction_id'] ?? null,
+            $row['adjustment_id'] ?? null,
+            $row['order_id'] ?? null,
+        );
+        if ($id === null) {
             throw new RuntimeException('TikTok statement transaction tidak memiliki ID.');
         }
 
@@ -466,6 +474,12 @@ class TikTokFinancialTransactionService
         $currency = strtoupper(trim((string) ($row['currency'] ?? $statement['currency'] ?? 'IDR'))) ?: 'IDR';
         $status = strtoupper(trim((string) ($row['status'] ?? $statement['status'] ?? 'SETTLED'))) ?: 'SETTLED';
         $meta = $this->statementTypeMeta($type);
+        $orderId = $this->firstNonEmptyString(
+            $row['order_id'] ?? null,
+            $row['associated_order_id'] ?? null,
+            $row['adjustment_order_id'] ?? null,
+        );
+        $adjustmentId = $this->firstNonEmptyString($row['adjustment_id'] ?? null);
 
         return [
             'transaction_id' => $id,
@@ -486,9 +500,9 @@ class TikTokFinancialTransactionService
             'badge' => $meta['badge'],
             'status' => $status,
             'reason' => trim((string) ($row['reason'] ?? $row['description'] ?? $row['adjustment_type'] ?? '')) ?: null,
-            'statement_id' => $statementId !== '' ? $statementId : null,
-            'order_id' => $row['order_id'] ?? $row['associated_order_id'] ?? $row['adjustment_order_id'] ?? null,
-            'adjustment_id' => $row['adjustment_id'] ?? null,
+            'statement_id' => $statementId,
+            'order_id' => $orderId,
+            'adjustment_id' => $adjustmentId,
             'settlement_amount' => $settlementAmount,
             'revenue_amount' => $revenueAmount,
             'shipping_cost_amount' => $shippingCostAmount,
@@ -699,6 +713,18 @@ class TikTokFinancialTransactionService
             'flow' => 'UNKNOWN',
             'badge' => $statementMeta['badge'],
         ];
+    }
+
+    private function firstNonEmptyString(mixed ...$values): ?string
+    {
+        foreach ($values as $value) {
+            $normalized = trim((string) $value);
+            if ($normalized !== '') {
+                return $normalized;
+            }
+        }
+
+        return null;
     }
 
     private function formatSyncTime(mixed $value): ?string

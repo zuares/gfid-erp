@@ -54,7 +54,7 @@ class TikTokFinancialTransactionController extends Controller
         }
 
         try {
-            $source = $validated['source'] ?? 'account';
+            $source = $validated['source'] ?? 'statements';
             $result = $this->service->storedTransactions($store, $from, $to, [
                 'source' => $source,
                 'types' => $validated['types'] ?? '',
@@ -270,7 +270,7 @@ class TikTokFinancialTransactionController extends Controller
         }
 
         try {
-            $source = $validated['source'] ?? 'account';
+            $source = $validated['source'] ?? 'statements';
             $result = $this->service->storedTransactions($store, $from, $to, [
                 'source' => $source,
                 'types' => $validated['types'] ?? '',

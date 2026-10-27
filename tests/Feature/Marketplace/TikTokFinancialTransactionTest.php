@@ -223,6 +223,35 @@ class TikTokFinancialTransactionTest extends TestCase
         });
     }
 
+    public function test_statement_mapping_uses_non_empty_order_fallbacks(): void
+    {
+        $store = $this->createStore();
+        $service = app(TikTokFinancialTransactionService::class);
+
+        $item = $service->normalizeStatementTransactionRow([
+            'id' => 'STMT-TX-RESERVE',
+            'type' => 'RESERVE',
+            'order_id' => '',
+            'associated_order_id' => 'ORDER-RESERVE-1',
+            'adjustment_order_id' => 'ORDER-ADJUSTMENT-1',
+            'reserve_amount' => '-5000',
+        ], $store, [
+            'id' => '',
+            'statement_id' => 'STATEMENT-FALLBACK-1',
+        ]);
+
+        $this->assertSame('STATEMENT-FALLBACK-1', $item['statement_id']);
+        $this->assertSame('ORDER-RESERVE-1', $item['order_id']);
+        $this->assertNull($item['adjustment_id']);
+    }
+
+    public function test_statement_source_is_the_default_data_source(): void
+    {
+        $service = app(TikTokFinancialTransactionService::class);
+
+        $this->assertSame('statements', $service->getDataSources()[0]['code']);
+    }
+
     public function test_controller_can_select_statement_source(): void
     {
         $store = $this->createStore();
@@ -307,6 +336,7 @@ class TikTokFinancialTransactionTest extends TestCase
                 'store' => $store->id,
                 'date_from' => now()->subDays(3)->toDateString(),
                 'date_to' => now()->toDateString(),
+                'source' => 'account',
             ]))
             ->assertOk()
             ->assertJsonPath('success', true)
