@@ -1434,6 +1434,7 @@
                                 <span class="icon">⚙️</span><span>Produksi</span><span class="chevron">▸</span>
                             </button>
                             <div class="collapse {{ $prodOpen ? 'show' : '' }}" id="navProductionOperatingMobile">
+                                <ul class="mobile-sidebar-nav">
 
                         @if ($hasProdDashboard)
                             <li>
@@ -1542,6 +1543,7 @@
                                 </a>
                             </li>
                         @endif
+                                </ul>
                             </div>
                         </li>
                     @endif
