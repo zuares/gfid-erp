@@ -367,7 +367,14 @@
     @include('layouts.partials.navbar')
 
     {{-- MOBILE SIDEBAR (drawer) --}}
-    @include('layouts.partials.mobile-sidebar')
+    {{--
+      Keep the drawer isolated from the application root. This prevents a
+      malformed/stale cached sidebar partial from closing #app before the
+      main shell and creating a full-viewport blank area above the content.
+    --}}
+    <div class="app-mobile-sidebar-host">
+      @include('layouts.partials.mobile-sidebar')
+    </div>
 
     {{-- APP SHELL: sidebar + main --}}
     <div class="app-shell">
