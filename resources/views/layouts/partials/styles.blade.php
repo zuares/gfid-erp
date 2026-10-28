@@ -229,15 +229,33 @@
      navbar (yang terlihat sebagai ruang kosong ekstra di mobile).
   */
   #app.app-root{
+    /*
+       Navbar dan bottom navigation bersifat fixed. Root tidak perlu menjadi
+       flex-column; jika aturan flex lama/cached ikut terbaca, ruang kosong
+       dapat terdistribusi sebelum konten utama.
+    */
+    display:block !important;
+    height:auto;
     min-height:max(0px, calc(var(--app-vh) - var(--app-navbar-offset)));
     width:100%;
     min-width:0;
   }
-  .app-shell{ min-height:0; width:100%; min-width:0; }
+  .app-shell{
+    display:block;
+    min-height:0;
+    height:auto;
+    margin:0;
+    padding:0;
+    width:100%;
+    min-width:0;
+  }
   .app-main{
+    display:block;
     width:100%;
     min-width:0;
     margin-left:0;
+    margin-top:0;
+    align-self:auto;
     overflow-x:clip;
   }
 
