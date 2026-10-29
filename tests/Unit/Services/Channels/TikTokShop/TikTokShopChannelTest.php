@@ -519,4 +519,52 @@ class TikTokShopChannelTest extends TestCase
         $this->assertStringContainsString('seller.return_refund.basic', $res['message']);
         $this->assertSame([], $res['response']['return']);
     }
+
+    public function test_product_creation_endpoints_use_v202309_contracts(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-CREATE-ENDPOINTS',
+            'name' => 'TikTok Create Endpoints',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        Http::fake(fn ($request) => Http::response(match (true) {
+            str_contains($request->url(), '/images/upload') => ['code' => 0, 'data' => ['uri' => 'tos://image', 'url' => 'https://img.test/image.jpg']],
+            str_contains($request->url(), '/listing_check') => ['code' => 0, 'data' => ['check_result' => 'PASS']],
+            str_contains($request->url(), '/categories/') && str_contains($request->url(), '/attributes') => ['code' => 0, 'data' => ['attributes' => []]],
+            str_contains($request->url(), '/categories') => ['code' => 0, 'data' => ['categories' => []]],
+            str_contains($request->url(), '/warehouses') => ['code' => 0, 'data' => ['warehouses' => []]],
+            default => ['code' => 0, 'data' => ['product_id' => 'product-new']],
+        }));
+        $driver = app(TikTokShopChannel::class);
+        $payload = ['title' => 'Produk', 'save_mode' => 'AS_DRAFT', 'idempotency_key' => 'key'];
+
+        $driver->getProductCategories($store);
+        $driver->getProductAttributes($store, '12345');
+        $driver->getProductWarehouses($store);
+        $upload = $driver->uploadProductImage($store, 'image-bytes', 'image.jpg', 'image/jpeg');
+        $driver->checkProductListing($store, $payload);
+        $driver->addProduct($store, $payload);
+
+        $this->assertSame('tos://image', data_get($upload, 'data.uri'));
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), '/product/202309/categories?')
+            && str_contains($request->url(), 'category_version=v2')
+            && str_contains($request->url(), 'listing_platform=TIKTOK_SHOP'));
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), '/product/202309/products/listing_check?')
+            && str_contains($request->url(), 'is_diagnosis_required=true')
+            && $request->body() === '{"title":"Produk"}');
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), '/product/202309/images/upload?')
+            && str_contains($request->body(), 'name="data"')
+            && str_contains($request->body(), 'name="use_case"')
+            && str_contains($request->body(), 'MAIN_IMAGE'));
+    }
 }

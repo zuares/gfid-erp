@@ -6,6 +6,8 @@ use App\Models\Channel;
 use App\Models\MarketplaceProduct;
 use App\Models\MarketplaceProductModel;
 use App\Models\Store;
+use App\Services\Channels\ChannelManager;
+use App\Services\Channels\TikTokShop\TikTokShopChannel;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\MarketplaceProductService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -133,5 +135,85 @@ class MarketplaceProductServiceTikTokTest extends TestCase
         $this->assertSame('Track Jacket', $result['product']['item_name']);
         $this->assertCount(1, $result['models']);
         $this->assertSame(7, $result['models'][0]['stock']);
+    }
+
+    public function test_tiktok_create_checks_listing_persists_publication_and_is_idempotent(): void
+    {
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-CREATE-TEST',
+            'name' => 'TikTok Create Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $payload = [
+            'save_mode' => 'AS_DRAFT',
+            'idempotency_key' => '7bb1da2b-58e7-4ef7-a6b0-bcb36b31d53e',
+            'title' => 'Jaket Track Baru',
+            'description' => '<p>Deskripsi</p>',
+            'category_id' => '12345',
+            'category_version' => 'v2',
+            'listing_platforms' => ['TIKTOK_SHOP'],
+            'main_images' => [['uri' => 'tos://main-image']],
+            'package_weight' => ['value' => '0.5', 'unit' => 'KILOGRAM'],
+            'package_dimensions' => ['length' => '20', 'width' => '15', 'height' => '5', 'unit' => 'CENTIMETER'],
+            'skus' => [[
+                'seller_sku' => 'JACKET-BLK-M',
+                'price' => ['amount' => '125000', 'currency' => 'IDR'],
+                'inventory' => [['warehouse_id' => 'warehouse-1', 'quantity' => 8]],
+            ]],
+        ];
+
+        $driver = Mockery::mock(TikTokShopChannel::class);
+        $driver->shouldReceive('checkProductListing')->once()->with(Mockery::type(Store::class), $payload)->andReturn([
+            'code' => 0,
+            'data' => ['check_result' => 'PASS'],
+            'request_id' => 'check-request',
+        ]);
+        $driver->shouldReceive('addProduct')->once()->with(Mockery::type(Store::class), $payload)->andReturn([
+            'code' => 0,
+            'data' => ['product_id' => '1729592969712207999', 'skus' => [['id' => '1729592969712208000']]],
+            'request_id' => 'create-request',
+        ]);
+        $driver->shouldReceive('getProduct')->once()->andReturn([
+            'code' => 0,
+            'data' => [
+                'id' => '1729592969712207999',
+                'title' => 'Jaket Track Baru',
+                'status' => 'DRAFT',
+                'categories' => [['id' => '12345']],
+                'main_images' => [['uri' => 'tos://main-image', 'url' => 'https://img.test/main.jpg']],
+                'skus' => [[
+                    'id' => '1729592969712208000',
+                    'seller_sku' => 'JACKET-BLK-M',
+                    'price' => ['amount' => '125000', 'currency' => 'IDR'],
+                    'inventory' => [['warehouse_id' => 'warehouse-1', 'quantity' => 8]],
+                ]],
+            ],
+        ]);
+        $manager = Mockery::mock(ChannelManager::class);
+        $manager->shouldReceive('driver')->twice()->with(Mockery::type(Store::class))->andReturn($driver);
+        $service = new MarketplaceProductService(Mockery::mock(MarketplaceApiGateway::class), $manager);
+
+        $result = $service->createProduct($store, $payload);
+        $replay = $service->createProduct($store, $payload);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($replay['idempotent_replay']);
+        $this->assertSame('1729592969712207999', $result['item_id']);
+        $this->assertDatabaseHas('marketplace_product_publications', [
+            'store_id' => $store->id,
+            'idempotency_key' => $payload['idempotency_key'],
+            'status' => 'success',
+            'platform_product_id' => '1729592969712207999',
+        ]);
+        $this->assertDatabaseHas('marketplace_products', [
+            'store_id' => $store->id,
+            'item_id' => '1729592969712207999',
+            'item_name' => 'Jaket Track Baru',
+            'item_status' => 'UNLIST',
+            'stock_total' => 8,
+        ]);
     }
 }

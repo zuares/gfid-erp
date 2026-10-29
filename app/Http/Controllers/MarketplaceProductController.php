@@ -15,10 +15,23 @@ class MarketplaceProductController extends Controller
 
     public function createOptions()
     {
-        $stores = Store::whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+        $stores = Store::with('channel:id,code,name')
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee', 'shp', 'TIKTOK', 'TTK', 'TT', 'tiktok', 'ttk', 'tt']))
             ->where('status', 'active')
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'name', 'code', 'channel_id'])
+            ->map(function (Store $store): array {
+                $channel = strtolower((string) $store->channel?->code);
+                $channel = in_array($channel, ['tt', 'ttk'], true) ? 'tiktok' : 'shopee';
+
+                return [
+                    'id' => $store->id,
+                    'name' => $store->name,
+                    'code' => $store->code,
+                    'channel' => $channel,
+                    'channel_name' => $channel === 'tiktok' ? 'TikTok Shop' : 'Shopee',
+                ];
+            })->values();
 
         return response()->json([
             'stores' => $stores,
@@ -31,16 +44,16 @@ class MarketplaceProductController extends Controller
         $store = $this->createStore($request);
         $result = $this->products->getCreateCategories($store);
 
-        return $this->marketplaceResult($result, 'Kategori Shopee gagal diambil.');
+        return $this->marketplaceResult($result, 'Kategori marketplace gagal diambil.');
     }
 
     public function createAttributes(Request $request)
     {
-        $data = $request->validate(['category_id' => 'required|integer|min:1']);
+        $data = $request->validate(['category_id' => ['required', 'regex:/^[0-9]{1,30}$/']]);
         $store = $this->createStore($request);
-        $result = $this->products->getCreateAttributes($store, (int) $data['category_id']);
+        $result = $this->products->getCreateAttributes($store, (string) $data['category_id']);
 
-        return $this->marketplaceResult($result, 'Atribut kategori Shopee gagal diambil.');
+        return $this->marketplaceResult($result, 'Atribut kategori marketplace gagal diambil.');
     }
 
     public function createLogistics(Request $request)
@@ -48,7 +61,7 @@ class MarketplaceProductController extends Controller
         $store = $this->createStore($request);
         $result = $this->products->getCreateLogistics($store);
 
-        return $this->marketplaceResult($result, 'Channel logistik Shopee gagal diambil.');
+        return $this->marketplaceResult($result, 'Data logistik marketplace gagal diambil.');
     }
 
     public function uploadCreateImages(Request $request)
@@ -66,6 +79,11 @@ class MarketplaceProductController extends Controller
 
     public function publishCreate(Request $request)
     {
+        $store = $this->createStore($request);
+        if ($this->isTikTokStore($store)) {
+            return $this->publishTikTokCreate($request, $store);
+        }
+
         $data = $request->validate([
             'store_id' => 'required|integer|exists:stores,id',
             'item_name' => 'required|string|max:255',
@@ -93,7 +111,6 @@ class MarketplaceProductController extends Controller
             'item_status' => 'nullable|in:NORMAL,UNLIST',
         ]);
 
-        $store = $this->createStore($request);
         $payload = [
             'item_name' => $data['item_name'],
             'description' => $data['description'],
@@ -117,6 +134,86 @@ class MarketplaceProductController extends Controller
         return $this->marketplaceResult($result, 'Produk baru gagal dipublish ke Shopee.');
     }
 
+    private function publishTikTokCreate(Request $request, Store $store)
+    {
+        $data = $request->validate([
+            'item_name' => 'required|string|max:255',
+            'item_sku' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'description' => 'required|string|max:10000',
+            'category_id' => ['required', 'regex:/^[0-9]{1,30}$/'],
+            'image_ids' => 'required|array|min:1|max:9',
+            'image_ids.*' => 'required|string|max:500',
+            'original_price' => 'required|numeric|min:100',
+            'stock' => 'required|integer|min:0',
+            'weight' => 'required|numeric|gt:0',
+            'dimension' => 'required|array',
+            'dimension.package_length' => 'required|numeric|gt:0',
+            'dimension.package_width' => 'required|numeric|gt:0',
+            'dimension.package_height' => 'required|numeric|gt:0',
+            'warehouse_id' => 'required|string|max:80',
+            'attribute_list' => 'nullable|array',
+            'attribute_list.*.attribute_id' => 'required|string|max:30',
+            'attribute_list.*.attribute_value_list' => 'required|array|min:1',
+            'attribute_list.*.attribute_value_list.*.value_id' => 'nullable|string|max:30',
+            'attribute_list.*.attribute_value_list.*.original_value_name' => 'required|string|max:500',
+            'save_mode' => 'nullable|in:AS_DRAFT,LISTING',
+            'idempotency_key' => 'required|uuid',
+        ]);
+
+        $attributes = collect($data['attribute_list'] ?? [])->map(function (array $attribute): array {
+            return [
+                'id' => (string) $attribute['attribute_id'],
+                'values' => collect($attribute['attribute_value_list'])->map(function (array $value): array {
+                    return array_filter([
+                        'id' => filled($value['value_id'] ?? null) && (string) $value['value_id'] !== '0'
+                            ? (string) $value['value_id']
+                            : null,
+                        'name' => (string) $value['original_value_name'],
+                    ], static fn ($item) => $item !== null);
+                })->values()->all(),
+            ];
+        })->values()->all();
+
+        $payload = [
+            'save_mode' => $data['save_mode'] ?? 'AS_DRAFT',
+            'idempotency_key' => $data['idempotency_key'],
+            'title' => $data['item_name'],
+            'description' => '<p>'.nl2br(e($data['description']), false).'</p>',
+            'category_id' => (string) $data['category_id'],
+            'category_version' => 'v2',
+            'listing_platforms' => ['TIKTOK_SHOP'],
+            'main_images' => collect($data['image_ids'])->map(fn ($uri): array => ['uri' => (string) $uri])->values()->all(),
+            'package_weight' => [
+                'value' => (string) $data['weight'],
+                'unit' => 'KILOGRAM',
+            ],
+            'package_dimensions' => [
+                'length' => (string) $data['dimension']['package_length'],
+                'width' => (string) $data['dimension']['package_width'],
+                'height' => (string) $data['dimension']['package_height'],
+                'unit' => 'CENTIMETER',
+            ],
+            'skus' => [[
+                'seller_sku' => $data['item_sku'],
+                'price' => [
+                    'amount' => (string) ((int) round((float) $data['original_price'])),
+                    'currency' => 'IDR',
+                ],
+                'inventory' => [[
+                    'warehouse_id' => $data['warehouse_id'],
+                    'quantity' => (int) $data['stock'],
+                ]],
+            ]],
+        ];
+        if ($attributes !== []) {
+            $payload['product_attributes'] = $attributes;
+        }
+
+        $result = $this->products->createProduct($store, $payload);
+
+        return $this->marketplaceResult($result, 'Produk baru gagal dibuat di TikTok Shop.');
+    }
+
     public function page()
     {
         return view('marketplace.products');
@@ -127,12 +224,17 @@ class MarketplaceProductController extends Controller
         $storeId = $request->validate(['store_id' => 'required|integer|exists:stores,id'])['store_id'];
         $store = Store::whereKey($storeId)
             ->where('status', 'active')
-            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee']))
+            ->whereHas('channel', fn ($q) => $q->whereIn('code', ['SHOPEE', 'SHP', 'shopee', 'shp', 'TIKTOK', 'TTK', 'TT', 'tiktok', 'ttk', 'tt']))
             ->first();
 
-        abort_unless($store, 422, 'Toko aktif Shopee tidak ditemukan.');
+        abort_unless($store, 422, 'Toko aktif Shopee/TikTok tidak ditemukan.');
 
         return $store;
+    }
+
+    private function isTikTokStore(Store $store): bool
+    {
+        return in_array(strtolower((string) $store->channel?->code), ['tiktok', 'ttk', 'tt'], true);
     }
 
     private function marketplaceResult(array $result, string $fallbackMessage)

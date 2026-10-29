@@ -6,11 +6,13 @@ use App\Models\MarketplaceProduct;
 use App\Models\MarketplaceProductChangeLog;
 use App\Models\MarketplaceProductImage;
 use App\Models\MarketplaceProductModel;
+use App\Models\MarketplaceProductPublication;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceApiGateway;
 use App\Services\Marketplace\Ads\AdsExperimentService;
 use App\Services\Channels\ChannelManager;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class MarketplaceProductService
 {
@@ -862,6 +864,49 @@ class MarketplaceProductService
 
     public function getCreateCategories(Store $store): array
     {
+        if ($this->isTikTokStore($store)) {
+            $result = $this->channelDriver($store)->getProductCategories($store);
+            if (! empty($result['error'])) {
+                return $result;
+            }
+
+            $categories = array_values(array_filter(
+                (array) data_get($result, 'data.categories', []),
+                static function ($category): bool {
+                    if (! is_array($category)) {
+                        return false;
+                    }
+                    $isLeaf = in_array($category['is_leaf'] ?? false, [true, 1, '1', 'true', 'TRUE'], true);
+                    $permissions = array_map('strtoupper', (array) ($category['permission_statuses'] ?? []));
+
+                    return $isLeaf && ($permissions === [] || in_array('AVAILABLE', $permissions, true));
+                }
+            ));
+            $byId = collect((array) data_get($result, 'data.categories', []))
+                ->filter(fn ($category): bool => is_array($category) && filled($category['id'] ?? null))
+                ->keyBy(fn (array $category): string => (string) $category['id']);
+
+            $normalized = collect($categories)->map(function (array $category) use ($byId): array {
+                $path = [];
+                $current = $category;
+                $visited = [];
+                while (filled($current['id'] ?? null) && ! isset($visited[(string) $current['id']])) {
+                    $visited[(string) $current['id']] = true;
+                    array_unshift($path, (string) ($current['local_name'] ?? $current['name'] ?? 'Kategori'));
+                    $parentId = (string) ($current['parent_id'] ?? '');
+                    $current = $parentId !== '' ? (array) $byId->get($parentId, []) : [];
+                }
+
+                return [
+                    'category_id' => (string) $category['id'],
+                    'category_name' => implode(' › ', $path),
+                    'is_leaf' => true,
+                ];
+            })->sortBy('category_name', SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
+
+            return ['response' => ['category_list' => $normalized]];
+        }
+
         return $this->channelDriver($store)->getProductCategory($store, 'id');
     }
 
@@ -918,8 +963,41 @@ class MarketplaceProductService
         ];
     }
 
-    public function getCreateAttributes(Store $store, int $categoryId): array
+    public function getCreateAttributes(Store $store, int|string $categoryId): array
     {
+        if ($this->isTikTokStore($store)) {
+            $result = $this->channelDriver($store)->getProductAttributes($store, (string) $categoryId);
+            if (! empty($result['error'])) {
+                return $result;
+            }
+
+            $attributes = collect((array) data_get($result, 'data.attributes', []))
+                ->filter(fn ($attribute): bool => is_array($attribute))
+                ->map(function (array $attribute): array {
+                    $values = collect((array) ($attribute['values'] ?? []))
+                        ->filter(fn ($value): bool => is_array($value))
+                        ->map(fn (array $value): array => [
+                            'value_id' => (string) ($value['id'] ?? ''),
+                            'original_value_name' => (string) ($value['name'] ?? ''),
+                        ])->values()->all();
+
+                    return [
+                        'attribute_id' => (string) ($attribute['id'] ?? ''),
+                        'attribute_name' => (string) ($attribute['name'] ?? 'Atribut'),
+                        'is_mandatory' => in_array(
+                            $attribute['is_requried'] ?? $attribute['is_required'] ?? false,
+                            [true, 1, '1', 'true', 'TRUE'],
+                            true
+                        ),
+                        'attribute_type' => (string) ($attribute['type'] ?? 'PRODUCT_PROPERTY'),
+                        'attribute_value_list' => $values,
+                    ];
+                })->filter(fn (array $attribute): bool => $attribute['attribute_id'] !== '')
+                ->values()->all();
+
+            return ['response' => ['attribute_list' => $attributes]];
+        }
+
         return $this->channelDriver($store)->getProductAttributeTree($store, $categoryId, 'id');
     }
 
@@ -991,6 +1069,31 @@ class MarketplaceProductService
 
     public function getCreateLogistics(Store $store): array
     {
+        if ($this->isTikTokStore($store)) {
+            $result = $this->channelDriver($store)->getProductWarehouses($store);
+            if (! empty($result['error'])) {
+                return $result;
+            }
+
+            $warehouses = collect((array) data_get($result, 'data.warehouses', []))
+                ->filter(fn ($warehouse): bool => is_array($warehouse)
+                    && ($warehouse['type'] ?? 'SALES_WAREHOUSE') === 'SALES_WAREHOUSE'
+                    && ! in_array(
+                        strtoupper((string) ($warehouse['effect_status'] ?? 'EFFECTIVE')),
+                        ['INEFFECTIVE', 'INACTIVE', 'DISABLED'],
+                        true
+                    ))
+                ->map(fn (array $warehouse): array => [
+                    'logistics_channel_id' => (string) ($warehouse['id'] ?? ''),
+                    'logistics_channel_name' => (string) ($warehouse['name'] ?? 'Gudang TikTok'),
+                    'enabled' => in_array($warehouse['is_default'] ?? false, [true, 1, '1', 'true', 'TRUE'], true),
+                    'is_default' => in_array($warehouse['is_default'] ?? false, [true, 1, '1', 'true', 'TRUE'], true),
+                ])->filter(fn (array $warehouse): bool => $warehouse['logistics_channel_id'] !== '')
+                ->values()->all();
+
+            return ['response' => ['logistics_channel_list' => $warehouses]];
+        }
+
         return $this->channelDriver($store)->getProductLogistics($store);
     }
 
@@ -1000,6 +1103,10 @@ class MarketplaceProductService
      */
     public function createProduct(Store $store, array $payload): array
     {
+        if ($this->isTikTokStore($store)) {
+            return $this->createTikTokProduct($store, $payload);
+        }
+
         $driver = $this->channelDriver($store);
         if (! is_callable([$driver, 'addProduct'])) {
             return ['error' => 'not_supported', 'message' => 'Channel toko ini belum mendukung tambah produk.'];
@@ -1051,6 +1158,158 @@ class MarketplaceProductService
             response: ['publish' => $res, 'detail' => $detail],
             error: $warning,
         );
+
+        return array_filter([
+            'success' => true,
+            'item_id' => (string) $itemId,
+            'product_id' => $product->id,
+            'warning' => $warning,
+        ], static fn ($value) => $value !== null);
+    }
+
+    private function createTikTokProduct(Store $store, array $payload): array
+    {
+        if (data_get($store->meta, 'api_access_mode') === 'read_only') {
+            return [
+                'error' => 'read_only_connection',
+                'message' => 'Koneksi TikTok toko ini hanya memiliki akses baca. Hubungkan ulang dengan scope Product write.',
+            ];
+        }
+
+        $driver = $this->channelDriver($store);
+        $idempotencyKey = (string) ($payload['idempotency_key'] ?? Str::uuid());
+        $payload['idempotency_key'] = $idempotencyKey;
+        $requestHash = hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $publication = MarketplaceProductPublication::firstOrCreate(
+            ['store_id' => $store->id, 'idempotency_key' => $idempotencyKey],
+            [
+                'channel_code' => 'tiktok',
+                'status' => 'pending',
+                'request_hash' => $requestHash,
+                'payload_json' => $payload,
+                'created_by' => auth()->id(),
+            ]
+        );
+
+        if (! $publication->wasRecentlyCreated && $publication->request_hash !== $requestHash) {
+            return [
+                'error' => 'idempotency_conflict',
+                'message' => 'Idempotency key sudah dipakai untuk payload produk yang berbeda.',
+            ];
+        }
+        if ($publication->status === 'success' && filled($publication->platform_product_id)) {
+            $product = MarketplaceProduct::where('store_id', $store->id)
+                ->where('item_id', $publication->platform_product_id)
+                ->first();
+
+            return [
+                'success' => true,
+                'item_id' => $publication->platform_product_id,
+                'product_id' => $product?->id,
+                'idempotent_replay' => true,
+            ];
+        }
+
+        $publication->update([
+            'status' => 'checking',
+            'payload_json' => $payload,
+            'response_json' => null,
+            'error_message' => null,
+            'completed_at' => null,
+        ]);
+
+        $check = $driver->checkProductListing($store, $payload);
+        $checkResult = strtoupper((string) data_get($check, 'data.check_result', ''));
+        if (! empty($check['error']) || in_array($checkResult, ['FAIL', 'FAILED'], true)) {
+            $reasons = collect((array) data_get($check, 'data.fail_reasons', []))
+                ->map(function ($reason): string {
+                    $message = data_get($reason, 'message') ?? data_get($reason, 'reason') ?? $reason;
+
+                    return is_scalar($message) ? (string) $message : (json_encode($message) ?: 'Validasi TikTok gagal');
+                })
+                ->filter()->implode('; ');
+            $message = $reasons ?: ($check['message'] ?? 'Produk tidak lolos pemeriksaan listing TikTok.');
+            $publication->update([
+                'status' => 'validation_failed',
+                'response_json' => ['listing_check' => $check],
+                'error_message' => $message,
+                'platform_request_id' => $check['request_id'] ?? null,
+                'completed_at' => now(),
+            ]);
+
+            return ['error' => 'listing_check_failed', 'message' => $message, 'response' => $check];
+        }
+
+        $publication->update(['status' => 'publishing']);
+        $res = $driver->addProduct($store, $payload);
+        if (! empty($res['error'])) {
+            $publication->update([
+                'status' => 'failed',
+                'response_json' => ['listing_check' => $check, 'publish' => $res],
+                'error_message' => $res['message'] ?? (string) $res['error'],
+                'platform_request_id' => $res['request_id'] ?? null,
+                'completed_at' => now(),
+            ]);
+
+            return $res;
+        }
+
+        $itemId = data_get($res, 'data.product_id') ?? data_get($res, 'data.id');
+        if (! $itemId) {
+            $publication->update([
+                'status' => 'failed',
+                'response_json' => ['listing_check' => $check, 'publish' => $res],
+                'error_message' => 'TikTok menerima request tetapi tidak mengembalikan product_id.',
+                'platform_request_id' => $res['request_id'] ?? null,
+                'completed_at' => now(),
+            ]);
+
+            return [
+                'error' => 'product_id_missing',
+                'message' => 'TikTok menerima request tetapi tidak mengembalikan product_id.',
+                'response' => $res,
+            ];
+        }
+
+        $detail = $driver->getProduct($store, (string) $itemId);
+        $item = data_get($detail, 'data');
+        $warning = null;
+        if (! is_array($item) || empty($item['id'])) {
+            $warning = 'Produk berhasil dibuat di TikTok, tetapi detailnya belum dapat dibaca ulang. Jalankan sinkron produk untuk melengkapinya.';
+            $createdSkus = (array) data_get($res, 'data.skus', []);
+            $item = [
+                'id' => (string) $itemId,
+                'title' => $payload['title'] ?? null,
+                'status' => ($payload['save_mode'] ?? 'AS_DRAFT') === 'LISTING' ? 'ACTIVATE' : 'DRAFT',
+                'category_id' => $payload['category_id'] ?? null,
+                'main_images' => $payload['main_images'] ?? [],
+                'skus' => collect((array) ($payload['skus'] ?? []))->values()->map(function (array $sku, int $index) use ($createdSkus): array {
+                    $sku['id'] = data_get($createdSkus, $index.'.id')
+                        ?? data_get($createdSkus, $index.'.sku_id')
+                        ?? 'pending-'.($index + 1);
+
+                    return $sku;
+                })->all(),
+            ];
+        }
+
+        $product = $this->upsertTikTokProduct($store, $item);
+        $this->logProductChange(
+            product: $product,
+            action: 'create',
+            status: $warning ? 'warning' : 'success',
+            after: ['item_id' => (string) $itemId, 'payload' => $payload],
+            response: ['listing_check' => $check, 'publish' => $res, 'detail' => $detail],
+            error: $warning,
+        );
+        $publication->update([
+            'status' => 'success',
+            'response_json' => ['listing_check' => $check, 'publish' => $res, 'detail' => $detail],
+            'error_message' => $warning,
+            'platform_product_id' => (string) $itemId,
+            'platform_request_id' => $res['request_id'] ?? null,
+            'completed_at' => now(),
+        ]);
 
         return array_filter([
             'success' => true,
@@ -1306,14 +1565,16 @@ class MarketplaceProductService
             $imageId = data_get($upload, 'response.image_info.image_id')
                 ?? data_get($upload, 'response.image_list.0.image_id')
                 ?? data_get($upload, 'response.image_id')
-                ?? data_get($upload, 'image_id');
+                ?? data_get($upload, 'image_id')
+                ?? data_get($upload, 'data.uri');
             $imageUrl = data_get($upload, 'response.image_info.image_url')
                 ?? data_get($upload, 'response.image_list.0.image_url')
                 ?? data_get($upload, 'response.image_url')
-                ?? data_get($upload, 'image_url');
+                ?? data_get($upload, 'image_url')
+                ?? data_get($upload, 'data.url');
 
             if (! $imageId) {
-                return ['error' => 'image_id_missing', 'message' => 'Shopee tidak mengembalikan image ID hasil upload.'];
+                return ['error' => 'image_id_missing', 'message' => 'Marketplace tidak mengembalikan ID/URI hasil upload gambar.'];
             }
 
             $uploaded[] = [

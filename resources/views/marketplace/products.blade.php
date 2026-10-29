@@ -704,7 +704,7 @@
             <div class="modal-header border-0 pb-2">
                 <div>
                     <h5 class="modal-title fw-bold" id="modalProductCreateLabel">Tambah Produk Baru</h5>
-                    <div class="prd-edit-meta">Wizard terpisah · produk dibuat sebagai UNLIST sampai diverifikasi.</div>
+                    <div class="prd-edit-meta">Shopee dan TikTok Shop · mode aman default: UNLIST/DRAFT.</div>
                 </div>
                 <button class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
             </div>
@@ -804,6 +804,10 @@
     async function api(url, opts = {}) {
         const headers = { 'Accept': 'application/json', ...(opts.headers || {}) };
         if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+        const method = String(opts.method || 'GET').toUpperCase();
+        if (!['GET', 'HEAD'].includes(method)) {
+            headers['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        }
         const res = await fetch(url, { ...opts, headers });
         if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || ('HTTP ' + res.status));
         return res.json();
@@ -823,17 +827,27 @@
         loading: false,
     };
 
+    function createUuid() {
+        if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
+            const random = Math.floor(Math.random() * 16);
+            return (character === 'x' ? random : ((random & 0x3) | 0x8)).toString(16);
+        });
+    }
+
     function emptyProductCreate() {
         return {
             step: 1,
             stores: [],
             storeId: '',
+            channel: '',
             categories: [],
             categoryId: '',
             attributes: [],
             attributeList: [],
             logistics: [],
             selectedLogistics: [],
+            warehouseId: '',
             logisticsLoaded: false,
             files: [],
             images: [],
@@ -841,8 +855,17 @@
             price: '', stock: '', weight: '',
             length: '', width: '', height: '',
             status: 'UNLIST',
+            idempotencyKey: createUuid(),
             publishing: false,
         };
+    }
+
+    function selectedCreateStore() {
+        return productCreate?.stores.find(store => String(store.id) === String(productCreate.storeId)) || null;
+    }
+
+    function isTikTokCreate() {
+        return (productCreate?.channel || selectedCreateStore()?.channel) === 'tiktok';
     }
 
     function flattenCreateCategories(nodes, level = 0, rows = []) {
@@ -908,7 +931,7 @@
         if (values.length) {
             return `<select class="form-select form-select-sm" data-create-attr="${esc(attr.attribute_id)}">
                 <option value="">Pilih nilai…</option>
-                ${values.map(value => `<option value="${esc(value.value_id ?? 0)}" data-original="${esc(value.original_value_name ?? value.value_name ?? '')}">${esc(value.original_value_name ?? value.value_name ?? 'Nilai')}</option>`).join('')}
+                ${values.map(value => `<option value="${esc(value.value_id ?? '')}" data-original="${esc(value.original_value_name ?? value.value_name ?? '')}">${esc(value.original_value_name ?? value.value_name ?? 'Nilai')}</option>`).join('')}
             </select>`;
         }
         return `<input class="form-control form-control-sm" data-create-attr="${esc(attr.attribute_id)}" placeholder="Isi ${esc(attr.attribute_name || 'nilai atribut')}">`;
@@ -917,17 +940,19 @@
     function renderProductCreate() {
         if (!productCreate) return;
         const body = $('productCreateBody');
+        const tiktok = isTikTokCreate();
+        const marketplaceName = tiktok ? 'TikTok Shop' : 'Shopee';
         let html = '';
 
         if (productCreate.step === 1) {
             html = `<div class="prd-edit-section">
                 <div class="prd-edit-section-title">1. Pilih toko dan kategori</div>
-                <label class="form-label small fw-bold">Toko Shopee</label>
+                <label class="form-label small fw-bold">Toko marketplace</label>
                 <select class="form-select mb-3" id="createStoreSelect" onchange="onProductCreateStoreChange(this.value)">
                     <option value="">Pilih toko…</option>
                     ${productCreate.stores.map(store => `<option value="${store.id}" ${String(store.id) === String(productCreate.storeId) ? 'selected' : ''}>${esc(store.name)} (${esc(store.code)})</option>`).join('')}
                 </select>
-                <label class="form-label small fw-bold">Kategori Shopee</label>
+                <label class="form-label small fw-bold">Kategori ${marketplaceName}</label>
                 <select class="form-select" id="createCategorySelect" onchange="productCreate.categoryId=this.value" ${productCreate.categories.length ? '' : 'disabled'}>
                     <option value="">${productCreate.storeId ? (productCreate.categories.length ? 'Pilih kategori…' : 'Memuat kategori…') : 'Pilih toko terlebih dahulu'}</option>
                     ${productCreate.categories.map(category => `<option value="${esc(category.id)}" ${String(category.id) === String(productCreate.categoryId) ? 'selected' : ''}>${esc(category.name)}</option>`).join('')}
@@ -950,6 +975,7 @@
                         productCreate.logistics = result.response?.logistics_channel_list || result.logistics_channel_list || [];
                         const enabled = productCreate.logistics.filter(item => item.enabled).map(item => String(item.logistics_channel_id ?? item.logistic_id));
                         productCreate.selectedLogistics = enabled.length ? enabled : (productCreate.logistics[0] ? [String(productCreate.logistics[0].logistics_channel_id ?? productCreate.logistics[0].logistic_id)] : []);
+                        productCreate.warehouseId = tiktok ? (enabled[0] || String(productCreate.logistics[0]?.logistics_channel_id || '')) : '';
                         productCreate.logisticsLoaded = true;
                         renderProductCreate();
                     })
@@ -960,31 +986,35 @@
                 <div class="row g-2">
                     <div class="col-md-8"><label class="form-label small fw-bold">Nama produk</label><input class="form-control form-control-sm" id="createItemName" value="${esc(productCreate.itemName)}" maxlength="255"></div>
                     <div class="col-md-4"><label class="form-label small fw-bold">SKU</label><input class="form-control form-control-sm" id="createItemSku" value="${esc(productCreate.itemSku)}" maxlength="100"></div>
-                    <div class="col-12"><label class="form-label small fw-bold">Deskripsi</label><textarea class="form-control form-control-sm" id="createDescription" rows="4" maxlength="3000">${esc(productCreate.description)}</textarea></div>
+                    <div class="col-12"><label class="form-label small fw-bold">Deskripsi</label><textarea class="form-control form-control-sm" id="createDescription" rows="4" maxlength="${tiktok ? 10000 : 3000}">${esc(productCreate.description)}</textarea></div>
                     <div class="col-md-3"><label class="form-label small fw-bold">Harga</label><input type="number" min="100" class="form-control form-control-sm" id="createPrice" value="${esc(productCreate.price)}"></div>
                     <div class="col-md-3"><label class="form-label small fw-bold">Stok</label><input type="number" min="0" class="form-control form-control-sm" id="createStock" value="${esc(productCreate.stock)}"></div>
                     <div class="col-md-3"><label class="form-label small fw-bold">Berat (kg)</label><input type="number" step="0.001" min="0.001" class="form-control form-control-sm" id="createWeight" value="${esc(productCreate.weight)}"></div>
-                    <div class="col-md-3"><label class="form-label small fw-bold">Status awal</label><select class="form-select form-select-sm" id="createStatus"><option value="UNLIST" ${productCreate.status === 'UNLIST' ? 'selected' : ''}>UNLIST (aman)</option><option value="NORMAL" ${productCreate.status === 'NORMAL' ? 'selected' : ''}>NORMAL</option></select></div>
+                    <div class="col-md-3"><label class="form-label small fw-bold">Status awal</label><select class="form-select form-select-sm" id="createStatus">${tiktok
+                        ? `<option value="AS_DRAFT" ${productCreate.status === 'AS_DRAFT' ? 'selected' : ''}>DRAFT (aman)</option><option value="LISTING" ${productCreate.status === 'LISTING' ? 'selected' : ''}>LANGSUNG LISTING</option>`
+                        : `<option value="UNLIST" ${productCreate.status === 'UNLIST' ? 'selected' : ''}>UNLIST (aman)</option><option value="NORMAL" ${productCreate.status === 'NORMAL' ? 'selected' : ''}>NORMAL</option>`}</select></div>
                     <div class="col-md-4"><label class="form-label small fw-bold">Panjang (cm)</label><input type="number" min="1" class="form-control form-control-sm" id="createLength" value="${esc(productCreate.length)}"></div>
                     <div class="col-md-4"><label class="form-label small fw-bold">Lebar (cm)</label><input type="number" min="1" class="form-control form-control-sm" id="createWidth" value="${esc(productCreate.width)}"></div>
                     <div class="col-md-4"><label class="form-label small fw-bold">Tinggi (cm)</label><input type="number" min="1" class="form-control form-control-sm" id="createHeight" value="${esc(productCreate.height)}"></div>
                 </div>
             </div>
             <div class="prd-edit-section">
-                <div class="prd-edit-section-title">4. Gambar dan logistik</div>
+                <div class="prd-edit-section-title">4. Gambar dan ${tiktok ? 'gudang' : 'logistik'}</div>
                 <input type="file" class="form-control form-control-sm mb-2" id="createImages" accept="image/jpeg,image/png" multiple onchange="productCreate.files=Array.from(this.files || [])">
                 <div class="prd-edit-meta mb-2">Maksimal 9 gambar, JPG/PNG, 5 MB per file.</div>
                 <div class="row g-2">${productCreate.logistics.length ? productCreate.logistics.map(item => {
                     const id = String(item.logistics_channel_id ?? item.logistic_id ?? '');
-                    const name = item.logistics_channel_name ?? item.logistic_name ?? `Logistik ${id}`;
-                    return `<div class="col-md-6"><label class="border rounded p-2 d-flex gap-2 align-items-center small"><input type="checkbox" data-create-logistic="${esc(id)}" ${productCreate.selectedLogistics.includes(id) ? 'checked' : ''}> <span>${esc(name)} <span class="text-muted">(${esc(id)})</span></span></label></div>`;
-                }).join('') : `<div class="col-12 text-muted small">${productCreate.loadingLogistics ? 'Memuat channel logistik…' : 'Channel logistik belum tersedia.'}</div>`}</div>
+                    const name = item.logistics_channel_name ?? item.logistic_name ?? `${tiktok ? 'Gudang' : 'Logistik'} ${id}`;
+                    return `<div class="col-md-6"><label class="border rounded p-2 d-flex gap-2 align-items-center small"><input type="${tiktok ? 'radio' : 'checkbox'}" ${tiktok ? 'name="createWarehouse" data-create-warehouse' : 'data-create-logistic'}="${esc(id)}" ${(tiktok ? productCreate.warehouseId === id : productCreate.selectedLogistics.includes(id)) ? 'checked' : ''}> <span>${esc(name)} <span class="text-muted">(${esc(id)})</span></span></label></div>`;
+                }).join('') : `<div class="col-12 text-muted small">${productCreate.loadingLogistics ? `Memuat ${tiktok ? 'gudang' : 'channel logistik'}…` : `${tiktok ? 'Gudang' : 'Channel logistik'} belum tersedia.`}</div>`}</div>
             </div>`;
         } else {
-            const selectedLogistics = productCreate.selectedLogistics.length ? productCreate.selectedLogistics.join(', ') : 'Belum dipilih';
+            const selectedLogistics = tiktok
+                ? (productCreate.logistics.find(item => String(item.logistics_channel_id ?? item.logistic_id) === String(productCreate.warehouseId))?.logistics_channel_name || productCreate.warehouseId || 'Belum dipilih')
+                : (productCreate.selectedLogistics.length ? productCreate.selectedLogistics.join(', ') : 'Belum dipilih');
             html = `<div class="prd-edit-section">
                 <div class="prd-edit-section-title">Preview sebelum publish</div>
-                <dl class="row small mb-0"><dt class="col-sm-3">Toko</dt><dd class="col-sm-9">${esc(productCreate.stores.find(s => String(s.id) === String(productCreate.storeId))?.name || '—')}</dd><dt class="col-sm-3">Kategori</dt><dd class="col-sm-9">${esc(productCreate.categories.find(c => String(c.id) === String(productCreate.categoryId))?.name || productCreate.categoryId)}</dd><dt class="col-sm-3">Nama / SKU</dt><dd class="col-sm-9">${esc(productCreate.itemName)} / ${esc(productCreate.itemSku || '—')}</dd><dt class="col-sm-3">Harga / stok</dt><dd class="col-sm-9">${rp(productCreate.price)} / ${esc(productCreate.stock)}</dd><dt class="col-sm-3">Gambar</dt><dd class="col-sm-9">${productCreate.images.length} gambar</dd><dt class="col-sm-3">Logistik</dt><dd class="col-sm-9">${esc(selectedLogistics)}</dd></dl>
+                <dl class="row small mb-0"><dt class="col-sm-3">Marketplace</dt><dd class="col-sm-9">${marketplaceName}</dd><dt class="col-sm-3">Toko</dt><dd class="col-sm-9">${esc(productCreate.stores.find(s => String(s.id) === String(productCreate.storeId))?.name || '—')}</dd><dt class="col-sm-3">Kategori</dt><dd class="col-sm-9">${esc(productCreate.categories.find(c => String(c.id) === String(productCreate.categoryId))?.name || productCreate.categoryId)}</dd><dt class="col-sm-3">Nama / SKU</dt><dd class="col-sm-9">${esc(productCreate.itemName)} / ${esc(productCreate.itemSku || '—')}</dd><dt class="col-sm-3">Harga / stok</dt><dd class="col-sm-9">${rp(productCreate.price)} / ${esc(productCreate.stock)}</dd><dt class="col-sm-3">Gambar</dt><dd class="col-sm-9">${productCreate.images.length} gambar</dd><dt class="col-sm-3">${tiktok ? 'Gudang' : 'Logistik'}</dt><dd class="col-sm-9">${esc(selectedLogistics)}</dd></dl>
                 <div class="alert alert-warning small mt-3 mb-0">Produk akan dibuat sebagai <strong>${esc(productCreate.status)}</strong>. Publish tidak mengubah campaign atau eksperimen iklan.</div>
             </div>`;
         }
@@ -993,12 +1023,12 @@
         $('productCreateStatus').textContent = createStepStatus();
         $('productCreatePrev').disabled = productCreate.step <= 1 || productCreate.publishing;
         $('productCreateNext').disabled = productCreate.publishing;
-        $('productCreateNext').textContent = productCreate.step === 4 ? 'Publish ke Shopee' : 'Lanjut';
+        $('productCreateNext').textContent = productCreate.step === 4 ? `Publish ke ${marketplaceName}` : 'Lanjut';
     }
 
     window.openProductCreate = async function () {
         productCreate = emptyProductCreate();
-        $('productCreateBody').innerHTML = '<div class="text-center text-muted py-5">Memuat toko Shopee…</div>';
+        $('productCreateBody').innerHTML = '<div class="text-center text-muted py-5">Memuat toko marketplace…</div>';
         bootstrap.Modal.getOrCreateInstance($('modalProductCreate')).show();
         try {
             const result = await api(`${API}/create/options`);
@@ -1011,10 +1041,16 @@
 
     window.onProductCreateStoreChange = async function (storeId) {
         productCreate.storeId = storeId;
+        productCreate.channel = selectedCreateStore()?.channel || '';
+        productCreate.status = productCreate.channel === 'tiktok' ? 'AS_DRAFT' : 'UNLIST';
         productCreate.categories = [];
         productCreate.categoryId = '';
         productCreate.logistics = [];
         productCreate.logisticsLoaded = false;
+        productCreate.warehouseId = '';
+        productCreate.images = [];
+        productCreate.files = [];
+        productCreate.idempotencyKey = createUuid();
         renderProductCreate();
         if (!storeId) return;
         try {
@@ -1031,9 +1067,9 @@
             if (!attr || !input.value) return;
             const option = input.selectedOptions?.[0];
             list.push({
-                attribute_id: Number(attr.attribute_id),
+                attribute_id: isTikTokCreate() ? String(attr.attribute_id) : Number(attr.attribute_id),
                 attribute_value_list: [{
-                    value_id: Number(input.value) || 0,
+                    value_id: isTikTokCreate() ? String(input.value || '') : (Number(input.value) || 0),
                     original_value_name: option?.dataset.original || input.value,
                 }],
             });
@@ -1053,6 +1089,7 @@
         productCreate.height = $('createHeight')?.value || productCreate.height;
         productCreate.status = $('createStatus')?.value || productCreate.status;
         productCreate.selectedLogistics = Array.from(document.querySelectorAll('[data-create-logistic]:checked')).map(input => input.dataset.createLogistic);
+        productCreate.warehouseId = document.querySelector('[data-create-warehouse]:checked')?.dataset.createWarehouse || productCreate.warehouseId;
     }
 
     async function loadProductCreateAttributes() {
@@ -1084,30 +1121,38 @@
             } else if (productCreate.step === 3) {
                 collectProductCreateContent();
                 if (!productCreate.itemName || !productCreate.description || Number(productCreate.price) < 100 || Number(productCreate.weight) <= 0) throw new Error('Lengkapi nama, deskripsi, harga, dan berat.');
+                if (isTikTokCreate() && !/^[A-Za-z0-9._-]+$/.test(productCreate.itemSku)) throw new Error('SKU TikTok wajib diisi dan hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus.');
                 if (!productCreate.length || !productCreate.width || !productCreate.height) throw new Error('Lengkapi dimensi paket.');
-                if (!productCreate.selectedLogistics.length) throw new Error('Pilih minimal satu channel logistik.');
+                if (isTikTokCreate() ? !productCreate.warehouseId : !productCreate.selectedLogistics.length) throw new Error(isTikTokCreate() ? 'Pilih gudang TikTok.' : 'Pilih minimal satu channel logistik.');
                 await uploadProductCreateImages();
                 productCreate.step = 4;
             } else {
                 productCreate.publishing = true;
                 renderProductCreate();
+                const payload = {
+                    store_id: productCreate.storeId,
+                    item_name: productCreate.itemName,
+                    item_sku: productCreate.itemSku || null,
+                    description: productCreate.description,
+                    category_id: String(productCreate.categoryId),
+                    image_ids: productCreate.images.map(image => image.image_id),
+                    original_price: Number(productCreate.price),
+                    stock: Number(productCreate.stock),
+                    weight: Number(productCreate.weight),
+                    dimension: { package_length: Number(productCreate.length), package_width: Number(productCreate.width), package_height: Number(productCreate.height) },
+                    attribute_list: productCreate.attributeList,
+                };
+                if (isTikTokCreate()) {
+                    payload.warehouse_id = productCreate.warehouseId;
+                    payload.save_mode = productCreate.status;
+                    payload.idempotency_key = productCreate.idempotencyKey;
+                } else {
+                    payload.logistic_info = productCreate.selectedLogistics.map(id => ({ logistic_id: Number(id), enabled: true, is_free: false }));
+                    payload.item_status = productCreate.status;
+                }
                 const result = await api(`${API}/create/publish`, {
                     method: 'POST',
-                    body: JSON.stringify({
-                        store_id: productCreate.storeId,
-                        item_name: productCreate.itemName,
-                        item_sku: productCreate.itemSku || null,
-                        description: productCreate.description,
-                        category_id: productCreate.categoryId,
-                        image_ids: productCreate.images.map(image => image.image_id),
-                        original_price: Number(productCreate.price),
-                        stock: Number(productCreate.stock),
-                        weight: Number(productCreate.weight),
-                        dimension: { package_length: Number(productCreate.length), package_width: Number(productCreate.width), package_height: Number(productCreate.height) },
-                        logistic_info: productCreate.selectedLogistics.map(id => ({ logistic_id: Number(id), enabled: true, is_free: false })),
-                        attribute_list: productCreate.attributeList,
-                        item_status: productCreate.status,
-                    }),
+                    body: JSON.stringify(payload),
                 });
                 productCreate.publishing = false;
                 toast(result.warning || `Produk berhasil dibuat. Item ID ${result.item_id || '—'}`, result.warning ? 'warning' : 'success');

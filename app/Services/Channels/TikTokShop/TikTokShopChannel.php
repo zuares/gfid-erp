@@ -126,14 +126,95 @@ class TikTokShopChannel implements MarketplaceChannel
         return $result;
     }
 
+    protected function postMultipart(
+        Store $store,
+        string $path,
+        string $contents,
+        string $filename,
+        string $mimeType,
+        array $fields = [],
+        array $params = []
+    ): array {
+        $result = $this->doMultipartRequest($store, $path, $contents, $filename, $mimeType, $fields, $params);
+
+        $code = $result['code'] ?? null;
+        if ($code === 105 || $code === 'invalid_access_token') {
+            $refreshed = $this->refreshToken($store);
+            if (empty($refreshed['error'])) {
+                $store->refresh();
+                $result = $this->doMultipartRequest($store, $path, $contents, $filename, $mimeType, $fields, $params);
+            }
+        }
+
+        return $result;
+    }
+
+    protected function doMultipartRequest(
+        Store $store,
+        string $path,
+        string $contents,
+        string $filename,
+        string $mimeType,
+        array $fields = [],
+        array $params = []
+    ): array {
+        $query = array_merge($params, [
+            'app_key' => $this->appKey($store),
+            'timestamp' => (string) time(),
+        ]);
+
+        $shopCipher = $this->shopCipher($store);
+        if ($shopCipher !== '') {
+            $query['shop_cipher'] = $shopCipher;
+        }
+
+        // TikTok's upload endpoint signs the URL parameters. The multipart
+        // boundary and binary body are deliberately excluded from the sign.
+        $query['sign'] = $this->sign($store, $path, $query);
+        $url = $this->baseUrl($store).$path.'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+
+        $request = Http::connectTimeout(10)
+            ->timeout(60)
+            ->retry(2, 1000, throw: false)
+            ->withHeaders(['x-tts-access-token' => $this->accessToken($store)])
+            ->attach('data', $contents, $filename, ['Content-Type' => $mimeType]);
+
+        foreach ($fields as $name => $value) {
+            $request = $request->attach((string) $name, (string) $value);
+        }
+
+        $response = $request->post($url);
+        $json = $response->json();
+        $meta = [
+            'http_status' => $response->status(),
+            'retry_after' => (int) ($response->header('Retry-After') ?? 0),
+        ];
+
+        if ($json === null) {
+            return [
+                'error' => true,
+                'code' => -1,
+                'message' => $response->body(),
+                'status' => $response->status(),
+                '_meta' => $meta,
+            ];
+        }
+
+        if ($response->status() >= 400 || (isset($json['code']) && (int) $json['code'] !== 0)) {
+            $json['error'] = true;
+        }
+        $json['_meta'] = array_merge((array) ($json['_meta'] ?? []), $meta);
+
+        return $json;
+    }
+
     protected function doRequest(
         Store $store,
         string $method,
         string $path,
         array $params = [],
         array $body = []
-    ): array
-    {
+    ): array {
         $timestamp = (string) time();
 
         $query = array_merge($params, [
@@ -323,6 +404,83 @@ class TikTokShopChannel implements MarketplaceChannel
     public function getProduct(Store $store, string $productId): array
     {
         return $this->get($store, '/product/202309/products/'.rawurlencode($productId));
+    }
+
+    public function getProductCategories(
+        Store $store,
+        string $locale = 'id-ID',
+        string $categoryVersion = 'v2'
+    ): array {
+        return $this->get($store, '/product/202309/categories', [
+            'locale' => $locale,
+            'category_version' => $categoryVersion,
+            'listing_platform' => 'TIKTOK_SHOP',
+            'include_prohibited_categories' => 'false',
+        ]);
+    }
+
+    public function getProductCategoryRules(
+        Store $store,
+        string $categoryId,
+        string $locale = 'id-ID',
+        string $categoryVersion = 'v2'
+    ): array {
+        return $this->get(
+            $store,
+            '/product/202309/categories/'.rawurlencode($categoryId).'/rules',
+            ['locale' => $locale, 'category_version' => $categoryVersion]
+        );
+    }
+
+    public function getProductAttributes(
+        Store $store,
+        string $categoryId,
+        string $locale = 'id-ID',
+        string $categoryVersion = 'v2'
+    ): array {
+        return $this->get(
+            $store,
+            '/product/202309/categories/'.rawurlencode($categoryId).'/attributes',
+            ['locale' => $locale, 'category_version' => $categoryVersion]
+        );
+    }
+
+    public function getProductWarehouses(Store $store): array
+    {
+        return $this->get($store, '/logistics/202309/warehouses');
+    }
+
+    public function uploadProductImage(
+        Store $store,
+        string $contents,
+        string $filename,
+        string $mimeType = 'application/octet-stream'
+    ): array {
+        return $this->postMultipart(
+            $store,
+            '/product/202309/images/upload',
+            $contents,
+            $filename,
+            $mimeType,
+            ['use_case' => 'MAIN_IMAGE']
+        );
+    }
+
+    public function checkProductListing(Store $store, array $payload): array
+    {
+        unset($payload['save_mode'], $payload['idempotency_key']);
+
+        return $this->post(
+            $store,
+            '/product/202309/products/listing_check',
+            $payload,
+            ['is_diagnosis_required' => 'true']
+        );
+    }
+
+    public function addProduct(Store $store, array $payload): array
+    {
+        return $this->post($store, '/product/202309/products', $payload);
     }
 
     /**

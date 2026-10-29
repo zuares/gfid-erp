@@ -234,16 +234,11 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     // Produk Marketplace
     Route::get('/products',                        [\App\Http\Controllers\MarketplaceProductController::class, 'index']);
     Route::get('/products/create/options',         [\App\Http\Controllers\MarketplaceProductController::class, 'createOptions']);
-    Route::post('/products/create/categories',     [\App\Http\Controllers\MarketplaceProductController::class, 'createCategories'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/products/create/attributes',     [\App\Http\Controllers\MarketplaceProductController::class, 'createAttributes'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/products/create/logistics',      [\App\Http\Controllers\MarketplaceProductController::class, 'createLogistics'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/products/create/images/upload',  [\App\Http\Controllers\MarketplaceProductController::class, 'uploadCreateImages'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-    Route::post('/products/create/publish',        [\App\Http\Controllers\MarketplaceProductController::class, 'publishCreate'])
-        ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/products/create/categories',     [\App\Http\Controllers\MarketplaceProductController::class, 'createCategories']);
+    Route::post('/products/create/attributes',     [\App\Http\Controllers\MarketplaceProductController::class, 'createAttributes']);
+    Route::post('/products/create/logistics',      [\App\Http\Controllers\MarketplaceProductController::class, 'createLogistics']);
+    Route::post('/products/create/images/upload',  [\App\Http\Controllers\MarketplaceProductController::class, 'uploadCreateImages']);
+    Route::post('/products/create/publish',        [\App\Http\Controllers\MarketplaceProductController::class, 'publishCreate']);
     Route::get('/products/{product}/category-info', [\App\Http\Controllers\MarketplaceProductController::class, 'categoryInfo']);
     Route::get('/products/{product}/edit',         [\App\Http\Controllers\MarketplaceProductController::class, 'edit']);
     Route::post('/products/sync',                  [\App\Http\Controllers\MarketplaceProductController::class, 'sync'])
