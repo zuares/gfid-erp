@@ -2,8 +2,8 @@
 
 namespace App\Services\Channels\TikTokShop;
 
-use App\Models\Store;
 use App\Models\MarketplaceOrder;
+use App\Models\Store;
 use App\Services\Channels\Contracts\MarketplaceChannel;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -60,10 +60,10 @@ class TikTokShopChannel implements MarketplaceChannel
         ksort($params);
         $paramStr = '';
         foreach ($params as $k => $v) {
-            $paramStr .= $k . $v;
+            $paramStr .= $k.$v;
         }
 
-        $toSign = $appSecret . $path . $paramStr . $body . $appSecret;
+        $toSign = $appSecret.$path.$paramStr.$body.$appSecret;
 
         return hash_hmac('sha256', $toSign, $appSecret);
     }
@@ -80,8 +80,7 @@ class TikTokShopChannel implements MarketplaceChannel
             $result = $this->doRequest($store, 'GET', $path, $params);
 
             // Token expired → auto-refresh sekali lalu retry.
-            $code = $result['code'] ?? null;
-            if ($code === 105 || $code === 'invalid_access_token') {
+            if ($this->isAccessTokenError($result)) {
                 $refreshed = $this->refreshToken($store);
                 if (empty($refreshed['error'])) {
                     $store->refresh();
@@ -114,8 +113,7 @@ class TikTokShopChannel implements MarketplaceChannel
     {
         $result = $this->doRequest($store, 'POST', $path, $params, $body);
 
-        $code = $result['code'] ?? null;
-        if ($code === 105 || $code === 'invalid_access_token') {
+        if ($this->isAccessTokenError($result)) {
             $refreshed = $this->refreshToken($store);
             if (empty($refreshed['error'])) {
                 $store->refresh();
@@ -137,8 +135,7 @@ class TikTokShopChannel implements MarketplaceChannel
     ): array {
         $result = $this->doMultipartRequest($store, $path, $contents, $filename, $mimeType, $fields, $params);
 
-        $code = $result['code'] ?? null;
-        if ($code === 105 || $code === 'invalid_access_token') {
+        if ($this->isAccessTokenError($result)) {
             $refreshed = $this->refreshToken($store);
             if (empty($refreshed['error'])) {
                 $store->refresh();
@@ -218,7 +215,7 @@ class TikTokShopChannel implements MarketplaceChannel
         $timestamp = (string) time();
 
         $query = array_merge($params, [
-            'app_key'   => $this->appKey($store),
+            'app_key' => $this->appKey($store),
             'timestamp' => $timestamp,
         ]);
 
@@ -262,10 +259,10 @@ class TikTokShopChannel implements MarketplaceChannel
             }, throw: false)
             ->withHeaders([
                 'x-tts-access-token' => $this->accessToken($store),
-                'content-type'       => 'application/json',
+                'content-type' => 'application/json',
             ]);
 
-        $url = $this->baseUrl($store) . $path;
+        $url = $this->baseUrl($store).$path;
 
         // TikTok expects app_key, timestamp, sign, shop_cipher, and endpoint
         // parameters in the query string even when the request body is JSON.
@@ -275,7 +272,7 @@ class TikTokShopChannel implements MarketplaceChannel
         $response = $method === 'POST'
             ? $request
                 ->withOptions(['body' => $bodyJson])
-                ->send('POST', $url . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986))
+                ->send('POST', $url.'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986))
             : $request->get($url, $query);
 
         $json = $response->json();
@@ -303,6 +300,33 @@ class TikTokShopChannel implements MarketplaceChannel
         $json['_meta'] = array_merge((array) ($json['_meta'] ?? []), $meta);
 
         return $json;
+    }
+
+    /**
+     * TikTok uses both dedicated auth codes and the shared gateway code
+     * 36009004 for an invalid x-tts-access-token header. The shared code is
+     * also used for unrelated request validation errors, so only treat it as
+     * refreshable when the message explicitly identifies the access token.
+     */
+    protected function isAccessTokenError(array $result): bool
+    {
+        $code = strtolower(trim((string) ($result['code'] ?? '')));
+        if (in_array($code, ['105', '105001', '105002', 'invalid_access_token'], true)) {
+            return true;
+        }
+
+        $message = strtolower(trim((string) ($result['message'] ?? '')));
+        if ($message === '') {
+            return false;
+        }
+
+        $mentionsTokenHeader = str_contains($message, 'x-tts-access-token')
+            || str_contains($message, 'access_token header')
+            || str_contains($message, 'access token');
+        $isInvalidOrExpired = str_contains($message, 'invalid')
+            || str_contains($message, 'expired');
+
+        return $mentionsTokenHeader && $isInvalidOrExpired;
     }
 
     /**
@@ -706,6 +730,7 @@ class TikTokShopChannel implements MarketplaceChannel
         }
 
         $shipped['package_id'] = $packageId;
+
         return $shipped;
     }
 
@@ -1097,6 +1122,7 @@ class TikTokShopChannel implements MarketplaceChannel
             ?? data_get($data, 'tracking_info.0.tracking_number');
 
         $result['response'] = ['tracking_number' => $tracking, 'raw' => $data];
+
         return $result;
     }
 
@@ -1105,6 +1131,7 @@ class TikTokShopChannel implements MarketplaceChannel
         $result = $this->getTrackingNumber($store, $orderSn);
         $tracking = data_get($result, 'response.raw.tracking', data_get($result, 'response.raw.tracking_info', []));
         $result['response']['tracking_info'] = is_array($tracking) ? $tracking : [];
+
         return $result;
     }
 
@@ -1174,6 +1201,7 @@ class TikTokShopChannel implements MarketplaceChannel
     protected function isSeaStore(Store $store): bool
     {
         $region = strtoupper(trim((string) $store->region));
+
         return in_array(substr($region, 0, 2), self::SEA_REGIONS, true);
     }
 

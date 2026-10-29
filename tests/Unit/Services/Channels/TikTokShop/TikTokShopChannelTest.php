@@ -105,6 +105,71 @@ class TikTokShopChannelTest extends TestCase
         });
     }
 
+    public function test_invalid_tiktok_token_header_refreshes_token_then_retries_request(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+        config()->set('tiktok_shop.auth_url', 'https://auth.tiktok-shops.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-TOKEN-REFRESH',
+            'name' => 'TikTok Token Refresh Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'expired-access-token',
+                'refresh_token' => 'refresh-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        $categoryRequests = 0;
+        Http::fake(function ($request) use (&$categoryRequests) {
+            if (str_contains($request->url(), '/api/v2/token/refresh')) {
+                return Http::response([
+                    'code' => 0,
+                    'data' => [
+                        'access_token' => 'refreshed-access-token',
+                        'refresh_token' => 'rotated-refresh-token',
+                        'access_token_expire_in' => 7200,
+                        'refresh_token_expire_in' => 86400,
+                    ],
+                ]);
+            }
+
+            if (str_contains($request->url(), '/product/202309/categories')) {
+                $categoryRequests++;
+                if ($categoryRequests === 1) {
+                    return Http::response([
+                        'code' => 36009004,
+                        'message' => "Invalid credentials. The 'x-tts-access-token' header is invalid.",
+                    ]);
+                }
+
+                $this->assertSame('refreshed-access-token', $request->header('x-tts-access-token')[0] ?? null);
+
+                return Http::response([
+                    'code' => 0,
+                    'message' => 'Success',
+                    'data' => ['categories' => []],
+                ]);
+            }
+
+            return Http::response(['code' => -1, 'message' => 'Unexpected request'], 500);
+        });
+
+        $response = app(TikTokShopChannel::class)->getProductCategories($store);
+
+        $this->assertSame(0, $response['code']);
+        $this->assertSame(2, $categoryRequests);
+        $this->assertSame('refreshed-access-token', $store->fresh()->credential('access_token'));
+        $this->assertSame('rotated-refresh-token', $store->fresh()->credential('refresh_token'));
+        Http::assertSentCount(3);
+    }
+
     public function test_get_unsettled_transactions_uses_the_v202507_finance_endpoint(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
