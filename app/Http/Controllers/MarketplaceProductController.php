@@ -22,7 +22,7 @@ class MarketplaceProductController extends Controller
             ->get(['id', 'name', 'code', 'channel_id'])
             ->map(function (Store $store): array {
                 $channel = strtolower((string) $store->channel?->code);
-                $channel = in_array($channel, ['tt', 'ttk'], true) ? 'tiktok' : 'shopee';
+                $channel = in_array($channel, ['tiktok', 'tt', 'ttk'], true) ? 'tiktok' : 'shopee';
 
                 return [
                     'id' => $store->id,

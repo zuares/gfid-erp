@@ -26,7 +26,7 @@ class MarketplaceProductTikTokCreateTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->actingAs($owner)
+        $response = $this->actingAs($owner)
             ->getJson('/api/marketplace/products/create/options')
             ->assertOk()
             ->assertJsonFragment([
@@ -35,6 +35,9 @@ class MarketplaceProductTikTokCreateTest extends TestCase
                 'channel' => 'tiktok',
                 'channel_name' => 'TikTok Shop',
             ]);
+
+        $storeOption = collect($response->json('stores'))->firstWhere('id', $store->id);
+        $this->assertSame('tiktok', $storeOption['channel'] ?? null);
     }
 
     public function test_publish_tiktok_create_builds_the_official_single_sku_payload(): void
