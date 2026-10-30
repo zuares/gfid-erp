@@ -47,6 +47,14 @@ class MarketplaceProductController extends Controller
         return $this->marketplaceResult($result, 'Kategori marketplace gagal diambil.');
     }
 
+    public function tiktokDiagnostics(Request $request)
+    {
+        $store = $this->createStore($request);
+        abort_unless($this->isTikTokStore($store), 422, 'Diagnostik ini hanya tersedia untuk toko TikTok Shop.');
+
+        return response()->json($this->products->diagnoseTikTokConnection($store));
+    }
+
     public function createAttributes(Request $request)
     {
         $data = $request->validate(['category_id' => ['required', 'regex:/^[0-9]{1,30}$/']]);

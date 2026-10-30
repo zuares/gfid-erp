@@ -49,6 +49,10 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
         Route::get('reports/sales/export', [MarketplaceOrderController::class, 'salesSummaryCsv'])
             ->name('reports.sales.export');
 
+        Route::post('products/tiktok-diagnostics', [\App\Http\Controllers\MarketplaceProductController::class, 'tiktokDiagnostics'])
+            ->middleware('role:owner')
+            ->name('products.tiktok-diagnostics');
+
         // Bounded Marketplace Finance read model and reconciliation views.
         Route::prefix('finance')->name('finance.')->group(function () {
             Route::get('/', [MarketplaceFinanceController::class, 'index'])->name('index');

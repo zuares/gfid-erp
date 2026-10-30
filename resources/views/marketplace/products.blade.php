@@ -440,6 +440,19 @@
     body[data-theme="dark"] .prd-demo-badge{ color:#fbbf24; background:rgba(245,158,11,.12); }
     .btn-mini{ border-radius:8px; }
     .prd-edit-section{ border-radius:14px; padding:.95rem; background:rgba(148,163,184,.025); }
+    .ttk-diag-summary{ border:1px solid var(--prd-border); border-radius:14px; padding:.85rem 1rem; background:rgba(248,250,252,.65); }
+    body[data-theme="dark"] .ttk-diag-summary{ background:rgba(15,23,42,.55); }
+    .ttk-diag-steps{ display:grid; gap:.55rem; margin-top:.8rem; }
+    .ttk-diag-step{ display:flex; align-items:flex-start; gap:.65rem; padding:.7rem .75rem; border:1px solid var(--prd-border); border-radius:12px; }
+    .ttk-diag-icon{ width:28px; height:28px; flex:none; display:grid; place-items:center; border-radius:999px; font-size:.75rem; }
+    .ttk-diag-step.passed .ttk-diag-icon{ color:#15803d; background:rgba(22,163,74,.12); }
+    .ttk-diag-step.warning .ttk-diag-icon{ color:#b45309; background:rgba(245,158,11,.14); }
+    .ttk-diag-step.failed .ttk-diag-icon{ color:#b91c1c; background:rgba(239,68,68,.12); }
+    .ttk-diag-step.skipped .ttk-diag-icon{ color:#64748b; background:rgba(148,163,184,.16); }
+    .ttk-diag-copy{ min-width:0; flex:1; }
+    .ttk-diag-copy strong{ display:block; font-size:.78rem; }
+    .ttk-diag-copy small{ display:block; color:#64748b; font-size:.7rem; line-height:1.45; }
+    .ttk-diag-meta{ flex:none; color:#94a3b8; font-size:.65rem; text-align:right; }
     .modal-content{ border:1px solid var(--prd-border)!important; box-shadow:0 24px 70px rgba(15,23,42,.18); }
     body[data-theme="dark"] .modal-content{ box-shadow:0 24px 70px rgba(0,0,0,.35); }
     @media (max-width:768px){
@@ -463,6 +476,9 @@
         </div>
         <div class="controls">
             <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()" title="Cocokkan SKU marketplace dengan item internal"><i class="bi bi-link-45deg me-1"></i>Auto-map</button>
+            @if(auth()->user()?->isOwner())
+                <button class="btn btn-pill btn-prd-outline" id="btnTikTokDiagnostics" onclick="openTikTokDiagnostics()" title="Uji koneksi dan endpoint produk TikTok Shop"><i class="bi bi-activity me-1"></i>Tes TikTok</button>
+            @endif
             <button class="btn btn-pill btn-prd-primary" onclick="openProductCreate()" title="Buat listing produk baru"><i class="bi bi-plus-lg me-1"></i>Tambah Produk</button>
             <button class="btn btn-pill btn-prd-outline" id="btnSync" onclick="syncProducts()" title="Ambil data terbaru dari semua marketplace"><i class="bi bi-arrow-repeat me-1"></i>Sync Produk</button>
         </div>
@@ -715,6 +731,33 @@
                 <span class="prd-edit-meta me-auto" id="productCreateStatus">Langkah 1 dari 4</span>
                 <button class="btn btn-light border" style="border-radius:999px" id="productCreatePrev" onclick="previousProductCreateStep()" disabled>Kembali</button>
                 <button class="btn btn-primary fw-bold" style="border-radius:999px" id="productCreateNext" onclick="nextProductCreateStep()">Lanjut</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalTikTokDiagnostics" tabindex="-1" aria-labelledby="modalTikTokDiagnosticsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header border-0 pb-2">
+                <div>
+                    <div class="prd-edit-meta mb-1"><i class="bi bi-tiktok me-1"></i>KONEKSI MARKETPLACE</div>
+                    <h5 class="modal-title fw-bold" id="modalTikTokDiagnosticsLabel">Tes Endpoint TikTok Shop</h5>
+                    <div class="prd-edit-meta">Menguji toko, daftar produk, dan satu detail produk tanpa menampilkan credential.</div>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body pt-1">
+                <label class="form-label fw-bold" for="tiktokDiagnosticStore" style="font-size:.75rem">Toko TikTok Shop</label>
+                <select class="form-select" id="tiktokDiagnosticStore" style="border-radius:10px"></select>
+                <div id="tiktokDiagnosticResult" class="mt-3" aria-live="polite">
+                    <div class="ttk-diag-summary text-muted small">Pilih toko lalu jalankan tes koneksi.</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <span class="prd-edit-meta me-auto" id="tiktokDiagnosticStatus">Belum diuji.</span>
+                <button class="btn btn-light border" style="border-radius:999px" data-bs-dismiss="modal">Tutup</button>
+                <button class="btn btn-primary fw-bold" style="border-radius:999px" id="tiktokDiagnosticRun" onclick="runTikTokDiagnostics()"><i class="bi bi-play-fill me-1"></i>Jalankan Tes</button>
             </div>
         </div>
     </div>
@@ -1528,6 +1571,93 @@
         } catch (e) { alert('Sync gagal: ' + e.message); }
         finally { $('btnSync').disabled = false; $('btnSync').textContent = '⟳ Sync Produk'; }
     };
+
+    window.openTikTokDiagnostics = async function () {
+        const modal = bootstrap.Modal.getOrCreateInstance($('modalTikTokDiagnostics'));
+        const select = $('tiktokDiagnosticStore');
+        const runButton = $('tiktokDiagnosticRun');
+        select.innerHTML = '<option value="">Memuat toko TikTok…</option>';
+        select.disabled = true;
+        runButton.disabled = true;
+        $('tiktokDiagnosticResult').innerHTML = '<div class="ttk-diag-summary text-muted small"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Memuat daftar toko…</div>';
+        $('tiktokDiagnosticStatus').textContent = 'Memuat toko…';
+        modal.show();
+
+        try {
+            const options = await api(`${API}/create/options`);
+            const stores = (options.stores || []).filter(store => store.channel === 'tiktok');
+            if (!stores.length) {
+                select.innerHTML = '<option value="">Tidak ada toko TikTok aktif</option>';
+                $('tiktokDiagnosticResult').innerHTML = '<div class="alert alert-warning mb-0">Hubungkan atau aktifkan toko TikTok Shop terlebih dahulu.</div>';
+                $('tiktokDiagnosticStatus').textContent = 'Toko TikTok tidak ditemukan.';
+                return;
+            }
+
+            select.innerHTML = stores.map(store => `<option value="${esc(store.id)}">${esc(store.name)} (${esc(store.code)})</option>`).join('');
+            select.disabled = false;
+            runButton.disabled = false;
+            $('tiktokDiagnosticResult').innerHTML = '<div class="ttk-diag-summary text-muted small">Siap menguji tiga endpoint utama TikTok Shop.</div>';
+            $('tiktokDiagnosticStatus').textContent = `${stores.length} toko TikTok tersedia.`;
+        } catch (error) {
+            $('tiktokDiagnosticResult').innerHTML = `<div class="alert alert-danger mb-0">${esc(error.message || 'Gagal memuat toko TikTok.')}</div>`;
+            $('tiktokDiagnosticStatus').textContent = 'Gagal memuat toko.';
+        }
+    };
+
+    window.runTikTokDiagnostics = async function () {
+        const storeId = $('tiktokDiagnosticStore').value;
+        const runButton = $('tiktokDiagnosticRun');
+        if (!storeId) return;
+
+        runButton.disabled = true;
+        runButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Menguji…';
+        $('tiktokDiagnosticStore').disabled = true;
+        $('tiktokDiagnosticResult').innerHTML = '<div class="ttk-diag-summary text-muted small"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Menguji credential, toko, Search Products, dan Get Product…</div>';
+        $('tiktokDiagnosticStatus').textContent = 'Tes koneksi sedang berjalan…';
+
+        try {
+            const result = await api('/marketplace/products/tiktok-diagnostics', {
+                method: 'POST',
+                body: JSON.stringify({ store_id: Number(storeId) }),
+            });
+            renderTikTokDiagnostics(result);
+        } catch (error) {
+            $('tiktokDiagnosticResult').innerHTML = `<div class="alert alert-danger mb-0">${esc(error.message || 'Tes koneksi TikTok gagal.')}</div>`;
+            $('tiktokDiagnosticStatus').textContent = 'Tes gagal dijalankan.';
+        } finally {
+            runButton.disabled = false;
+            runButton.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Uji Lagi';
+            $('tiktokDiagnosticStore').disabled = false;
+        }
+    };
+
+    function renderTikTokDiagnostics(result) {
+        const summaryClass = result.status === 'success' ? 'alert-success' : (result.status === 'warning' ? 'alert-warning' : 'alert-danger');
+        const icons = { passed: 'bi-check-lg', warning: 'bi-exclamation-lg', failed: 'bi-x-lg', skipped: 'bi-dash-lg' };
+        const labels = { passed: 'Berhasil', warning: 'Peringatan', failed: 'Gagal', skipped: 'Dilewati' };
+        const steps = (result.steps || []).map(step => {
+            const details = step.details || {};
+            const detailParts = [];
+            if (details.product_id) detailParts.push(`Produk ${esc(details.product_id)}`);
+            if (details.sku_count != null) detailParts.push(`${esc(details.sku_count)} SKU`);
+            if (details.sample_count != null) detailParts.push(`${esc(details.sample_count)} sampel`);
+            return `<div class="ttk-diag-step ${esc(step.status)}">
+                <span class="ttk-diag-icon"><i class="bi ${icons[step.status] || 'bi-circle'}"></i></span>
+                <span class="ttk-diag-copy"><strong>${esc(step.label)}</strong><small>${esc(step.message)}${detailParts.length ? ` · ${detailParts.join(' · ')}` : ''}</small></span>
+                <span class="ttk-diag-meta">${esc(labels[step.status] || step.status)}${step.duration_ms ? `<br>${esc(step.duration_ms)} ms` : ''}${step.request_id ? `<br>ID ${esc(step.request_id)}` : ''}</span>
+            </div>`;
+        }).join('');
+
+        const tokenNotice = result.token_refreshed
+            ? '<div class="alert alert-info py-2 mt-2 mb-0 small"><i class="bi bi-arrow-repeat me-1"></i>Access token berhasil diperbarui otomatis.</div>'
+            : '';
+        const reconnectNotice = result.reconnect_required
+            ? '<div class="alert alert-danger py-2 mt-2 mb-0 small"><i class="bi bi-plug me-1"></i>Authorization tidak valid. Hubungkan ulang toko TikTok melalui OAuth.</div>'
+            : '';
+
+        $('tiktokDiagnosticResult').innerHTML = `<div class="alert ${summaryClass} mb-0"><strong>${esc(result.store?.name || 'TikTok Shop')}</strong><div class="small mt-1">${esc(result.message)}</div></div>${tokenNotice}${reconnectNotice}<div class="ttk-diag-steps">${steps}</div>`;
+        $('tiktokDiagnosticStatus').textContent = result.tested_at ? `Diuji ${orderDate(result.tested_at)}` : 'Tes selesai.';
+    }
 
     function buildStoreOptions() {
         const sel = $('fStore'), cur = sel.value;

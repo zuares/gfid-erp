@@ -18,6 +18,62 @@ class MarketplaceProductServiceTikTokTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_tiktok_diagnostics_checks_shop_search_and_product_without_exposing_secrets(): void
+    {
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-DIAGNOSTIC-TEST',
+            'name' => 'TikTok Diagnostic Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-secret',
+                'app_secret' => 'app-secret-sensitive',
+                'access_token' => 'TTP_access-token-sensitive',
+                'refresh_token' => 'refresh-token-sensitive',
+                'shop_cipher' => 'shop-cipher-sensitive',
+            ],
+        ]);
+
+        $gateway = Mockery::mock(MarketplaceApiGateway::class);
+        $gateway->shouldReceive('getShopInfo')->once()->andReturn([
+            'code' => 0,
+            'request_id' => 'shop-request',
+            'data' => ['shops' => [['id' => 'shop-1']]],
+        ]);
+        $gateway->shouldReceive('searchProducts')->once()->with(
+            Mockery::type(Store::class),
+            'ALL',
+            '',
+            1,
+        )->andReturn([
+            'code' => 0,
+            'request_id' => 'search-request',
+            'data' => ['products' => [['id' => 'product-1', 'title' => 'Jaket']], 'next_page_token' => 'next'],
+        ]);
+        $gateway->shouldReceive('getProduct')->once()->with(
+            Mockery::type(Store::class),
+            'product-1',
+        )->andReturn([
+            'code' => 0,
+            'request_id' => 'detail-request',
+            'data' => ['id' => 'product-1', 'title' => 'Jaket', 'status' => 'ACTIVATE', 'skus' => [['id' => 'sku-1']]],
+        ]);
+
+        $result = (new MarketplaceProductService($gateway))->diagnoseTikTokConnection($store);
+        $encoded = json_encode($result);
+
+        $this->assertSame('success', $result['status']);
+        $this->assertFalse($result['reconnect_required']);
+        $this->assertCount(4, $result['steps']);
+        $this->assertSame('product-1', data_get($result, 'steps.3.details.product_id'));
+        $this->assertStringNotContainsString('app-secret-sensitive', $encoded);
+        $this->assertStringNotContainsString('TTP_access-token-sensitive', $encoded);
+        $this->assertStringNotContainsString('refresh-token-sensitive', $encoded);
+        $this->assertStringNotContainsString('shop-cipher-sensitive', $encoded);
+    }
+
     public function test_tiktok_catalog_sync_persists_product_skus_prices_stock_and_status(): void
     {
         $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);

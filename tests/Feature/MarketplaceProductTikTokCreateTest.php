@@ -90,4 +90,51 @@ class MarketplaceProductTikTokCreateTest extends TestCase
             ->assertOk()
             ->assertJsonPath('item_id', 'product-new');
     }
+
+    public function test_owner_can_run_tiktok_product_diagnostics(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-TTK-DIAGNOSTICS']);
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'TTK-DIAGNOSTICS',
+            'name' => 'Toko TikTok Diagnostics',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $service = Mockery::mock(MarketplaceProductService::class);
+        $service->shouldReceive('diagnoseTikTokConnection')->once()->with(
+            Mockery::on(fn (Store $candidate): bool => $candidate->is($store))
+        )->andReturn([
+            'status' => 'success',
+            'message' => 'Semua endpoint utama TikTok Shop merespons dengan baik.',
+            'reconnect_required' => false,
+            'token_refreshed' => false,
+            'steps' => [],
+        ]);
+        $this->app->instance(MarketplaceProductService::class, $service);
+
+        $this->actingAs($owner)
+            ->postJson('/marketplace/products/tiktok-diagnostics', ['store_id' => $store->id])
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('reconnect_required', false);
+    }
+
+    public function test_non_owner_cannot_run_tiktok_product_diagnostics(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADMIN-TTK-DIAGNOSTICS']);
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'TTK-DIAGNOSTICS-FORBIDDEN',
+            'name' => 'Toko TikTok Diagnostics Forbidden',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson('/marketplace/products/tiktok-diagnostics', ['store_id' => $store->id])
+            ->assertForbidden();
+    }
 }

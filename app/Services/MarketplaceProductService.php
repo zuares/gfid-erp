@@ -22,6 +22,259 @@ class MarketplaceProductService
     ) {}
 
     /**
+     * Jalankan smoke test aman untuk koneksi TikTok Shop tanpa mengembalikan
+     * credential atau raw response ke browser. Setiap panggilan dibatasi ke
+     * satu halaman/satu produk agar diagnostik tidak berubah menjadi full sync.
+     */
+    public function diagnoseTikTokConnection(Store $store): array
+    {
+        $store->loadMissing('channel:id,code,name');
+        if (! $this->isTikTokStore($store)) {
+            return [
+                'status' => 'failed',
+                'message' => 'Toko yang dipilih bukan TikTok Shop.',
+                'reconnect_required' => false,
+                'steps' => [],
+            ];
+        }
+
+        $credentials = [
+            'app_key' => filled($store->credential('app_key', config('tiktok_shop.app_key'))),
+            'app_secret' => filled($store->credential('app_secret', config('tiktok_shop.app_secret'))),
+            'access_token' => filled($store->credential('access_token')),
+            'refresh_token' => filled($store->credential('refresh_token')),
+            'shop_cipher' => filled($store->credential('shop_cipher', $store->meta['shop_cipher'] ?? null)),
+        ];
+        $requiredCredentialsReady = collect($credentials)
+            ->except('refresh_token')
+            ->every(static fn (bool $ready): bool => $ready);
+        $steps = [[
+            'key' => 'credentials',
+            'label' => 'Kredensial lokal',
+            'status' => $requiredCredentialsReady
+                ? ($credentials['refresh_token'] ? 'passed' : 'warning')
+                : 'failed',
+            'message' => ! $requiredCredentialsReady
+                ? 'Kredensial wajib TikTok Shop belum lengkap.'
+                : ($credentials['refresh_token']
+                    ? 'App, token, dan shop cipher tersedia.'
+                    : 'Access token tersedia, tetapi refresh token belum tersimpan.'),
+            'duration_ms' => 0,
+            'details' => $credentials,
+        ]];
+
+        if (! $requiredCredentialsReady) {
+            return $this->tiktokDiagnosticResponse(
+                $store,
+                $steps,
+                'failed',
+                'Lengkapi atau hubungkan ulang toko TikTok Shop sebelum menguji API.',
+                ! $credentials['access_token'] || ! $credentials['refresh_token'],
+            );
+        }
+
+        $initialTokenHash = hash('sha256', (string) $store->credential('access_token'));
+
+        $shopCall = $this->runTikTokDiagnosticCall(
+            fn (): array => $this->gateway->getShopInfo($store),
+            'authorized_shop',
+            'Authorized Shop',
+        );
+        $steps[] = $shopCall['step'];
+        if ($shopCall['failed']) {
+            $this->appendSkippedTikTokSteps($steps, ['Search Products', 'Get Product']);
+
+            return $this->tiktokDiagnosticResponse(
+                $store,
+                $steps,
+                'failed',
+                'TikTok Shop menolak pemeriksaan toko.',
+                $this->isTikTokAuthenticationFailure($shopCall['result']),
+                $initialTokenHash,
+            );
+        }
+
+        $shops = data_get($shopCall['result'], 'data.shops', []);
+        $steps[array_key_last($steps)]['details'] = [
+            'authorized_shop_count' => is_array($shops) ? count($shops) : null,
+        ];
+
+        $searchCall = $this->runTikTokDiagnosticCall(
+            fn (): array => $this->gateway->searchProducts($store, 'ALL', '', 1),
+            'search_products',
+            'Search Products',
+        );
+        $steps[] = $searchCall['step'];
+        if ($searchCall['failed']) {
+            $this->appendSkippedTikTokSteps($steps, ['Get Product']);
+
+            return $this->tiktokDiagnosticResponse(
+                $store,
+                $steps,
+                'failed',
+                'Daftar produk TikTok belum dapat diambil.',
+                $this->isTikTokAuthenticationFailure($searchCall['result']),
+                $initialTokenHash,
+            );
+        }
+
+        $products = data_get($searchCall['result'], 'data.products', []);
+        $products = is_array($products) ? $products : [];
+        $sample = $products[0] ?? null;
+        $productId = trim((string) data_get($sample, 'id', data_get($sample, 'product_id', '')));
+        $steps[array_key_last($steps)]['status'] = $productId !== '' ? 'passed' : 'warning';
+        $steps[array_key_last($steps)]['message'] = $productId !== ''
+            ? 'Endpoint daftar produk merespons dan mengembalikan sampel produk.'
+            : 'Endpoint merespons, tetapi toko belum memiliki produk.';
+        $steps[array_key_last($steps)]['details'] = [
+            'sample_count' => count($products),
+            'has_more' => filled(data_get($searchCall['result'], 'data.next_page_token')),
+        ];
+
+        if ($productId === '') {
+            $this->appendSkippedTikTokSteps($steps, ['Get Product'], 'Tidak ada product_id untuk diuji.');
+
+            return $this->tiktokDiagnosticResponse(
+                $store,
+                $steps,
+                'warning',
+                'Koneksi TikTok sehat, tetapi belum ada produk untuk diuji lebih lanjut.',
+                false,
+                $initialTokenHash,
+            );
+        }
+
+        $detailCall = $this->runTikTokDiagnosticCall(
+            fn (): array => $this->gateway->getProduct($store, $productId),
+            'get_product',
+            'Get Product',
+        );
+        $steps[] = $detailCall['step'];
+        if ($detailCall['failed']) {
+            return $this->tiktokDiagnosticResponse(
+                $store,
+                $steps,
+                'failed',
+                'Detail produk TikTok belum dapat diambil.',
+                $this->isTikTokAuthenticationFailure($detailCall['result']),
+                $initialTokenHash,
+            );
+        }
+
+        $detail = (array) data_get($detailCall['result'], 'data', []);
+        $steps[array_key_last($steps)]['details'] = [
+            'product_id' => $productId,
+            'title' => (string) ($detail['title'] ?? data_get($sample, 'title', '')),
+            'status' => (string) ($detail['status'] ?? data_get($sample, 'status', '')),
+            'sku_count' => count((array) ($detail['skus'] ?? [])),
+        ];
+
+        return $this->tiktokDiagnosticResponse(
+            $store,
+            $steps,
+            'success',
+            'Semua endpoint utama TikTok Shop merespons dengan baik.',
+            false,
+            $initialTokenHash,
+        );
+    }
+
+    private function runTikTokDiagnosticCall(\Closure $call, string $key, string $label): array
+    {
+        $startedAt = microtime(true);
+        try {
+            $result = $call();
+        } catch (\Throwable $exception) {
+            Log::warning('TikTok product diagnostic call failed unexpectedly.', [
+                'step' => $key,
+                'exception' => $exception::class,
+                'code' => $exception->getCode(),
+            ]);
+            $result = [
+                'error' => true,
+                'message' => 'Terjadi kesalahan internal saat menghubungi TikTok Shop.',
+            ];
+        }
+
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+        $failed = ! empty($result['error'])
+            || (isset($result['code']) && (string) $result['code'] !== '0');
+
+        return [
+            'failed' => $failed,
+            'result' => $result,
+            'step' => [
+                'key' => $key,
+                'label' => $label,
+                'status' => $failed ? 'failed' : 'passed',
+                'message' => $failed
+                    ? $this->safeTikTokDiagnosticMessage($result['message'] ?? 'TikTok Shop mengembalikan error.')
+                    : 'Endpoint merespons dengan sukses.',
+                'code' => isset($result['code']) ? (string) $result['code'] : null,
+                'request_id' => filled($result['request_id'] ?? null) ? (string) $result['request_id'] : null,
+                'duration_ms' => $durationMs,
+            ],
+        ];
+    }
+
+    private function appendSkippedTikTokSteps(array &$steps, array $labels, string $message = 'Dilewati karena tahap sebelumnya gagal.'): void
+    {
+        foreach ($labels as $label) {
+            $steps[] = [
+                'key' => Str::snake($label),
+                'label' => $label,
+                'status' => 'skipped',
+                'message' => $message,
+                'duration_ms' => 0,
+            ];
+        }
+    }
+
+    private function tiktokDiagnosticResponse(
+        Store $store,
+        array $steps,
+        string $status,
+        string $message,
+        bool $reconnectRequired,
+        ?string $initialTokenHash = null,
+    ): array {
+        $store->refresh();
+        $currentTokenHash = hash('sha256', (string) $store->credential('access_token'));
+
+        return [
+            'status' => $status,
+            'message' => $message,
+            'reconnect_required' => $reconnectRequired,
+            'token_refreshed' => $initialTokenHash !== null && ! hash_equals($initialTokenHash, $currentTokenHash),
+            'tested_at' => now()->toIso8601String(),
+            'store' => [
+                'id' => $store->id,
+                'name' => $store->name,
+                'code' => $store->code,
+            ],
+            'steps' => $steps,
+        ];
+    }
+
+    private function isTikTokAuthenticationFailure(array $result): bool
+    {
+        $code = strtolower(trim((string) ($result['code'] ?? '')));
+        $message = strtolower((string) ($result['message'] ?? ''));
+
+        return in_array($code, ['105', '105001', '105002', 'invalid_access_token'], true)
+            || ((str_contains($message, 'access token') || str_contains($message, 'x-tts-access-token'))
+                && (str_contains($message, 'invalid') || str_contains($message, 'expired')));
+    }
+
+    private function safeTikTokDiagnosticMessage(mixed $message): string
+    {
+        $message = trim((string) $message);
+        $message = preg_replace('/\bTTP_[A-Za-z0-9_-]+\b/', '[TOKEN DISEMBUNYIKAN]', $message) ?? $message;
+
+        return Str::limit($message, 320, '…');
+    }
+
+    /**
      * Sync semua produk sebuah toko (status NORMAL + UNLIST).
      * Return: ['synced' => n, 'errors' => []]
      */
