@@ -49,6 +49,46 @@ class TikTokShopChannelTest extends TestCase
         );
     }
 
+    public function test_get_shop_info_does_not_send_shop_cipher(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-SHOP-INFO',
+            'name' => 'TikTok Shop Info Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-must-not-be-sent',
+            ],
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/*' => Http::response([
+                'code' => 0,
+                'data' => ['shops' => []],
+            ]),
+        ]);
+
+        app(TikTokShopChannel::class)->getShopInfo($store);
+
+        Http::assertSent(function ($request): bool {
+            $url = $request->url();
+
+            return $request->method() === 'GET'
+                && str_starts_with($url, 'https://open-api.tiktokglobalshop.com/seller/202309/shops?')
+                && str_contains($url, 'app_key=app-key-test')
+                && str_contains($url, 'sign=')
+                && str_contains($url, 'timestamp=')
+                && ! str_contains($url, 'shop_cipher=');
+        });
+    }
+
     public function test_post_request_keeps_tiktok_query_parameters_outside_json_body(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');

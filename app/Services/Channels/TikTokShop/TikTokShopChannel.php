@@ -70,14 +70,19 @@ class TikTokShopChannel implements MarketplaceChannel
 
     // ─── HTTP helpers ─────────────────────────────────────────────────────────
 
-    protected function get(Store $store, string $path, array $params = []): array
+    protected function get(
+        Store $store,
+        string $path,
+        array $params = [],
+        bool $includeShopCipher = true
+    ): array
     {
         $maxAttempts = max(1, (int) config('tiktok_shop.rate_limit_max_attempts', 3));
         $result = [];
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             $this->paceFinanceRequest($store, $path);
-            $result = $this->doRequest($store, 'GET', $path, $params);
+            $result = $this->doRequest($store, 'GET', $path, $params, [], $includeShopCipher);
 
             // Token expired → auto-refresh sekali lalu retry.
             if ($this->isAccessTokenError($result)) {
@@ -85,7 +90,7 @@ class TikTokShopChannel implements MarketplaceChannel
                 if (empty($refreshed['error'])) {
                     $store->refresh();
                     $this->paceFinanceRequest($store, $path);
-                    $result = $this->doRequest($store, 'GET', $path, $params);
+                    $result = $this->doRequest($store, 'GET', $path, $params, [], $includeShopCipher);
                 }
             }
 
@@ -210,7 +215,8 @@ class TikTokShopChannel implements MarketplaceChannel
         string $method,
         string $path,
         array $params = [],
-        array $body = []
+        array $body = [],
+        bool $includeShopCipher = true
     ): array {
         $timestamp = (string) time();
 
@@ -220,7 +226,7 @@ class TikTokShopChannel implements MarketplaceChannel
         ]);
 
         $shopCipher = $this->shopCipher($store);
-        if ($shopCipher !== '') {
+        if ($includeShopCipher && $shopCipher !== '') {
             $query['shop_cipher'] = $shopCipher;
         }
 
@@ -382,7 +388,7 @@ class TikTokShopChannel implements MarketplaceChannel
 
     public function getShopInfo(Store $store): array
     {
-        return $this->get($store, '/seller/202309/shops');
+        return $this->get($store, '/seller/202309/shops', [], false);
     }
 
     // ─── Products (TikTok Shop Product API v202309) ─────────────────────────
