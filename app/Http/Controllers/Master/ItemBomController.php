@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 class ItemBomController extends Controller
 {
     private const QTY_MIN = 0.0001; // biar bisa 0,0095
-    private const DEFAULT_WASTE_PCT = '15';
+    private const DEFAULT_WASTE_PCT = '0';
     private const PAGINATE = 20;
 
     public function index(Request $request)

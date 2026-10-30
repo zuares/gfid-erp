@@ -582,7 +582,7 @@
     'material_text' => null,
     'qty' => '',
     'uom' => 'pcs',
-    'scrap_pct' => 15,
+    'scrap_pct' => 0,
     'is_optional' => 0,
   ]];
 @endphp
@@ -705,7 +705,7 @@
                     @php
                       $defaultScrap = (string) ($bom?->lines
                           ?->firstWhere('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
-                          ?->scrap_pct ?? 15);
+                          ?->scrap_pct ?? 0);
                     @endphp
                     <td class="text-end">
                       <div class="d-inline-flex align-items-center gap-1 flex-wrap justify-content-end">
@@ -733,7 +733,7 @@
 
       <div class="rowx" style="justify-content:flex-end;margin-top:12px">
         <button type="button" class="btnx primary" id="btn-add"><i class="bi bi-plus-lg"></i> Tambah Baris</button>
-        <button type="button" class="btnx" id="btn-default-waste">Waste default 15%</button>
+        <button type="button" class="btnx" id="btn-default-waste">Waste default 0%</button>
       </div>
 
       <div class="table-wrap mt-3">
@@ -801,8 +801,8 @@
                          max="100"
                          step="0.1"
                          name="lines[{{ $i }}][scrap_pct]"
-                         value="{{ (string) data_get($r,'scrap_pct',15) }}"
-                         placeholder="15">
+                         value="{{ (string) data_get($r,'scrap_pct',0) }}"
+                         placeholder="0">
                 </td>
                 <td>
                   <select class="inp mono" name="lines[{{ $i }}][is_optional]">
@@ -913,25 +913,6 @@
     });
   }
 
-  function stageRank(value){
-    return {
-      main_material: 0,
-      sewing_supply: 1,
-      packing_supply: 2,
-    }[value] ?? 99;
-  }
-
-  function reorderLines(){
-    const $tbody = $('#lines');
-    const rows = $tbody.children('tr.line').get();
-    rows.sort(function(a, b){
-      return stageRank($(a).find('select.usage-stage').val())
-        - stageRank($(b).find('select.usage-stage').val());
-    });
-    $(rows).appendTo($tbody);
-    renumber();
-  }
-
   function ensureOneRow(){
     const $tbody = $('#lines');
     if ($tbody.find('tr.line').length === 0) addRow();
@@ -952,7 +933,7 @@
             <td><select class="inp mono usage-stage" name="lines[${i}][usage_stage]">${usageHtml}</select></td>
         <td><input class="inp mono qty" inputmode="decimal" data-max-decimals="3" name="lines[${i}][qty]" placeholder="0,000"><div class="bom-usage-hint" style="font-size:.68rem;line-height:1.45;margin-top:3px;"></div></td>
         <td><input class="inp mono uom" name="lines[${i}][uom]" value="pcs" placeholder="pcs"></td>
-        <td><input class="inp mono scrap" type="number" inputmode="decimal" min="0" max="100" step="0.1" name="lines[${i}][scrap_pct]" value="15" placeholder="15"></td>
+        <td><input class="inp mono scrap" type="number" inputmode="decimal" min="0" max="100" step="0.1" name="lines[${i}][scrap_pct]" value="0" placeholder="0"></td>
         <td>
           <select class="inp mono" name="lines[${i}][is_optional]">
             <option value="0" selected>No</option>
@@ -965,12 +946,12 @@
     const $row = $(html);
     $tbody.append($row);
     initMaterialSelect($row.find('select.mat'));
-    reorderLines();
+    renumber();
   }
 
   $(document).on('click', '#btn-add', addRow);
   $(document).on('click', '#btn-default-waste', function(){
-    $('#lines input.scrap').val('15');
+    $('#lines input.scrap').val('0');
     $('#lines tr.line').css('background', '#ecfdf5');
     setTimeout(() => $('#lines tr.line').css('background', ''), 900);
   });
@@ -1038,11 +1019,8 @@
   $('#lines tr.line').each(function(){ renderUsageHint($(this)); });
   $('#lines').on('change', 'select.mat, select.usage-stage', function(){
     const $row = $(this).closest('tr.line');
-    if ($(this).hasClass('usage-stage')) reorderLines();
     renderUsageHint($row);
   });
-
-  reorderLines();
 
   // ── "Pakai sebagai bahan utama" dari panel riwayat pemakaian ──
   $(document).on('click', '.btn-use-material', function(){

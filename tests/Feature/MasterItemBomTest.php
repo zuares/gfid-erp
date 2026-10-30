@@ -331,17 +331,26 @@ class MasterItemBomTest extends TestCase
         ]);
     }
 
-    public function test_new_bom_line_uses_fifteen_percent_waste_by_default(): void
+    public function test_new_bom_line_uses_zero_percent_waste_by_default(): void
     {
         $this->actingAs($this->owner)
             ->get(route('master.item_boms.create'))
             ->assertOk()
             ->assertSee('Waste (%)')
-            ->assertSee('Waste default 15%')
+            ->assertSee('Waste default 0%')
             ->assertSee('name="lines[0][scrap_pct]"', false)
-            ->assertSee('value="15"', false)
+            ->assertSee('value="0"', false)
             ->assertSee('data-max-decimals="3"', false)
             ->assertSee('placeholder="0,000"', false)
             ->assertSee('toFixed(3)', false);
+    }
+
+    public function test_bom_form_does_not_reorder_rows_when_group_changes(): void
+    {
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.create'))
+            ->assertOk()
+            ->assertDontSee('function reorderLines', false)
+            ->assertDontSee('stageRank(', false);
     }
 }
