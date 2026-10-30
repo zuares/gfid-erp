@@ -834,6 +834,7 @@
 (function () {
     const API = '/api/marketplace/products';
     let products = [];   // semua data dari server
+    let registeredStores = []; // toko aktif tetap tersedia meski belum memiliki produk lokal
     let kpiFilter = '';  // filter cepat via klik KPI
     const $ = id => document.getElementById(id);
     const esc = s => (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1550,7 +1551,18 @@
     window.loadProducts = async function () {
         $('prdBody').innerHTML = `<tr><td colspan="7" class="empty"><div class="empty-state"><div class="empty-state-icon"><i class="bi bi-arrow-repeat"></i></div><div class="empty-state-title">Mengambil produk terbaru…</div><div class="empty-state-copy">Data listing sedang disiapkan dari penyimpanan lokal.</div></div></td></tr>`;
         try {
-            products = await api(API);
+            const [productResult, storeResult] = await Promise.allSettled([
+                api(API),
+                api('/api/marketplace/stores'),
+            ]);
+            if (productResult.status === 'rejected') throw productResult.reason;
+
+            products = productResult.value;
+            if (storeResult.status === 'fulfilled' && Array.isArray(storeResult.value)) {
+                registeredStores = storeResult.value.filter(store =>
+                    store?.is_active && String(store?.status || '').toLowerCase() === 'active'
+                );
+            }
             const demoBadge = $('prdDemoBadge');
             if (demoBadge) demoBadge.classList.toggle('show', products.some(product => product.raw_json?.dummy_source === 'marketplace_products_ui_v1'));
             buildStoreOptions();
@@ -1661,7 +1673,16 @@
 
     function buildStoreOptions() {
         const sel = $('fStore'), cur = sel.value;
-        const stores = [...new Map(products.filter(p => p.store).map(p => [p.store.id, p.store.name])).entries()];
+        const storesById = new Map();
+        registeredStores.forEach(store => {
+            if (store?.id != null) storesById.set(String(store.id), store.name || store.code || `Toko ${store.id}`);
+        });
+        products.filter(product => product.store).forEach(product => {
+            storesById.set(String(product.store.id), product.store.name);
+        });
+        const stores = [...storesById.entries()].sort(([, firstName], [, secondName]) =>
+            String(firstName || '').localeCompare(String(secondName || ''), 'id')
+        );
         
         let html = `<button type="button" class="store-tab ${cur === '' ? 'active' : ''}" role="tab" aria-selected="${cur === ''}" onclick="setStoreTab('')">Semua Produk</button>`;
         html += `<button type="button" class="store-tab ${cur === 'bermasalah' ? 'active' : ''}" role="tab" aria-selected="${cur === 'bermasalah'}" style="color:var(--bs-danger);" onclick="setStoreTab('bermasalah')">⚠ Bermasalah</button>`;
