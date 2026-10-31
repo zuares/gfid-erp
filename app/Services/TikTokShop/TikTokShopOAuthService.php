@@ -2,6 +2,7 @@
 
 namespace App\Services\TikTokShop;
 
+use App\Jobs\Marketplace\SyncMarketplaceProductsJob;
 use App\Jobs\SyncMarketplaceReturns;
 use App\Models\Channel;
 use App\Models\Store;
@@ -30,10 +31,10 @@ class TikTokShopOAuthService
 
             // This service runs in the queue CLI process, not the forked FPM
             // worker that handles the browser callback.
-            $tokenResponse = $this->tiktokHttp()->connectTimeout(5)->timeout(10)->get($authUrl . '/api/v2/token/get', [
-                'app_key'    => $appKey,
+            $tokenResponse = $this->tiktokHttp()->connectTimeout(5)->timeout(10)->get($authUrl.'/api/v2/token/get', [
+                'app_key' => $appKey,
                 'app_secret' => $appSecret,
-                'auth_code'  => $authCode,
+                'auth_code' => $authCode,
                 'grant_type' => 'authorized_code',
             ]);
 
@@ -74,6 +75,7 @@ class TikTokShopOAuthService
                     'request_id' => $tokenData['request_id'] ?? null,
                     'message' => $tokenData['message'] ?? null,
                 ]);
+
                 return [
                     'status' => 'failed',
                     'message' => 'TikTok Shop tidak mengembalikan access token. Mulai koneksi ulang.',
@@ -85,6 +87,7 @@ class TikTokShopOAuthService
                     'user_type' => $userType,
                     'request_id' => $tokenData['request_id'] ?? null,
                 ]);
+
                 return [
                     'status' => 'failed',
                     'message' => 'Akun yang dipilih bukan akun seller TikTok Shop.',
@@ -122,6 +125,57 @@ class TikTokShopOAuthService
             );
 
             $targetStore = $targetStoreId ? Store::find((int) $targetStoreId) : null;
+
+            if ($targetStore) {
+                $targetShopId = trim((string) $targetStore->external_shop_id);
+                $targetShopCipher = trim((string) $targetStore->credential('shop_cipher'));
+                $targetStoreCode = trim((string) $targetStore->code);
+                $targetCodeCipher = str_starts_with($targetStoreCode, 'tiktok_')
+                    ? substr($targetStoreCode, strlen('tiktok_'))
+                    : '';
+
+                // Store codes are created from the first confirmed TikTok cipher.
+                // Prefer that immutable identity so a previous bad re-auth can repair
+                // a swapped credential instead of preserving the wrong shop.
+                $matchedShop = $targetCodeCipher !== ''
+                    ? collect($shops)->first(static fn (array $shop): bool => trim((string) ($shop['shop_cipher'] ?? '')) === $targetCodeCipher)
+                    : null;
+
+                if (! $matchedShop && $targetCodeCipher === '') {
+                    $matchedShop = collect($shops)->first(function (array $shop) use ($targetShopId, $targetShopCipher): bool {
+                        $shopId = trim((string) ($shop['shop_id'] ?? ''));
+                        $shopCipher = trim((string) ($shop['shop_cipher'] ?? ''));
+
+                        return ($targetShopId !== '' && $shopId === $targetShopId)
+                            || ($targetShopCipher !== '' && $shopCipher === $targetShopCipher);
+                    });
+                }
+
+                // A brand-new placeholder store has no TikTok identity yet.
+                // It is safe to bind only when OAuth returned exactly one shop.
+                if (! $matchedShop && $targetShopId === '' && $targetShopCipher === '' && count($shops) === 1) {
+                    $matchedShop = $shops[0];
+                }
+
+                if (! $matchedShop) {
+                    Log::warning('TikTok OAuth target store does not match an authorized shop', [
+                        'store_id' => $targetStore->id,
+                        'has_code_cipher' => $targetCodeCipher !== '',
+                        'has_external_shop_id' => $targetShopId !== '',
+                        'has_shop_cipher' => $targetShopCipher !== '',
+                        'authorized_shop_count' => count($shops),
+                    ]);
+
+                    return [
+                        'status' => 'failed',
+                        'message' => 'Toko TikTok yang dipilih tidak ditemukan pada akun yang diotorisasi. Tidak ada data toko yang diubah. Pilih akun seller untuk toko yang benar lalu hubungkan ulang.',
+                    ];
+                }
+
+                // Re-authorizing a specific store must never overwrite it with
+                // another shop merely because TikTok returns that shop first.
+                $shops = [$matchedShop];
+            }
 
             foreach ($shops as $shop) {
                 $shopId = (string) ($shop['shop_id'] ?? '');
@@ -178,13 +232,14 @@ class TikTokShopOAuthService
                     $targetStore = null;
                 } else {
                     $storeModel = Store::updateOrCreate(
-                        ['code' => 'tiktok_' . $shopCipher],
+                        ['code' => 'tiktok_'.$shopCipher],
                         $storePayload
                     );
                 }
 
                 Artisan::queue('marketplace:sync-orders', ['--store' => $storeModel->id]);
                 SyncMarketplaceReturns::dispatch($storeModel, null, null, true);
+                SyncMarketplaceProductsJob::dispatch($storeModel);
             }
 
             Log::info('TikTok Shop OAuth processed successfully', [
@@ -195,7 +250,7 @@ class TikTokShopOAuthService
                 'status' => 'success',
                 'message' => count($shops) === 1
                     ? 'Toko TikTok Shop berhasil terhubung.'
-                    : count($shops) . ' toko TikTok Shop berhasil terhubung.',
+                    : count($shops).' toko TikTok Shop berhasil terhubung.',
                 'shop_count' => count($shops),
             ];
 
@@ -216,7 +271,7 @@ class TikTokShopOAuthService
     {
         return app()->environment('testing')
             ? Http::withOptions([])
-            : Http::withOptions(['handler' => new StreamHandler()]);
+            : Http::withOptions(['handler' => new StreamHandler]);
     }
 
     protected function fetchAuthorizedShops(string $appKey, string $appSecret, string $accessToken): array
@@ -291,7 +346,7 @@ class TikTokShopOAuthService
                     'x-tts-access-token' => $accessToken,
                     'content-type' => 'application/json',
                 ])
-                ->get($baseUrl . $path, $query);
+                ->get($baseUrl.$path, $query);
 
             $json = $response->json() ?? [];
             if (! $response->successful() || (isset($json['code']) && (int) $json['code'] !== 0)) {
@@ -299,13 +354,14 @@ class TikTokShopOAuthService
                     'code' => $json['code'] ?? null,
                     'message' => $json['message'] ?? null,
                 ];
-                Log::warning($label . ' failed', [
+                Log::warning($label.' failed', [
                     'path' => $path,
                     'http_status' => $response->status(),
                     'code' => $json['code'] ?? null,
                     'request_id' => $json['request_id'] ?? null,
                     'message' => $json['message'] ?? null,
                 ]);
+
                 return [];
             }
 
@@ -319,10 +375,11 @@ class TikTokShopOAuthService
                 'region' => (string) ($shop['region'] ?? $shop['shop_region'] ?? 'ID'),
             ], array_values(array_filter($shops, static fn ($shop): bool => is_array($shop))));
         } catch (\Throwable $e) {
-            Log::warning($label . ' exception', [
+            Log::warning($label.' exception', [
                 'path' => $path,
                 'message' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
@@ -334,10 +391,10 @@ class TikTokShopOAuthService
 
         $paramStr = '';
         foreach ($params as $key => $value) {
-            $paramStr .= $key . $value;
+            $paramStr .= $key.$value;
         }
 
-        return hash_hmac('sha256', $appSecret . $path . $paramStr . $body . $appSecret, $appSecret);
+        return hash_hmac('sha256', $appSecret.$path.$paramStr.$body.$appSecret, $appSecret);
     }
 
     protected function tokenExpiresAt(mixed $value): ?\Illuminate\Support\Carbon

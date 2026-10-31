@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\Marketplace\SyncMarketplaceProductsJob;
+use App\Models\Channel;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\TikTokShop\TikTokShopOAuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -14,6 +17,139 @@ use Tests\TestCase;
 class TikTokShopOAuthTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_reauthorization_repairs_a_swapped_store_using_its_original_cipher_and_syncs_products(): void
+    {
+        config()->set('tiktok_shop.app_key', 'app-key-test');
+        config()->set('tiktok_shop.app_secret', 'app-secret-test');
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop', 'status' => 'active']);
+        $targetStore = Store::create([
+            'code' => 'tiktok_cipher-gfid',
+            'channel_id' => $channel->id,
+            'name' => 'GFID',
+            // These are the values that a former bad re-auth accidentally wrote.
+            'external_shop_id' => 'shop-greatfull',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'shop_cipher' => 'cipher-greatfull',
+                'access_token' => 'old-greatfull-token',
+            ],
+        ]);
+        $otherStore = Store::create([
+            'code' => 'tiktok_cipher-greatfull',
+            'channel_id' => $channel->id,
+            'name' => 'Greatfull.id',
+            'external_shop_id' => 'shop-greatfull',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'shop_cipher' => 'cipher-greatfull',
+                'access_token' => 'greatfull-token',
+            ],
+        ]);
+
+        Queue::fake();
+        Http::fake([
+            'https://auth.tiktok-shops.com/api/v2/token/get*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'access_token' => 'fresh-gfid-token',
+                    'refresh_token' => 'fresh-gfid-refresh-token',
+                    'access_token_expire_in' => 7200,
+                    'refresh_token_expire_in' => 86400,
+                    'user_type' => 0,
+                    'granted_scopes' => ['seller.product.basic', 'seller.product.write'],
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/seller/202309/shops*' => Http::response([
+                'code' => 0,
+                'data' => ['shops' => [
+                    [
+                        'shop_id' => 'shop-greatfull',
+                        'cipher' => 'cipher-greatfull',
+                        'shop_name' => 'Greatfull.id',
+                        'region' => 'ID',
+                    ],
+                    [
+                        'shop_id' => 'shop-gfid',
+                        'cipher' => 'cipher-gfid',
+                        'shop_name' => 'GFID',
+                        'region' => 'ID',
+                    ],
+                ]],
+            ]),
+        ]);
+
+        $result = app(TikTokShopOAuthService::class)->process('authorization-code-test', $targetStore->id);
+
+        $this->assertSame('success', $result['status']);
+        $targetStore->refresh();
+        $otherStore->refresh();
+
+        $this->assertSame('shop-gfid', $targetStore->external_shop_id);
+        $this->assertSame('cipher-gfid', $targetStore->credential('shop_cipher'));
+        $this->assertSame('fresh-gfid-token', $targetStore->credential('access_token'));
+        $this->assertSame('shop-greatfull', $otherStore->external_shop_id);
+        $this->assertSame('greatfull-token', $otherStore->credential('access_token'));
+
+        Queue::assertPushed(SyncMarketplaceProductsJob::class, function (SyncMarketplaceProductsJob $job) use ($targetStore): bool {
+            return $job->store->is($targetStore);
+        });
+    }
+
+    public function test_reauthorization_does_not_change_a_store_when_its_original_tiktok_shop_is_not_authorized(): void
+    {
+        config()->set('tiktok_shop.app_key', 'app-key-test');
+        config()->set('tiktok_shop.app_secret', 'app-secret-test');
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop', 'status' => 'active']);
+        $store = Store::create([
+            'code' => 'tiktok_cipher-gfid',
+            'channel_id' => $channel->id,
+            'name' => 'GFID',
+            'external_shop_id' => 'shop-gfid',
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'shop_cipher' => 'cipher-gfid',
+                'access_token' => 'old-gfid-token',
+            ],
+        ]);
+
+        Queue::fake();
+        Http::fake([
+            'https://auth.tiktok-shops.com/api/v2/token/get*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'access_token' => 'fresh-token',
+                    'refresh_token' => 'fresh-refresh-token',
+                    'user_type' => 0,
+                ],
+            ]),
+            'https://open-api.tiktokglobalshop.com/seller/202309/shops*' => Http::response([
+                'code' => 0,
+                'data' => ['shops' => [[
+                    'shop_id' => 'shop-greatfull',
+                    'cipher' => 'cipher-greatfull',
+                    'shop_name' => 'Greatfull.id',
+                    'region' => 'ID',
+                ]]],
+            ]),
+        ]);
+
+        $result = app(TikTokShopOAuthService::class)->process('authorization-code-test', $store->id);
+
+        $this->assertSame('failed', $result['status']);
+        $store->refresh();
+        $this->assertSame('shop-gfid', $store->external_shop_id);
+        $this->assertSame('cipher-gfid', $store->credential('shop_cipher'));
+        $this->assertSame('old-gfid-token', $store->credential('access_token'));
+        Queue::assertNotPushed(SyncMarketplaceProductsJob::class);
+    }
 
     public function test_seller_authorization_uses_service_id_and_new_seller_endpoint(): void
     {
@@ -140,7 +276,7 @@ class TikTokShopOAuthTest extends TestCase
 
         $start = $this->actingAs($user)->get(route('marketplace.tiktok.connect'));
         parse_str((string) parse_url($start->headers->get('Location'), PHP_URL_QUERY), $query);
-        $this->assertNotNull(Cache::get('tiktok_oauth_state:' . $query['state']));
+        $this->assertNotNull(Cache::get('tiktok_oauth_state:'.$query['state']));
 
         // Simulate the browser returning with a different session cookie.
         $this->withSession(['tiktok_oauth_state' => Str::random(64)]);
@@ -333,7 +469,7 @@ class TikTokShopOAuthTest extends TestCase
         $connectionId = $redirectQuery['connection_id'] ?? null;
 
         $this->assertNotEmpty($connectionId);
-        $status = $this->actingAs($user)->getJson('/api/marketplace/tiktok/connection-status/' . $connectionId);
+        $status = $this->actingAs($user)->getJson('/api/marketplace/tiktok/connection-status/'.$connectionId);
         $status->assertOk()
             ->assertJsonPath('status', 'failed')
             ->assertJsonPath('code', 105005);
