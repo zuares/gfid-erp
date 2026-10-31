@@ -187,6 +187,38 @@
     }
     .sv-list-head { display: none; }
     .sv-records { display: grid; gap: .65rem; padding: .65rem; }
+    .sv-product-group {
+        overflow: hidden; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card);
+        background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .035);
+    }
+    .sv-product-toggle {
+        display: grid; grid-template-columns: 42px minmax(0, 1fr) auto auto; align-items: center; gap: .65rem;
+        width: 100%; min-height: 68px; padding: .65rem .75rem; border: 0; background: var(--sv-surface);
+        color: var(--sv-content); text-align: left; cursor: pointer;
+    }
+    .sv-product-toggle:hover { background: color-mix(in srgb, var(--sv-brand) 4%, var(--sv-surface)); }
+    .sv-product-toggle-icon {
+        display: grid; width: 42px; height: 42px; place-items: center; overflow: hidden;
+        border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control);
+        background: var(--sv-soft); color: var(--sv-muted); font-size: .9rem;
+    }
+    .sv-product-toggle-icon img { width: 100%; height: 100%; object-fit: cover; }
+    .sv-product-toggle-copy { display: grid; gap: .12rem; min-width: 0; }
+    .sv-product-toggle-id {
+        overflow: hidden; color: var(--sv-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .64rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sv-product-toggle-copy strong { overflow: hidden; color: var(--sv-content); font-size: .8rem; font-weight: 850; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+    .sv-product-toggle-copy small { overflow: hidden; color: var(--sv-muted); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
+    .sv-product-toggle-count {
+        display: inline-flex; align-items: center; min-height: 26px; padding: .2rem .5rem;
+        border-radius: 999px; background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface));
+        color: var(--sv-brand-strong); font-size: .65rem; font-weight: 800; white-space: nowrap;
+    }
+    .sv-product-toggle-chevron { color: var(--sv-muted); font-size: .8rem; transition: transform .16s ease; }
+    .sv-product-group.is-open .sv-product-toggle-chevron { transform: rotate(180deg); }
+    .sv-product-group-body { display: grid; gap: .5rem; padding: .55rem; border-top: 1px solid var(--sv-line); background: color-mix(in srgb, var(--sv-soft) 45%, var(--sv-surface)); }
+    .sv-product-group-body[hidden] { display: none; }
     .sv-record {
         display: grid; grid-template-columns: 52px minmax(0, 1fr);
         grid-template-areas: 'photo variant' 'support support' 'metrics metrics' 'action action';
@@ -340,6 +372,10 @@
             font-weight: 800; letter-spacing: .035em; text-transform: uppercase;
         }
         .sv-records { display: block; padding: 0; }
+        .sv-product-group { border-inline: 0; border-radius: 0; box-shadow: none; }
+        .sv-product-group + .sv-product-group { border-top: 1px solid var(--sv-line); }
+        .sv-product-toggle { padding-inline: .75rem; }
+        .sv-product-group-body { display: block; padding: 0; }
         .sv-record {
             grid-template-areas: none; align-items: center; border: 0; border-bottom: 1px solid var(--sv-line);
             border-radius: 0; padding: .65rem .75rem;
@@ -532,7 +568,41 @@
                 <span>Terakhir Sync</span>
             </div>
             <div class="sv-records" id="svRows">
-                @forelse($variants as $variant)
+                @php
+                    $variantGroups = $variants->getCollection()->groupBy(fn ($variant) => $variant->product?->id ?: 'variant-'.$variant->id);
+                @endphp
+                @if($variantGroups->isEmpty())
+                    <div class="sv-empty" data-empty-row>
+                        <span class="sv-empty-icon"><i class="bi bi-check2"></i></span>
+                        <strong>Tidak ada variant ditemukan</strong>
+                        <span>Tidak ada stok kosong yang cocok dengan toko dan filter aktif.</span>
+                    </div>
+                @else
+                    @foreach($variantGroups as $groupKey => $groupVariants)
+                        @php
+                            $groupProduct = $groupVariants->first()->product;
+                            $groupId = 'sv-product-group-'.preg_replace('/[^a-zA-Z0-9_-]/', '-', (string) $groupKey);
+                            $groupOpen = $loop->first;
+                        @endphp
+                        <section class="sv-product-group {{ $groupOpen ? 'is-open' : '' }}" data-product-group data-product-id="{{ $groupProduct?->id }}">
+                            <button class="sv-product-toggle" type="button" aria-expanded="{{ $groupOpen ? 'true' : 'false' }}" aria-controls="{{ $groupId }}">
+                                <span class="sv-product-toggle-icon" aria-hidden="true">
+                                    @if($groupProduct?->image_url)
+                                        <img src="{{ $groupProduct->image_url }}" alt="" loading="lazy">
+                                    @else
+                                        <i class="bi bi-image"></i>
+                                    @endif
+                                </span>
+                                <span class="sv-product-toggle-copy">
+                                    <span class="sv-product-toggle-id">ID {{ $groupProduct?->item_id ?: '—' }}</span>
+                                    <strong>{{ $groupProduct?->item_name ?: 'Produk tanpa nama' }}</strong>
+                                    <small>{{ $groupProduct?->store?->name ?: 'Toko tidak ditemukan' }}</small>
+                                </span>
+                                <span class="sv-product-toggle-count">{{ number_format($groupVariants->count()) }} variant</span>
+                                <i class="bi bi-chevron-down sv-product-toggle-chevron" aria-hidden="true"></i>
+                            </button>
+                            <div class="sv-product-group-body" id="{{ $groupId }}" @if(!$groupOpen) hidden @endif>
+                                @foreach($groupVariants as $variant)
                     @php
                         $product = $variant->product;
                         $mapping = $variant->mapping_detail;
@@ -601,14 +671,12 @@
                             </form>
                             <span class="sv-status" data-stock-status aria-live="polite"></span>
                         </div>
-                    </article>
-                @empty
-                    <div class="sv-empty" data-empty-row>
-                        <span class="sv-empty-icon"><i class="bi bi-check2"></i></span>
-                        <strong>Tidak ada variant ditemukan</strong>
-                        <span>Tidak ada stok kosong yang cocok dengan toko dan filter aktif.</span>
-                    </div>
-                @endforelse
+                                </article>
+                                @endforeach
+                            </div>
+                        </section>
+                    @endforeach
+                @endif
             </div>
             @if($variants->hasPages())<div class="sv-pages">{{ $variants->links() }}</div>@endif
         </section>
@@ -694,6 +762,23 @@
         if (!rows || rows.querySelector('[data-stock-row]')) return;
         rows.innerHTML = '<div class="sv-empty" data-empty-row><span class="sv-empty-icon"><i class="bi bi-check2"></i></span><strong>Semua stok variant terisi</strong><span>Perubahan berhasil dikirim ke marketplace.</span></div>';
     };
+    const removeStockRow = row => {
+        const productGroup = row.closest('[data-product-group]');
+        row.remove();
+        if (productGroup && !productGroup.querySelector('[data-stock-row]')) productGroup.remove();
+        showEmpty();
+    };
+    const bindProductAccordions = () => {
+        document.querySelectorAll('[data-product-group] .sv-product-toggle').forEach(toggle => toggle.addEventListener('click', () => {
+            const group = toggle.closest('[data-product-group]');
+            const panel = group?.querySelector('.sv-product-group-body');
+            if (!group || !panel) return;
+            const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+            toggle.setAttribute('aria-expanded', String(!isOpen));
+            group.classList.toggle('is-open', !isOpen);
+            panel.hidden = isOpen;
+        }));
+    };
     const bindStockActions = () => {
         document.querySelectorAll('[data-stock-form]').forEach(form => form.addEventListener('submit', async event => {
             event.preventDefault();
@@ -740,14 +825,12 @@
                 if (isInternalEmptyAudit && stock === 0) {
                     setCount('internal_empty', -1);
                     setCount('scope_internal_empty', -1);
-                    row.remove();
-                    showEmpty();
+                    removeStockRow(row);
                 } else if (row.dataset.stockScope === 'marketplace_empty' && stock > 0) {
                     setCount('total', -1);
                     setCount('scope_empty', -1);
                     setCount(previous < 0 ? 'negative' : 'zero', -1);
-                    row.remove();
-                    showEmpty();
+                    removeStockRow(row);
                 } else if (row.dataset.stockScope === 'marketplace_empty' && previous < 0 && stock === 0) {
                     setCount('negative', -1);
                     setCount('zero', 1);
@@ -841,7 +924,7 @@
             tabs[nextIndex]?.click();
         }));
     };
-    const bindAll = () => { bindStockActions(); bindRealtimeFilter(); bindDashboardLinks(); bindStoreTabs(); };
+    const bindAll = () => { bindProductAccordions(); bindStockActions(); bindRealtimeFilter(); bindDashboardLinks(); bindStoreTabs(); };
     window.addEventListener('popstate', () => loadDashboard(window.location.href, false));
     bindAll();
 })();

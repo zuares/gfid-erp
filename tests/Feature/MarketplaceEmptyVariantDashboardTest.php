@@ -61,6 +61,9 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('Stok MP')
             ->assertSee('Update Stok')
             ->assertSee('Stok Kosong tapi di Marketplace Ada Stok')
+            ->assertSee('data-product-group', false)
+            ->assertSee('sv-product-group-body', false)
+            ->assertSee('aria-expanded="true"', false)
             ->assertSee('data-mp-stock-val', false)
             ->assertDontSee('Stok saat ini:', false)
             ->assertSee('Hitam / M')
@@ -293,7 +296,10 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('Variant Stok Kosong');
 
         $this->actingAs($admin)
-            ->get(route('marketplace.products.empty-variants'))
+            ->get(route('marketplace.products.empty-variants', [
+                'stock_scope' => 'marketplace_empty',
+                'stock_status' => 'zero',
+            ]))
             ->assertOk()
             ->assertSee(route('marketplace.products.empty-variants'), false)
             ->assertSee('Variant Stok Kosong');
