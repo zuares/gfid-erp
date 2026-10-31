@@ -7,7 +7,6 @@ use App\Models\MarketplaceProductModel;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Query\JoinClause;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +14,8 @@ use Illuminate\View\View;
 
 class EmptyVariantDashboardController extends Controller
 {
+    private const SALES_AVERAGE_DAYS = 30;
+
     private const CHANNEL_CODES = [
         'SHOPEE', 'SHP', 'shopee', 'shp',
         'TIKTOK', 'TTK', 'TT', 'tiktok', 'ttk', 'tt',
@@ -30,28 +31,38 @@ class EmptyVariantDashboardController extends Controller
             : '';
         $search = mb_substr(trim((string) $request->query('search')), 0, 100);
         $storeId = max(0, $request->integer('store_id'));
+        $averageSalesInput = $request->query('min_avg_sales');
+        $minAverageSales = $request->filled('min_avg_sales') && is_numeric($averageSalesInput)
+            ? min(1_000_000, max(0, (float) $averageSalesInput))
+            : null;
 
         $scopedQuery = $this->mappedEmptyStockQuery()
             ->when($storeId > 0, fn (Builder $query) => $query->where('mp_stock.store_id', $storeId))
             ->when($channel === 'tiktok', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['tiktok', 'ttk', 'tt']))
             ->when($channel === 'shopee', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['shopee', 'shp']))
+            ->when($minAverageSales !== null, fn (Builder $query) => $query->whereRaw('COALESCE(sales_30.avg_daily_sales, 0) > CAST(? AS DECIMAL(18,4))', [$minAverageSales]))
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $like = '%'.$search.'%';
                 $query->where(function (Builder $searchQuery) use ($like): void {
                     $searchQuery->where('mp_stock.item_name', 'like', $like)
                         ->orWhere('marketplace_product_models.model_name', 'like', $like)
                         ->orWhere('marketplace_product_models.model_sku', 'like', $like)
-                        ->orWhere('marketplace_product_models.model_id', 'like', $like)
-                        ->orWhere('mapped_item.code', 'like', $like)
-                        ->orWhere('mapped_item.name', 'like', $like);
+                        ->orWhere('marketplace_product_models.model_id', 'like', $like);
                 });
             });
 
+        $aggregate = (clone $scopedQuery)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock = 0 THEN 1 ELSE 0 END) as zero_count')
+            ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock < 0 THEN 1 ELSE 0 END) as negative_count')
+            ->selectRaw('COUNT(DISTINCT marketplace_product_models.marketplace_product_id) as product_count')
+            ->toBase()
+            ->first();
         $summary = [
-            'total' => (clone $scopedQuery)->distinct()->count('marketplace_product_models.id'),
-            'zero' => (clone $scopedQuery)->where('marketplace_product_models.stock', 0)->distinct()->count('marketplace_product_models.id'),
-            'negative' => (clone $scopedQuery)->where('marketplace_product_models.stock', '<', 0)->distinct()->count('marketplace_product_models.id'),
-            'products' => (clone $scopedQuery)->distinct()->count('marketplace_product_models.marketplace_product_id'),
+            'total' => (int) ($aggregate->total ?? 0),
+            'zero' => (int) ($aggregate->zero_count ?? 0),
+            'negative' => (int) ($aggregate->negative_count ?? 0),
+            'products' => (int) ($aggregate->product_count ?? 0),
         ];
 
         $variantsQuery = clone $scopedQuery;
@@ -63,7 +74,7 @@ class EmptyVariantDashboardController extends Controller
 
         $variants = $variantsQuery
             ->select('marketplace_product_models.*')
-            ->distinct()
+            ->selectRaw('COALESCE(sales_30.avg_daily_sales, 0) as average_daily_sales')
             ->with([
                 'product:id,store_id,item_id,item_name,item_sku,item_status,image_url,synced_at',
                 'product.store:id,name,code,channel_id',
@@ -71,7 +82,7 @@ class EmptyVariantDashboardController extends Controller
             ])
             ->orderBy('marketplace_product_models.stock')
             ->orderBy('mp_stock.item_name')
-            ->paginate(30)
+            ->simplePaginate(25)
             ->withQueryString();
 
         $this->attachMappingsAndInternalStocks($variants->getCollection());
@@ -91,29 +102,38 @@ class EmptyVariantDashboardController extends Controller
             'channel',
             'search',
             'storeId',
+            'minAverageSales',
         ));
     }
 
     private function mappedEmptyStockQuery(): Builder
     {
+        $salesAverage = DB::table('marketplace_product_dailies')
+            ->select('marketplace_product_id')
+            ->selectRaw('SUM(COALESCE(sales_delta, 0)) / ? as avg_daily_sales', [self::SALES_AVERAGE_DAYS])
+            ->whereDate('date', '>=', today()->subDays(self::SALES_AVERAGE_DAYS - 1)->toDateString())
+            ->groupBy('marketplace_product_id');
+
         return MarketplaceProductModel::query()
             ->join('marketplace_products as mp_stock', 'mp_stock.id', '=', 'marketplace_product_models.marketplace_product_id')
             ->join('stores as st_stock', 'st_stock.id', '=', 'mp_stock.store_id')
             ->join('channels as ch_stock', 'ch_stock.id', '=', 'st_stock.channel_id')
-            ->join('sku_mappings as sm_stock', function (JoinClause $join): void {
-                $join->whereRaw('LOWER(sm_stock.marketplace_sku) = LOWER(marketplace_product_models.model_sku)')
-                    ->where(function (JoinClause $mapping): void {
-                        $mapping->whereNull('sm_stock.channel_code')
-                            ->orWhereRaw("(LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(sm_stock.channel_code) IN ('shopee', 'shp'))")
-                            ->orWhereRaw("(LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(sm_stock.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))");
-                    });
-            })
-            ->join('items as mapped_item', 'mapped_item.id', '=', 'sm_stock.item_id')
+            ->leftJoinSub($salesAverage, 'sales_30', fn ($join) => $join->on('sales_30.marketplace_product_id', '=', 'mp_stock.id'))
             ->where('mp_stock.has_model', true)
             ->where('marketplace_product_models.model_id', '!=', '0')
             ->whereNotNull('marketplace_product_models.model_sku')
             ->whereRaw("TRIM(marketplace_product_models.model_sku) != ''")
-            ->where('marketplace_product_models.stock', '<=', 0);
+            ->where('marketplace_product_models.stock', '<=', 0)
+            ->whereExists(function ($mapping): void {
+                $mapping->selectRaw('1')
+                    ->from('sku_mappings as sm_stock')
+                    ->whereColumn('sm_stock.marketplace_sku', 'marketplace_product_models.model_sku')
+                    ->where(function ($channelMapping): void {
+                        $channelMapping->whereNull('sm_stock.channel_code')
+                            ->orWhereRaw("(LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(sm_stock.channel_code) IN ('shopee', 'shp'))")
+                            ->orWhereRaw("(LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(sm_stock.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))");
+                    });
+            });
     }
 
     private function attachMappingsAndInternalStocks(Collection $variants): void
@@ -123,13 +143,13 @@ class EmptyVariantDashboardController extends Controller
         }
 
         $skus = $variants->pluck('model_sku')
-            ->map(fn ($sku) => mb_strtolower(trim((string) $sku)))
+            ->map(fn ($sku) => trim((string) $sku))
             ->filter()
             ->unique()
             ->values();
 
         $mappings = SkuMapping::query()
-            ->whereIn(DB::raw('LOWER(marketplace_sku)'), $skus)
+            ->whereIn('marketplace_sku', $skus)
             ->with('item:id,code,name')
             ->get();
 

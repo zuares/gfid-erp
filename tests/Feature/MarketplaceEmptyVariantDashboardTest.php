@@ -5,11 +5,15 @@ namespace Tests\Feature;
 use App\Models\Channel;
 use App\Models\Item;
 use App\Models\MarketplaceProduct;
+use App\Models\MarketplaceProductDaily;
 use App\Models\MarketplaceProductModel;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\MarketplaceProductService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Mockery;
 use Tests\TestCase;
 
 class MarketplaceEmptyVariantDashboardTest extends TestCase
@@ -36,9 +40,12 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $this->actingAs($owner)
             ->get(route('marketplace.products.empty-variants'))
             ->assertOk()
-            ->assertSee('Dashboard Variant Stok Kosong')
+            ->assertSee('Stok Variant Kosong')
             ->assertSee('Hitam / M')
             ->assertSee('JACKET-BLK-M')
+            ->assertSee('data-stock-form', false)
+            ->assertSee('data-product-id="'.$product->id.'"', false)
+            ->assertSee('data-model-id="empty-mapped"', false)
             ->assertDontSee('Navy / M')
             ->assertDontSee('Hitam / L');
     }
@@ -61,6 +68,44 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertDontSee('Navy / L');
     }
 
+    public function test_dashboard_filters_variants_by_thirty_day_average_sales(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-AVG-SALES']);
+        $channel = Channel::create(['code' => 'SHOPEE', 'name' => 'Shopee']);
+        $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-AVG-SALES', 'name' => 'Shopee Average Sales', 'status' => 'active', 'is_active' => true]);
+
+        $fastProduct = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'fast-product', 'item_name' => 'Produk Cepat', 'item_status' => 'NORMAL', 'has_model' => true]);
+        $fastItem = Item::create(['code' => 'FAST-M', 'name' => 'Fast M', 'unit' => 'pcs', 'type' => 'finished']);
+        SkuMapping::create(['marketplace_sku' => 'FAST-M', 'channel_code' => 'shopee', 'item_id' => $fastItem->id]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $fastProduct->id, 'model_id' => 'fast-model', 'model_name' => 'Fast / M', 'model_sku' => 'FAST-M', 'stock' => 0]);
+        MarketplaceProductDaily::create(['store_id' => $store->id, 'marketplace_product_id' => $fastProduct->id, 'date' => today(), 'item_status' => 'NORMAL', 'stock_total' => 0, 'sales_delta' => 90]);
+
+        $slowProduct = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'slow-product', 'item_name' => 'Produk Lambat', 'item_status' => 'NORMAL', 'has_model' => true]);
+        $slowItem = Item::create(['code' => 'SLOW-M', 'name' => 'Slow M', 'unit' => 'pcs', 'type' => 'finished']);
+        SkuMapping::create(['marketplace_sku' => 'SLOW-M', 'channel_code' => 'shopee', 'item_id' => $slowItem->id]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $slowProduct->id, 'model_id' => 'slow-model', 'model_name' => 'Slow / M', 'model_sku' => 'SLOW-M', 'stock' => 0]);
+        MarketplaceProductDaily::create(['store_id' => $store->id, 'marketplace_product_id' => $slowProduct->id, 'date' => today(), 'item_status' => 'NORMAL', 'stock_total' => 0, 'sales_delta' => 30]);
+
+        $this->assertEquals(3, DB::table('marketplace_product_dailies')
+            ->where('marketplace_product_id', $fastProduct->id)
+            ->selectRaw('SUM(COALESCE(sales_delta, 0)) / 30 as average_sales')
+            ->value('average_sales'));
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.products.empty-variants'))
+            ->assertOk()
+            ->assertSee('Produk Cepat')
+            ->assertSee('3,0');
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 2]))
+            ->assertOk()
+            ->assertSee('Produk Cepat')
+            ->assertSee('3,0')
+            ->assertDontSee('Produk Lambat')
+            ->assertSee('value="2"', false);
+    }
+
     public function test_single_sku_product_is_not_treated_as_empty_variant(): void
     {
         $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-SINGLE-SKU']);
@@ -77,5 +122,28 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
     public function test_guest_cannot_open_empty_variant_dashboard(): void
     {
         $this->get(route('marketplace.products.empty-variants'))->assertRedirect();
+    }
+
+    public function test_mapped_empty_variant_stock_can_be_updated_through_marketplace_endpoint(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-UPDATE-EMPTY-STOCK']);
+        $channel = Channel::create(['code' => 'SHOPEE', 'name' => 'Shopee']);
+        $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-UPDATE-STOCK', 'name' => 'Shopee Update Stock', 'status' => 'active', 'is_active' => true]);
+        $product = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'product-update-stock', 'item_name' => 'Produk Update Stok', 'item_status' => 'NORMAL', 'has_model' => true]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'model-update', 'model_name' => 'Hitam / M', 'model_sku' => 'UPDATE-BLK-M', 'stock' => 0]);
+
+        $service = Mockery::mock(MarketplaceProductService::class);
+        $service->shouldReceive('updateStock')->once()->with(
+            Mockery::on(fn (MarketplaceProduct $candidate): bool => $candidate->is($product)),
+            [['model_id' => 'model-update', 'stock' => 12]],
+        )->andReturn(['success' => true]);
+        $this->app->instance(MarketplaceProductService::class, $service);
+
+        $this->actingAs($owner)
+            ->postJson('/api/marketplace/products/'.$product->id.'/stock', [
+                'stock_list' => [['model_id' => 'model-update', 'stock' => 12]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
     }
 }
