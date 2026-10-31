@@ -29,12 +29,17 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $product = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'product-variants', 'item_name' => 'Jaket Multi Variant', 'item_status' => 'NORMAL', 'has_model' => true]);
 
         $mappedItem = Item::create(['code' => 'JACKET-BLK-M', 'name' => 'Jaket Hitam M', 'unit' => 'pcs', 'type' => 'finished']);
+        DB::table('items')->where('id', $mappedItem->id)->update(['avg_daily_sales' => 2, 'avg_daily_sales_window' => 30]);
         SkuMapping::create(['marketplace_sku' => 'TT-JACKET-BLK-M', 'channel_code' => 'tiktok', 'item_id' => $mappedItem->id]);
         $emptyModel = MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-mapped', 'model_name' => 'Hitam / M', 'model_sku' => 'TT-JACKET-BLK-M', 'stock' => 0]);
         $warehouse = Warehouse::create(['code' => 'WH-VARIANT-DASH', 'name' => 'Warehouse Variant Dashboard']);
         InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $mappedItem->id, 'qty' => 15, 'allocated_qty' => 3]);
 
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-unmapped', 'model_name' => 'Navy / M', 'model_sku' => 'TT-JACKET-NAVY-M', 'stock' => 0]);
+
+        $neverSoldItem = Item::create(['code' => 'JACKET-ZERO-S', 'name' => 'Jaket Belum Terjual', 'unit' => 'pcs', 'type' => 'finished']);
+        SkuMapping::create(['marketplace_sku' => 'TT-JACKET-ZERO-S', 'channel_code' => 'tiktok', 'item_id' => $neverSoldItem->id]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-never-sold', 'model_name' => 'Belum Terjual / S', 'model_sku' => 'TT-JACKET-ZERO-S', 'stock' => 0]);
 
         $stockedItem = Item::create(['code' => 'JACKET-BLK-L', 'name' => 'Jaket Hitam L', 'unit' => 'pcs', 'type' => 'finished']);
         SkuMapping::create(['marketplace_sku' => 'TT-JACKET-BLK-L', 'channel_code' => 'tiktok', 'item_id' => $stockedItem->id]);
@@ -53,11 +58,19 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('data-realtime-filter', false)
             ->assertSee('TikTok Stock Audit')
             ->assertDontSee('id="svStore"', false)
-            ->assertSee('class="sv-product-photo"', false)
+            ->assertSee('sv-product-photo', false)
+            ->assertSee('class="sv-item-id"', false)
+            ->assertSee('class="sv-record"', false)
+            ->assertSee('class="sv-list-head"', false)
+            ->assertSee('Filter diterapkan otomatis saat nilai berubah.')
+            ->assertSee('title="Jaket Multi Variant"', false)
+            ->assertSee('ID product-variants')
             ->assertSee('Stok internal')
             ->assertSee('id="stock-'.$emptyModel->id.'"', false)
             ->assertSee('value="12"', false)
+            ->assertSee('id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value="0"', false)
             ->assertDontSee('Pakai stok tersedia')
+            ->assertDontSee('Belum Terjual / S')
             ->assertDontSee('Navy / M')
             ->assertDontSee('Hitam / L');
     }
@@ -69,6 +82,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-EMPTY-STOCK', 'name' => 'Shopee Stock Audit', 'status' => 'active', 'is_active' => true]);
         $product = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'product-global', 'item_name' => 'Celana Variant', 'item_status' => 'NORMAL', 'has_model' => true]);
         $item = Item::create(['code' => 'PANTS-NAVY-XL', 'name' => 'Celana Navy XL', 'unit' => 'pcs', 'type' => 'finished']);
+        DB::table('items')->where('id', $item->id)->update(['avg_daily_sales' => 1, 'avg_daily_sales_window' => 30]);
         SkuMapping::create(['marketplace_sku' => 'SHP-PANTS-NAVY-XL', 'channel_code' => null, 'item_id' => $item->id]);
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'zero', 'model_name' => 'Navy / XL', 'model_sku' => 'SHP-PANTS-NAVY-XL', 'stock' => 0]);
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'negative', 'model_name' => 'Navy / L', 'model_sku' => 'SHP-PANTS-NAVY-XL', 'stock' => -2]);

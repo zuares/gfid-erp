@@ -32,7 +32,7 @@ class EmptyVariantDashboardController extends Controller
         $averageSalesInput = $request->query('min_avg_sales');
         $minAverageSales = $request->filled('min_avg_sales') && is_numeric($averageSalesInput)
             ? min(1_000_000, max(0, (float) $averageSalesInput))
-            : null;
+            : 0.0;
         $inventoryAverageSales = $this->inventoryAverageSalesExpression();
 
         $scopedQuery = $this->mappedEmptyStockQuery()
