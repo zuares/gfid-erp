@@ -41,6 +41,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $neverSoldItem = Item::create(['code' => 'JACKET-ZERO-S', 'name' => 'Jaket Belum Terjual', 'unit' => 'pcs', 'type' => 'finished']);
         SkuMapping::create(['marketplace_sku' => 'TT-JACKET-ZERO-S', 'channel_code' => 'tiktok', 'item_id' => $neverSoldItem->id]);
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-never-sold', 'model_name' => 'Belum Terjual / S', 'model_sku' => 'TT-JACKET-ZERO-S', 'stock' => 0]);
+        InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $neverSoldItem->id, 'qty' => 4, 'allocated_qty' => 0]);
 
         $internalEmptyItem = Item::create(['code' => 'JACKET-EMPTY-INTERNAL', 'name' => 'Jaket Internal Kosong', 'unit' => 'pcs', 'type' => 'finished']);
         DB::table('items')->where('id', $internalEmptyItem->id)->update(['avg_daily_sales' => 2, 'avg_daily_sales_window' => 30]);
@@ -69,7 +70,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('data-model-id="empty-mapped"', false)
             ->assertSee('id="svStockConfirm"', false)
             ->assertSee('id="svSaveFeedback"', false)
-            ->assertSee('aria-label="Semua toko marketplace"', false)
+            ->assertSee('role="group" aria-label="Pilih toko marketplace"', false)
             ->assertSee('aria-label="Toko TikTok Shop"', false)
             ->assertSee('data-realtime-filter', false)
             ->assertSee('TikTok Stock Audit')
@@ -84,13 +85,18 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('Stok internal')
             ->assertSee('id="stock-'.$emptyModel->id.'"', false)
             ->assertSee('value="12"', false)
-            ->assertSee('id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value="0"', false)
+            ->assertSee('id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value=""', false)
             ->assertDontSee('Pakai stok tersedia')
-            ->assertDontSee('Belum Terjual / S')
+            ->assertSee('Belum Terjual / S')
             ->assertDontSee('Internal Kosong / M')
             ->assertDontSee('Hitam / Minus')
             ->assertDontSee('Navy / M')
             ->assertDontSee('Hitam / L');
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 0]))
+            ->assertOk()
+            ->assertSee('Belum Terjual / S');
     }
 
     public function test_dashboard_accepts_global_mapping_and_filters_zero_stock(): void

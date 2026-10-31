@@ -38,9 +38,11 @@ class EmptyVariantDashboardController extends Controller
         $search = mb_substr(trim((string) $request->query('search')), 0, 100);
         $storeId = max(0, $request->integer('store_id'));
         $averageSalesInput = $request->query('min_avg_sales');
-        $minAverageSales = $request->filled('min_avg_sales') && is_numeric($averageSalesInput)
-            ? min(1_000_000, max(0, (float) $averageSalesInput))
-            : 0.0;
+        $minAverageSales = $request->filled('min_avg_sales')
+            && is_numeric($averageSalesInput)
+            && (float) $averageSalesInput > 0
+            ? min(1_000_000, (float) $averageSalesInput)
+            : null;
         $inventoryAverageSales = $this->inventoryAverageSalesExpression();
         $inventoryAvailableStock = $this->inventoryAvailableStockExpression();
         $stores = $this->connectedStores($channel);

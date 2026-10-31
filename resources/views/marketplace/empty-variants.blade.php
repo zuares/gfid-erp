@@ -69,22 +69,16 @@
         color: var(--sv-muted); font-size: .66rem; font-weight: 750; letter-spacing: .025em;
     }
     .sv-section-label { display: block; margin: 0 0 .5rem .15rem; text-transform: uppercase; }
-    .sv-store-tabs {
-        display: flex; gap: .2rem; overflow-x: auto; padding: .25rem;
-        border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control); background: var(--sv-soft);
-        scroll-snap-type: x proximity; scrollbar-width: none;
-    }
-    .sv-store-tabs::-webkit-scrollbar { display: none; }
     .sv-store-tab {
         display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: .4rem;
-        min-height: 34px; padding: .4rem .65rem; border: 1px solid transparent; border-radius: 8px;
-        background: transparent; color: var(--sv-muted); font-size: .71rem; font-weight: 750;
+        min-height: 34px; padding: .4rem .65rem; border: 1px solid var(--sv-line); border-radius: 8px;
+        background: var(--sv-soft); color: var(--sv-muted); font-size: .71rem; font-weight: 750;
         line-height: 1; text-decoration: none; white-space: nowrap; scroll-snap-align: start;
     }
-    .sv-store-tab:hover { color: var(--sv-brand-strong); }
+    .sv-store-tab:hover { border-color: color-mix(in srgb, var(--sv-brand) 28%, var(--sv-line)); color: var(--sv-brand-strong); }
     .sv-store-tab.active {
-        border-color: color-mix(in srgb, var(--sv-brand) 16%, var(--sv-line));
-        background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .06); color: var(--sv-brand-strong);
+        border-color: color-mix(in srgb, var(--sv-brand) 38%, var(--sv-line));
+        background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface)); box-shadow: 0 1px 2px rgba(16, 24, 40, .06); color: var(--sv-brand-strong);
     }
     .sv-scope-nav { display: flex; gap: .25rem; flex-wrap: wrap; padding: .25rem; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control); background: var(--sv-soft); }
     .sv-scope-btn {
@@ -152,23 +146,24 @@
         padding: .9rem; border-bottom: 1px solid var(--sv-line); background: linear-gradient(90deg, color-mix(in srgb, var(--sv-brand) 5%, var(--sv-surface)), var(--sv-surface) 55%);
     }
     .sv-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
-    .sv-store-picker-row {
-        display: flex; flex-direction: column; gap: .45rem; padding-top: .7rem; border-top: 1px solid var(--sv-line);
-    }
-    @media (min-width: 768px) {
-        .sv-store-picker-row { flex-direction: row; align-items: flex-start; gap: .75rem; }
-    }
+    .sv-store-picker-row { display: grid; gap: .5rem; padding-top: .7rem; border-top: 1px solid var(--sv-line); }
+    @media (min-width: 768px) { .sv-store-picker-row { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .75rem; } }
     .sv-store-picker-label {
-        display: inline-flex; align-items: center; gap: .35rem; font-size: .7rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; flex: 0 0 auto;
+        display: inline-flex; align-items: center; gap: .35rem; min-height: 34px; font-size: .7rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap;
     }
-    .sv-panel-tabs { margin: 0; padding-bottom: .15rem; flex: 1 1 auto; }
-    .sv-store-groups { display: grid; gap: .55rem; min-width: 0; flex: 1 1 auto; }
-    .sv-store-group { display: grid; gap: .35rem; min-width: 0; }
+    .sv-store-groups { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .75rem; min-width: 0; }
+    .sv-store-group { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; min-width: 0; padding-left: .75rem; border-left: 1px solid var(--sv-line); }
     .sv-store-group-label {
-        display: inline-flex; align-items: center; gap: .35rem; color: var(--sv-muted);
-        font-size: .65rem; font-weight: 800; letter-spacing: .025em; text-transform: uppercase;
+        display: inline-flex; align-items: center; gap: .3rem; color: var(--sv-muted);
+        font-size: .63rem; font-weight: 800; letter-spacing: .025em; text-transform: uppercase; white-space: nowrap;
     }
     .sv-store-group-label i { color: var(--sv-brand); }
+    .sv-store-tab-list { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 0; }
+    @media (max-width: 767.98px) {
+        .sv-store-group { width: 100%; padding-left: 0; border-left: 0; }
+        .sv-store-tab-list { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; padding-bottom: .15rem; scrollbar-width: none; }
+        .sv-store-tab-list::-webkit-scrollbar { display: none; }
+    }
     .sv-panel-summary {
         display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .65rem; padding-top: .6rem; border-top: 1px solid var(--sv-line);
         color: var(--sv-muted); font-size: .7rem; line-height: 1.35;
@@ -385,14 +380,14 @@
         'store_id' => $storeId ?: null,
         'channel' => $channel ?: null,
         'search' => $search ?: null,
-        'min_avg_sales' => $minAverageSales > 0 ? $minAverageSales : null,
+        'min_avg_sales' => $minAverageSales,
         'stock_scope' => $stockScope !== 'marketplace_empty' ? $stockScope : null,
     ], fn ($value) => $value !== null && $value !== '');
     $storeSharedFilters = array_filter([
         'stock_scope' => $stockScope !== 'marketplace_empty' ? $stockScope : null,
         'stock_status' => $stockStatus ?: null,
         'search' => $search ?: null,
-        'min_avg_sales' => $minAverageSales > 0 ? $minAverageSales : null,
+        'min_avg_sales' => $minAverageSales,
     ], fn ($value) => $value !== null && $value !== '');
     $allStoreFilters = array_merge($storeSharedFilters, array_filter(['channel' => $channel ?: null]));
     $emptyScopeTotal = $summary['empty_total'] ?? $summary['total'];
@@ -412,7 +407,7 @@
         <div>
             <span class="sv-eyebrow"><i class="bi bi-box-seam"></i> Inventory Marketplace</span>
             <h1 class="sv-title">Stok Variant Kosong</h1>
-            <p class="sv-copy">Prioritaskan variant ter-mapping yang pernah terjual, lalu kirim stok internal tersedia langsung ke marketplace.</p>
+            <p class="sv-copy">Tinjau variant ter-mapping dengan stok internal tersedia, lalu kirim pembaruan stok langsung ke marketplace.</p>
         </div>
         <a class="sv-back" href="{{ route('marketplace.products') }}"><i class="bi bi-arrow-left"></i><span>Kembali ke Produk</span></a>
     </header>
@@ -442,8 +437,8 @@
                 <select class="form-select sv-control" id="svStock" name="stock_status" @disabled($stockScope !== 'marketplace_empty')><option value="zero" @selected($stockStatus === 'zero')>Stok tepat 0</option><option value="negative" @selected($stockStatus === 'negative')>Stok minus</option></select>
             </div>
             <div class="sv-field">
-                <label class="sv-field-label" for="svAverage">Rata² terjual/hari lebih dari</label>
-                <input class="form-control sv-control" id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value="{{ $minAverageSales }}" inputmode="decimal" placeholder="Contoh: 2">
+                <label class="sv-field-label" for="svAverage">Rata² terjual/hari lebih dari <span class="text-muted fw-normal">(opsional)</span></label>
+                <input class="form-control sv-control" id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value="{{ $minAverageSales }}" inputmode="decimal" placeholder="Semua penjualan">
             </div>
         </form>
 
@@ -482,15 +477,13 @@
 
                 <div class="sv-store-picker-row">
                     <span class="sv-store-picker-label"><i class="bi bi-shop"></i> Pilih Toko:</span>
-                    <div class="sv-store-groups">
-                        <nav class="sv-store-tabs sv-panel-tabs" aria-label="Semua toko marketplace">
-                            <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua Toko</a>
-                        </nav>
+                    <div class="sv-store-groups" role="group" aria-label="Pilih toko marketplace">
+                        <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua Toko</a>
                         @foreach($storeGroups as $group)
                             @continue($group['stores']->isEmpty())
                             <section class="sv-store-group" aria-labelledby="svStoreGroup{{ ucfirst($group['key']) }}">
                                 <span class="sv-store-group-label" id="svStoreGroup{{ ucfirst($group['key']) }}"><i class="bi {{ $group['icon'] }}"></i>{{ $group['label'] }}</span>
-                                <nav class="sv-store-tabs sv-panel-tabs" aria-label="Toko {{ $group['label'] }}">
+                                <nav class="sv-store-tab-list" aria-label="Toko {{ $group['label'] }}">
                                     @foreach($group['stores'] as $store)
                                         <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" aria-current="{{ $storeId === $store->id ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
                                     @endforeach
