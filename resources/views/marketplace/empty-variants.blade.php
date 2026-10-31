@@ -381,10 +381,10 @@
         'channel' => $channel ?: null,
         'search' => $search ?: null,
         'min_avg_sales' => $minAverageSales,
-        'stock_scope' => $stockScope !== 'marketplace_empty' ? $stockScope : null,
+        'stock_scope' => $stockScope !== 'all' ? $stockScope : null,
     ], fn ($value) => $value !== null && $value !== '');
     $storeSharedFilters = array_filter([
-        'stock_scope' => $stockScope !== 'marketplace_empty' ? $stockScope : null,
+        'stock_scope' => $stockScope !== 'all' ? $stockScope : null,
         'stock_status' => $stockStatus ?: null,
         'search' => $search ?: null,
         'min_avg_sales' => $minAverageSales,
@@ -392,6 +392,7 @@
     $allStoreFilters = array_merge($storeSharedFilters, array_filter(['channel' => $channel ?: null]));
     $emptyScopeTotal = $summary['empty_total'] ?? $summary['total'];
     $internalEmptyTotal = $summary['internal_empty_mp_stock'] ?? 0;
+    $mappedTotal = $summary['mapped_total'] ?? $summary['total'];
     $storesByChannel = $stores->groupBy(function ($store): string {
         $channelCode = strtolower((string) $store->channel?->code);
         return in_array($channelCode, ['tiktok', 'ttk', 'tt'], true) ? 'tiktok' : 'shopee';
@@ -407,7 +408,7 @@
         <div>
             <span class="sv-eyebrow"><i class="bi bi-box-seam"></i> Inventory Marketplace</span>
             <h1 class="sv-title">Stok Variant Kosong</h1>
-            <p class="sv-copy">Tinjau variant ter-mapping dengan stok internal tersedia, lalu kirim pembaruan stok langsung ke marketplace.</p>
+            <p class="sv-copy">Tinjau seluruh variant ter-mapping, lalu gunakan filter untuk memprioritaskan pembaruan stok.</p>
         </div>
         <a class="sv-back" href="{{ route('marketplace.products') }}"><i class="bi bi-arrow-left"></i><span>Kembali ke Produk</span></a>
     </header>
@@ -446,9 +447,11 @@
             <div class="sv-panel-head">
                 <div class="sv-panel-title-row">
                     <div>
-                        <h2 class="sv-panel-title">Variant perlu diperbarui</h2>
+                        <h2 class="sv-panel-title">{{ $stockScope === 'all' ? 'Semua variant termapping' : 'Variant perlu diperbarui' }}</h2>
                         @if($stockScope === 'internal_empty_marketplace_stock')
                             <span class="sv-scope-note"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>Audit mismatch: stok internal kosong, tetapi marketplace masih menjual variant ini.</span>
+                        @elseif($stockScope === 'all')
+                            <span class="sv-scope-note">Belum ada filter stok aktif. Pilih mode audit untuk memprioritaskan tindakan.</span>
                         @else
                             <span class="sv-scope-note">Menampilkan stok marketplace 0 dengan stok internal tersedia untuk pembaruan.</span>
                         @endif
@@ -457,10 +460,18 @@
                 </div>
 
                 <nav class="sv-scope-nav" aria-label="Mode pemeriksaan stok">
+                    <a class="sv-scope-btn {{ $stockScope === 'all' ? 'active' : '' }}"
+                       aria-current="{{ $stockScope === 'all' ? 'page' : 'false' }}"
+                       data-dashboard-link
+                       href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => null, 'stock_status' => null])) }}">
+                        <i class="bi bi-grid-3x3-gap"></i>
+                        <span>Semua variant</span>
+                        <span class="sv-badge" data-summary="scope_all">{{ number_format($mappedTotal) }}</span>
+                    </a>
                     <a class="sv-scope-btn {{ $stockScope === 'marketplace_empty' ? 'active' : '' }}"
                        aria-current="{{ $stockScope === 'marketplace_empty' ? 'page' : 'false' }}"
                        data-dashboard-link
-                       href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => null, 'stock_status' => 'zero'])) }}">
+                       href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => 'marketplace_empty', 'stock_status' => 'zero'])) }}">
                         <i class="bi bi-box-seam"></i>
                         <span>Stok MP 0 · Internal Ada</span>
                         <span class="sv-badge" data-summary="scope_empty">{{ number_format($emptyScopeTotal) }}</span>
@@ -498,11 +509,15 @@
                         <span class="sv-summary-item sv-summary-item--warning"><strong data-summary="internal_empty">{{ number_format($internalEmptyTotal) }}</strong> variant internal kosong</span>
                         <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
                         <span class="sv-summary-item">Marketplace masih ada stok</span>
-                    @else
+                    @elseif($stockScope === 'marketplace_empty')
                         <span class="sv-summary-item"><strong data-summary="total">{{ number_format($emptyScopeTotal) }}</strong> variant siap diisi</span>
                         <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
                         <a class="sv-summary-item {{ $stockStatus === 'zero' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'zero'])) }}">Stok 0: <strong data-summary="zero">{{ number_format($summary['zero']) }}</strong></a>
                         <a class="sv-summary-item {{ $stockStatus === 'negative' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'negative'])) }}">Minus: <strong data-summary="negative">{{ number_format($summary['negative']) }}</strong></a>
+                    @else
+                        <span class="sv-summary-item"><strong data-summary="total">{{ number_format($mappedTotal) }}</strong> variant termapping</span>
+                        <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
+                        <span class="sv-summary-item">Pilih mode stok untuk menyaring</span>
                     @endif
                 </nav>
             </div>
@@ -727,13 +742,13 @@
                     setCount('scope_internal_empty', -1);
                     row.remove();
                     showEmpty();
-                } else if (!isInternalEmptyAudit && stock > 0) {
+                } else if (row.dataset.stockScope === 'marketplace_empty' && stock > 0) {
                     setCount('total', -1);
                     setCount('scope_empty', -1);
                     setCount(previous < 0 ? 'negative' : 'zero', -1);
                     row.remove();
                     showEmpty();
-                } else if (!isInternalEmptyAudit && previous < 0 && stock === 0) {
+                } else if (row.dataset.stockScope === 'marketplace_empty' && previous < 0 && stock === 0) {
                     setCount('negative', -1);
                     setCount('zero', 1);
                     status.textContent = 'Tersimpan · stok masih 0.';

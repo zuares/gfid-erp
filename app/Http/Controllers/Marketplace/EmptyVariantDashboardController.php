@@ -15,6 +15,7 @@ use Illuminate\View\View;
 class EmptyVariantDashboardController extends Controller
 {
     private const STOCK_SCOPES = [
+        'all',
         'marketplace_empty',
         'internal_empty_marketplace_stock',
     ];
@@ -28,7 +29,7 @@ class EmptyVariantDashboardController extends Controller
     {
         $stockScope = in_array($request->query('stock_scope'), self::STOCK_SCOPES, true)
             ? (string) $request->query('stock_scope')
-            : 'marketplace_empty';
+            : 'all';
         $stockStatus = in_array($request->query('stock_status'), ['zero', 'negative'], true)
             ? (string) $request->query('stock_status')
             : 'zero';
@@ -86,21 +87,36 @@ class EmptyVariantDashboardController extends Controller
             ->toBase()
             ->first();
 
+        $allAggregate = (clone $baseScopedQuery)
+            ->selectRaw('COUNT(*) as mapped_total')
+            ->selectRaw('COUNT(DISTINCT marketplace_product_models.marketplace_product_id) as mapped_product_count')
+            ->toBase()
+            ->first();
+
         $emptyTotal = (int) ($emptyAggregate->empty_total ?? 0);
         $zeroCount = (int) ($emptyAggregate->zero_count ?? 0);
         $negativeCount = (int) ($emptyAggregate->negative_count ?? 0);
         $internalEmptyCount = (int) ($internalEmptyAggregate->internal_empty_mp_stock_count ?? 0);
+        $mappedTotal = (int) ($allAggregate->mapped_total ?? 0);
+        $mappedProductCount = (int) ($allAggregate->mapped_product_count ?? 0);
 
         $summary = [
-            'total' => $stockScope === 'internal_empty_marketplace_stock' ? $internalEmptyCount : $emptyTotal,
+            'total' => match ($stockScope) {
+                'internal_empty_marketplace_stock' => $internalEmptyCount,
+                'marketplace_empty' => $emptyTotal,
+                default => $mappedTotal,
+            },
+            'mapped_total' => $mappedTotal,
             'empty_total' => $emptyTotal,
             'zero' => $zeroCount,
             'negative' => $negativeCount,
             'marketplace_available' => $internalEmptyCount,
             'internal_empty_mp_stock' => $internalEmptyCount,
-            'products' => $stockScope === 'internal_empty_marketplace_stock'
-                ? (int) ($internalEmptyAggregate->internal_empty_product_count ?? 0)
-                : (int) ($emptyAggregate->empty_product_count ?? 0),
+            'products' => match ($stockScope) {
+                'internal_empty_marketplace_stock' => (int) ($internalEmptyAggregate->internal_empty_product_count ?? 0),
+                'marketplace_empty' => (int) ($emptyAggregate->empty_product_count ?? 0),
+                default => $mappedProductCount,
+            },
         ];
 
         $variantsQuery = clone $baseScopedQuery;
@@ -108,7 +124,7 @@ class EmptyVariantDashboardController extends Controller
             $variantsQuery
                 ->where('marketplace_product_models.stock', '>', 0)
                 ->whereRaw($inventoryAvailableStock.' <= 0');
-        } else {
+        } elseif ($stockScope === 'marketplace_empty') {
             $variantsQuery->whereRaw($inventoryAvailableStock.' > 0');
             if ($stockStatus === 'zero') {
                 $variantsQuery->where('marketplace_product_models.stock', 0);

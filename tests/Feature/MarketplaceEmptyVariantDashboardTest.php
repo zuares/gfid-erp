@@ -53,7 +53,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'stocked-mapped', 'model_name' => 'Hitam / L', 'model_sku' => 'TT-JACKET-BLK-L', 'stock' => 8]);
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants'))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'marketplace_empty']))
             ->assertOk()
             ->assertSee('Stok Variant Kosong')
             ->assertSee('Variant perlu diperbarui')
@@ -96,7 +96,12 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $this->actingAs($owner)
             ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 0]))
             ->assertOk()
-            ->assertSee('Belum Terjual / S');
+            ->assertSee('Semua variant termapping')
+            ->assertSee('Belum Terjual / S')
+            ->assertSee('Internal Kosong / M')
+            ->assertSee('Hitam / Minus')
+            ->assertSee('Hitam / L')
+            ->assertDontSee('Navy / M');
     }
 
     public function test_dashboard_accepts_global_mapping_and_filters_zero_stock(): void
@@ -114,7 +119,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $item->id, 'qty' => 5, 'allocated_qty' => 0]);
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_status' => 'zero', 'channel' => 'shopee']))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'marketplace_empty', 'stock_status' => 'zero', 'channel' => 'shopee']))
             ->assertOk()
             ->assertSee('aria-label="Toko Shopee"', false)
             ->assertSee('Navy / XL')
