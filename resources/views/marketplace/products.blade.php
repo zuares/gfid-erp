@@ -475,6 +475,7 @@
             <div class="kpis" id="kpiRow"></div>
         </div>
         <div class="controls">
+            <a class="btn btn-pill btn-prd-outline" href="{{ route('marketplace.products.empty-variants') }}" title="Lihat produk dengan data varian yang belum lengkap"><i class="bi bi-exclamation-diamond me-1"></i>Variant Kosong</a>
             <button class="btn btn-pill btn-prd-outline" id="btnAutoMap" onclick="autoMap()" title="Cocokkan SKU marketplace dengan item internal"><i class="bi bi-link-45deg me-1"></i>Auto-map</button>
             @if(auth()->user()?->isOwner())
                 <button class="btn btn-pill btn-prd-outline" id="btnTikTokDiagnostics" onclick="openTikTokDiagnostics()" title="Uji koneksi dan endpoint produk TikTok Shop"><i class="bi bi-activity me-1"></i>Tes TikTok</button>
@@ -3384,6 +3385,12 @@
         } catch (e) {}
     }
 
+    const initialProductFilters = new URLSearchParams(window.location.search);
+    const initialProductSearch = initialProductFilters.get('search');
+    if (initialProductSearch && $('fSearch')) {
+        $('fSearch').value = initialProductSearch;
+        if ($('fStatus')) $('fStatus').value = '';
+    }
     loadProducts();
 })();
 </script>

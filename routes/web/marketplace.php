@@ -12,6 +12,7 @@ use App\Http\Controllers\Marketplace\MarketplaceFinancialStatementController;
 use App\Http\Controllers\Marketplace\MarketplaceFinancialClosingController;
 use App\Http\Controllers\Marketplace\MarketplaceFinanceController;
 use App\Http\Controllers\Marketplace\AmsPerformanceReportController;
+use App\Http\Controllers\Marketplace\EmptyVariantDashboardController;
 Route::middleware(['web', 'auth', 'access:marketplace'])
     ->prefix('marketplace')
     ->name('marketplace.')
@@ -52,6 +53,9 @@ Route::middleware(['web', 'auth', 'access:marketplace'])
         Route::post('products/tiktok-diagnostics', [\App\Http\Controllers\MarketplaceProductController::class, 'tiktokDiagnostics'])
             ->middleware('role:owner')
             ->name('products.tiktok-diagnostics');
+
+        Route::get('products/empty-variants', EmptyVariantDashboardController::class)
+            ->name('products.empty-variants');
 
         // Bounded Marketplace Finance read model and reconciliation views.
         Route::prefix('finance')->name('finance.')->group(function () {
