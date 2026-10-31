@@ -84,6 +84,33 @@
     }
     .dash-sec .bi { font-size: 1.1rem; color: var(--dsh-accent); }
 
+    /* ---------- Marketplace stock alerts ---------- */
+    .dash-stock-alert-grid { display: grid; gap: .7rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dash-stock-alert {
+        display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: .7rem;
+        min-width: 0; min-height: 82px; padding: .8rem .9rem; border: 1px solid var(--dsh-border);
+        border-radius: var(--dsh-radius); background: var(--dsh-surface, #fff); box-shadow: var(--dsh-shadow);
+        color: var(--text, #0f172a); text-decoration: none;
+        transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
+    }
+    a.dash-stock-alert:hover { color: var(--text, #0f172a); transform: translateY(-1px); box-shadow: 0 8px 20px rgba(48,49,125,.1); }
+    .dash-stock-alert-warning { border-color: color-mix(in srgb, #f59e0b 35%, var(--dsh-border)); }
+    .dash-stock-alert-danger { border-color: color-mix(in srgb, #ef4444 35%, var(--dsh-border)); }
+    .dash-stock-alert-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 10px; font-size: 1rem; }
+    .dash-stock-alert-warning .dash-stock-alert-icon { color: #b45309; background: rgba(245,158,11,.14); }
+    .dash-stock-alert-danger .dash-stock-alert-icon { color: #dc2626; background: rgba(239,68,68,.12); }
+    .dash-stock-alert-copy { display: grid; gap: .18rem; min-width: 0; }
+    .dash-stock-alert-copy strong { min-width: 0; color: var(--text, #0f172a); font-size: .8rem; line-height: 1.25; }
+    .dash-stock-alert-copy small { color: var(--dsh-muted); font-size: .68rem; line-height: 1.3; }
+    .dash-stock-alert-value { color: var(--text, #0f172a); font-size: 1.55rem; font-weight: 850; line-height: 1; font-variant-numeric: tabular-nums; }
+    .dash-stock-alert-warning .dash-stock-alert-value { color: #b45309; }
+    .dash-stock-alert-danger .dash-stock-alert-value { color: #dc2626; }
+    .dash-stock-alert-arrow { color: var(--dsh-muted); font-size: .8rem; }
+    body[data-theme="dark"] a.dash-stock-alert:hover { color: var(--text, #f8fafc); }
+    body[data-theme="dark"] .dash-stock-alert-copy strong { color: var(--text, #f8fafc); }
+    body[data-theme="dark"] .dash-stock-alert-warning .dash-stock-alert-value { color: #fcd34d; }
+    body[data-theme="dark"] .dash-stock-alert-danger .dash-stock-alert-value { color: #fca5a5; }
+
     /* ---------- KPI grid ---------- */
     .dash-grid { display: grid; gap: .7rem; align-items: stretch; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
     .kpi {
@@ -326,6 +353,8 @@
         .kpi-value { font-size: 1.25rem; }
         .dash-sec { font-size: .88rem; margin-top: .8rem; }
         .dash-ads-grid { grid-template-columns: 1fr; gap: .7rem; }
+        .dash-stock-alert-grid { grid-template-columns: 1fr; }
+        .dash-stock-alert { min-height: 76px; padding: .7rem .75rem; }
         .dash-chart-card { padding: .75rem; }
         .dash-chart-wrap-pie, .dash-chart-wrap-heatmap { height: 210px; }
 

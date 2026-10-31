@@ -69,6 +69,8 @@
     </div>
 </section>
 
+@include('dashboard.partials._marketplace_stock_alerts', ['d' => $d])
+
 <div class="dash-sec"><i class="bi bi-graph-up-arrow"></i> Penjualan (bulan berjalan)</div>
 <div class="dash-grid">
     @include('dashboard.partials._kpi', [

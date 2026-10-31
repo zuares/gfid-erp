@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\Inventory\InventoryIntelligenceService;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use App\Services\Marketplace\MarketplaceLogisticsService;
+use App\Services\Marketplace\MarketplaceVariantStockSummaryService;
 use App\Models\MarketplaceOrder;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +45,7 @@ class DashboardController extends Controller
         private InventoryIntelligenceService $inventoryIntelligence,
         private MarketplaceAnalyticsSummaryService $marketplaceAnalytics,
         private MarketplaceLogisticsService $marketplaceLogistics,
+        private MarketplaceVariantStockSummaryService $marketplaceVariantStockSummary,
     )
     {
     }
@@ -171,7 +173,7 @@ class DashboardController extends Controller
 
     private function ownerData(): array
     {
-        $cacheKey = 'dashboard.owner.v14.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.owner.v15.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->ownerDataUncached());
     }
@@ -302,6 +304,8 @@ class DashboardController extends Controller
             }
         } catch (\Throwable $e) {}
 
+        $marketplaceVariantStock = $this->marketplaceVariantStockSummary->summary();
+
         return [
             'marketplace_today_kpi' => $marketplaceTodayKpi,
             'marketplace_yesterday_kpi' => $marketplaceYesterdayKpi,
@@ -336,12 +340,13 @@ class DashboardController extends Controller
             'list_stock'          => $this->stockCriticalList(6),
             'ads_hourly'          => $adsHourly,
             'ads_campaigns'       => $adsCampaigns,
+            'marketplace_variant_stock' => $marketplaceVariantStock,
         ];
     }
 
     private function adminData(): array
     {
-        $cacheKey = 'dashboard.admin.v13.' . Carbon::today()->toDateString();
+        $cacheKey = 'dashboard.admin.v14.' . Carbon::today()->toDateString();
 
         return (array) Cache::store('file')->remember($cacheKey, now()->addMinutes(2), fn () => $this->adminDataUncached());
     }
@@ -350,6 +355,7 @@ class DashboardController extends Controller
     {
         $salesTd = $this->mpSales(0);
         $sales7  = $this->mpSales(6);
+        $marketplaceVariantStock = $this->marketplaceVariantStockSummary->summary();
 
         return [
             'orders_today'      => $this->mpOrdersInPeriod(0),
@@ -367,6 +373,7 @@ class DashboardController extends Controller
             'list_todo_items'   => $this->mpUnshippedItemList(50),
             'repeat_orders'     => $this->mpRepeatOrderList(8),
             'list_stock'        => $this->stockCriticalList(6, 'finished_good'),
+            'marketplace_variant_stock' => $marketplaceVariantStock,
         ];
     }
 

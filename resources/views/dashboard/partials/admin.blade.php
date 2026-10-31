@@ -14,6 +14,8 @@
     </div>
 </section>
 
+@include('dashboard.partials._marketplace_stock_alerts', ['d' => $d])
+
 {{-- ================= PESANAN HARI INI ================= --}}
 <div class="dash-sec"><i class="bi bi-bag-check"></i> Pesanan & Penjualan</div>
 <div class="dash-grid">

@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Marketplace;
 use App\Http\Controllers\Controller;
 use App\Models\MarketplaceProductModel;
 use App\Models\SkuMapping;
-use App\Models\Store;
+use App\Services\Marketplace\MarketplaceVariantStockSummaryService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -20,10 +20,10 @@ class EmptyVariantDashboardController extends Controller
         'internal_empty_marketplace_stock',
     ];
 
-    private const CHANNEL_CODES = [
-        'SHOPEE', 'SHP', 'shopee', 'shp',
-        'TIKTOK', 'TTK', 'TT', 'tiktok', 'ttk', 'tt',
-    ];
+    public function __construct(
+        private MarketplaceVariantStockSummaryService $variantStockSummary,
+    ) {
+    }
 
     public function __invoke(Request $request): View
     {
@@ -44,16 +44,16 @@ class EmptyVariantDashboardController extends Controller
             && (float) $averageSalesInput > 0
             ? min(1_000_000, (float) $averageSalesInput)
             : null;
-        $inventoryAverageSales = $this->inventoryAverageSalesExpression();
-        $inventoryAvailableStock = $this->inventoryAvailableStockExpression();
-        $stores = $this->connectedStores($channel);
+        $inventoryAverageSales = $this->variantStockSummary->inventoryAverageSalesExpression();
+        $inventoryAvailableStock = $this->variantStockSummary->inventoryAvailableStockExpression();
+        $stores = $this->variantStockSummary->connectedStores($channel);
         $connectedStoreIds = $stores->pluck('id');
 
         if ($storeId > 0 && ! $connectedStoreIds->contains($storeId)) {
             $storeId = 0;
         }
 
-        $baseScopedQuery = $this->mappedEmptyStockQuery()
+        $baseScopedQuery = $this->variantStockSummary->mappedEmptyStockQuery()
             ->whereIn('mp_stock.store_id', $connectedStoreIds)
             ->when($storeId > 0, fn (Builder $query) => $query->where('mp_stock.store_id', $storeId))
             ->when($channel === 'tiktok', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['tiktok', 'ttk', 'tt']))
@@ -159,84 +159,6 @@ class EmptyVariantDashboardController extends Controller
             'storeId',
             'minAverageSales',
         ));
-    }
-
-    private function mappedEmptyStockQuery(): Builder
-    {
-        return MarketplaceProductModel::query()
-            ->join('marketplace_products as mp_stock', 'mp_stock.id', '=', 'marketplace_product_models.marketplace_product_id')
-            ->join('stores as st_stock', 'st_stock.id', '=', 'mp_stock.store_id')
-            ->join('channels as ch_stock', 'ch_stock.id', '=', 'st_stock.channel_id')
-            ->where('mp_stock.has_model', true)
-            ->where('marketplace_product_models.model_id', '!=', '0')
-            ->whereNotNull('marketplace_product_models.model_sku')
-            ->whereRaw("TRIM(marketplace_product_models.model_sku) != ''")
-            ->whereExists(function ($mapping): void {
-                $mapping->selectRaw('1')
-                    ->from('sku_mappings as sm_stock')
-                    ->whereColumn('sm_stock.marketplace_sku', 'marketplace_product_models.model_sku')
-                    ->where(function ($channelMapping): void {
-                        $channelMapping->whereNull('sm_stock.channel_code')
-                            ->orWhereRaw("(LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(sm_stock.channel_code) IN ('shopee', 'shp'))")
-                            ->orWhereRaw("(LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(sm_stock.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))");
-                    });
-            });
-    }
-
-    private function inventoryAverageSalesExpression(): string
-    {
-        return <<<'SQL'
-COALESCE((
-    SELECT mapped_ads.avg_daily_sales
-    FROM sku_mappings AS ads_mapping
-    INNER JOIN items AS mapped_ads ON mapped_ads.id = ads_mapping.item_id
-    WHERE ads_mapping.marketplace_sku = marketplace_product_models.model_sku
-      AND (
-        ads_mapping.channel_code IS NULL
-        OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(ads_mapping.channel_code) IN ('shopee', 'shp'))
-        OR (LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(ads_mapping.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))
-      )
-    ORDER BY CASE WHEN ads_mapping.channel_code IS NULL THEN 1 ELSE 0 END
-    LIMIT 1
-), 0)
-SQL;
-    }
-
-    private function inventoryAvailableStockExpression(): string
-    {
-        return <<<'SQL'
-COALESCE((
-    SELECT COALESCE(SUM(internal_stock.qty), 0) - COALESCE(SUM(internal_stock.allocated_qty), 0)
-    FROM inventory_stocks AS internal_stock
-    WHERE internal_stock.item_id = (
-        SELECT availability_mapping.item_id
-        FROM sku_mappings AS availability_mapping
-        WHERE availability_mapping.marketplace_sku = marketplace_product_models.model_sku
-          AND (
-            availability_mapping.channel_code IS NULL
-            OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(availability_mapping.channel_code) IN ('shopee', 'shp'))
-            OR (LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(availability_mapping.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))
-          )
-        ORDER BY CASE WHEN availability_mapping.channel_code IS NULL THEN 1 ELSE 0 END
-        LIMIT 1
-    )
-), 0)
-SQL;
-    }
-
-    private function connectedStores(?string $channel = null): Collection
-    {
-        return Store::query()
-            ->where('status', 'active')
-            ->where('is_active', true)
-            ->whereHas('channel', fn (Builder $query) => $query->whereIn('code', self::CHANNEL_CODES))
-            ->when($channel === 'tiktok', fn (Builder $query) => $query->whereHas('channel', fn ($q) => $q->whereIn(DB::raw('LOWER(code)'), ['tiktok', 'ttk', 'tt'])))
-            ->when($channel === 'shopee', fn (Builder $query) => $query->whereHas('channel', fn ($q) => $q->whereIn(DB::raw('LOWER(code)'), ['shopee', 'shp'])))
-            ->with('channel:id,code,name')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'channel_id', 'credentials', 'token_expires_at', 'status', 'is_active'])
-            ->filter(fn (Store $store): bool => (bool) $store->is_active && strtolower(trim((string) $store->status)) === 'active' && $store->connection_status === 'CONNECTED')
-            ->values();
     }
 
     private function attachMappingsAndInternalStocks(Collection $variants): void
