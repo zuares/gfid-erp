@@ -14,8 +14,6 @@ use Illuminate\View\View;
 
 class EmptyVariantDashboardController extends Controller
 {
-    private const SALES_AVERAGE_DAYS = 30;
-
     private const CHANNEL_CODES = [
         'SHOPEE', 'SHP', 'shopee', 'shp',
         'TIKTOK', 'TTK', 'TT', 'tiktok', 'ttk', 'tt',
@@ -35,12 +33,13 @@ class EmptyVariantDashboardController extends Controller
         $minAverageSales = $request->filled('min_avg_sales') && is_numeric($averageSalesInput)
             ? min(1_000_000, max(0, (float) $averageSalesInput))
             : null;
+        $inventoryAverageSales = $this->inventoryAverageSalesExpression();
 
         $scopedQuery = $this->mappedEmptyStockQuery()
             ->when($storeId > 0, fn (Builder $query) => $query->where('mp_stock.store_id', $storeId))
             ->when($channel === 'tiktok', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['tiktok', 'ttk', 'tt']))
             ->when($channel === 'shopee', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['shopee', 'shp']))
-            ->when($minAverageSales !== null, fn (Builder $query) => $query->whereRaw('COALESCE(sales_30.avg_daily_sales, 0) > CAST(? AS DECIMAL(18,4))', [$minAverageSales]))
+            ->when($minAverageSales !== null, fn (Builder $query) => $query->whereRaw($inventoryAverageSales.' > CAST(? AS DECIMAL(18,4))', [$minAverageSales]))
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $like = '%'.$search.'%';
                 $query->where(function (Builder $searchQuery) use ($like): void {
@@ -74,7 +73,7 @@ class EmptyVariantDashboardController extends Controller
 
         $variants = $variantsQuery
             ->select('marketplace_product_models.*')
-            ->selectRaw('COALESCE(sales_30.avg_daily_sales, 0) as average_daily_sales')
+            ->selectRaw($inventoryAverageSales.' as average_daily_sales')
             ->with([
                 'product:id,store_id,item_id,item_name,item_sku,item_status,image_url,synced_at',
                 'product.store:id,name,code,channel_id',
@@ -108,17 +107,10 @@ class EmptyVariantDashboardController extends Controller
 
     private function mappedEmptyStockQuery(): Builder
     {
-        $salesAverage = DB::table('marketplace_product_dailies')
-            ->select('marketplace_product_id')
-            ->selectRaw('SUM(COALESCE(sales_delta, 0)) / ? as avg_daily_sales', [self::SALES_AVERAGE_DAYS])
-            ->whereDate('date', '>=', today()->subDays(self::SALES_AVERAGE_DAYS - 1)->toDateString())
-            ->groupBy('marketplace_product_id');
-
         return MarketplaceProductModel::query()
             ->join('marketplace_products as mp_stock', 'mp_stock.id', '=', 'marketplace_product_models.marketplace_product_id')
             ->join('stores as st_stock', 'st_stock.id', '=', 'mp_stock.store_id')
             ->join('channels as ch_stock', 'ch_stock.id', '=', 'st_stock.channel_id')
-            ->leftJoinSub($salesAverage, 'sales_30', fn ($join) => $join->on('sales_30.marketplace_product_id', '=', 'mp_stock.id'))
             ->where('mp_stock.has_model', true)
             ->where('marketplace_product_models.model_id', '!=', '0')
             ->whereNotNull('marketplace_product_models.model_sku')
@@ -136,6 +128,25 @@ class EmptyVariantDashboardController extends Controller
             });
     }
 
+    private function inventoryAverageSalesExpression(): string
+    {
+        return <<<'SQL'
+COALESCE((
+    SELECT mapped_ads.avg_daily_sales
+    FROM sku_mappings AS ads_mapping
+    INNER JOIN items AS mapped_ads ON mapped_ads.id = ads_mapping.item_id
+    WHERE ads_mapping.marketplace_sku = marketplace_product_models.model_sku
+      AND (
+        ads_mapping.channel_code IS NULL
+        OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(ads_mapping.channel_code) IN ('shopee', 'shp'))
+        OR (LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(ads_mapping.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))
+      )
+    ORDER BY CASE WHEN ads_mapping.channel_code IS NULL THEN 1 ELSE 0 END
+    LIMIT 1
+), 0)
+SQL;
+    }
+
     private function attachMappingsAndInternalStocks(Collection $variants): void
     {
         if ($variants->isEmpty()) {
@@ -150,7 +161,7 @@ class EmptyVariantDashboardController extends Controller
 
         $mappings = SkuMapping::query()
             ->whereIn('marketplace_sku', $skus)
-            ->with('item:id,code,name')
+            ->with('item:id,code,name,avg_daily_sales,avg_daily_sales_window,avg_daily_sales_updated_at')
             ->get();
 
         $mappingFor = function (MarketplaceProductModel $variant) use ($mappings): ?SkuMapping {
@@ -189,6 +200,9 @@ class EmptyVariantDashboardController extends Controller
                 'internal_physical' => $physical,
                 'internal_allocated' => $allocated,
                 'internal_available' => $physical - $allocated,
+                'avg_daily_sales' => (float) ($mapping->item?->avg_daily_sales ?? 0),
+                'avg_daily_sales_window' => (int) ($mapping->item?->avg_daily_sales_window ?? 30),
+                'avg_daily_sales_updated_at' => $mapping->item?->avg_daily_sales_updated_at,
             ] : null);
         }
     }

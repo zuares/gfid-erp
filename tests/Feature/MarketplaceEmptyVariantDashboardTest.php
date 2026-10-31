@@ -3,13 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Channel;
+use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\MarketplaceProduct;
-use App\Models\MarketplaceProductDaily;
 use App\Models\MarketplaceProductModel;
 use App\Models\SkuMapping;
 use App\Models\Store;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\MarketplaceProductService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +30,9 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
 
         $mappedItem = Item::create(['code' => 'JACKET-BLK-M', 'name' => 'Jaket Hitam M', 'unit' => 'pcs', 'type' => 'finished']);
         SkuMapping::create(['marketplace_sku' => 'TT-JACKET-BLK-M', 'channel_code' => 'tiktok', 'item_id' => $mappedItem->id]);
-        MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-mapped', 'model_name' => 'Hitam / M', 'model_sku' => 'TT-JACKET-BLK-M', 'stock' => 0]);
+        $emptyModel = MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-mapped', 'model_name' => 'Hitam / M', 'model_sku' => 'TT-JACKET-BLK-M', 'stock' => 0]);
+        $warehouse = Warehouse::create(['code' => 'WH-VARIANT-DASH', 'name' => 'Warehouse Variant Dashboard']);
+        InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $mappedItem->id, 'qty' => 15, 'allocated_qty' => 3]);
 
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-unmapped', 'model_name' => 'Navy / M', 'model_sku' => 'TT-JACKET-NAVY-M', 'stock' => 0]);
 
@@ -46,6 +49,15 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('data-stock-form', false)
             ->assertSee('data-product-id="'.$product->id.'"', false)
             ->assertSee('data-model-id="empty-mapped"', false)
+            ->assertSee('role="tablist"', false)
+            ->assertSee('data-realtime-filter', false)
+            ->assertSee('TikTok Stock Audit')
+            ->assertDontSee('id="svStore"', false)
+            ->assertSee('class="sv-product-photo"', false)
+            ->assertSee('Stok internal')
+            ->assertSee('id="stock-'.$emptyModel->id.'"', false)
+            ->assertSee('value="12"', false)
+            ->assertDontSee('Pakai stok tersedia')
             ->assertDontSee('Navy / M')
             ->assertDontSee('Hitam / L');
     }
@@ -68,7 +80,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertDontSee('Navy / L');
     }
 
-    public function test_dashboard_filters_variants_by_thirty_day_average_sales(): void
+    public function test_dashboard_filters_variants_by_inventory_average_daily_sales(): void
     {
         $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-AVG-SALES']);
         $channel = Channel::create(['code' => 'SHOPEE', 'name' => 'Shopee']);
@@ -76,26 +88,22 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
 
         $fastProduct = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'fast-product', 'item_name' => 'Produk Cepat', 'item_status' => 'NORMAL', 'has_model' => true]);
         $fastItem = Item::create(['code' => 'FAST-M', 'name' => 'Fast M', 'unit' => 'pcs', 'type' => 'finished']);
+        DB::table('items')->where('id', $fastItem->id)->update(['avg_daily_sales' => 3, 'avg_daily_sales_window' => 21]);
         SkuMapping::create(['marketplace_sku' => 'FAST-M', 'channel_code' => 'shopee', 'item_id' => $fastItem->id]);
         MarketplaceProductModel::create(['marketplace_product_id' => $fastProduct->id, 'model_id' => 'fast-model', 'model_name' => 'Fast / M', 'model_sku' => 'FAST-M', 'stock' => 0]);
-        MarketplaceProductDaily::create(['store_id' => $store->id, 'marketplace_product_id' => $fastProduct->id, 'date' => today(), 'item_status' => 'NORMAL', 'stock_total' => 0, 'sales_delta' => 90]);
 
         $slowProduct = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'slow-product', 'item_name' => 'Produk Lambat', 'item_status' => 'NORMAL', 'has_model' => true]);
         $slowItem = Item::create(['code' => 'SLOW-M', 'name' => 'Slow M', 'unit' => 'pcs', 'type' => 'finished']);
+        DB::table('items')->where('id', $slowItem->id)->update(['avg_daily_sales' => 1, 'avg_daily_sales_window' => 30]);
         SkuMapping::create(['marketplace_sku' => 'SLOW-M', 'channel_code' => 'shopee', 'item_id' => $slowItem->id]);
         MarketplaceProductModel::create(['marketplace_product_id' => $slowProduct->id, 'model_id' => 'slow-model', 'model_name' => 'Slow / M', 'model_sku' => 'SLOW-M', 'stock' => 0]);
-        MarketplaceProductDaily::create(['store_id' => $store->id, 'marketplace_product_id' => $slowProduct->id, 'date' => today(), 'item_status' => 'NORMAL', 'stock_total' => 0, 'sales_delta' => 30]);
-
-        $this->assertEquals(3, DB::table('marketplace_product_dailies')
-            ->where('marketplace_product_id', $fastProduct->id)
-            ->selectRaw('SUM(COALESCE(sales_delta, 0)) / 30 as average_sales')
-            ->value('average_sales'));
 
         $this->actingAs($owner)
             ->get(route('marketplace.products.empty-variants'))
             ->assertOk()
             ->assertSee('Produk Cepat')
-            ->assertSee('3,0');
+            ->assertSee('3,0')
+            ->assertSee('Inventory · 21 hari');
 
         $this->actingAs($owner)
             ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 2]))
