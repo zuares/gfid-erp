@@ -10,7 +10,7 @@
     $userRole = auth()->user()->role ?? null;
     $isOperating = $userRole === 'operating';
     $isAdmin = $userRole === 'admin';
-    $isOwner = $userRole === 'owner';
+    $isOwner = auth()->user()?->isOwner() ?? false;
     $isOpOrAdmin = $isOperating || $isAdmin;
 
     $isOpening = method_exists($opname, 'isOpening')

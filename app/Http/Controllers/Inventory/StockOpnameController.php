@@ -597,6 +597,12 @@ class StockOpnameController extends Controller
      */
     public function finalize(Request $request, StockOpname $stockOpname): RedirectResponse
     {
+        abort_unless(
+            auth()->user()?->isOwner(),
+            403,
+            'Hanya Owner yang boleh memfinalkan stock opname.'
+        );
+
         if (!$stockOpname->canFinalize()) {
             return redirect()
                 ->route('inventory.stock_opnames.show', $stockOpname)
