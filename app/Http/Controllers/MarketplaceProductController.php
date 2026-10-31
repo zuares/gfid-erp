@@ -8,6 +8,7 @@ use App\Services\MarketplaceProductService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class MarketplaceProductController extends Controller
 {
@@ -777,6 +778,29 @@ class MarketplaceProductController extends Controller
             'stock_list.*.model_id' => 'required',
             'stock_list.*.stock'    => 'required|integer|min:0',
         ]);
+
+        $rawModelIds = collect($data['stock_list'])->pluck('model_id');
+        if ($rawModelIds->contains(fn (mixed $modelId): bool => ! is_string($modelId) && ! is_int($modelId))) {
+            throw ValidationException::withMessages([
+                'stock_list' => 'ID variant harus berupa teks atau angka.',
+            ]);
+        }
+
+        $modelIds = $rawModelIds
+            ->map(fn (mixed $modelId): string => (string) $modelId)
+            ->values();
+
+        if ($product->has_model) {
+            $validModelCount = $product->models()
+                ->whereIn('model_id', $modelIds->unique()->all())
+                ->count();
+
+            if ($modelIds->duplicates()->isNotEmpty() || $validModelCount !== $modelIds->count()) {
+                throw ValidationException::withMessages([
+                    'stock_list' => 'Variant yang diperbarui harus milik produk marketplace ini dan tidak boleh duplikat.',
+                ]);
+            }
+        }
 
         $res = $this->products->updateStock($product, $data['stock_list']);
 

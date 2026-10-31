@@ -34,12 +34,18 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $emptyModel = MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-mapped', 'model_name' => 'Hitam / M', 'model_sku' => 'TT-JACKET-BLK-M', 'stock' => 0]);
         $warehouse = Warehouse::create(['code' => 'WH-VARIANT-DASH', 'name' => 'Warehouse Variant Dashboard']);
         InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $mappedItem->id, 'qty' => 15, 'allocated_qty' => 3]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'negative-mapped', 'model_name' => 'Hitam / Minus', 'model_sku' => 'TT-JACKET-BLK-M', 'stock' => -1]);
 
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-unmapped', 'model_name' => 'Navy / M', 'model_sku' => 'TT-JACKET-NAVY-M', 'stock' => 0]);
 
         $neverSoldItem = Item::create(['code' => 'JACKET-ZERO-S', 'name' => 'Jaket Belum Terjual', 'unit' => 'pcs', 'type' => 'finished']);
         SkuMapping::create(['marketplace_sku' => 'TT-JACKET-ZERO-S', 'channel_code' => 'tiktok', 'item_id' => $neverSoldItem->id]);
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-never-sold', 'model_name' => 'Belum Terjual / S', 'model_sku' => 'TT-JACKET-ZERO-S', 'stock' => 0]);
+
+        $internalEmptyItem = Item::create(['code' => 'JACKET-EMPTY-INTERNAL', 'name' => 'Jaket Internal Kosong', 'unit' => 'pcs', 'type' => 'finished']);
+        DB::table('items')->where('id', $internalEmptyItem->id)->update(['avg_daily_sales' => 2, 'avg_daily_sales_window' => 30]);
+        SkuMapping::create(['marketplace_sku' => 'TT-JACKET-EMPTY-INTERNAL', 'channel_code' => 'tiktok', 'item_id' => $internalEmptyItem->id]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'empty-internal-empty', 'model_name' => 'Internal Kosong / M', 'model_sku' => 'TT-JACKET-EMPTY-INTERNAL', 'stock' => 0]);
 
         $stockedItem = Item::create(['code' => 'JACKET-BLK-L', 'name' => 'Jaket Hitam L', 'unit' => 'pcs', 'type' => 'finished']);
         SkuMapping::create(['marketplace_sku' => 'TT-JACKET-BLK-L', 'channel_code' => 'tiktok', 'item_id' => $stockedItem->id]);
@@ -61,7 +67,10 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('data-stock-form', false)
             ->assertSee('data-product-id="'.$product->id.'"', false)
             ->assertSee('data-model-id="empty-mapped"', false)
-            ->assertSee('role="tablist"', false)
+            ->assertSee('id="svStockConfirm"', false)
+            ->assertSee('id="svSaveFeedback"', false)
+            ->assertSee('aria-label="Semua toko marketplace"', false)
+            ->assertSee('aria-label="Toko TikTok Shop"', false)
             ->assertSee('data-realtime-filter', false)
             ->assertSee('TikTok Stock Audit')
             ->assertDontSee('id="svStore"', false)
@@ -78,6 +87,8 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value="0"', false)
             ->assertDontSee('Pakai stok tersedia')
             ->assertDontSee('Belum Terjual / S')
+            ->assertDontSee('Internal Kosong / M')
+            ->assertDontSee('Hitam / Minus')
             ->assertDontSee('Navy / M')
             ->assertDontSee('Hitam / L');
     }
@@ -93,10 +104,13 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         SkuMapping::create(['marketplace_sku' => 'SHP-PANTS-NAVY-XL', 'channel_code' => null, 'item_id' => $item->id]);
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'zero', 'model_name' => 'Navy / XL', 'model_sku' => 'SHP-PANTS-NAVY-XL', 'stock' => 0]);
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'negative', 'model_name' => 'Navy / L', 'model_sku' => 'SHP-PANTS-NAVY-XL', 'stock' => -2]);
+        $warehouse = Warehouse::create(['code' => 'WH-GLOBAL-MAPPING', 'name' => 'Warehouse Global Mapping']);
+        InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $item->id, 'qty' => 5, 'allocated_qty' => 0]);
 
         $this->actingAs($owner)
             ->get(route('marketplace.products.empty-variants', ['stock_status' => 'zero', 'channel' => 'shopee']))
             ->assertOk()
+            ->assertSee('aria-label="Toko Shopee"', false)
             ->assertSee('Navy / XL')
             ->assertDontSee('Navy / L');
     }
@@ -118,6 +132,9 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         DB::table('items')->where('id', $slowItem->id)->update(['avg_daily_sales' => 1, 'avg_daily_sales_window' => 30]);
         SkuMapping::create(['marketplace_sku' => 'SLOW-M', 'channel_code' => 'shopee', 'item_id' => $slowItem->id]);
         MarketplaceProductModel::create(['marketplace_product_id' => $slowProduct->id, 'model_id' => 'slow-model', 'model_name' => 'Slow / M', 'model_sku' => 'SLOW-M', 'stock' => 0]);
+        $warehouse = Warehouse::create(['code' => 'WH-AVG-SALES', 'name' => 'Warehouse Average Sales']);
+        InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $fastItem->id, 'qty' => 8, 'allocated_qty' => 0]);
+        InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $slowItem->id, 'qty' => 8, 'allocated_qty' => 0]);
 
         $this->actingAs($owner)
             ->get(route('marketplace.products.empty-variants'))
@@ -211,6 +228,46 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('success', true);
+    }
+
+    public function test_stock_endpoint_rejects_model_that_does_not_belong_to_product(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-REJECT-FOREIGN-MODEL']);
+        $channel = Channel::create(['code' => 'SHOPEE', 'name' => 'Shopee']);
+        $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-REJECT-FOREIGN-MODEL', 'name' => 'Shopee Reject Foreign Model', 'status' => 'active', 'is_active' => true]);
+        $product = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'product-reject-foreign-model', 'item_name' => 'Produk Model Validasi', 'item_status' => 'NORMAL', 'has_model' => true]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'valid-model', 'model_name' => 'Valid / M', 'model_sku' => 'VALID-M', 'stock' => 0]);
+
+        $service = Mockery::mock(MarketplaceProductService::class);
+        $service->shouldNotReceive('updateStock');
+        $this->app->instance(MarketplaceProductService::class, $service);
+
+        $this->actingAs($owner)
+            ->postJson('/api/marketplace/products/'.$product->id.'/stock', [
+                'stock_list' => [['model_id' => 'foreign-model', 'stock' => 12]],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('stock_list');
+    }
+
+    public function test_stock_endpoint_rejects_non_scalar_model_id(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-REJECT-INVALID-MODEL-ID']);
+        $channel = Channel::create(['code' => 'SHOPEE', 'name' => 'Shopee']);
+        $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-REJECT-INVALID-MODEL-ID', 'name' => 'Shopee Reject Invalid Model ID', 'status' => 'active', 'is_active' => true]);
+        $product = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'product-reject-invalid-model-id', 'item_name' => 'Produk Model Invalid', 'item_status' => 'NORMAL', 'has_model' => true]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 'valid-model', 'model_name' => 'Valid / M', 'model_sku' => 'VALID-M', 'stock' => 0]);
+
+        $service = Mockery::mock(MarketplaceProductService::class);
+        $service->shouldNotReceive('updateStock');
+        $this->app->instance(MarketplaceProductService::class, $service);
+
+        $this->actingAs($owner)
+            ->postJson('/api/marketplace/products/'.$product->id.'/stock', [
+                'stock_list' => [['model_id' => ['invalid'], 'stock' => 12]],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('stock_list');
     }
 
     public function test_sidebar_displays_empty_variants_link_for_owner_and_admin(): void

@@ -53,12 +53,10 @@
         border-radius: 999px; background: linear-gradient(90deg, transparent, var(--sv-brand), transparent);
         background-size: 45% 100%; animation: sv-loading 1s linear infinite;
     }
-    .sv-toolbar, .sv-filter, .sv-panel {
+    .sv-filter, .sv-panel {
         border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card);
         background: var(--sv-surface); box-shadow: var(--sv-shadow);
     }
-    .sv-toolbar { margin-bottom: .75rem; padding: .65rem; }
-    .sv-toolbar .sv-summary { margin-top: 0; }
     .sv-section-label, .sv-field-label, .sv-cell-label {
         color: var(--sv-muted); font-size: .66rem; font-weight: 750; letter-spacing: .025em;
     }
@@ -79,7 +77,7 @@
         border-color: color-mix(in srgb, var(--sv-brand) 24%, var(--sv-line));
         background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface)); color: var(--sv-brand-strong);
     }
-    .sv-scope-nav { display: flex; gap: .5rem; margin-bottom: .65rem; flex-wrap: wrap; }
+    .sv-scope-nav { display: flex; gap: .5rem; flex-wrap: wrap; }
     .sv-scope-btn {
         display: inline-flex; align-items: center; gap: .5rem;
         min-height: 42px; padding: .45rem .85rem; border: 1px solid var(--sv-line);
@@ -108,18 +106,6 @@
     }
     .sv-scope-btn.active .sv-badge { background: var(--sv-brand); color: #fff; }
     .sv-scope-btn--warning.active .sv-badge { background: #f59e0b; color: #fff; }
-    .sv-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; margin-top: .5rem; }
-    .sv-stat {
-        display: flex; align-items: center; justify-content: space-between; gap: .4rem; min-height: 48px;
-        padding: .5rem .65rem; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control);
-        background: var(--sv-surface); color: var(--sv-muted); font-size: .69rem; font-weight: 700; text-decoration: none;
-    }
-    .sv-stat strong { color: var(--sv-content); font-size: .95rem; font-variant-numeric: tabular-nums; }
-    .sv-stat:hover { border-color: color-mix(in srgb, var(--sv-brand) 30%, var(--sv-line)); color: var(--sv-brand-strong); }
-    .sv-stat.active {
-        border-color: color-mix(in srgb, var(--sv-danger) 28%, var(--sv-line));
-        background: color-mix(in srgb, var(--sv-danger) 7%, var(--sv-surface)); color: var(--sv-danger);
-    }
     .sv-filter {
         display: grid; grid-template-columns: minmax(0, 1fr); gap: .7rem;
         margin-bottom: .75rem; padding: .8rem;
@@ -156,15 +142,36 @@
     }
     .sv-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
     .sv-store-picker-row {
-        display: flex; flex-direction: column; gap: .45rem; margin-top: .4rem; padding-top: .6rem; border-top: 1px dashed var(--sv-line);
+        display: flex; flex-direction: column; gap: .45rem; padding-top: .65rem; border-top: 1px dashed var(--sv-line);
     }
     @media (min-width: 768px) {
-        .sv-store-picker-row { flex-direction: row; align-items: center; gap: .75rem; }
+        .sv-store-picker-row { flex-direction: row; align-items: flex-start; gap: .75rem; }
     }
     .sv-store-picker-label {
         display: inline-flex; align-items: center; gap: .35rem; font-size: .7rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; flex: 0 0 auto;
     }
     .sv-panel-tabs { margin: 0; padding-bottom: .15rem; flex: 1 1 auto; }
+    .sv-store-groups { display: grid; gap: .55rem; min-width: 0; flex: 1 1 auto; }
+    .sv-store-group { display: grid; gap: .3rem; min-width: 0; }
+    .sv-store-group-label {
+        display: inline-flex; align-items: center; gap: .35rem; color: var(--sv-muted);
+        font-size: .65rem; font-weight: 800; letter-spacing: .025em; text-transform: uppercase;
+    }
+    .sv-store-group-label i { color: var(--sv-brand); }
+    .sv-panel-summary {
+        display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .65rem;
+        color: var(--sv-muted); font-size: .7rem; line-height: 1.35;
+    }
+    .sv-summary-item {
+        display: inline-flex; align-items: center; gap: .25rem; min-height: 28px;
+        color: var(--sv-muted); font-weight: 700; text-decoration: none;
+    }
+    .sv-summary-item strong { color: var(--sv-content); font-size: .76rem; font-variant-numeric: tabular-nums; }
+    a.sv-summary-item { padding: .15rem .35rem; border-radius: 999px; }
+    a.sv-summary-item:hover { background: var(--sv-soft); color: var(--sv-brand-strong); }
+    a.sv-summary-item:focus-visible { outline: 2px solid var(--sv-brand); outline-offset: 2px; }
+    a.sv-summary-item.active { background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface)); color: var(--sv-brand-strong); }
+    .sv-summary-item--warning strong { color: #b45309; }
     .sv-scope-note { color: var(--sv-muted); font-size: .68rem; line-height: 1.35; }
     .sv-panel-title { margin: 0; color: var(--sv-content); font-size: .82rem; font-weight: 800; }
     .sv-panel-count {
@@ -247,6 +254,45 @@
     .sv-status { display: block; min-height: 1rem; margin-top: .32rem; color: var(--sv-muted); font-size: .64rem; }
     .sv-status.error { color: var(--sv-danger); }
     .sv-status.ok { color: var(--sv-success); }
+    .sv-save-feedback {
+        position: fixed; z-index: 1080; right: max(1rem, env(safe-area-inset-right)); bottom: max(1rem, env(safe-area-inset-bottom));
+        display: flex; width: min(360px, calc(100vw - 2rem)); align-items: center; gap: .55rem;
+        padding: .75rem .85rem; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control);
+        background: var(--sv-surface); box-shadow: 0 14px 32px rgba(16, 24, 40, .16); color: var(--sv-content);
+        font-size: .74rem; font-weight: 750; line-height: 1.4; opacity: 0; pointer-events: none;
+        transform: translateY(.5rem); transition: opacity .16s ease, transform .16s ease;
+    }
+    .sv-save-feedback.is-visible { opacity: 1; transform: translateY(0); }
+    .sv-save-feedback.success { border-color: color-mix(in srgb, var(--sv-success) 35%, var(--sv-line)); }
+    .sv-save-feedback.error { border-color: color-mix(in srgb, var(--sv-danger) 35%, var(--sv-line)); }
+    .sv-save-feedback i { font-size: 1rem; }
+    .sv-save-feedback.success i { color: var(--sv-success); }
+    .sv-save-feedback.error i { color: var(--sv-danger); }
+    .sv-confirm-dialog {
+        width: min(420px, calc(100% - 1.5rem)); margin: auto; padding: 0; overflow: hidden;
+        border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card); background: var(--sv-surface);
+        box-shadow: 0 24px 70px rgba(16, 24, 40, .26); color: var(--sv-content);
+    }
+    .sv-confirm-dialog::backdrop { background: rgba(16, 24, 40, .46); backdrop-filter: blur(2px); }
+    .sv-confirm-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: 1rem 1rem .7rem; }
+    .sv-confirm-kicker { display: flex; align-items: center; gap: .4rem; color: var(--sv-brand-strong); font-size: .65rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+    .sv-confirm-title { margin: .24rem 0 0; color: var(--sv-content); font-size: .96rem; font-weight: 850; }
+    .sv-confirm-close {
+        display: inline-grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border: 0;
+        border-radius: 50%; background: transparent; color: var(--sv-muted); font-size: 1rem;
+    }
+    .sv-confirm-close:hover { background: var(--sv-soft); color: var(--sv-content); }
+    .sv-confirm-body { padding: .1rem 1rem 1rem; }
+    .sv-confirm-copy { margin: 0; color: var(--sv-muted); font-size: .76rem; line-height: 1.5; }
+    .sv-confirm-detail { display: grid; grid-template-columns: 1fr auto; gap: .55rem 1rem; margin: .85rem 0 0; padding: .75rem; border-radius: var(--sv-radius-control); background: var(--sv-soft); }
+    .sv-confirm-detail dt { color: var(--sv-muted); font-size: .64rem; font-weight: 750; }
+    .sv-confirm-detail dd { max-width: 210px; margin: 0; overflow: hidden; color: var(--sv-content); font-size: .72rem; font-weight: 800; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+    .sv-confirm-stock { color: var(--sv-success) !important; font-variant-numeric: tabular-nums; }
+    .sv-confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; padding: .8rem 1rem 1rem; border-top: 1px solid var(--sv-line); }
+    .sv-confirm-button { min-height: 42px; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control); background: var(--sv-surface); color: var(--sv-content); font-size: .75rem; font-weight: 800; }
+    .sv-confirm-button:hover { background: var(--sv-soft); }
+    .sv-confirm-button--primary { border-color: var(--sv-brand); background: var(--sv-brand); color: #fff; }
+    .sv-confirm-button--primary:hover { border-color: var(--sv-brand-strong); background: var(--sv-brand-strong); }
     .sv-empty {
         display: grid; justify-items: center; gap: .35rem; padding: 3.5rem 1rem;
         color: var(--sv-muted); text-align: center;
@@ -263,16 +309,12 @@
     @media (min-width: 576px) {
         .sv-head { flex-direction: row; align-items: flex-start; justify-content: space-between; }
         .sv-back { min-height: 38px; }
-        .sv-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         .sv-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .sv-search-field, .sv-filter-note { grid-column: 1 / -1; }
     }
     @media (min-width: 768px) {
         .sv-page { padding-top: 1.25rem; }
-        .sv-toolbar { padding: .8rem; }
-        .sv-summary { display: flex; }
-        .sv-stat { min-width: 120px; flex: 0 0 auto; }
-        .sv-filter { grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(130px, 1fr)); align-items: end; }
+        .sv-filter { grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)); align-items: end; }
         .sv-search-field { grid-column: auto; }
         .sv-filter-note { grid-column: 1 / -1; }
         .sv-records { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -320,7 +362,7 @@
         .sv-save { min-height: 38px; padding-inline: .7rem; }
     }
     @media (prefers-reduced-motion: reduce) {
-        .sv-dashboard-content, .sv-record { transition: none; }
+        .sv-dashboard-content, .sv-record, .sv-save-feedback { transition: none; }
         .sv-dashboard-content.is-loading::before { animation: none; }
     }
 </style>
@@ -344,6 +386,14 @@
     $allStoreFilters = array_merge($storeSharedFilters, array_filter(['channel' => $channel ?: null]));
     $emptyScopeTotal = $summary['empty_total'] ?? $summary['total'];
     $internalEmptyTotal = $summary['internal_empty_mp_stock'] ?? 0;
+    $storesByChannel = $stores->groupBy(function ($store): string {
+        $channelCode = strtolower((string) $store->channel?->code);
+        return in_array($channelCode, ['tiktok', 'ttk', 'tt'], true) ? 'tiktok' : 'shopee';
+    });
+    $storeGroups = [
+        ['key' => 'tiktok', 'label' => 'TikTok Shop', 'icon' => 'bi-music-note-beamed', 'stores' => $storesByChannel->get('tiktok', collect())],
+        ['key' => 'shopee', 'label' => 'Shopee', 'icon' => 'bi-bag', 'stores' => $storesByChannel->get('shopee', collect())],
+    ];
 @endphp
 
 <main class="sv-page">
@@ -359,42 +409,6 @@
     <div class="sv-feedback" id="svFilterFeedback" role="alert" aria-live="assertive"></div>
 
     <div class="sv-dashboard-content" id="svDashboardContent">
-        <section class="sv-toolbar" aria-label="Pemeriksaan dan ringkasan stok">
-            {{-- Mode Filter: Marketplace Kosong vs Internal Kosong tapi di Marketplace Ada Stok --}}
-            <div class="sv-scope-nav" role="tablist" aria-label="Mode pemeriksaan stok">
-                <a class="sv-scope-btn {{ $stockScope === 'marketplace_empty' ? 'active' : '' }}"
-                   role="tab"
-                   aria-selected="{{ $stockScope === 'marketplace_empty' ? 'true' : 'false' }}"
-                   data-dashboard-link
-                   href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => null, 'stock_status' => null])) }}">
-                    <i class="bi bi-box-seam"></i>
-                    <span>Stok Marketplace Kosong</span>
-                    <span class="sv-badge">{{ number_format($emptyScopeTotal) }}</span>
-                </a>
-                <a class="sv-scope-btn sv-scope-btn--warning {{ $stockScope === 'internal_empty_marketplace_stock' ? 'active' : '' }}"
-                   role="tab"
-                   aria-selected="{{ $stockScope === 'internal_empty_marketplace_stock' ? 'true' : 'false' }}"
-                   data-dashboard-link
-                   href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => 'internal_empty_marketplace_stock', 'stock_status' => null])) }}">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <span>Stok Kosong tapi di Marketplace Ada Stok</span>
-                    <span class="sv-badge sv-badge--warning">{{ number_format($internalEmptyTotal) }}</span>
-                </a>
-            </div>
-
-            <nav class="sv-summary" aria-label="Ringkasan filter aktif">
-                @if($stockScope === 'internal_empty_marketplace_stock')
-                    <span class="sv-stat active"><span>Internal kosong · MP ada stok</span><strong data-summary="internal_empty">{{ number_format($internalEmptyTotal) }}</strong></span>
-                    <span class="sv-stat"><span>Produk terdampak</span><strong>{{ number_format($summary['products']) }}</strong></span>
-                @else
-                    <a class="sv-stat {{ $stockStatus === '' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => null])) }}"><span>Semua variant</span><strong data-summary="total">{{ number_format($emptyScopeTotal) }}</strong></a>
-                    <a class="sv-stat {{ $stockStatus === 'zero' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'zero'])) }}"><span>Stok 0</span><strong data-summary="zero">{{ number_format($summary['zero']) }}</strong></a>
-                    <a class="sv-stat {{ $stockStatus === 'negative' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'negative'])) }}"><span>Stok minus</span><strong data-summary="negative">{{ number_format($summary['negative']) }}</strong></a>
-                    <span class="sv-stat"><span>Produk</span><strong>{{ number_format($summary['products']) }}</strong></span>
-                @endif
-            </nav>
-        </section>
-
         <form class="sv-filter" method="GET" action="{{ route('marketplace.products.empty-variants') }}" data-realtime-filter>
             @if($storeId > 0)<input type="hidden" name="store_id" value="{{ $storeId }}">@endif
             <div class="sv-field sv-search-field">
@@ -406,12 +420,8 @@
                 <select class="form-select sv-control" id="svChannel" name="channel"><option value="">Semua channel</option><option value="shopee" @selected($channel === 'shopee')>Shopee</option><option value="tiktok" @selected($channel === 'tiktok')>TikTok Shop</option></select>
             </div>
             <div class="sv-field">
-                <label class="sv-field-label" for="svScope">Pemeriksaan stok</label>
-                <select class="form-select sv-control" id="svScope" name="stock_scope"><option value="marketplace_empty" @selected($stockScope === 'marketplace_empty')>Marketplace kosong</option><option value="internal_empty_marketplace_stock" @selected($stockScope === 'internal_empty_marketplace_stock')>Stok kosong tapi di marketplace ada stok</option></select>
-            </div>
-            <div class="sv-field">
                 <label class="sv-field-label" for="svStock">Status stok marketplace</label>
-                <select class="form-select sv-control" id="svStock" name="stock_status" @disabled($stockScope !== 'marketplace_empty')><option value="">Stok 0 & minus</option><option value="zero" @selected($stockStatus === 'zero')>Stok tepat 0</option><option value="negative" @selected($stockStatus === 'negative')>Stok minus</option></select>
+                <select class="form-select sv-control" id="svStock" name="stock_status" @disabled($stockScope !== 'marketplace_empty')><option value="zero" @selected($stockStatus === 'zero')>Stok tepat 0</option><option value="negative" @selected($stockStatus === 'negative')>Stok minus</option></select>
             </div>
             <div class="sv-field">
                 <label class="sv-field-label" for="svAverage">Rata² terjual/hari lebih dari</label>
@@ -428,22 +438,63 @@
                         @if($stockScope === 'internal_empty_marketplace_stock')
                             <span class="sv-scope-note"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>Audit mismatch: stok internal kosong, tetapi marketplace masih menjual variant ini.</span>
                         @else
-                            <span class="sv-scope-note">Prioritaskan variant ter-mapping yang pernah terjual untuk pembaruan stok.</span>
+                            <span class="sv-scope-note">Menampilkan stok marketplace 0 dengan stok internal tersedia untuk pembaruan.</span>
                         @endif
                     </div>
                     <span class="sv-panel-count">{{ number_format($variants->count()) }} di halaman ini</span>
                 </div>
 
-                {{-- Pilih Toko di section Variant perlu diperbarui --}}
+                <nav class="sv-scope-nav" aria-label="Mode pemeriksaan stok">
+                    <a class="sv-scope-btn {{ $stockScope === 'marketplace_empty' ? 'active' : '' }}"
+                       aria-current="{{ $stockScope === 'marketplace_empty' ? 'page' : 'false' }}"
+                       data-dashboard-link
+                       href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => null, 'stock_status' => 'zero'])) }}">
+                        <i class="bi bi-box-seam"></i>
+                        <span>Stok MP 0 · Internal Ada</span>
+                        <span class="sv-badge" data-summary="scope_empty">{{ number_format($emptyScopeTotal) }}</span>
+                    </a>
+                    <a class="sv-scope-btn sv-scope-btn--warning {{ $stockScope === 'internal_empty_marketplace_stock' ? 'active' : '' }}"
+                       aria-current="{{ $stockScope === 'internal_empty_marketplace_stock' ? 'page' : 'false' }}"
+                       data-dashboard-link
+                       href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => 'internal_empty_marketplace_stock', 'stock_status' => null])) }}">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span>Stok Kosong tapi di Marketplace Ada Stok</span>
+                        <span class="sv-badge sv-badge--warning" data-summary="scope_internal_empty">{{ number_format($internalEmptyTotal) }}</span>
+                    </a>
+                </nav>
+
                 <div class="sv-store-picker-row">
                     <span class="sv-store-picker-label"><i class="bi bi-shop"></i> Pilih Toko:</span>
-                    <nav class="sv-store-tabs sv-panel-tabs" role="tablist" aria-label="Pilih toko marketplace">
-                        <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" role="tab" aria-controls="svRows" aria-selected="{{ $storeId === 0 ? 'true' : 'false' }}" tabindex="{{ $storeId === 0 ? '0' : '-1' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua Toko</a>
-                        @foreach($stores as $store)
-                            <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" role="tab" aria-controls="svRows" aria-selected="{{ $storeId === $store->id ? 'true' : 'false' }}" tabindex="{{ $storeId === $store->id ? '0' : '-1' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
+                    <div class="sv-store-groups">
+                        <nav class="sv-store-tabs sv-panel-tabs" aria-label="Semua toko marketplace">
+                            <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua Toko</a>
+                        </nav>
+                        @foreach($storeGroups as $group)
+                            @continue($group['stores']->isEmpty())
+                            <section class="sv-store-group" aria-labelledby="svStoreGroup{{ ucfirst($group['key']) }}">
+                                <span class="sv-store-group-label" id="svStoreGroup{{ ucfirst($group['key']) }}"><i class="bi {{ $group['icon'] }}"></i>{{ $group['label'] }}</span>
+                                <nav class="sv-store-tabs sv-panel-tabs" aria-label="Toko {{ $group['label'] }}">
+                                    @foreach($group['stores'] as $store)
+                                        <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" aria-current="{{ $storeId === $store->id ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
+                                    @endforeach
+                                </nav>
+                            </section>
                         @endforeach
-                    </nav>
+                    </div>
                 </div>
+
+                <nav class="sv-panel-summary" aria-label="Ringkasan dan filter stok">
+                    @if($stockScope === 'internal_empty_marketplace_stock')
+                        <span class="sv-summary-item sv-summary-item--warning"><strong data-summary="internal_empty">{{ number_format($internalEmptyTotal) }}</strong> variant internal kosong</span>
+                        <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
+                        <span class="sv-summary-item">Marketplace masih ada stok</span>
+                    @else
+                        <span class="sv-summary-item"><strong data-summary="total">{{ number_format($emptyScopeTotal) }}</strong> variant siap diisi</span>
+                        <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
+                        <a class="sv-summary-item {{ $stockStatus === 'zero' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'zero'])) }}">Stok 0: <strong data-summary="zero">{{ number_format($summary['zero']) }}</strong></a>
+                        <a class="sv-summary-item {{ $stockStatus === 'negative' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'negative'])) }}">Minus: <strong data-summary="negative">{{ number_format($summary['negative']) }}</strong></a>
+                    @endif
+                </nav>
             </div>
             <div class="sv-list-head" aria-hidden="true">
                 <span>Produk</span>
@@ -518,7 +569,7 @@
                         </div>
                         <div class="sv-action">
                             <span class="sv-cell-label">Update Stok</span>
-                            <form class="sv-stock-form" data-stock-form data-product-id="{{ $product?->id }}" data-model-id="{{ $variant->model_id }}">
+                            <form class="sv-stock-form" data-stock-form data-product-id="{{ $product?->id }}" data-model-id="{{ $variant->model_id }}" data-variant-name="{{ $variant->model_name ?: $variant->model_sku }}" data-store-name="{{ $product?->store?->name ?: 'Marketplace' }}">
                                 <label class="visually-hidden" for="stock-{{ $variant->id }}">Update stok {{ $variant->model_name }}</label>
                                 <input class="sv-stock-input" id="stock-{{ $variant->id }}" name="stock" type="number" min="0" step="1" value="{{ $stockScope === 'internal_empty_marketplace_stock' ? 0 : $available }}" required inputmode="numeric">
                                 <button class="sv-save" type="submit" title="Kirim perubahan stok ke marketplace"><i class="bi bi-cloud-arrow-up"></i><span>Simpan</span></button>
@@ -538,6 +589,30 @@
         </section>
     </div>
 </main>
+<dialog class="sv-confirm-dialog" id="svStockConfirm" aria-labelledby="svStockConfirmTitle" aria-describedby="svStockConfirmCopy">
+    <form method="dialog">
+        <div class="sv-confirm-head">
+            <div>
+                <span class="sv-confirm-kicker"><i class="bi bi-cloud-arrow-up"></i> Konfirmasi pembaruan</span>
+                <h2 class="sv-confirm-title" id="svStockConfirmTitle">Simpan stok ke marketplace?</h2>
+            </div>
+            <button class="sv-confirm-close" type="submit" value="cancel" aria-label="Batalkan pembaruan stok"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="sv-confirm-body">
+            <p class="sv-confirm-copy" id="svStockConfirmCopy">Stok marketplace akan diperbarui sesuai nilai berikut.</p>
+            <dl class="sv-confirm-detail">
+                <dt>Variant</dt><dd id="svConfirmVariant">—</dd>
+                <dt>Toko</dt><dd id="svConfirmStore">—</dd>
+                <dt>Stok baru</dt><dd class="sv-confirm-stock" id="svConfirmStock">0</dd>
+            </dl>
+        </div>
+        <div class="sv-confirm-actions">
+            <button class="sv-confirm-button" type="submit" value="cancel">Batal</button>
+            <button class="sv-confirm-button sv-confirm-button--primary" type="submit" value="confirm"><i class="bi bi-check2"></i> Simpan stok</button>
+        </div>
+    </form>
+</dialog>
+<div class="sv-save-feedback" id="svSaveFeedback" role="status" aria-live="polite" aria-atomic="true"></div>
 @endsection
 
 @push('scripts')
@@ -546,6 +621,9 @@
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     let filterTimer = null;
     let activeRequest = null;
+    let saveFeedbackTimer = null;
+    let pendingConfirmation = null;
+    const stockConfirmDialog = document.getElementById('svStockConfirm');
     const setCount = (name, delta) => {
         const element = document.querySelector(`[data-summary="${name}"]`);
         if (!element) return;
@@ -558,6 +636,34 @@
         feedback.textContent = message;
         feedback.classList.toggle('is-visible', Boolean(message));
     };
+    const showSaveFeedback = (message, type) => {
+        const feedback = document.getElementById('svSaveFeedback');
+        if (!feedback) return;
+        window.clearTimeout(saveFeedbackTimer);
+        const icon = document.createElement('i');
+        icon.className = type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-circle-fill';
+        feedback.replaceChildren(icon, document.createTextNode(message));
+        feedback.className = `sv-save-feedback ${type} is-visible`;
+        feedback.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        saveFeedbackTimer = window.setTimeout(() => feedback.classList.remove('is-visible'), 5000);
+    };
+    const confirmStockUpdate = (form, stock) => new Promise(resolve => {
+        if (!stockConfirmDialog || typeof stockConfirmDialog.showModal !== 'function') {
+            resolve(window.confirm(`Simpan stok ${stock.toLocaleString('id-ID')} untuk ${form.dataset.variantName || 'variant ini'}?`));
+            return;
+        }
+        document.getElementById('svConfirmVariant').textContent = form.dataset.variantName || 'Variant tanpa nama';
+        document.getElementById('svConfirmStore').textContent = form.dataset.storeName || 'Marketplace';
+        document.getElementById('svConfirmStock').textContent = stock.toLocaleString('id-ID');
+        pendingConfirmation = {resolve};
+        stockConfirmDialog.returnValue = '';
+        stockConfirmDialog.showModal();
+    });
+    stockConfirmDialog?.addEventListener('close', () => {
+        const confirmation = pendingConfirmation;
+        pendingConfirmation = null;
+        confirmation?.resolve(stockConfirmDialog.returnValue === 'confirm');
+    });
     const showEmpty = () => {
         const rows = document.getElementById('svRows');
         if (!rows || rows.querySelector('[data-stock-row]')) return;
@@ -577,6 +683,12 @@
                 input.focus();
                 return;
             }
+            if (!await confirmStockUpdate(form, stock)) {
+                status.textContent = 'Pembaruan stok dibatalkan.';
+                status.className = 'sv-status';
+                input.focus();
+                return;
+            }
             button.disabled = true;
             input.disabled = true;
             status.textContent = 'Mengirim stok ke marketplace…';
@@ -593,6 +705,7 @@
                 const isInternalEmptyAudit = row.dataset.stockScope === 'internal_empty_marketplace_stock';
                 status.textContent = 'Stok berhasil dikirim.';
                 status.className = 'sv-status ok';
+                showSaveFeedback('Stok berhasil dikirim ke marketplace.', 'success');
                 row.dataset.currentStock = String(stock);
                 const mpStockVal = row.querySelector('[data-mp-stock-val]');
                 if (mpStockVal) {
@@ -600,12 +713,13 @@
                     mpStockVal.className = `sv-mp-stock ${stock === 0 ? 'is-zero' : (stock < 0 ? 'is-negative' : 'is-available')}`;
                 }
                 if (isInternalEmptyAudit && stock === 0) {
-                    setCount('total', -1);
                     setCount('internal_empty', -1);
+                    setCount('scope_internal_empty', -1);
                     row.remove();
                     showEmpty();
                 } else if (!isInternalEmptyAudit && stock > 0) {
                     setCount('total', -1);
+                    setCount('scope_empty', -1);
                     setCount(previous < 0 ? 'negative' : 'zero', -1);
                     row.remove();
                     showEmpty();
@@ -617,6 +731,7 @@
             } catch (error) {
                 status.textContent = error.message || 'Gagal menyimpan stok.';
                 status.className = 'sv-status error';
+                showSaveFeedback(error.message || 'Gagal menyimpan stok. Coba lagi.', 'error');
             } finally {
                 if (document.body.contains(button)) {
                     button.disabled = false;

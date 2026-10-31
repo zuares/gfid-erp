@@ -31,7 +31,7 @@ class EmptyVariantDashboardController extends Controller
             : 'marketplace_empty';
         $stockStatus = in_array($request->query('stock_status'), ['zero', 'negative'], true)
             ? (string) $request->query('stock_status')
-            : '';
+            : 'zero';
         $channel = in_array($request->query('channel'), ['shopee', 'tiktok'], true)
             ? (string) $request->query('channel')
             : '';
@@ -66,20 +66,28 @@ class EmptyVariantDashboardController extends Controller
                 });
             });
 
-        $aggregate = (clone $baseScopedQuery)
-            ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock <= 0 THEN 1 ELSE 0 END) as empty_total')
+        $emptyAggregate = (clone $baseScopedQuery)
+            ->where('marketplace_product_models.stock', '<=', 0)
+            ->whereRaw($inventoryAvailableStock.' > 0')
+            ->selectRaw('COUNT(*) as empty_total')
             ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock = 0 THEN 1 ELSE 0 END) as zero_count')
             ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock < 0 THEN 1 ELSE 0 END) as negative_count')
-            ->selectRaw("SUM(CASE WHEN marketplace_product_models.stock > 0 AND ({$inventoryAvailableStock} <= 0) THEN 1 ELSE 0 END) as internal_empty_mp_stock_count")
-            ->selectRaw('COUNT(DISTINCT CASE WHEN marketplace_product_models.stock <= 0 THEN marketplace_product_models.marketplace_product_id END) as empty_product_count')
-            ->selectRaw("COUNT(DISTINCT CASE WHEN marketplace_product_models.stock > 0 AND ({$inventoryAvailableStock} <= 0) THEN marketplace_product_models.marketplace_product_id END) as internal_empty_product_count")
+            ->selectRaw('COUNT(DISTINCT marketplace_product_models.marketplace_product_id) as empty_product_count')
             ->toBase()
             ->first();
 
-        $emptyTotal = (int) ($aggregate->empty_total ?? 0);
-        $zeroCount = (int) ($aggregate->zero_count ?? 0);
-        $negativeCount = (int) ($aggregate->negative_count ?? 0);
-        $internalEmptyCount = (int) ($aggregate->internal_empty_mp_stock_count ?? 0);
+        $internalEmptyAggregate = (clone $baseScopedQuery)
+            ->where('marketplace_product_models.stock', '>', 0)
+            ->whereRaw($inventoryAvailableStock.' <= 0')
+            ->selectRaw('COUNT(*) as internal_empty_mp_stock_count')
+            ->selectRaw('COUNT(DISTINCT marketplace_product_models.marketplace_product_id) as internal_empty_product_count')
+            ->toBase()
+            ->first();
+
+        $emptyTotal = (int) ($emptyAggregate->empty_total ?? 0);
+        $zeroCount = (int) ($emptyAggregate->zero_count ?? 0);
+        $negativeCount = (int) ($emptyAggregate->negative_count ?? 0);
+        $internalEmptyCount = (int) ($internalEmptyAggregate->internal_empty_mp_stock_count ?? 0);
 
         $summary = [
             'total' => $stockScope === 'internal_empty_marketplace_stock' ? $internalEmptyCount : $emptyTotal,
@@ -89,8 +97,8 @@ class EmptyVariantDashboardController extends Controller
             'marketplace_available' => $internalEmptyCount,
             'internal_empty_mp_stock' => $internalEmptyCount,
             'products' => $stockScope === 'internal_empty_marketplace_stock'
-                ? (int) ($aggregate->internal_empty_product_count ?? 0)
-                : (int) ($aggregate->empty_product_count ?? 0),
+                ? (int) ($internalEmptyAggregate->internal_empty_product_count ?? 0)
+                : (int) ($emptyAggregate->empty_product_count ?? 0),
         ];
 
         $variantsQuery = clone $baseScopedQuery;
@@ -99,7 +107,7 @@ class EmptyVariantDashboardController extends Controller
                 ->where('marketplace_product_models.stock', '>', 0)
                 ->whereRaw($inventoryAvailableStock.' <= 0');
         } else {
-            $variantsQuery->where('marketplace_product_models.stock', '<=', 0);
+            $variantsQuery->whereRaw($inventoryAvailableStock.' > 0');
             if ($stockStatus === 'zero') {
                 $variantsQuery->where('marketplace_product_models.stock', 0);
             } elseif ($stockStatus === 'negative') {

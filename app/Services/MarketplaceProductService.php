@@ -912,6 +912,30 @@ class MarketplaceProductService
      */
     public function updateStock(MarketplaceProduct $product, array $stockList): array
     {
+        if ($product->has_model) {
+            $rawModelIds = collect($stockList)->pluck('model_id');
+            if ($rawModelIds->contains(fn ($modelId): bool => ! is_string($modelId) && ! is_int($modelId))) {
+                return [
+                    'error' => true,
+                    'message' => 'ID variant stok tidak valid.',
+                ];
+            }
+
+            $modelIds = $rawModelIds
+                ->map(fn ($modelId): string => (string) $modelId)
+                ->values();
+            $validModelCount = $product->models()
+                ->whereIn('model_id', $modelIds->unique()->all())
+                ->count();
+
+            if ($modelIds->duplicates()->isNotEmpty() || $validModelCount !== $modelIds->count()) {
+                return [
+                    'error' => true,
+                    'message' => 'Variant stok tidak ditemukan pada produk marketplace ini.',
+                ];
+            }
+        }
+
         $driver = $this->channelDriver($product->store);
         if ($this->isTikTokStore($product->store)) {
             $tiktokStockList = [];
