@@ -4,6 +4,8 @@
     $qty = fn ($n) => number_format((float) $n, 0, ',', '.');
 @endphp
 
+@include('dashboard.partials._marketplace_stock_alerts', ['d' => $d])
+
 @php
     $marketplaceKpi = $d['marketplace_kpi'] ?? [];
     $marketplaceTodayKpi = $d['marketplace_today_kpi'] ?? [];
@@ -68,8 +70,6 @@
         @include('dashboard.partials._list_order_items', ['title' => 'Permintaan belum dikirim per item internal', 'rows' => $d['list_todo_items'] ?? [], 'link' => $r('marketplace.orders')])
     </div>
 </section>
-
-@include('dashboard.partials._marketplace_stock_alerts', ['d' => $d])
 
 <div class="dash-sec"><i class="bi bi-graph-up-arrow"></i> Penjualan (bulan berjalan)</div>
 <div class="dash-grid">

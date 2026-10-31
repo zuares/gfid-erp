@@ -4,6 +4,8 @@
     $qty = fn ($n) => number_format((float) $n, 0, ',', '.');
 @endphp
 
+@include('dashboard.partials._marketplace_stock_alerts', ['d' => $d])
+
 <section class="dash-priority-stack" aria-labelledby="dash-priority-title">
     <h2 id="dash-priority-title" class="visually-hidden">Prioritas kerja hari ini</h2>
     <div class="dash-panels">
@@ -13,8 +15,6 @@
         @include('dashboard.partials._list_order_items', ['title' => 'Permintaan belum dikirim per item internal', 'rows' => $d['list_todo_items'] ?? [], 'link' => $r('marketplace.orders')])
     </div>
 </section>
-
-@include('dashboard.partials._marketplace_stock_alerts', ['d' => $d])
 
 {{-- ================= PESANAN HARI INI ================= --}}
 <div class="dash-sec"><i class="bi bi-bag-check"></i> Pesanan & Penjualan</div>
