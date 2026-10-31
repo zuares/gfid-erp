@@ -58,6 +58,7 @@
         background: var(--sv-surface); box-shadow: var(--sv-shadow);
     }
     .sv-toolbar { margin-bottom: .75rem; padding: .65rem; }
+    .sv-toolbar .sv-summary { margin-top: 0; }
     .sv-section-label, .sv-field-label, .sv-cell-label {
         color: var(--sv-muted); font-size: .66rem; font-weight: 750; letter-spacing: .025em;
     }
@@ -78,6 +79,35 @@
         border-color: color-mix(in srgb, var(--sv-brand) 24%, var(--sv-line));
         background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface)); color: var(--sv-brand-strong);
     }
+    .sv-scope-nav { display: flex; gap: .5rem; margin-bottom: .65rem; flex-wrap: wrap; }
+    .sv-scope-btn {
+        display: inline-flex; align-items: center; gap: .5rem;
+        min-height: 42px; padding: .45rem .85rem; border: 1px solid var(--sv-line);
+        border-radius: var(--sv-radius-control); background: var(--sv-surface);
+        color: var(--sv-muted); font-size: .76rem; font-weight: 750; text-decoration: none;
+        transition: all .15s ease;
+    }
+    .sv-scope-btn:hover {
+        border-color: color-mix(in srgb, var(--sv-brand) 35%, var(--sv-line));
+        color: var(--sv-brand-strong);
+    }
+    .sv-scope-btn.active {
+        border-color: var(--sv-brand);
+        background: color-mix(in srgb, var(--sv-brand) 8%, var(--sv-surface));
+        color: var(--sv-brand-strong);
+    }
+    .sv-scope-btn--warning.active {
+        border-color: #f59e0b;
+        background: color-mix(in srgb, #f59e0b 10%, var(--sv-surface));
+        color: #b45309;
+    }
+    .sv-badge {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 22px; height: 22px; padding: 0 .4rem; border-radius: 999px;
+        background: var(--sv-soft); color: var(--sv-muted); font-size: .68rem; font-weight: 800;
+    }
+    .sv-scope-btn.active .sv-badge { background: var(--sv-brand); color: #fff; }
+    .sv-scope-btn--warning.active .sv-badge { background: #f59e0b; color: #fff; }
     .sv-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; margin-top: .5rem; }
     .sv-stat {
         display: flex; align-items: center; justify-content: space-between; gap: .4rem; min-height: 48px;
@@ -109,6 +139,7 @@
     .sv-control:focus {
         border-color: var(--sv-brand); box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--sv-brand) 15%, transparent);
     }
+    .sv-control:disabled { background: var(--sv-soft); color: var(--sv-muted); cursor: not-allowed; }
     .sv-filter-note { display: flex; align-items: center; gap: .4rem; color: var(--sv-muted); font-size: .66rem; }
     .sv-filter-note i { color: var(--sv-success); }
     .sv-feedback {
@@ -120,9 +151,21 @@
     .sv-feedback.is-visible { display: block; }
     .sv-panel { overflow: hidden; }
     .sv-panel-head {
-        display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+        display: grid; gap: .7rem;
         padding: .8rem; border-bottom: 1px solid var(--sv-line);
     }
+    .sv-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+    .sv-store-picker-row {
+        display: flex; flex-direction: column; gap: .45rem; margin-top: .4rem; padding-top: .6rem; border-top: 1px dashed var(--sv-line);
+    }
+    @media (min-width: 768px) {
+        .sv-store-picker-row { flex-direction: row; align-items: center; gap: .75rem; }
+    }
+    .sv-store-picker-label {
+        display: inline-flex; align-items: center; gap: .35rem; font-size: .7rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; flex: 0 0 auto;
+    }
+    .sv-panel-tabs { margin: 0; padding-bottom: .15rem; flex: 1 1 auto; }
+    .sv-scope-note { color: var(--sv-muted); font-size: .68rem; line-height: 1.35; }
     .sv-panel-title { margin: 0; color: var(--sv-content); font-size: .82rem; font-weight: 800; }
     .sv-panel-count {
         display: inline-flex; align-items: center; min-height: 26px; padding: .2rem .5rem;
@@ -142,7 +185,7 @@
     .sv-photo-cell { grid-area: photo; }
     .sv-variant-cell { grid-area: variant; min-width: 0; }
     .sv-support { grid-area: support; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .75fr); gap: .65rem; }
-    .sv-metrics { grid-area: metrics; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+    .sv-metrics { grid-area: metrics; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
     .sv-action { grid-area: action; min-width: 0; }
     .sv-cell-label { display: block; margin-bottom: .28rem; text-transform: uppercase; }
     .sv-img {
@@ -167,6 +210,14 @@
     .sv-meta { margin-top: .18rem; color: var(--sv-muted); font-size: .65rem; line-height: 1.35; }
     .sv-sync { color: var(--sv-content); font-size: .7rem; font-weight: 700; }
     .sv-metric { min-width: 0; padding: .6rem; border-radius: var(--sv-radius-control); background: var(--sv-soft); }
+    .sv-mp-stock-cell { min-width: 0; }
+    .sv-mp-stock {
+        display: block; font-size: 1.05rem; font-weight: 850;
+        letter-spacing: -.025em; font-variant-numeric: tabular-nums; line-height: 1.15;
+    }
+    .sv-mp-stock.is-zero { color: var(--sv-muted); }
+    .sv-mp-stock.is-negative { color: var(--sv-danger); }
+    .sv-mp-stock.is-available { color: var(--sv-brand-strong); }
     .sv-internal, .sv-average {
         display: block; color: var(--sv-content); font-size: 1.05rem; font-weight: 850;
         letter-spacing: -.025em; font-variant-numeric: tabular-nums; line-height: 1.15;
@@ -221,7 +272,7 @@
         .sv-toolbar { padding: .8rem; }
         .sv-summary { display: flex; }
         .sv-stat { min-width: 120px; flex: 0 0 auto; }
-        .sv-filter { grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)); align-items: end; }
+        .sv-filter { grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(130px, 1fr)); align-items: end; }
         .sv-search-field { grid-column: auto; }
         .sv-filter-note { grid-column: 1 / -1; }
         .sv-records { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -229,7 +280,7 @@
     @media (min-width: 1120px) {
         .sv-panel-head { padding: .75rem 1rem; }
         .sv-list-head, .sv-record {
-            grid-template-columns: 64px minmax(200px, 1.6fr) minmax(140px, 1.05fr) 115px 125px minmax(190px, 1.15fr) 112px;
+            grid-template-columns: 56px minmax(170px, 1.4fr) minmax(130px, 1fr) 96px 112px 108px minmax(180px, 1.1fr) 100px;
             gap: 0;
         }
         .sv-list-head {
@@ -248,16 +299,17 @@
         }
         .sv-record:last-child { border-bottom: 0; }
         .sv-record:hover { background: color-mix(in srgb, var(--sv-brand) 3%, var(--sv-surface)); box-shadow: none; }
-        .sv-photo-cell, .sv-variant-cell, .sv-map-cell, .sv-internal-cell,
+        .sv-photo-cell, .sv-variant-cell, .sv-map-cell, .sv-mp-stock-cell, .sv-internal-cell,
         .sv-average-cell, .sv-action, .sv-sync-cell { grid-area: auto; min-width: 0; padding-inline: .55rem; }
         .sv-photo-cell { grid-column: 1; }
         .sv-variant-cell { grid-column: 2; }
         .sv-map-cell { grid-column: 3; }
-        .sv-internal-cell { grid-column: 4; }
-        .sv-average-cell { grid-column: 5; }
-        .sv-action { grid-column: 6; }
-        .sv-sync-cell { grid-column: 7; }
-        .sv-photo-cell, .sv-variant-cell, .sv-map-cell, .sv-internal-cell,
+        .sv-mp-stock-cell { grid-column: 4; }
+        .sv-internal-cell { grid-column: 5; }
+        .sv-average-cell { grid-column: 6; }
+        .sv-action { grid-column: 7; }
+        .sv-sync-cell { grid-column: 8; }
+        .sv-photo-cell, .sv-variant-cell, .sv-map-cell, .sv-mp-stock-cell, .sv-internal-cell,
         .sv-average-cell, .sv-action, .sv-sync-cell { grid-row: 1; }
         .sv-support, .sv-metrics { display: contents; }
         .sv-cell-label { display: none; }
@@ -280,14 +332,18 @@
         'store_id' => $storeId ?: null,
         'channel' => $channel ?: null,
         'search' => $search ?: null,
-        'min_avg_sales' => $minAverageSales,
+        'min_avg_sales' => $minAverageSales > 0 ? $minAverageSales : null,
+        'stock_scope' => $stockScope !== 'marketplace_empty' ? $stockScope : null,
     ], fn ($value) => $value !== null && $value !== '');
     $storeSharedFilters = array_filter([
+        'stock_scope' => $stockScope !== 'marketplace_empty' ? $stockScope : null,
         'stock_status' => $stockStatus ?: null,
         'search' => $search ?: null,
-        'min_avg_sales' => $minAverageSales,
+        'min_avg_sales' => $minAverageSales > 0 ? $minAverageSales : null,
     ], fn ($value) => $value !== null && $value !== '');
     $allStoreFilters = array_merge($storeSharedFilters, array_filter(['channel' => $channel ?: null]));
+    $emptyScopeTotal = $summary['empty_total'] ?? $summary['total'];
+    $internalEmptyTotal = $summary['internal_empty_mp_stock'] ?? 0;
 @endphp
 
 <main class="sv-page">
@@ -303,19 +359,39 @@
     <div class="sv-feedback" id="svFilterFeedback" role="alert" aria-live="assertive"></div>
 
     <div class="sv-dashboard-content" id="svDashboardContent">
-        <section class="sv-toolbar" aria-label="Toko dan ringkasan stok">
-            <span class="sv-section-label">Pilih toko</span>
-            <nav class="sv-store-tabs" role="tablist" aria-label="Filter toko marketplace">
-                <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" role="tab" aria-controls="svRows" aria-selected="{{ $storeId === 0 ? 'true' : 'false' }}" tabindex="{{ $storeId === 0 ? '0' : '-1' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua Toko</a>
-                @foreach($stores as $store)
-                    <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" role="tab" aria-controls="svRows" aria-selected="{{ $storeId === $store->id ? 'true' : 'false' }}" tabindex="{{ $storeId === $store->id ? '0' : '-1' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
-                @endforeach
-            </nav>
-            <nav class="sv-summary" aria-label="Ringkasan stok">
-                <a class="sv-stat {{ $stockStatus === '' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $baseFilters) }}"><span>Semua variant</span><strong data-summary="total">{{ number_format($summary['total']) }}</strong></a>
-                <a class="sv-stat {{ $stockStatus === 'zero' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'zero'])) }}"><span>Stok 0</span><strong data-summary="zero">{{ number_format($summary['zero']) }}</strong></a>
-                <a class="sv-stat {{ $stockStatus === 'negative' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'negative'])) }}"><span>Stok minus</span><strong data-summary="negative">{{ number_format($summary['negative']) }}</strong></a>
-                <span class="sv-stat"><span>Produk</span><strong>{{ number_format($summary['products']) }}</strong></span>
+        <section class="sv-toolbar" aria-label="Pemeriksaan dan ringkasan stok">
+            {{-- Mode Filter: Marketplace Kosong vs Internal Kosong tapi di Marketplace Ada Stok --}}
+            <div class="sv-scope-nav" role="tablist" aria-label="Mode pemeriksaan stok">
+                <a class="sv-scope-btn {{ $stockScope === 'marketplace_empty' ? 'active' : '' }}"
+                   role="tab"
+                   aria-selected="{{ $stockScope === 'marketplace_empty' ? 'true' : 'false' }}"
+                   data-dashboard-link
+                   href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => null, 'stock_status' => null])) }}">
+                    <i class="bi bi-box-seam"></i>
+                    <span>Stok Marketplace Kosong</span>
+                    <span class="sv-badge">{{ number_format($emptyScopeTotal) }}</span>
+                </a>
+                <a class="sv-scope-btn sv-scope-btn--warning {{ $stockScope === 'internal_empty_marketplace_stock' ? 'active' : '' }}"
+                   role="tab"
+                   aria-selected="{{ $stockScope === 'internal_empty_marketplace_stock' ? 'true' : 'false' }}"
+                   data-dashboard-link
+                   href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => 'internal_empty_marketplace_stock', 'stock_status' => null])) }}">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span>Stok Kosong tapi di Marketplace Ada Stok</span>
+                    <span class="sv-badge sv-badge--warning">{{ number_format($internalEmptyTotal) }}</span>
+                </a>
+            </div>
+
+            <nav class="sv-summary" aria-label="Ringkasan filter aktif">
+                @if($stockScope === 'internal_empty_marketplace_stock')
+                    <span class="sv-stat active"><span>Internal kosong · MP ada stok</span><strong data-summary="internal_empty">{{ number_format($internalEmptyTotal) }}</strong></span>
+                    <span class="sv-stat"><span>Produk terdampak</span><strong>{{ number_format($summary['products']) }}</strong></span>
+                @else
+                    <a class="sv-stat {{ $stockStatus === '' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => null])) }}"><span>Semua variant</span><strong data-summary="total">{{ number_format($emptyScopeTotal) }}</strong></a>
+                    <a class="sv-stat {{ $stockStatus === 'zero' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'zero'])) }}"><span>Stok 0</span><strong data-summary="zero">{{ number_format($summary['zero']) }}</strong></a>
+                    <a class="sv-stat {{ $stockStatus === 'negative' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'negative'])) }}"><span>Stok minus</span><strong data-summary="negative">{{ number_format($summary['negative']) }}</strong></a>
+                    <span class="sv-stat"><span>Produk</span><strong>{{ number_format($summary['products']) }}</strong></span>
+                @endif
             </nav>
         </section>
 
@@ -330,8 +406,12 @@
                 <select class="form-select sv-control" id="svChannel" name="channel"><option value="">Semua channel</option><option value="shopee" @selected($channel === 'shopee')>Shopee</option><option value="tiktok" @selected($channel === 'tiktok')>TikTok Shop</option></select>
             </div>
             <div class="sv-field">
-                <label class="sv-field-label" for="svStock">Status stok</label>
-                <select class="form-select sv-control" id="svStock" name="stock_status"><option value="">Stok 0 & minus</option><option value="zero" @selected($stockStatus === 'zero')>Stok tepat 0</option><option value="negative" @selected($stockStatus === 'negative')>Stok minus</option></select>
+                <label class="sv-field-label" for="svScope">Pemeriksaan stok</label>
+                <select class="form-select sv-control" id="svScope" name="stock_scope"><option value="marketplace_empty" @selected($stockScope === 'marketplace_empty')>Marketplace kosong</option><option value="internal_empty_marketplace_stock" @selected($stockScope === 'internal_empty_marketplace_stock')>Stok kosong tapi di marketplace ada stok</option></select>
+            </div>
+            <div class="sv-field">
+                <label class="sv-field-label" for="svStock">Status stok marketplace</label>
+                <select class="form-select sv-control" id="svStock" name="stock_status" @disabled($stockScope !== 'marketplace_empty')><option value="">Stok 0 & minus</option><option value="zero" @selected($stockStatus === 'zero')>Stok tepat 0</option><option value="negative" @selected($stockStatus === 'negative')>Stok minus</option></select>
             </div>
             <div class="sv-field">
                 <label class="sv-field-label" for="svAverage">Rata² terjual/hari lebih dari</label>
@@ -342,11 +422,38 @@
 
         <section class="sv-panel" aria-live="polite" aria-label="Daftar variant stok kosong">
             <div class="sv-panel-head">
-                <h2 class="sv-panel-title">Variant perlu diperbarui</h2>
-                <span class="sv-panel-count">{{ number_format($variants->count()) }} di halaman ini</span>
+                <div class="sv-panel-title-row">
+                    <div>
+                        <h2 class="sv-panel-title">Variant perlu diperbarui</h2>
+                        @if($stockScope === 'internal_empty_marketplace_stock')
+                            <span class="sv-scope-note"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>Audit mismatch: stok internal kosong, tetapi marketplace masih menjual variant ini.</span>
+                        @else
+                            <span class="sv-scope-note">Prioritaskan variant ter-mapping yang pernah terjual untuk pembaruan stok.</span>
+                        @endif
+                    </div>
+                    <span class="sv-panel-count">{{ number_format($variants->count()) }} di halaman ini</span>
+                </div>
+
+                {{-- Pilih Toko di section Variant perlu diperbarui --}}
+                <div class="sv-store-picker-row">
+                    <span class="sv-store-picker-label"><i class="bi bi-shop"></i> Pilih Toko:</span>
+                    <nav class="sv-store-tabs sv-panel-tabs" role="tablist" aria-label="Pilih toko marketplace">
+                        <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" role="tab" aria-controls="svRows" aria-selected="{{ $storeId === 0 ? 'true' : 'false' }}" tabindex="{{ $storeId === 0 ? '0' : '-1' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua Toko</a>
+                        @foreach($stores as $store)
+                            <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" role="tab" aria-controls="svRows" aria-selected="{{ $storeId === $store->id ? 'true' : 'false' }}" tabindex="{{ $storeId === $store->id ? '0' : '-1' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
+                        @endforeach
+                    </nav>
+                </div>
             </div>
             <div class="sv-list-head" aria-hidden="true">
-                <span>Produk</span><span>Variant</span><span>Mapping</span><span>Stok internal</span><span>Rata² terjual/hari</span><span>Stok marketplace baru</span><span>Terakhir sync</span>
+                <span>Produk</span>
+                <span>Variant</span>
+                <span>Mapping</span>
+                <span>Stok MP</span>
+                <span>Stok Internal</span>
+                <span>Rata² Terjual/Hari</span>
+                <span>Update Stok</span>
+                <span>Terakhir Sync</span>
             </div>
             <div class="sv-records" id="svRows">
                 @forelse($variants as $variant)
@@ -356,7 +463,7 @@
                         $available = max(0, (int) floor($mapping['internal_available'] ?? 0));
                         $averageWindow = max(1, (int) ($mapping['avg_daily_sales_window'] ?? 30));
                     @endphp
-                    <article class="sv-record" data-stock-row data-current-stock="{{ $variant->stock }}">
+                    <article class="sv-record" data-stock-row data-stock-scope="{{ $stockScope }}" data-current-stock="{{ $variant->stock }}">
                         <div class="sv-photo-cell">
                             <span class="sv-cell-label">Produk</span>
                             @if($product?->image_url)
@@ -384,6 +491,21 @@
                             </div>
                         </div>
                         <div class="sv-metrics">
+                            <div class="sv-metric sv-mp-stock-cell">
+                                <span class="sv-cell-label">Stok Marketplace</span>
+                                <span class="sv-mp-stock @if($variant->stock < 0) is-negative @elseif($variant->stock === 0) is-zero @else is-available @endif" data-mp-stock-val>
+                                    {{ number_format($variant->stock) }}
+                                </span>
+                                <div class="sv-meta">
+                                    @if($variant->stock < 0)
+                                        <span class="text-danger fw-bold">Minus {{ abs($variant->stock) }}</span>
+                                    @elseif($variant->stock === 0)
+                                        <span class="text-muted">Kosong (0)</span>
+                                    @else
+                                        <span class="text-primary fw-bold">Ada stok</span>
+                                    @endif
+                                </div>
+                            </div>
                             <div class="sv-metric sv-internal-cell">
                                 <span class="sv-cell-label">Stok internal</span>
                                 <span class="sv-internal">{{ number_format($available, 0, ',', '.') }}</span>
@@ -395,13 +517,13 @@
                             </div>
                         </div>
                         <div class="sv-action">
-                            <span class="sv-cell-label">Stok marketplace baru</span>
+                            <span class="sv-cell-label">Update Stok</span>
                             <form class="sv-stock-form" data-stock-form data-product-id="{{ $product?->id }}" data-model-id="{{ $variant->model_id }}">
-                                <label class="visually-hidden" for="stock-{{ $variant->id }}">Stok baru {{ $variant->model_name }}</label>
-                                <input class="sv-stock-input" id="stock-{{ $variant->id }}" name="stock" type="number" min="0" step="1" value="{{ $available }}" required inputmode="numeric">
-                                <button class="sv-save" type="submit"><i class="bi bi-cloud-arrow-up"></i><span>Simpan</span></button>
+                                <label class="visually-hidden" for="stock-{{ $variant->id }}">Update stok {{ $variant->model_name }}</label>
+                                <input class="sv-stock-input" id="stock-{{ $variant->id }}" name="stock" type="number" min="0" step="1" value="{{ $stockScope === 'internal_empty_marketplace_stock' ? 0 : $available }}" required inputmode="numeric">
+                                <button class="sv-save" type="submit" title="Kirim perubahan stok ke marketplace"><i class="bi bi-cloud-arrow-up"></i><span>Simpan</span></button>
                             </form>
-                            <span class="sv-status" data-stock-status aria-live="polite">Stok saat ini: {{ number_format($variant->stock) }}</span>
+                            <span class="sv-status" data-stock-status aria-live="polite"></span>
                         </div>
                     </article>
                 @empty
@@ -468,15 +590,26 @@
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
                 const previous = Number(row.dataset.currentStock || 0);
+                const isInternalEmptyAudit = row.dataset.stockScope === 'internal_empty_marketplace_stock';
                 status.textContent = 'Stok berhasil dikirim.';
                 status.className = 'sv-status ok';
                 row.dataset.currentStock = String(stock);
-                if (stock > 0) {
+                const mpStockVal = row.querySelector('[data-mp-stock-val]');
+                if (mpStockVal) {
+                    mpStockVal.textContent = stock.toLocaleString('id-ID');
+                    mpStockVal.className = `sv-mp-stock ${stock === 0 ? 'is-zero' : (stock < 0 ? 'is-negative' : 'is-available')}`;
+                }
+                if (isInternalEmptyAudit && stock === 0) {
+                    setCount('total', -1);
+                    setCount('internal_empty', -1);
+                    row.remove();
+                    showEmpty();
+                } else if (!isInternalEmptyAudit && stock > 0) {
                     setCount('total', -1);
                     setCount(previous < 0 ? 'negative' : 'zero', -1);
                     row.remove();
                     showEmpty();
-                } else if (previous < 0 && stock === 0) {
+                } else if (!isInternalEmptyAudit && previous < 0 && stock === 0) {
                     setCount('negative', -1);
                     setCount('zero', 1);
                     status.textContent = 'Tersimpan · stok masih 0.';

@@ -14,6 +14,11 @@ use Illuminate\View\View;
 
 class EmptyVariantDashboardController extends Controller
 {
+    private const STOCK_SCOPES = [
+        'marketplace_empty',
+        'internal_empty_marketplace_stock',
+    ];
+
     private const CHANNEL_CODES = [
         'SHOPEE', 'SHP', 'shopee', 'shp',
         'TIKTOK', 'TTK', 'TT', 'tiktok', 'ttk', 'tt',
@@ -21,6 +26,9 @@ class EmptyVariantDashboardController extends Controller
 
     public function __invoke(Request $request): View
     {
+        $stockScope = in_array($request->query('stock_scope'), self::STOCK_SCOPES, true)
+            ? (string) $request->query('stock_scope')
+            : 'marketplace_empty';
         $stockStatus = in_array($request->query('stock_status'), ['zero', 'negative'], true)
             ? (string) $request->query('stock_status')
             : '';
@@ -34,8 +42,16 @@ class EmptyVariantDashboardController extends Controller
             ? min(1_000_000, max(0, (float) $averageSalesInput))
             : 0.0;
         $inventoryAverageSales = $this->inventoryAverageSalesExpression();
+        $inventoryAvailableStock = $this->inventoryAvailableStockExpression();
+        $stores = $this->connectedStores($channel);
+        $connectedStoreIds = $stores->pluck('id');
 
-        $scopedQuery = $this->mappedEmptyStockQuery()
+        if ($storeId > 0 && ! $connectedStoreIds->contains($storeId)) {
+            $storeId = 0;
+        }
+
+        $baseScopedQuery = $this->mappedEmptyStockQuery()
+            ->whereIn('mp_stock.store_id', $connectedStoreIds)
             ->when($storeId > 0, fn (Builder $query) => $query->where('mp_stock.store_id', $storeId))
             ->when($channel === 'tiktok', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['tiktok', 'ttk', 'tt']))
             ->when($channel === 'shopee', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['shopee', 'shp']))
@@ -50,25 +66,45 @@ class EmptyVariantDashboardController extends Controller
                 });
             });
 
-        $aggregate = (clone $scopedQuery)
-            ->selectRaw('COUNT(*) as total')
+        $aggregate = (clone $baseScopedQuery)
+            ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock <= 0 THEN 1 ELSE 0 END) as empty_total')
             ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock = 0 THEN 1 ELSE 0 END) as zero_count')
             ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock < 0 THEN 1 ELSE 0 END) as negative_count')
-            ->selectRaw('COUNT(DISTINCT marketplace_product_models.marketplace_product_id) as product_count')
+            ->selectRaw("SUM(CASE WHEN marketplace_product_models.stock > 0 AND ({$inventoryAvailableStock} <= 0) THEN 1 ELSE 0 END) as internal_empty_mp_stock_count")
+            ->selectRaw('COUNT(DISTINCT CASE WHEN marketplace_product_models.stock <= 0 THEN marketplace_product_models.marketplace_product_id END) as empty_product_count')
+            ->selectRaw("COUNT(DISTINCT CASE WHEN marketplace_product_models.stock > 0 AND ({$inventoryAvailableStock} <= 0) THEN marketplace_product_models.marketplace_product_id END) as internal_empty_product_count")
             ->toBase()
             ->first();
+
+        $emptyTotal = (int) ($aggregate->empty_total ?? 0);
+        $zeroCount = (int) ($aggregate->zero_count ?? 0);
+        $negativeCount = (int) ($aggregate->negative_count ?? 0);
+        $internalEmptyCount = (int) ($aggregate->internal_empty_mp_stock_count ?? 0);
+
         $summary = [
-            'total' => (int) ($aggregate->total ?? 0),
-            'zero' => (int) ($aggregate->zero_count ?? 0),
-            'negative' => (int) ($aggregate->negative_count ?? 0),
-            'products' => (int) ($aggregate->product_count ?? 0),
+            'total' => $stockScope === 'internal_empty_marketplace_stock' ? $internalEmptyCount : $emptyTotal,
+            'empty_total' => $emptyTotal,
+            'zero' => $zeroCount,
+            'negative' => $negativeCount,
+            'marketplace_available' => $internalEmptyCount,
+            'internal_empty_mp_stock' => $internalEmptyCount,
+            'products' => $stockScope === 'internal_empty_marketplace_stock'
+                ? (int) ($aggregate->internal_empty_product_count ?? 0)
+                : (int) ($aggregate->empty_product_count ?? 0),
         ];
 
-        $variantsQuery = clone $scopedQuery;
-        if ($stockStatus === 'zero') {
-            $variantsQuery->where('marketplace_product_models.stock', 0);
-        } elseif ($stockStatus === 'negative') {
-            $variantsQuery->where('marketplace_product_models.stock', '<', 0);
+        $variantsQuery = clone $baseScopedQuery;
+        if ($stockScope === 'internal_empty_marketplace_stock') {
+            $variantsQuery
+                ->where('marketplace_product_models.stock', '>', 0)
+                ->whereRaw($inventoryAvailableStock.' <= 0');
+        } else {
+            $variantsQuery->where('marketplace_product_models.stock', '<=', 0);
+            if ($stockStatus === 'zero') {
+                $variantsQuery->where('marketplace_product_models.stock', 0);
+            } elseif ($stockStatus === 'negative') {
+                $variantsQuery->where('marketplace_product_models.stock', '<', 0);
+            }
         }
 
         $variants = $variantsQuery
@@ -86,17 +122,11 @@ class EmptyVariantDashboardController extends Controller
 
         $this->attachMappingsAndInternalStocks($variants->getCollection());
 
-        $stores = Store::query()
-            ->where('status', 'active')
-            ->whereHas('channel', fn (Builder $query) => $query->whereIn('code', self::CHANNEL_CODES))
-            ->with('channel:id,code,name')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'channel_id']);
-
         return view('marketplace.empty-variants', compact(
             'variants',
             'stores',
             'summary',
+            'stockScope',
             'stockStatus',
             'channel',
             'search',
@@ -115,7 +145,6 @@ class EmptyVariantDashboardController extends Controller
             ->where('marketplace_product_models.model_id', '!=', '0')
             ->whereNotNull('marketplace_product_models.model_sku')
             ->whereRaw("TRIM(marketplace_product_models.model_sku) != ''")
-            ->where('marketplace_product_models.stock', '<=', 0)
             ->whereExists(function ($mapping): void {
                 $mapping->selectRaw('1')
                     ->from('sku_mappings as sm_stock')
@@ -145,6 +174,43 @@ COALESCE((
     LIMIT 1
 ), 0)
 SQL;
+    }
+
+    private function inventoryAvailableStockExpression(): string
+    {
+        return <<<'SQL'
+COALESCE((
+    SELECT COALESCE(SUM(internal_stock.qty), 0) - COALESCE(SUM(internal_stock.allocated_qty), 0)
+    FROM inventory_stocks AS internal_stock
+    WHERE internal_stock.item_id = (
+        SELECT availability_mapping.item_id
+        FROM sku_mappings AS availability_mapping
+        WHERE availability_mapping.marketplace_sku = marketplace_product_models.model_sku
+          AND (
+            availability_mapping.channel_code IS NULL
+            OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(availability_mapping.channel_code) IN ('shopee', 'shp'))
+            OR (LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(availability_mapping.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))
+          )
+        ORDER BY CASE WHEN availability_mapping.channel_code IS NULL THEN 1 ELSE 0 END
+        LIMIT 1
+    )
+), 0)
+SQL;
+    }
+
+    private function connectedStores(?string $channel = null): Collection
+    {
+        return Store::query()
+            ->where('status', 'active')
+            ->where('is_active', true)
+            ->whereHas('channel', fn (Builder $query) => $query->whereIn('code', self::CHANNEL_CODES))
+            ->when($channel === 'tiktok', fn (Builder $query) => $query->whereHas('channel', fn ($q) => $q->whereIn(DB::raw('LOWER(code)'), ['tiktok', 'ttk', 'tt'])))
+            ->when($channel === 'shopee', fn (Builder $query) => $query->whereHas('channel', fn ($q) => $q->whereIn(DB::raw('LOWER(code)'), ['shopee', 'shp'])))
+            ->with('channel:id,code,name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'channel_id', 'credentials', 'token_expires_at', 'status', 'is_active'])
+            ->filter(fn (Store $store): bool => (bool) $store->is_active && strtolower(trim((string) $store->status)) === 'active' && $store->connection_status === 'CONNECTED')
+            ->values();
     }
 
     private function attachMappingsAndInternalStocks(Collection $variants): void

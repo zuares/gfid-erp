@@ -25,7 +25,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
     {
         $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-EMPTY-STOCK']);
         $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
-        $store = Store::create(['channel_id' => $channel->id, 'code' => 'TTK-EMPTY-STOCK', 'name' => 'TikTok Stock Audit', 'status' => 'active', 'is_active' => true]);
+        $store = Store::create(['channel_id' => $channel->id, 'code' => 'TTK-EMPTY-STOCK', 'name' => 'TikTok Stock Audit', 'status' => 'active', 'is_active' => true, 'credentials' => ['access_token' => 'tiktok-empty-stock-token']]);
         $product = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'product-variants', 'item_name' => 'Jaket Multi Variant', 'item_status' => 'NORMAL', 'has_model' => true]);
 
         $mappedItem = Item::create(['code' => 'JACKET-BLK-M', 'name' => 'Jaket Hitam M', 'unit' => 'pcs', 'type' => 'finished']);
@@ -49,6 +49,13 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->get(route('marketplace.products.empty-variants'))
             ->assertOk()
             ->assertSee('Stok Variant Kosong')
+            ->assertSee('Variant perlu diperbarui')
+            ->assertSee('Pilih Toko:')
+            ->assertSee('Stok MP')
+            ->assertSee('Update Stok')
+            ->assertSee('Stok Kosong tapi di Marketplace Ada Stok')
+            ->assertSee('data-mp-stock-val', false)
+            ->assertDontSee('Stok saat ini:', false)
             ->assertSee('Hitam / M')
             ->assertSee('JACKET-BLK-M')
             ->assertSee('data-stock-form', false)
@@ -79,7 +86,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
     {
         $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-GLOBAL-MAPPING']);
         $channel = Channel::create(['code' => 'SHOPEE', 'name' => 'Shopee']);
-        $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-EMPTY-STOCK', 'name' => 'Shopee Stock Audit', 'status' => 'active', 'is_active' => true]);
+        $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-EMPTY-STOCK', 'name' => 'Shopee Stock Audit', 'status' => 'active', 'is_active' => true, 'credentials' => ['access_token' => 'shopee-empty-stock-token']]);
         $product = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'product-global', 'item_name' => 'Celana Variant', 'item_status' => 'NORMAL', 'has_model' => true]);
         $item = Item::create(['code' => 'PANTS-NAVY-XL', 'name' => 'Celana Navy XL', 'unit' => 'pcs', 'type' => 'finished']);
         DB::table('items')->where('id', $item->id)->update(['avg_daily_sales' => 1, 'avg_daily_sales_window' => 30]);
@@ -98,7 +105,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
     {
         $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-AVG-SALES']);
         $channel = Channel::create(['code' => 'SHOPEE', 'name' => 'Shopee']);
-        $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-AVG-SALES', 'name' => 'Shopee Average Sales', 'status' => 'active', 'is_active' => true]);
+        $store = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-AVG-SALES', 'name' => 'Shopee Average Sales', 'status' => 'active', 'is_active' => true, 'credentials' => ['access_token' => 'shopee-average-sales-token']]);
 
         $fastProduct = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'fast-product', 'item_name' => 'Produk Cepat', 'item_status' => 'NORMAL', 'has_model' => true]);
         $fastItem = Item::create(['code' => 'FAST-M', 'name' => 'Fast M', 'unit' => 'pcs', 'type' => 'finished']);
@@ -141,6 +148,43 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $this->actingAs($owner)->get(route('marketplace.products.empty-variants'))->assertOk()->assertDontSee('Produk Single SKU');
     }
 
+    public function test_dashboard_only_shows_connected_active_stores_and_can_audit_internal_empty_stock(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-STOCK-MISMATCH']);
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $connectedStore = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-CONNECTED', 'name' => 'Toko API Terhubung', 'status' => 'active', 'is_active' => true, 'credentials' => ['access_token' => 'connected-token']]);
+        $disconnectedStore = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-DISCONNECTED', 'name' => 'Toko Tidak Terhubung', 'status' => 'active', 'is_active' => true]);
+        $inactiveStore = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-INACTIVE', 'name' => 'Toko Nonaktif', 'status' => 'active', 'is_active' => false, 'credentials' => ['access_token' => 'inactive-token']]);
+        $inactiveStatusStore = Store::create(['channel_id' => $channel->id, 'code' => 'SHP-INACTIVE-STATUS', 'name' => 'Toko Status Inactive', 'status' => 'inactive', 'is_active' => true, 'credentials' => ['access_token' => 'status-token']]);
+
+        $auditedItem = Item::create(['code' => 'AUDIT-EMPTY', 'name' => 'Audit Internal Kosong', 'unit' => 'pcs', 'type' => 'finished']);
+        DB::table('items')->where('id', $auditedItem->id)->update(['avg_daily_sales' => 2, 'avg_daily_sales_window' => 30]);
+        SkuMapping::create(['marketplace_sku' => 'AUDIT-EMPTY', 'channel_code' => 'shopee', 'item_id' => $auditedItem->id]);
+        $connectedProduct = MarketplaceProduct::create(['store_id' => $connectedStore->id, 'item_id' => 'audit-connected', 'item_name' => 'Variant Audit Terhubung', 'item_status' => 'NORMAL', 'has_model' => true]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $connectedProduct->id, 'model_id' => 'audit-model', 'model_name' => 'Audit / M', 'model_sku' => 'AUDIT-EMPTY', 'stock' => 7]);
+
+        $hiddenItem = Item::create(['code' => 'AUDIT-HIDDEN', 'name' => 'Audit Hidden', 'unit' => 'pcs', 'type' => 'finished']);
+        DB::table('items')->where('id', $hiddenItem->id)->update(['avg_daily_sales' => 2, 'avg_daily_sales_window' => 30]);
+        SkuMapping::create(['marketplace_sku' => 'AUDIT-HIDDEN', 'channel_code' => 'shopee', 'item_id' => $hiddenItem->id]);
+        $disconnectedProduct = MarketplaceProduct::create(['store_id' => $disconnectedStore->id, 'item_id' => 'audit-disconnected', 'item_name' => 'Variant Tidak Terhubung', 'item_status' => 'NORMAL', 'has_model' => true]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $disconnectedProduct->id, 'model_id' => 'hidden-model', 'model_name' => 'Hidden / M', 'model_sku' => 'AUDIT-HIDDEN', 'stock' => 9]);
+        $inactiveProduct = MarketplaceProduct::create(['store_id' => $inactiveStore->id, 'item_id' => 'audit-inactive', 'item_name' => 'Variant Nonaktif', 'item_status' => 'NORMAL', 'has_model' => true]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $inactiveProduct->id, 'model_id' => 'inactive-model', 'model_name' => 'Inactive / M', 'model_sku' => 'AUDIT-HIDDEN', 'stock' => 9]);
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'internal_empty_marketplace_stock']))
+            ->assertOk()
+            ->assertSee('Toko API Terhubung')
+            ->assertDontSee('Toko Tidak Terhubung')
+            ->assertDontSee('Toko Nonaktif')
+            ->assertDontSee('Toko Status Inactive')
+            ->assertSee('Variant Audit Terhubung')
+            ->assertSee('Audit mismatch: stok internal kosong, tetapi marketplace masih menjual variant ini.')
+            ->assertSee('data-stock-scope="internal_empty_marketplace_stock"', false)
+            ->assertDontSee('Variant Tidak Terhubung')
+            ->assertDontSee('Variant Nonaktif');
+    }
+
     public function test_guest_cannot_open_empty_variant_dashboard(): void
     {
         $this->get(route('marketplace.products.empty-variants'))->assertRedirect();
@@ -167,5 +211,23 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('success', true);
+    }
+
+    public function test_sidebar_displays_empty_variants_link_for_owner_and_admin(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-SIDEBAR-EMPTY-VARIANTS']);
+        $admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADMIN-SIDEBAR-EMPTY-VARIANTS']);
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.products.empty-variants'))
+            ->assertOk()
+            ->assertSee(route('marketplace.products.empty-variants'), false)
+            ->assertSee('Variant Stok Kosong');
+
+        $this->actingAs($admin)
+            ->get(route('marketplace.products.empty-variants'))
+            ->assertOk()
+            ->assertSee(route('marketplace.products.empty-variants'), false)
+            ->assertSee('Variant Stok Kosong');
     }
 }

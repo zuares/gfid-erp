@@ -102,6 +102,8 @@
     $hasMarketplacePemenuhan = $router->has('marketplace.fulfillment');
     $hasMarketplacePickingBarang     = $router->has('marketplace.picking');
     $hasMarketplaceSkuMapping  = $router->has('marketplace.sku-mapping');
+    $hasMarketplaceProducts    = $router->has('marketplace.products');
+    $hasMarketplaceEmptyVariants = $router->has('marketplace.products.empty-variants');
     $hasMarketplaceSync        = $router->has('marketplace.sync');
     $hasMarketplacePromotions  = $router->has('marketplace.promotions');
     $hasMarketplacePromotionsSummary  = $router->has('marketplace.promotions.summary');
@@ -237,7 +239,7 @@
     $canModule = fn (string $module) => $user ? $user->canAccessModule($module) : false;
     $hasDashboardRoute = $hasDashboardRoute && $canModule('dashboard');
     $hasCashExpensesIndex = $hasCashExpensesIndex && $canModule('cash-expenses');
-    $hasStandaloneAccounting = $hasStandaloneAccounting && $isAdmin;
+    $hasStandaloneAccounting = $hasStandaloneAccounting && ($isAdmin || $isOwner);
 
     if (!$canModule('inventory')) {
         $hasInvStocksItems = $hasInvStocksLots = $hasInvStockCard = false;
@@ -353,6 +355,7 @@
     $openMarketplaceCatalogGroup =
         $open('marketplace.toko') ||
         $open('marketplace.products') ||
+        $open('marketplace.products.*') ||
         $open('marketplace.sku-mapping') ||
         $open('marketplace.promotions') ||
         $open('marketplace.promotions.*') ||
@@ -389,6 +392,8 @@
         $open('marketplace.settings') ||
         $open('marketplace.orders') ||
         $open('marketplace.orders.*') ||
+        $open('marketplace.products') ||
+        $open('marketplace.products.*') ||
         $open('marketplace.fulfillment') ||
         $open('marketplace.fulfillment.*') ||
         $open('marketplace.picking') ||
@@ -1414,7 +1419,7 @@
             @endif
 
             {{-- Toko Online --}}
-            @if ($canShow($hasMarketplaceIndex, $router->has('marketplace.products'), $hasMarketplacePromotions, $hasMarketplacePromotionsSummary, $hasMarketplaceSalesReport, $hasMarketplaceSalesDashboard, $hasMarketplaceFinance, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
+            @if ($canShow($hasMarketplaceIndex, $hasMarketplaceProducts, $hasMarketplaceEmptyVariants, $hasMarketplacePromotions, $hasMarketplacePromotionsSummary, $hasMarketplaceSalesReport, $hasMarketplaceSalesDashboard, $hasMarketplaceFinance, $hasMarketplaceReconcileQueue, $hasMarketplaceReconcileItemsIndex))
                 <x-sidebar.label text="Toko Online" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openMarketplaceTools ? 'is-open' : '' }}" type="button"
@@ -1449,7 +1454,7 @@
                             </div>
                         @endif
 
-                        @if ($router->has('marketplace.products') || $router->has('marketplace.boost') || $hasMarketplacePromotions || $hasMarketplacePromotionsSummary)
+                        @if ($hasMarketplaceProducts || $hasMarketplaceEmptyVariants || $router->has('marketplace.boost') || $hasMarketplacePromotions || $hasMarketplacePromotionsSummary)
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ $openMarketplaceCatalogGroup ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceAdminCatalog"
                                 aria-expanded="{{ $openMarketplaceCatalogGroup ? 'true' : 'false' }}" aria-controls="navMarketplaceAdminCatalog">
@@ -1458,10 +1463,16 @@
                                 <span class="chevron">▸</span>
                             </button>
                             <div class="collapse sidebar-nested-collapse {{ $openMarketplaceCatalogGroup ? 'show' : '' }}" id="navMarketplaceAdminCatalog">
-                                @if ($router->has('marketplace.products'))
+                                @if ($hasMarketplaceProducts)
                                     <x-sidebar.sub-link href="{{ route('marketplace.products') }}" icon="bi bi-tags"
                                         :active="request()->routeIs('marketplace.products')">
                                         Produk
+                                    </x-sidebar.sub-link>
+                                @endif
+                                @if ($hasMarketplaceEmptyVariants)
+                                    <x-sidebar.sub-link href="{{ route('marketplace.products.empty-variants') }}" icon="bi bi-box-seam"
+                                        :active="request()->routeIs('marketplace.products.empty-variants')">
+                                        Variant Stok Kosong
                                     </x-sidebar.sub-link>
                                 @endif
                                 @if (!$isAdmin && $router->has('marketplace.boost'))
@@ -2153,7 +2164,7 @@
                     </button>
 
                     <div class="collapse {{ $openMarketplaceTools ? 'show' : '' }}" id="navMarketplaceOwner">
-                        @if ($canShow($hasMarketplaceToko, $hasMarketplaceOrders, $hasMarketplaceCreate, $hasMarketplacePemenuhan, $hasMarketplacePickingBarang, $router->has('marketplace.products'), $router->has('marketplace.boost'), $hasMarketplacePromotions, $hasMarketplacePromotionsSummary))
+                        @if ($canShow($hasMarketplaceToko, $hasMarketplaceOrders, $hasMarketplaceCreate, $hasMarketplacePemenuhan, $hasMarketplacePickingBarang, $hasMarketplaceProducts, $hasMarketplaceEmptyVariants, $router->has('marketplace.boost'), $hasMarketplacePromotions, $hasMarketplacePromotionsSummary))
                             <button class="sidebar-link sidebar-toggle sidebar-nested-toggle {{ ($openMarketplaceOrderGroup || $openMarketplaceCatalogGroup) ? 'is-open' : '' }}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#navMarketplaceOwnerOperational"
                                 aria-expanded="{{ ($openMarketplaceOrderGroup || $openMarketplaceCatalogGroup) ? 'true' : 'false' }}" aria-controls="navMarketplaceOwnerOperational">
@@ -2196,10 +2207,16 @@
                                 Order Manual
                             </x-sidebar.sub-link>
                         @endif
-                        @if ($router->has('marketplace.products'))
+                        @if ($hasMarketplaceProducts)
                             <x-sidebar.sub-link href="{{ route('marketplace.products') }}" icon="bi bi-tags"
                                 :active="request()->routeIs('marketplace.products')">
                                 Produk
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceEmptyVariants)
+                            <x-sidebar.sub-link href="{{ route('marketplace.products.empty-variants') }}" icon="bi bi-box-seam"
+                                :active="request()->routeIs('marketplace.products.empty-variants')">
+                                Variant Stok Kosong
                             </x-sidebar.sub-link>
                         @endif
                         @if ($router->has('marketplace.boost'))
