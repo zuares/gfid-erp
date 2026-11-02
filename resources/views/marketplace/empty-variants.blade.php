@@ -308,9 +308,13 @@
     .sv-save-feedback.error i { color: var(--sv-danger); }
     .sv-confirm-dialog {
         width: min(420px, calc(100% - 1.5rem)); margin: auto; padding: 0; overflow: hidden;
-        border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card); background: var(--sv-surface);
+        border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card);
+        /* Keep the dialog surface above the dimmed backdrop; native dialog styles can otherwise bleed through. */
+        background: var(--sv-surface, #fff) !important; background-color: var(--sv-surface, #fff) !important;
+        opacity: 1 !important; isolation: isolate;
         box-shadow: 0 24px 70px rgba(16, 24, 40, .26); color: var(--sv-content);
     }
+    .sv-confirm-dialog > form { background: var(--sv-surface, #fff); opacity: 1; }
     .sv-confirm-dialog::backdrop { background: rgba(16, 24, 40, .46); backdrop-filter: blur(2px); }
     .sv-confirm-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: 1rem 1rem .7rem; }
     .sv-confirm-kicker { display: flex; align-items: center; gap: .4rem; color: var(--sv-brand-strong); font-size: .65rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
