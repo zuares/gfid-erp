@@ -307,32 +307,38 @@
     .sv-save-feedback.success i { color: var(--sv-success); }
     .sv-save-feedback.error i { color: var(--sv-danger); }
     .sv-confirm-dialog {
-        width: min(420px, calc(100% - 1.5rem)); margin: auto; padding: 0; overflow: hidden;
+        width: min(440px, calc(100% - 1.5rem)); max-height: min(720px, calc(100dvh - 2rem)); margin: auto; padding: 0; overflow: hidden;
         border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card);
         /* Keep the dialog surface above the dimmed backdrop; native dialog styles can otherwise bleed through. */
         background: var(--sv-surface, #fff) !important; background-color: var(--sv-surface, #fff) !important;
         opacity: 1 !important; isolation: isolate;
         box-shadow: 0 24px 70px rgba(16, 24, 40, .26); color: var(--sv-content);
     }
-    .sv-confirm-dialog > form { background: var(--sv-surface, #fff); opacity: 1; }
+    .sv-confirm-dialog > form {
+        display: flex; min-height: 0; max-height: inherit; flex-direction: column;
+        background: var(--sv-surface, #fff); opacity: 1;
+    }
     .sv-confirm-dialog::backdrop { background: rgba(16, 24, 40, .46); backdrop-filter: blur(2px); }
-    .sv-confirm-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: 1rem 1rem .7rem; }
-    .sv-confirm-kicker { display: flex; align-items: center; gap: .4rem; color: var(--sv-brand-strong); font-size: .65rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
-    .sv-confirm-title { margin: .24rem 0 0; color: var(--sv-content); font-size: .96rem; font-weight: 850; }
+    .sv-confirm-head { display: flex; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: 1.15rem 1.25rem .85rem; }
+    .sv-confirm-kicker { display: flex; align-items: center; gap: .45rem; color: var(--sv-brand-strong); font-size: .65rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+    .sv-confirm-kicker-icon { display: inline-grid; width: 1.65rem; height: 1.65rem; flex: 0 0 auto; place-items: center; border-radius: .55rem; background: color-mix(in srgb, var(--sv-brand) 11%, var(--sv-surface)); color: var(--sv-brand); font-size: .78rem; }
+    .sv-confirm-title { margin: .35rem 0 0; color: var(--sv-content); font-size: clamp(1rem, 3vw, 1.12rem); font-weight: 850; letter-spacing: -.025em; line-height: 1.2; }
     .sv-confirm-close {
-        display: inline-grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border: 0;
+        display: inline-grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border: 1px solid transparent;
         border-radius: 50%; background: transparent; color: var(--sv-muted); font-size: 1rem;
     }
-    .sv-confirm-close:hover { background: var(--sv-soft); color: var(--sv-content); }
-    .sv-confirm-body { padding: .1rem 1rem 1rem; }
+    .sv-confirm-close:hover { border-color: var(--sv-line); background: var(--sv-soft); color: var(--sv-content); }
+    .sv-confirm-close:focus-visible, .sv-confirm-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--sv-brand) 28%, transparent); outline-offset: 2px; }
+    .sv-confirm-body { min-height: 0; overflow-y: auto; padding: .1rem 1.25rem 1.25rem; overscroll-behavior: contain; }
     .sv-confirm-copy { margin: 0; color: var(--sv-muted); font-size: .76rem; line-height: 1.5; }
-    .sv-confirm-detail { display: grid; grid-template-columns: 1fr auto; gap: .55rem 1rem; margin: .85rem 0 0; padding: .75rem; border-radius: var(--sv-radius-control); background: var(--sv-soft); }
+    .sv-confirm-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: .7rem 1rem; margin: 1rem 0 0; padding: .85rem; border: 1px solid color-mix(in srgb, var(--sv-line) 80%, transparent); border-radius: var(--sv-radius-control); background: var(--sv-soft); }
     .sv-confirm-detail dt { color: var(--sv-muted); font-size: .64rem; font-weight: 750; }
-    .sv-confirm-detail dd { max-width: 210px; margin: 0; overflow: hidden; color: var(--sv-content); font-size: .72rem; font-weight: 800; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+    .sv-confirm-detail dd { min-width: 0; margin: 0; overflow: hidden; color: var(--sv-content); font-size: .72rem; font-weight: 800; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
     .sv-confirm-stock { color: var(--sv-success) !important; font-variant-numeric: tabular-nums; }
-    .sv-confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; padding: .8rem 1rem 1rem; border-top: 1px solid var(--sv-line); }
-    .sv-confirm-button { min-height: 42px; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control); background: var(--sv-surface); color: var(--sv-content); font-size: .75rem; font-weight: 800; }
-    .sv-confirm-button:hover { background: var(--sv-soft); }
+    .sv-confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; flex: 0 0 auto; padding: .9rem 1.25rem max(1rem, env(safe-area-inset-bottom)); border-top: 1px solid var(--sv-line); background: var(--sv-surface); }
+    .sv-confirm-button { min-height: 44px; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control); background: var(--sv-surface); color: var(--sv-content); font-size: .75rem; font-weight: 800; }
+    .sv-confirm-button :where(i, span) { color: inherit; }
+    .sv-confirm-button:hover { border-color: color-mix(in srgb, var(--sv-brand) 26%, var(--sv-line)); background: var(--sv-soft); }
     .sv-confirm-button--primary { border-color: var(--sv-brand); background: var(--sv-brand); color: #fff; }
     .sv-confirm-button--primary:hover { border-color: var(--sv-brand-strong); background: var(--sv-brand-strong); }
     .sv-empty {
@@ -406,6 +412,16 @@
         .sv-stock-form { grid-template-columns: 74px auto; }
         .sv-stock-input { min-height: 38px; font-size: .78rem; }
         .sv-save { min-height: 38px; padding-inline: .7rem; }
+    }
+    @media (max-width: 575.98px) {
+        .sv-confirm-dialog { width: calc(100% - 1rem); max-height: calc(100dvh - 1rem); border-radius: 18px; }
+        .sv-confirm-head { padding: 1rem 1rem .75rem; }
+        .sv-confirm-body { padding-inline: 1rem; }
+        .sv-confirm-detail { grid-template-columns: 1fr; gap: .2rem; }
+        .sv-confirm-detail dt:not(:first-child) { margin-top: .55rem; }
+        .sv-confirm-detail dd { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+        .sv-confirm-actions { grid-template-columns: 1fr; padding-inline: 1rem; }
+        .sv-confirm-button--primary { order: -1; }
     }
     @media (prefers-reduced-motion: reduce) {
         .sv-dashboard-content, .sv-record, .sv-save-feedback { transition: none; }
@@ -690,7 +706,7 @@
     <form method="dialog">
         <div class="sv-confirm-head">
             <div>
-                <span class="sv-confirm-kicker"><i class="bi bi-cloud-arrow-up"></i> Konfirmasi pembaruan</span>
+                <span class="sv-confirm-kicker"><span class="sv-confirm-kicker-icon" aria-hidden="true"><i class="bi bi-cloud-arrow-up"></i></span> Konfirmasi pembaruan</span>
                 <h2 class="sv-confirm-title" id="svStockConfirmTitle">Simpan stok ke marketplace?</h2>
             </div>
             <button class="sv-confirm-close" type="submit" value="cancel" aria-label="Batalkan pembaruan stok"><i class="bi bi-x-lg"></i></button>
