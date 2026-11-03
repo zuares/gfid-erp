@@ -29,7 +29,7 @@ class EmptyVariantDashboardController extends Controller
     {
         $stockScope = in_array($request->query('stock_scope'), self::STOCK_SCOPES, true)
             ? (string) $request->query('stock_scope')
-            : 'all';
+            : 'marketplace_empty';
         $stockStatus = in_array($request->query('stock_status'), ['zero', 'negative'], true)
             ? (string) $request->query('stock_status')
             : 'zero';

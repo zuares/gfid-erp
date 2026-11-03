@@ -57,7 +57,7 @@
         border-radius: 999px; background: linear-gradient(90deg, transparent, var(--sv-brand), transparent);
         background-size: 45% 100%; animation: sv-loading 1s linear infinite;
     }
-    .sv-filter, .sv-panel {
+    .sv-panel {
         border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card);
         background: var(--sv-surface); box-shadow: var(--sv-shadow);
     }
@@ -107,7 +107,7 @@
     .sv-scope-btn--warning.active .sv-badge { background: var(--sv-warning); color: #fff; }
     .sv-filter {
         display: grid; grid-template-columns: minmax(0, 1fr); gap: .65rem;
-        margin-bottom: .75rem; padding: .75rem;
+        grid-column: 1 / -1; margin: 0; padding: 0;
     }
     .sv-filter-head { display: flex; align-items: center; gap: .4rem; grid-column: 1 / -1; }
     .sv-filter-title { display: flex; align-items: center; gap: .4rem; margin: 0; color: var(--sv-content); font-size: .78rem; font-weight: 800; }
@@ -139,7 +139,7 @@
     .sv-panel-head { display: grid; gap: .7rem; padding: .9rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
     .sv-panel-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; min-width: 0; }
     .sv-panel-title-row > div { min-width: 0; }
-    .sv-store-picker-row { display: block; padding-top: .7rem; border-top: 1px solid var(--sv-line); }
+    .sv-store-picker-row { display: block; padding-top: .15rem; }
     .sv-store-picker { display: grid; gap: .55rem; min-width: 0; }
     .sv-store-platform-tabs { display: flex; gap: .25rem; max-width: 100%; padding: .2rem; overflow-x: auto; border: 1px solid var(--sv-line); border-radius: 10px; background: var(--sv-soft); scrollbar-width: none; }
     .sv-store-platform-tabs::-webkit-scrollbar { display: none; }
@@ -169,8 +169,8 @@
     }
     .sv-panel-summary {
         display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .55rem; padding: .45rem .6rem;
-        border: 1px solid color-mix(in srgb, var(--sv-line) 82%, transparent); border-radius: 10px;
-        background: color-mix(in srgb, var(--sv-soft) 55%, var(--sv-surface)); color: var(--sv-muted); font-size: .68rem; line-height: 1.35;
+        border: 0; border-radius: 10px;
+        background: var(--sv-soft); color: var(--sv-muted); font-size: .68rem; line-height: 1.35;
     }
     .sv-summary-item {
         display: inline-flex; align-items: center; gap: .25rem; min-height: 26px;
@@ -384,6 +384,7 @@
         .sv-panel-head { grid-template-columns: minmax(190px, .62fr) minmax(0, 1.38fr); align-items: center; }
         .sv-panel-title-row { grid-column: 1; }
         .sv-scope-nav { grid-column: 2; }
+        .sv-filter { grid-column: 1 / -1; }
         .sv-store-picker-row, .sv-panel-summary { grid-column: 1 / -1; }
     }
     @media (min-width: 1120px) {
@@ -511,38 +512,6 @@
     <div class="sv-feedback" id="svFilterFeedback" role="alert" aria-live="assertive"></div>
 
     <div class="sv-dashboard-content" id="svDashboardContent">
-        <form class="sv-filter" method="GET" action="{{ route('marketplace.products.empty-variants') }}" data-realtime-filter>
-            @if($storeId > 0)<input type="hidden" name="store_id" value="{{ $storeId }}">@endif
-            <div class="sv-filter-head">
-                <div>
-                    <h2 class="sv-filter-title"><i class="bi bi-sliders2"></i>Filter</h2>
-                </div>
-            </div>
-            <div class="sv-field sv-search-field">
-                <label class="sv-field-label" for="svSearch">Cari variant / SKU</label>
-                <div class="sv-search-wrap"><i class="bi bi-search"></i><input class="form-control sv-control sv-search" id="svSearch" name="search" value="{{ $search }}" maxlength="100" autocomplete="off" placeholder="Nama variant, SKU, atau ID produk"></div>
-            </div>
-            <div class="sv-field">
-                <label class="sv-field-label" for="svChannel">Channel</label>
-                <select class="form-select sv-control" id="svChannel" name="channel"><option value="">Semua channel</option><option value="shopee" @selected($channel === 'shopee')>Shopee</option><option value="tiktok" @selected($channel === 'tiktok')>TikTok Shop</option></select>
-            </div>
-            <div class="sv-field">
-                <label class="sv-field-label" for="svSales">Penjualan</label>
-                <select class="form-select sv-control" id="svSales" name="sales_scope">
-                    <option value="best_sellers" @selected($salesScope === 'best_sellers')>Terlaris saja</option>
-                    <option value="all" @selected($salesScope === 'all')>Semua produk</option>
-                </select>
-            </div>
-            <div class="sv-field">
-                <label class="sv-field-label" for="svStock">Stok MP</label>
-                <select class="form-select sv-control" id="svStock" name="stock_status" @disabled($stockScope !== 'marketplace_empty')><option value="zero" @selected($stockStatus === 'zero')>Stok tepat 0</option><option value="negative" @selected($stockStatus === 'negative')>Stok minus</option></select>
-            </div>
-            <div class="sv-field">
-                <label class="sv-field-label" for="svAverage">Rata-rata / hari &gt;</label>
-                <input class="form-control sv-control" id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value="{{ $minAverageSales }}" inputmode="decimal" placeholder="Semua penjualan">
-            </div>
-        </form>
-
         <section class="sv-panel" aria-live="polite" aria-label="Daftar variant stok kosong">
             <div class="sv-panel-head">
                 <div class="sv-panel-title-row">
@@ -553,14 +522,6 @@
                 </div>
 
                 <nav class="sv-scope-nav" aria-label="Mode pemeriksaan stok">
-                    <a class="sv-scope-btn {{ $stockScope === 'all' ? 'active' : '' }}"
-                       aria-current="{{ $stockScope === 'all' ? 'page' : 'false' }}"
-                       data-dashboard-link
-                       href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => null, 'stock_status' => null])) }}">
-                        <i class="bi bi-grid-3x3-gap"></i>
-                        <span>Semua variant</span>
-                        <span class="sv-badge" data-summary="scope_all">{{ number_format($mappedTotal) }}</span>
-                    </a>
                     <a class="sv-scope-btn {{ $stockScope === 'marketplace_empty' ? 'active' : '' }}"
                        aria-current="{{ $stockScope === 'marketplace_empty' ? 'page' : 'false' }}"
                        data-dashboard-link
@@ -578,6 +539,33 @@
                         <span class="sv-badge sv-badge--warning" data-summary="scope_internal_empty">{{ number_format($internalEmptyTotal) }}</span>
                     </a>
                 </nav>
+
+                <form class="sv-filter" method="GET" action="{{ route('marketplace.products.empty-variants') }}" data-realtime-filter>
+                    @if($storeId > 0)<input type="hidden" name="store_id" value="{{ $storeId }}">@endif
+                    <div class="sv-field sv-search-field">
+                        <label class="sv-field-label" for="svSearch">Cari variant / SKU</label>
+                        <div class="sv-search-wrap"><i class="bi bi-search"></i><input class="form-control sv-control sv-search" id="svSearch" name="search" value="{{ $search }}" maxlength="100" autocomplete="off" placeholder="Nama, SKU, atau ID produk"></div>
+                    </div>
+                    <div class="sv-field">
+                        <label class="sv-field-label" for="svChannel">Channel</label>
+                        <select class="form-select sv-control" id="svChannel" name="channel"><option value="">Semua channel</option><option value="shopee" @selected($channel === 'shopee')>Shopee</option><option value="tiktok" @selected($channel === 'tiktok')>TikTok Shop</option></select>
+                    </div>
+                    <div class="sv-field">
+                        <label class="sv-field-label" for="svSales">Penjualan</label>
+                        <select class="form-select sv-control" id="svSales" name="sales_scope">
+                            <option value="best_sellers" @selected($salesScope === 'best_sellers')>Terlaris</option>
+                            <option value="all" @selected($salesScope === 'all')>Semua produk</option>
+                        </select>
+                    </div>
+                    <div class="sv-field">
+                        <label class="sv-field-label" for="svStock">Stok MP</label>
+                        <select class="form-select sv-control" id="svStock" name="stock_status" @disabled($stockScope !== 'marketplace_empty')><option value="zero" @selected($stockStatus === 'zero')>Stok 0</option><option value="negative" @selected($stockStatus === 'negative')>Stok minus</option></select>
+                    </div>
+                    <div class="sv-field">
+                        <label class="sv-field-label" for="svAverage">Terjual / hari &gt;</label>
+                        <input class="form-control sv-control" id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value="{{ $minAverageSales }}" inputmode="decimal" placeholder="Semua">
+                    </div>
+                </form>
 
                 <div class="sv-store-picker-row">
                     <div class="sv-store-picker" data-store-picker data-active-platform="{{ $activeStorePlatform }}">

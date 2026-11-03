@@ -57,6 +57,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertOk()
             ->assertSee('Stok Variant Kosong')
             ->assertSee('Marketplace kosong')
+            ->assertDontSee('>Semua variant<', false)
             ->assertSee('Toko')
             ->assertSee('Stok MP')
             ->assertSee('Update Stok')
@@ -86,8 +87,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('class="sv-item-id"', false)
             ->assertSee('class="sv-record"', false)
             ->assertSee('class="sv-list-head"', false)
-            ->assertSee('Filter')
-            ->assertSee('Terlaris saja')
+            ->assertSee('Terlaris')
             ->assertSee('title="Jaket Multi Variant"', false)
             ->assertSee('ID product-variants')
             ->assertSee('Stok internal')
@@ -102,7 +102,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertDontSee('Hitam / L');
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 0, 'sales_scope' => 'all']))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'all', 'min_avg_sales' => 0, 'sales_scope' => 'all']))
             ->assertOk()
             ->assertSee('Semua variant')
             ->assertSee('Belum Terjual / S')
