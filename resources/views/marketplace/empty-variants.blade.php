@@ -198,7 +198,7 @@
         background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .035);
     }
     .sv-product-toggle {
-        display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; align-items: center; gap: .65rem;
+        display: grid; grid-template-columns: 26px 42px minmax(0, 1fr) auto auto; align-items: center; gap: .65rem;
         width: 100%; min-height: 68px; padding: .65rem 1rem .65rem 1.2rem; border: 0; background: var(--sv-surface);
         color: var(--sv-content); text-align: left; cursor: pointer;
     }
@@ -207,6 +207,12 @@
         display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--sv-line);
         border-radius: 7px; background: var(--sv-soft); color: var(--sv-muted); font-size: .64rem; font-weight: 850; font-variant-numeric: tabular-nums;
     }
+    .sv-product-toggle-icon {
+        position: relative; z-index: 1; display: grid; width: 42px; height: 42px; place-items: center; overflow: visible;
+        border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control);
+        background: var(--sv-soft); color: var(--sv-muted); font-size: .9rem;
+    }
+    .sv-product-toggle-icon img { position: relative; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; transition: transform .18s ease, box-shadow .18s ease; }
     .sv-product-toggle-copy { display: grid; gap: .12rem; min-width: 0; }
     .sv-product-toggle-id {
         overflow: hidden; color: var(--sv-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -224,32 +230,24 @@
     .sv-product-group-body { display: grid; gap: .5rem; padding: .55rem; border-top: 1px solid var(--sv-line); background: color-mix(in srgb, var(--sv-soft) 45%, var(--sv-surface)); }
     .sv-product-group-body[hidden] { display: none; }
     .sv-record {
-        display: grid; grid-template-columns: 52px minmax(0, 1fr);
-        grid-template-areas: 'photo variant' 'support support' 'metrics metrics' 'action action';
+        display: grid; grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: 'variant' 'support' 'metrics' 'action';
         gap: .7rem .75rem; padding: .75rem; border: 1px solid var(--sv-line);
         border-radius: calc(var(--sv-radius-card) - 3px); background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .035);
         transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
     }
     .sv-record:hover { border-color: color-mix(in srgb, var(--sv-brand) 28%, var(--sv-line)); box-shadow: 0 7px 18px rgba(16, 24, 40, .07); transform: translateY(-1px); }
-    .sv-photo-cell { position: relative; z-index: 1; grid-area: photo; }
     .sv-variant-cell { grid-area: variant; min-width: 0; }
     .sv-support { grid-area: support; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .75fr); gap: .65rem; }
     .sv-metrics { grid-area: metrics; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
     .sv-action { grid-area: action; min-width: 0; padding: .65rem; border: 1px solid color-mix(in srgb, var(--sv-brand) 14%, var(--sv-line)); border-radius: var(--sv-radius-control); background: color-mix(in srgb, var(--sv-brand) 4%, var(--sv-surface)); }
     .sv-cell-label { display: block; margin-bottom: .28rem; text-transform: uppercase; }
-    .sv-img {
-        width: 52px; height: 52px; border: 1px solid var(--sv-line);
-        border-radius: var(--sv-radius-control); background: var(--sv-soft); object-fit: cover;
-    }
-    .sv-product-photo { position: relative; z-index: 1; cursor: zoom-in; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; transform-origin: center; }
     @media (hover: hover) and (pointer: fine) {
-        .sv-product-photo:hover,
-        .sv-product-photo:focus-visible {
+        .sv-product-toggle-icon:hover img {
             z-index: 20; border-color: color-mix(in srgb, var(--sv-brand) 42%, var(--sv-line));
             box-shadow: 0 10px 24px rgba(16, 24, 40, .2); transform: scale(2.15);
         }
     }
-    .sv-img-empty { display: grid; place-items: center; color: var(--sv-muted); }
     .sv-item-id {
         display: inline-block; max-width: 100%; overflow: hidden;
         border-bottom: 1px dotted color-mix(in srgb, var(--sv-muted) 55%, transparent);
@@ -387,7 +385,7 @@
     @media (min-width: 1120px) {
         .sv-panel-head { padding: .75rem 1rem; }
         .sv-list-head, .sv-record {
-            grid-template-columns: 56px minmax(170px, 1.4fr) minmax(130px, 1fr) 96px 112px 108px minmax(180px, 1.1fr) 100px;
+            grid-template-columns: minmax(170px, 1.4fr) minmax(130px, 1fr) 96px 112px 108px minmax(180px, 1.1fr) 100px;
             gap: 0;
         }
         .sv-list-head {
@@ -410,21 +408,19 @@
         }
         .sv-record:last-child { border-bottom: 0; }
         .sv-record:hover { background: color-mix(in srgb, var(--sv-brand) 3%, var(--sv-surface)); box-shadow: none; transform: none; }
-        .sv-photo-cell, .sv-variant-cell, .sv-map-cell, .sv-mp-stock-cell, .sv-internal-cell,
+        .sv-variant-cell, .sv-map-cell, .sv-mp-stock-cell, .sv-internal-cell,
         .sv-average-cell, .sv-action, .sv-sync-cell { grid-area: auto; min-width: 0; padding-inline: .55rem; }
-        .sv-photo-cell { grid-column: 1; }
-        .sv-variant-cell { grid-column: 2; }
-        .sv-map-cell { grid-column: 3; }
-        .sv-mp-stock-cell { grid-column: 4; }
-        .sv-internal-cell { grid-column: 5; }
-        .sv-average-cell { grid-column: 6; }
-        .sv-action { grid-column: 7; }
-        .sv-sync-cell { grid-column: 8; }
-        .sv-photo-cell, .sv-variant-cell, .sv-map-cell, .sv-mp-stock-cell, .sv-internal-cell,
+        .sv-variant-cell { grid-column: 1; }
+        .sv-map-cell { grid-column: 2; }
+        .sv-mp-stock-cell { grid-column: 3; }
+        .sv-internal-cell { grid-column: 4; }
+        .sv-average-cell { grid-column: 5; }
+        .sv-action { grid-column: 6; }
+        .sv-sync-cell { grid-column: 7; }
+        .sv-variant-cell, .sv-map-cell, .sv-mp-stock-cell, .sv-internal-cell,
         .sv-average-cell, .sv-action, .sv-sync-cell { grid-row: 1; }
         .sv-support, .sv-metrics { display: contents; }
         .sv-cell-label { display: none; }
-        .sv-img { width: 44px; height: 44px; }
         .sv-metric { padding: 0; border: 0; background: transparent; }
         .sv-action { padding-block: 0; border: 0; border-radius: 0; background: transparent; }
         .sv-stock-form { grid-template-columns: 74px auto; }
@@ -455,7 +451,7 @@
         .sv-confirm-button--primary { order: -1; }
     }
     @media (prefers-reduced-motion: reduce) {
-        .sv-dashboard-content, .sv-record, .sv-save-feedback, .sv-product-photo { transition: none; }
+        .sv-dashboard-content, .sv-record, .sv-save-feedback, .sv-product-toggle-icon img { transition: none; }
         .sv-dashboard-content.is-loading::before { animation: none; }
     }
 </style>
@@ -614,7 +610,6 @@
                 </nav>
             </div>
             <div class="sv-list-head" aria-hidden="true">
-                <span>Produk</span>
                 <span>Variant</span>
                 <span>Mapping</span>
                 <span>Stok MP</span>
@@ -643,6 +638,13 @@
                         <section class="sv-product-group {{ $groupOpen ? 'is-open' : '' }}" data-product-group data-product-id="{{ $groupProduct?->id }}">
                             <button class="sv-product-toggle" type="button" aria-expanded="{{ $groupOpen ? 'true' : 'false' }}" aria-controls="{{ $groupId }}">
                                 <span class="sv-product-toggle-index" aria-hidden="true">{{ $loop->iteration }}</span>
+                                <span class="sv-product-toggle-icon" aria-hidden="true">
+                                    @if($groupProduct?->image_url)
+                                        <img src="{{ $groupProduct->image_url }}" alt="" loading="lazy">
+                                    @else
+                                        <i class="bi bi-image"></i>
+                                    @endif
+                                </span>
                                 <span class="sv-product-toggle-copy">
                                     <span class="sv-product-toggle-id">ID {{ $groupProduct?->item_id ?: '—' }}</span>
                                     <strong>{{ $groupProduct?->item_name ?: 'Produk tanpa nama' }}</strong>
@@ -660,14 +662,6 @@
                         $averageWindow = max(1, (int) ($mapping['avg_daily_sales_window'] ?? 30));
                     @endphp
                     <article class="sv-record" data-stock-row data-stock-scope="{{ $stockScope }}" data-current-stock="{{ $variant->stock }}">
-                        <div class="sv-photo-cell">
-                            <span class="sv-cell-label">Produk</span>
-                            @if($product?->image_url)
-                                <img class="sv-img sv-product-photo" src="{{ $product->image_url }}" alt="{{ $product->item_name ?: 'Produk marketplace' }}" loading="lazy">
-                            @else
-                                <span class="sv-img sv-img-empty sv-product-photo" title="Tidak ada foto" aria-label="Tidak ada foto produk"><i class="bi bi-image"></i></span>
-                            @endif
-                        </div>
                         <div class="sv-variant-cell">
                             <span class="sv-cell-label">Variant</span>
                             <span class="sv-item-id" tabindex="0" title="{{ $product?->item_name ?: 'Produk tanpa nama' }}" aria-label="Item ID {{ $product?->item_id }}. {{ $product?->item_name ?: 'Produk tanpa nama' }}">ID {{ $product?->item_id ?: '—' }}</span>
