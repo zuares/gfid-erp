@@ -486,7 +486,6 @@
         'sales_scope' => $salesScope !== 'best_sellers' ? $salesScope : null,
         'min_avg_sales' => $minAverageSales,
     ], fn ($value) => $value !== null && $value !== '');
-    $allStoreFilters = array_merge($storeSharedFilters, array_filter(['channel' => $channel ?: null]));
     $emptyScopeTotal = $summary['empty_total'] ?? $summary['total'];
     $internalEmptyTotal = $summary['internal_empty_mp_stock'] ?? 0;
     $mappedTotal = $summary['mapped_total'] ?? $summary['total'];
@@ -597,13 +596,10 @@
                             <span class="sv-store-filter-result" data-store-result aria-live="polite"></span>
                         </div>
 
-                        <div class="sv-store-platform-tabs" role="tablist" aria-label="Pilih platform marketplace">
-                            <a class="sv-store-platform-tab {{ $activeStorePlatform === 'all' ? 'active' : '' }}" data-dashboard-link data-store-platform="all" href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}" role="tab" aria-selected="{{ $activeStorePlatform === 'all' ? 'true' : 'false' }}">
-                                <i class="bi bi-grid"></i><span>Semua toko</span><span class="sv-store-platform-count">{{ $stores->count() }}</span>
-                            </a>
+                        <div class="sv-store-platform-tabs" role="group" aria-label="Filter platform toko">
                             @foreach($storeGroups as $group)
                                 @continue($group['stores']->isEmpty())
-                                <button type="button" class="sv-store-platform-tab {{ $activeStorePlatform === $group['key'] ? 'active' : '' }}" data-store-platform="{{ $group['key'] }}" role="tab" aria-selected="{{ $activeStorePlatform === $group['key'] ? 'true' : 'false' }}">
+                                <button type="button" class="sv-store-platform-tab {{ $activeStorePlatform === $group['key'] ? 'active' : '' }}" data-store-platform="{{ $group['key'] }}" aria-pressed="{{ $activeStorePlatform === $group['key'] ? 'true' : 'false' }}">
                                     <i class="bi {{ $group['icon'] }}"></i><span>{{ $group['label'] }}</span><span class="sv-store-platform-count">{{ $group['stores']->count() }}</span>
                                 </button>
                             @endforeach
@@ -1033,7 +1029,7 @@
             platformTabs.forEach(tab => {
                 const active = tab.dataset.storePlatform === platform;
                 tab.classList.toggle('active', active);
-                tab.setAttribute('aria-selected', String(active));
+                tab.setAttribute('aria-pressed', String(active));
             });
         };
 
