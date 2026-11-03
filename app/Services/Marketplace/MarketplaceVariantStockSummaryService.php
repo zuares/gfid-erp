@@ -95,7 +95,7 @@ class MarketplaceVariantStockSummaryService
                 $mapping->selectRaw('1')
                     ->from('sku_mappings as sm_stock')
                     ->where(function ($sku) use ($baseSkuExpression): void {
-                        $sku->whereRaw('LOWER(TRIM(sm_stock.marketplace_sku)) = LOWER(TRIM(marketplace_product_models.model_sku))')
+                        $sku->whereColumn('sm_stock.marketplace_sku', 'marketplace_product_models.model_sku')
                             ->orWhereRaw('LOWER(TRIM(sm_stock.marketplace_sku)) = LOWER(TRIM('.$baseSkuExpression.'))');
                     })
                     ->where(function ($channelMapping): void {
@@ -115,7 +115,7 @@ COALESCE((
     SELECT mapped_ads.avg_daily_sales
     FROM sku_mappings AS ads_mapping
     INNER JOIN items AS mapped_ads ON mapped_ads.id = ads_mapping.item_id
-    WHERE LOWER(TRIM(ads_mapping.marketplace_sku)) = LOWER(TRIM(marketplace_product_models.model_sku))
+    WHERE ads_mapping.marketplace_sku = marketplace_product_models.model_sku
       AND (
         ads_mapping.channel_code IS NULL
         OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(ads_mapping.channel_code) IN ('shopee', 'shp'))
@@ -151,7 +151,7 @@ COALESCE((
         (
             SELECT availability_mapping.item_id
             FROM sku_mappings AS availability_mapping
-            WHERE LOWER(TRIM(availability_mapping.marketplace_sku)) = LOWER(TRIM(marketplace_product_models.model_sku))
+            WHERE availability_mapping.marketplace_sku = marketplace_product_models.model_sku
               AND (
                 availability_mapping.channel_code IS NULL
                 OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(availability_mapping.channel_code) IN ('shopee', 'shp'))
