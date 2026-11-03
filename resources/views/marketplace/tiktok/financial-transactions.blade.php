@@ -28,12 +28,22 @@
     .tt-finance-search-wrap { position:relative; flex:1 1 280px; }
     .tt-finance-search-wrap .search-icon { position:absolute; top:50%; left:.75rem; color:#64748b; font-size:.85rem; pointer-events:none; transform:translateY(-50%); }
     .tt-finance-search-wrap input { padding-right:2.15rem; padding-left:2.15rem; border-radius:8px; font-size:.82rem; }
+    .tt-finance-search-wrap:focus-within input { border-color:var(--shp-accent,#5b5ce2); box-shadow:0 0 0 2px color-mix(in srgb, var(--shp-accent,#5b5ce2) 15%, transparent); }
     .tt-finance-search-clear { position:absolute; top:50%; right:.55rem; display:none; padding:0 .25rem; border:0; color:#64748b; background:transparent; cursor:pointer; font-size:1.1rem; line-height:1; transform:translateY(-50%); }
     .tt-finance-search-clear.show { display:block; }
     .tt-finance-actions { display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; margin-top:.75rem; }
-    .tt-finance-actions .btn { border-radius:999px; font-size:.78rem; font-weight:750; }
+    .tt-finance-actions .btn, .tt-finance-actions-group .btn { border-radius:7px; font-size:.78rem; font-weight:650; box-shadow:none; }
+    .tt-finance-actions-group .btn { min-height:40px; padding-inline:.78rem; }
+    .tt-finance-actions-group .btn i { color:inherit; }
+    .tt-finance-actions-group .btn-primary { border-color:var(--shp-accent,#5b5ce2); background:var(--shp-accent,#5b5ce2); }
+    .tt-finance-actions-group .btn-primary:hover,
+    .tt-finance-actions-group .btn-primary:focus-visible { border-color:var(--shp-accent-2,#4142bb); background:var(--shp-accent-2,#4142bb); }
+    .tt-finance-actions-group .btn-outline-primary { color:var(--shp-accent,#5b5ce2); border-color:var(--shp-accent,#5b5ce2); }
+    .tt-finance-actions-group .btn-outline-primary:hover,
+    .tt-finance-actions-group .btn-outline-primary:focus-visible { color:#fff; border-color:var(--shp-accent,#5b5ce2); background:var(--shp-accent,#5b5ce2); }
     .tt-finance-actions-group { display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; }
-    .tt-finance-help { display:flex; align-items:center; gap:.4rem; margin-top:.65rem; color:#64748b; font-size:.73rem; }
+    .tt-finance-help { display:flex; align-items:center; gap:.4rem; margin-top:.65rem; color:var(--shp-muted,#667085); font-size:.73rem; }
+    .tt-finance-help i { flex:0 0 auto; }
     .tt-finance-alert { display:none; padding:.7rem .85rem; margin-bottom:.9rem; border:1px solid #fecaca; border-radius:10px; color:#991b1b; background:#fef2f2; font-size:.78rem; }
     .tt-finance-alert.show { display:block; }
     .tt-finance-alert.success { border-color:#bbf7d0; color:#166534; background:#f0fdf4; }
@@ -100,7 +110,7 @@
     .tt-finance-raw { max-height:320px; overflow:auto; margin:0; padding:.85rem; border-radius:10px; color:#cbd5e1; background:#0f172a; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.7rem; line-height:1.45; }
     .tt-finance-raw { max-width:280px; margin:.4rem 0 0; padding:.45rem; border-radius:7px; color:#475569; background:#f8fafc; font-size:.65rem; white-space:pre-wrap; word-break:break-word; }
     @media (max-width: 992px) { .tt-finance-filters-grid { grid-template-columns:1fr 1fr; } .tt-finance-kpis { grid-template-columns:1fr 1fr; } .tt-finance-detail-grid { grid-template-columns:1fr; } }
-    @media (max-width: 600px) { .tt-finance-filters-grid { grid-template-columns:1fr; } .tt-finance-kpis { grid-template-columns:1fr 1fr; } .tt-finance-actions { align-items:stretch; } .tt-finance-actions .btn { flex:1; } }
+    @media (max-width: 600px) { .tt-finance-filters-grid { grid-template-columns:1fr; } .tt-finance-kpis { grid-template-columns:1fr 1fr; } .tt-finance-actions { align-items:stretch; } .tt-finance-actions-group { width:100%; } .tt-finance-actions-group .btn { flex:1 1 auto; } }
 </style>
 @endpush
 
@@ -161,10 +171,10 @@
                 <button id="ttSearchClear" type="button" class="tt-finance-search-clear" title="Hapus pencarian" aria-label="Hapus pencarian">×</button>
             </div>
             <div class="tt-finance-actions-group">
-                <button id="ttReset" type="button" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
-                <button id="ttExport" type="button" class="btn btn-outline-secondary"><i class="bi bi-download me-1"></i>CSV</button>
-                <button id="ttSync" type="button" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Sync sekarang</button>
-                <button id="ttLoad" type="button" class="btn btn-primary"><i class="bi bi-database me-1"></i>Muat Data Lokal</button>
+                <button id="ttReset" type="button" class="btn btn-outline-secondary btn-pill" title="Reset filter ke kondisi awal"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+                <button id="ttExport" type="button" class="btn btn-outline-secondary btn-pill" title="Unduh CSV"><i class="bi bi-download me-1"></i>CSV</button>
+                <button id="ttSync" type="button" class="btn btn-outline-primary btn-pill" title="Ambil data terbaru dari TikTok"><i class="bi bi-arrow-repeat me-1"></i>Sync sekarang</button>
+                <button id="ttLoad" type="button" class="btn btn-primary btn-pill" title="Baca transaksi yang sudah tersimpan"><i class="bi bi-database me-1"></i>Muat Data Lokal</button>
             </div>
         </div>
 

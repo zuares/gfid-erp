@@ -539,7 +539,13 @@ class TikTokFinancialTransactionTest extends TestCase
             ->get(route('marketplace.tiktok.financial-transactions'))
             ->assertOk()
             ->assertViewIs('marketplace.tiktok.financial-transactions')
-            ->assertSee('Transaksi Finansial TikTok');
+            ->assertSee('Transaksi Finansial TikTok')
+            ->assertSee('id="ttSearch"', false)
+            ->assertSee('id="ttReset"', false)
+            ->assertSee('id="ttExport"', false)
+            ->assertSee('id="ttSync"', false)
+            ->assertSee('id="ttLoad"', false)
+            ->assertSee('Data ditampilkan dari tabel lokal', false);
 
         $this->actingAs($user)
             ->getJson(route('marketplace.api.tiktok-financial-transactions', [

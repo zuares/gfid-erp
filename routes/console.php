@@ -314,18 +314,10 @@ Schedule::call(fn () => Artisan::call('queue:work', [
     ->name('queue-work-ads')
     ->withoutOverlapping(10);
 
-// Antrean 'heavy' KHUSUS pekerjaan lama (backfill histori, sync rentang >7 hari).
-// Dipisah supaya job berat berjam-jam TIDAK menyumbat webhook/resi di queue default.
-// withoutOverlapping: hanya satu worker heavy pada satu waktu.
-Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'heavy', '--stop-when-empty' => true, '--max-time' => 280, '--tries' => 1, '--sleep' => 2]))
-    ->everyFiveMinutes()
-    ->name('queue-work-heavy')
-    ->withoutOverlapping(10);
-
 // Settlement/Finance memakai connection khusus dengan retry_after panjang agar
 // job ratusan order tidak diambil ulang setelah 90 detik dan tidak dibunuh oleh
-// timeout worker default. Worker legacy di atas tetap dipertahankan untuk job
-// heavy lama yang masih berada pada connection database default.
+// timeout worker default. Semua job pada queue heavy wajib memakai connection
+// ini; worker default tidak boleh ikut mengambilnya dengan timeout yang pendek.
 Schedule::call(fn () => Artisan::call('queue:work', [
     'connection' => 'heavy',
     '--queue' => 'heavy',
