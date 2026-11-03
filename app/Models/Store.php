@@ -20,6 +20,7 @@ class Store extends Model
         'credentials',
         'token_expires_at',
         'last_synced_at',
+        'tiktok_financial_last_synced_at',
         'meta',
     ];
 
@@ -29,6 +30,7 @@ class Store extends Model
         'meta' => 'array',
         'token_expires_at' => 'datetime',
         'last_synced_at' => 'datetime',
+        'tiktok_financial_last_synced_at' => 'datetime',
     ];
 
     protected $hidden = ['credentials'];

@@ -187,7 +187,8 @@ class TikTokFinancialTransactionService
             ->when($source === 'account', fn ($query) => $query->whereIn('transaction_type', $types));
 
         $summary = $this->storedSummary(clone $query);
-        $lastSyncedAt = (clone $baseQuery)->max('synced_at');
+        $lastSyncedAt = $store->tiktok_financial_last_synced_at
+            ?? (clone $baseQuery)->max('synced_at');
 
         if (($options['all'] ?? false) === true) {
             $rows = $query
@@ -258,7 +259,7 @@ class TikTokFinancialTransactionService
         $moneyOut = 0.0;
         $moneyIn = 0.0;
         $unknown = 0;
-        $latestSync = null;
+        $latestSync = $store->tiktok_financial_last_synced_at;
         $gmvReferences = [];
 
         foreach ($rows as $candidate) {
@@ -372,6 +373,9 @@ class TikTokFinancialTransactionService
         }
 
         $result['total'] = $result['account']['count'] + $result['statements']['count'];
+        $syncedAt = now();
+        $store->forceFill(['tiktok_financial_last_synced_at' => $syncedAt])->saveQuietly();
+        $result['last_synced_at'] = $syncedAt->toISOString();
 
         return $result;
     }

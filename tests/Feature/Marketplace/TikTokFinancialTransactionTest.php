@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Marketplace;
 
+use App\Jobs\SyncTikTokFinancialTransactionsJob;
 use App\Models\Channel;
 use App\Models\MarketplaceTikTokFinancialTransaction;
 use App\Models\Store;
 use App\Models\User;
-use App\Jobs\SyncTikTokFinancialTransactionsJob;
-use App\Services\Marketplace\TikTokShop\TikTokFinancialTransactionService;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
+use App\Services\Marketplace\TikTokShop\TikTokFinancialTransactionService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -220,6 +221,61 @@ class TikTokFinancialTransactionTest extends TestCase
         ]));
 
         $response->assertOk()->assertJsonPath('data.reconciled_ad_cash_out', 4500);
+    }
+
+    public function test_finance_last_sync_timestamp_is_not_limited_to_selected_transaction_period(): void
+    {
+        $store = $this->createStore();
+        $store->update(['tiktok_financial_last_synced_at' => '2026-11-03 10:15:00']);
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'OLD-FINANCE-1',
+            'source' => 'withdrawals',
+            'transaction_type' => 'WITHDRAW',
+            'amount' => 1000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_OUT',
+            'transaction_created_at' => '2026-10-27 10:00:00',
+            'synced_at' => '2026-10-27 10:05:00',
+        ]);
+
+        $result = app(TikTokFinancialTransactionService::class)->storedTransactions(
+            $store->fresh(),
+            Carbon::parse('2026-11-01')->startOfDay(),
+            Carbon::parse('2026-11-03')->endOfDay(),
+            ['source' => 'account'],
+        );
+
+        $this->assertSame('2026-11-03T10:15:00+07:00', $result['last_synced_at']);
+        $this->assertSame(0, $result['pagination']['total']);
+    }
+
+    public function test_successful_finance_sync_records_timestamp_even_when_no_rows_are_returned(): void
+    {
+        $store = $this->createStore();
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202309/withdrawals*' => Http::response([
+                'code' => 0,
+                'message' => 'Success',
+                'data' => ['withdrawals' => [], 'next_page_token' => ''],
+            ], 200),
+            'https://open-api.tiktokglobalshop.com/finance/202309/statements*' => Http::response([
+                'code' => 0,
+                'message' => 'Success',
+                'data' => ['statements' => [], 'next_page_token' => ''],
+            ], 200),
+        ]);
+
+        $result = app(TikTokFinancialTransactionService::class)->syncStoredTransactions(
+            $store,
+            Carbon::parse('2026-11-03')->startOfDay(),
+            Carbon::parse('2026-11-03')->endOfDay(),
+            'all',
+        );
+
+        $this->assertSame(0, $result['total']);
+        $this->assertNotNull($result['last_synced_at']);
+        $this->assertNotNull($store->fresh()->tiktok_financial_last_synced_at);
     }
 
     public function test_tiktok_gmv_variant_feeds_analytics_without_counting_matching_payment_twice(): void
