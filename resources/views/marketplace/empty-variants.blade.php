@@ -226,9 +226,23 @@
         color: var(--sv-brand-strong); font-size: .65rem; font-weight: 800; white-space: nowrap;
     }
     .sv-product-toggle-chevron { color: var(--sv-muted); font-size: .8rem; transition: transform .16s ease; }
-    .sv-product-group.is-open .sv-product-toggle-chevron { transform: rotate(180deg); }
-    .sv-product-group-body { display: grid; gap: .5rem; padding: .55rem; border-top: 1px solid var(--sv-line); background: color-mix(in srgb, var(--sv-soft) 45%, var(--sv-surface)); }
-    .sv-product-group-body[hidden] { display: none; }
+    .sv-variant-dialog {
+        width: min(1120px, calc(100% - 1rem)); height: min(88dvh, 820px); margin: auto; padding: 0; overflow: hidden;
+        border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card); background: var(--sv-surface) !important;
+        color: var(--sv-content); opacity: 1 !important; isolation: isolate; box-shadow: 0 24px 70px rgba(16, 24, 40, .26);
+    }
+    .sv-variant-dialog::backdrop { background: rgba(16, 24, 40, .46); backdrop-filter: blur(2px); }
+    .sv-variant-dialog-panel { display: flex; min-height: 0; height: 100%; flex-direction: column; }
+    .sv-variant-dialog-head { display: flex; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
+    .sv-variant-dialog-kicker { display: block; margin-bottom: .25rem; color: var(--sv-brand-strong); font-size: .62rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+    .sv-variant-dialog-title { margin: 0; overflow: hidden; color: var(--sv-content); font-size: clamp(.95rem, 2vw, 1.15rem); font-weight: 800; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+    .sv-variant-dialog-meta { display: block; margin-top: .25rem; color: var(--sv-muted); font-size: .68rem; }
+    .sv-variant-dialog-close { display: inline-grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border: 1px solid transparent; border-radius: 50%; background: transparent; color: var(--sv-muted); font-size: .95rem; }
+    .sv-variant-dialog-close:hover { border-color: var(--sv-line); background: var(--sv-soft); color: var(--sv-content); }
+    .sv-variant-dialog-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--sv-brand) 28%, transparent); outline-offset: 2px; }
+    .sv-variant-dialog-body { min-height: 0; overflow: auto; background: color-mix(in srgb, var(--sv-soft) 45%, var(--sv-surface)); overscroll-behavior: contain; }
+    .sv-variant-dialog-body .sv-product-group-body { display: grid; gap: .5rem; padding: .65rem; }
+    .sv-variant-dialog-body .sv-record { box-shadow: 0 1px 2px rgba(16, 24, 40, .035); }
     .sv-record {
         display: grid; grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'variant' 'support' 'metrics' 'action';
@@ -441,6 +455,9 @@
         .sv-panel-head { padding: .7rem; }
         .sv-panel-title { font-size: .86rem; }
         .sv-panel-summary { gap: .15rem .45rem; }
+        .sv-variant-dialog { width: calc(100% - .75rem); height: calc(100dvh - .75rem); border-radius: 18px; }
+        .sv-variant-dialog-head { padding: .85rem .9rem; }
+        .sv-variant-dialog-body .sv-product-group-body { padding: .5rem; }
         .sv-confirm-dialog { width: calc(100% - 1rem); max-height: calc(100dvh - 1rem); border-radius: 18px; }
         .sv-confirm-head { padding: 1rem 1rem .75rem; }
         .sv-confirm-body { padding-inline: 1rem; }
@@ -609,15 +626,6 @@
                     @endif
                 </nav>
             </div>
-            <div class="sv-list-head" aria-hidden="true">
-                <span>Variant</span>
-                <span>Mapping</span>
-                <span>Stok MP</span>
-                <span>Stok Internal</span>
-                <span>Rata² Terjual/Hari</span>
-                <span>Update Stok</span>
-                <span>Terakhir Sync</span>
-            </div>
             <div class="sv-records" id="svRows">
                 @php
                     $variantGroups = $variants->getCollection()->groupBy(fn ($variant) => $variant->product?->id ?: 'variant-'.$variant->id);
@@ -633,10 +641,9 @@
                         @php
                             $groupProduct = $groupVariants->first()->product;
                             $groupId = 'sv-product-group-'.preg_replace('/[^a-zA-Z0-9_-]/', '-', (string) $groupKey);
-                            $groupOpen = $loop->first;
                         @endphp
-                        <section class="sv-product-group {{ $groupOpen ? 'is-open' : '' }}" data-product-group data-product-id="{{ $groupProduct?->id }}">
-                            <button class="sv-product-toggle" type="button" aria-expanded="{{ $groupOpen ? 'true' : 'false' }}" aria-controls="{{ $groupId }}">
+                        <section class="sv-product-group" data-product-group data-product-id="{{ $groupProduct?->id }}">
+                            <button class="sv-product-toggle" type="button" data-variant-dialog-trigger data-dialog-target="{{ $groupId }}" aria-haspopup="dialog" aria-controls="{{ $groupId }}">
                                 <span class="sv-product-toggle-index" aria-hidden="true">{{ $loop->iteration }}</span>
                                 <span class="sv-product-toggle-icon" aria-hidden="true">
                                     @if($groupProduct?->image_url)
@@ -651,9 +658,29 @@
                                     <small>{{ $groupProduct?->store?->name ?: 'Toko tidak ditemukan' }}</small>
                                 </span>
                                 <span class="sv-product-toggle-count">{{ number_format($groupVariants->count()) }} variant</span>
-                                <i class="bi bi-chevron-down sv-product-toggle-chevron" aria-hidden="true"></i>
+                                <i class="bi bi-arrow-up-right sv-product-toggle-chevron" aria-hidden="true"></i>
                             </button>
-                            <div class="sv-product-group-body" id="{{ $groupId }}" @if(!$groupOpen) hidden @endif>
+                            <dialog class="sv-variant-dialog" id="{{ $groupId }}" data-variant-dialog aria-labelledby="{{ $groupId }}-title">
+                                <div class="sv-variant-dialog-panel">
+                                    <header class="sv-variant-dialog-head">
+                                        <div>
+                                            <span class="sv-variant-dialog-kicker">Detail produk</span>
+                                            <h2 class="sv-variant-dialog-title" id="{{ $groupId }}-title">{{ $groupProduct?->item_name ?: 'Produk tanpa nama' }}</h2>
+                                            <span class="sv-variant-dialog-meta">ID {{ $groupProduct?->item_id ?: '—' }} · {{ $groupProduct?->store?->name ?: 'Toko tidak ditemukan' }}</span>
+                                        </div>
+                                        <button type="button" class="sv-variant-dialog-close" data-dialog-close aria-label="Tutup detail produk"><i class="bi bi-x-lg"></i></button>
+                                    </header>
+                                    <div class="sv-variant-dialog-body">
+                                        <div class="sv-list-head sv-modal-list-head" aria-hidden="true">
+                                            <span>Variant</span>
+                                            <span>Mapping</span>
+                                            <span>Stok MP</span>
+                                            <span>Stok Internal</span>
+                                            <span>Rata² Terjual/Hari</span>
+                                            <span>Update Stok</span>
+                                            <span>Terakhir Sync</span>
+                                        </div>
+                                        <div class="sv-product-group-body">
                                 @foreach($groupVariants as $variant)
                     @php
                         $product = $variant->product;
@@ -717,7 +744,10 @@
                         </div>
                                 </article>
                                 @endforeach
-                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </dialog>
                         </section>
                     @endforeach
                 @endif
@@ -809,19 +839,32 @@
     const removeStockRow = row => {
         const productGroup = row.closest('[data-product-group]');
         row.remove();
-        if (productGroup && !productGroup.querySelector('[data-stock-row]')) productGroup.remove();
+        if (productGroup && !productGroup.querySelector('[data-stock-row]')) {
+            const dialog = productGroup.querySelector('[data-variant-dialog]');
+            if (dialog?.open && typeof dialog.close === 'function') dialog.close();
+            productGroup.remove();
+        }
         showEmpty();
     };
-    const bindProductAccordions = () => {
-        document.querySelectorAll('[data-product-group] .sv-product-toggle').forEach(toggle => toggle.addEventListener('click', () => {
-            const group = toggle.closest('[data-product-group]');
-            const panel = group?.querySelector('.sv-product-group-body');
-            if (!group || !panel) return;
-            const isOpen = toggle.getAttribute('aria-expanded') === 'true';
-            toggle.setAttribute('aria-expanded', String(!isOpen));
-            group.classList.toggle('is-open', !isOpen);
-            panel.hidden = isOpen;
-        }));
+    const bindProductDialogs = () => {
+        document.querySelectorAll('[data-variant-dialog-trigger]').forEach(trigger => {
+            const dialog = document.getElementById(trigger.dataset.dialogTarget || '');
+            if (!dialog) return;
+            const closeDialog = () => {
+                if (typeof dialog.close === 'function') dialog.close();
+                else dialog.removeAttribute('open');
+            };
+            trigger.addEventListener('click', () => {
+                if (typeof dialog.showModal === 'function') dialog.showModal();
+                else dialog.setAttribute('open', '');
+                dialog.querySelector('[data-dialog-close]')?.focus();
+            });
+            dialog.querySelectorAll('[data-dialog-close]').forEach(button => button.addEventListener('click', closeDialog));
+            dialog.addEventListener('click', event => {
+                if (event.target === dialog) closeDialog();
+            });
+            dialog.addEventListener('close', () => trigger.focus());
+        });
     };
     const bindStockActions = () => {
         document.querySelectorAll('[data-stock-form]').forEach(form => form.addEventListener('submit', async event => {
@@ -1024,7 +1067,7 @@
             tabs[nextIndex]?.click();
         }));
     };
-    const bindAll = () => { bindProductAccordions(); bindStockActions(); bindRealtimeFilter(); bindDashboardLinks(); bindStorePicker(); bindStoreTabs(); };
+    const bindAll = () => { bindProductDialogs(); bindStockActions(); bindRealtimeFilter(); bindDashboardLinks(); bindStorePicker(); bindStoreTabs(); };
     window.addEventListener('popstate', () => loadDashboard(window.location.href, false));
     bindAll();
 })();
