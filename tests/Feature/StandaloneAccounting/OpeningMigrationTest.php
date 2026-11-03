@@ -3,6 +3,7 @@
 use App\Models\Account;
 use App\Models\Journal;
 use App\Models\StandaloneAccountingAccount;
+use App\Models\StandaloneAccountingAccountMapping;
 use App\Models\StandaloneAccountingJournal;
 use App\Models\StandaloneOpeningMigration;
 use App\Models\SystemSetting;
@@ -80,6 +81,28 @@ it('previews the inclusive cutoff period with posted nonvoid journals and includ
 
     $this->get(route('standalone-accounting.opening-migration.index', ['as_of' => '2026-10-31']))
         ->assertOk()->assertSee('Opening Migrasi')->assertSee('2026-08-31')->assertSee('WIP');
+});
+
+it('provides default opening mappings for the current standalone chart of accounts', function () {
+    expect(StandaloneAccountingAccountMapping::query()
+        ->whereIn('legacy_account_code', ['6302', '4101', '6303', '1302', '6304', '6305', '1306', '6306', '2104', '1307', '6301', '2301', '1308'])
+        ->pluck('standalone_account_code', 'legacy_account_code')
+        ->all())
+        ->toMatchArray([
+            '6302' => '6-180',
+            '4101' => '4-110',
+            '6303' => '6-210',
+            '1302' => '1-130',
+            '6304' => '6-210',
+            '6305' => '6-210',
+            '1306' => '1-130',
+            '6306' => '6-210',
+            '2104' => '2-120',
+            '1307' => '1-130',
+            '6301' => '6-150',
+            '2301' => '2-120',
+            '1308' => '1-130',
+        ]);
 });
 
 it('posts only the new ledger once with immutable evidence and no operational mutations', function () {
