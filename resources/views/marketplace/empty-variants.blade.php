@@ -139,21 +139,8 @@
     .sv-panel-head { display: grid; gap: .7rem; padding: .9rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
     .sv-panel-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; min-width: 0; }
     .sv-panel-title-row > div { min-width: 0; }
-    .sv-store-picker-row { display: grid; gap: .45rem; padding-top: .7rem; border-top: 1px solid var(--sv-line); }
-    @media (min-width: 768px) { .sv-store-picker-row { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .75rem; } }
-    .sv-store-picker-label {
-        display: inline-flex; align-items: center; gap: .35rem; min-height: 28px; font-size: .65rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
-    }
+    .sv-store-picker-row { display: block; padding-top: .7rem; border-top: 1px solid var(--sv-line); }
     .sv-store-picker { display: grid; gap: .55rem; min-width: 0; }
-    .sv-store-filter-bar { display: flex; align-items: center; gap: .45rem; min-width: 0; }
-    .sv-store-search { position: relative; flex: 1 1 220px; min-width: 0; }
-    .sv-store-search > i { position: absolute; top: 50%; left: .7rem; color: var(--sv-muted); pointer-events: none; transform: translateY(-50%); }
-    .sv-store-search input {
-        width: 100%; min-height: 36px; padding: .4rem .65rem .4rem 2rem; border: 1px solid var(--sv-line);
-        border-radius: 9px; background: var(--sv-surface); color: var(--sv-content); font-size: .72rem; outline: none;
-    }
-    .sv-store-search input:focus { border-color: var(--sv-brand); box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--sv-brand) 13%, transparent); }
-    .sv-store-filter-result { flex: 0 0 auto; color: var(--sv-muted); font-size: .66rem; white-space: nowrap; }
     .sv-store-platform-tabs { display: flex; gap: .25rem; max-width: 100%; padding: .2rem; overflow-x: auto; border: 1px solid var(--sv-line); border-radius: 10px; background: var(--sv-soft); scrollbar-width: none; }
     .sv-store-platform-tabs::-webkit-scrollbar { display: none; }
     .sv-store-platform-tab {
@@ -175,12 +162,10 @@
     .sv-store-tab-list { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 0; }
     .sv-store-empty { padding: .35rem .1rem 0; color: var(--sv-muted); font-size: .7rem; }
     @media (max-width: 767.98px) {
-        .sv-control, .sv-store-search input { font-size: 16px; }
+        .sv-control { font-size: 16px; }
         .sv-store-group { width: 100%; padding-left: 0; border-left: 0; }
         .sv-store-tab-list { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; padding-bottom: .15rem; scrollbar-width: none; }
         .sv-store-tab-list::-webkit-scrollbar { display: none; }
-        .sv-store-filter-bar { align-items: stretch; flex-direction: column; }
-        .sv-store-filter-result { padding-left: .1rem; }
     }
     .sv-panel-summary {
         display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .55rem; padding: .45rem .6rem;
@@ -219,11 +204,11 @@
     }
     .sv-product-toggle:hover { background: color-mix(in srgb, var(--sv-brand) 4%, var(--sv-surface)); }
     .sv-product-toggle-icon {
-        display: grid; width: 42px; height: 42px; place-items: center; overflow: hidden;
+        position: relative; z-index: 1; display: grid; width: 42px; height: 42px; place-items: center; overflow: visible;
         border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control);
         background: var(--sv-soft); color: var(--sv-muted); font-size: .9rem;
     }
-    .sv-product-toggle-icon img { width: 100%; height: 100%; object-fit: cover; }
+    .sv-product-toggle-icon img { position: relative; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; transition: transform .18s ease, box-shadow .18s ease; }
     .sv-product-toggle-copy { display: grid; gap: .12rem; min-width: 0; }
     .sv-product-toggle-id {
         overflow: hidden; color: var(--sv-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -248,7 +233,7 @@
         transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
     }
     .sv-record:hover { border-color: color-mix(in srgb, var(--sv-brand) 28%, var(--sv-line)); box-shadow: 0 7px 18px rgba(16, 24, 40, .07); transform: translateY(-1px); }
-    .sv-photo-cell { grid-area: photo; }
+    .sv-photo-cell { position: relative; z-index: 1; grid-area: photo; }
     .sv-variant-cell { grid-area: variant; min-width: 0; }
     .sv-support { grid-area: support; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .75fr); gap: .65rem; }
     .sv-metrics { grid-area: metrics; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
@@ -257,6 +242,15 @@
     .sv-img {
         width: 52px; height: 52px; border: 1px solid var(--sv-line);
         border-radius: var(--sv-radius-control); background: var(--sv-soft); object-fit: cover;
+    }
+    .sv-product-photo { position: relative; z-index: 1; cursor: zoom-in; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; transform-origin: center; }
+    @media (hover: hover) and (pointer: fine) {
+        .sv-product-photo:hover,
+        .sv-product-photo:focus-visible,
+        .sv-product-toggle-icon:hover img {
+            z-index: 20; border-color: color-mix(in srgb, var(--sv-brand) 42%, var(--sv-line));
+            box-shadow: 0 10px 24px rgba(16, 24, 40, .2); transform: scale(2.15);
+        }
     }
     .sv-img-empty { display: grid; place-items: center; color: var(--sv-muted); }
     .sv-item-id {
@@ -463,7 +457,7 @@
         .sv-confirm-button--primary { order: -1; }
     }
     @media (prefers-reduced-motion: reduce) {
-        .sv-dashboard-content, .sv-record, .sv-save-feedback { transition: none; }
+        .sv-dashboard-content, .sv-record, .sv-save-feedback, .sv-product-photo, .sv-product-toggle-icon img { transition: none; }
         .sv-dashboard-content.is-loading::before { animation: none; }
     }
 </style>
@@ -586,16 +580,7 @@
                 </nav>
 
                 <div class="sv-store-picker-row">
-                    <span class="sv-store-picker-label"><i class="bi bi-shop"></i> Toko</span>
                     <div class="sv-store-picker" data-store-picker data-active-platform="{{ $activeStorePlatform }}">
-                        <div class="sv-store-filter-bar" role="search" aria-label="Cari toko marketplace">
-                            <div class="sv-store-search">
-                                <i class="bi bi-search" aria-hidden="true"></i>
-                                <input type="search" data-store-search placeholder="Cari nama atau ID toko..." autocomplete="off" aria-label="Cari nama atau ID toko">
-                            </div>
-                            <span class="sv-store-filter-result" data-store-result aria-live="polite"></span>
-                        </div>
-
                         <div class="sv-store-platform-tabs" role="group" aria-label="Filter platform toko">
                             @foreach($storeGroups as $group)
                                 @continue($group['stores']->isEmpty())
@@ -612,13 +597,13 @@
                                     <span class="sv-store-group-label" id="svStoreGroup{{ ucfirst($group['key']) }}"><i class="bi {{ $group['icon'] }}"></i>{{ $group['label'] }}</span>
                                     <nav class="sv-store-tab-list" aria-label="Toko {{ $group['label'] }}">
                                         @foreach($group['stores'] as $store)
-                                            <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" aria-current="{{ $storeId === $store->id ? 'page' : 'false' }}" data-dashboard-link data-store-link data-store-name="{{ $store->name }}" data-store-id="{{ $store->id }} {{ $store->code }}" href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
+                                            <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" aria-current="{{ $storeId === $store->id ? 'page' : 'false' }}" data-dashboard-link data-store-link href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
                                         @endforeach
                                     </nav>
                                 </section>
                             @endforeach
                         </div>
-                        <span class="sv-store-empty" data-store-empty hidden>Toko tidak ditemukan.</span>
+                        <span class="sv-store-empty" data-store-empty hidden>Belum ada toko terhubung.</span>
                     </div>
                 </div>
 
@@ -995,37 +980,26 @@
         const picker = document.querySelector('[data-store-picker]');
         if (!picker) return;
 
-        const search = picker.querySelector('[data-store-search]');
-        const result = picker.querySelector('[data-store-result]');
         const empty = picker.querySelector('[data-store-empty]');
         const platformTabs = [...picker.querySelectorAll('[data-store-platform]')];
         const storeGroups = [...picker.querySelectorAll('[data-store-group]')];
-        const storeLinks = [...picker.querySelectorAll('[data-store-link]')];
 
         const apply = () => {
             const platform = picker.dataset.activePlatform || 'all';
-            const query = String(search?.value || '').trim().toLowerCase();
             let visibleCount = 0;
 
             storeGroups.forEach(group => {
                 const platformMatches = platform === 'all' || group.dataset.storeChannel === platform;
                 let groupVisible = false;
                 group.querySelectorAll('[data-store-link]').forEach(link => {
-                    const haystack = `${link.dataset.storeName || ''} ${link.dataset.storeId || ''}`.toLowerCase();
-                    const matches = platformMatches && (!query || haystack.includes(query));
-                    link.hidden = !matches;
-                    groupVisible = groupVisible || matches;
-                    if (matches) visibleCount += 1;
+                    link.hidden = !platformMatches;
+                    groupVisible = groupVisible || platformMatches;
+                    if (platformMatches) visibleCount += 1;
                 });
                 group.hidden = !groupVisible;
             });
 
             if (empty) empty.hidden = visibleCount > 0;
-            if (result) {
-                result.textContent = query || platform !== 'all'
-                    ? `${visibleCount} dari ${storeLinks.length} toko`
-                    : `${storeLinks.length} toko terhubung`;
-            }
             platformTabs.forEach(tab => {
                 const active = tab.dataset.storePlatform === platform;
                 tab.classList.toggle('active', active);
@@ -1033,7 +1007,6 @@
             });
         };
 
-        search?.addEventListener('input', apply);
         platformTabs.forEach((tab, index) => {
             tab.addEventListener('click', () => {
                 picker.dataset.activePlatform = tab.dataset.storePlatform || 'all';
