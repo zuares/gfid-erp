@@ -76,13 +76,13 @@
         border-color: color-mix(in srgb, var(--sv-brand) 38%, var(--sv-line));
         background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface)); box-shadow: 0 1px 2px rgba(16, 24, 40, .06); color: var(--sv-brand-strong);
     }
-    .sv-scope-nav { display: flex; gap: .25rem; flex-wrap: wrap; padding: .25rem; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control); background: var(--sv-soft); }
+    .sv-scope-nav { display: flex; gap: .25rem; flex-wrap: wrap; padding: .25rem; border: 1px solid var(--sv-line); border-radius: 12px; background: var(--sv-soft); }
     .sv-scope-btn {
-        display: inline-flex; align-items: center; gap: .5rem;
-        min-height: 38px; padding: .4rem .65rem; border: 1px solid transparent;
-        border-radius: 8px; background: transparent;
+        display: inline-flex; align-items: center; gap: .45rem; flex: 1 1 0;
+        min-height: 40px; padding: .4rem .7rem; border: 1px solid transparent;
+        border-radius: 9px; background: transparent;
         color: var(--sv-muted); font-size: .76rem; font-weight: 750; text-decoration: none;
-        transition: all .15s ease;
+        line-height: 1.2; white-space: nowrap; transition: color .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
     }
     .sv-scope-btn:hover {
         border-color: color-mix(in srgb, var(--sv-brand) 35%, var(--sv-line));
@@ -93,6 +93,7 @@
         background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .06);
         color: var(--sv-brand-strong);
     }
+    .sv-scope-btn > span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
     .sv-scope-btn--warning.active {
         border-color: color-mix(in srgb, var(--sv-warning) 30%, var(--sv-line));
         color: var(--sv-warning);
@@ -135,15 +136,16 @@
     }
     .sv-feedback.is-visible { display: block; }
     .sv-panel { overflow: hidden; }
-    .sv-panel-head { display: grid; gap: .65rem; padding: .8rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
-    .sv-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
-    .sv-store-picker-row { display: grid; gap: .45rem; padding-top: .65rem; border-top: 1px solid var(--sv-line); }
+    .sv-panel-head { display: grid; gap: .7rem; padding: .9rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
+    .sv-panel-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; min-width: 0; }
+    .sv-panel-title-row > div { min-width: 0; }
+    .sv-store-picker-row { display: grid; gap: .45rem; padding-top: .7rem; border-top: 1px solid var(--sv-line); }
     @media (min-width: 768px) { .sv-store-picker-row { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .75rem; } }
     .sv-store-picker-label {
         display: inline-flex; align-items: center; gap: .35rem; min-height: 28px; font-size: .65rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
     }
-    .sv-store-groups { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; min-width: 0; }
-    .sv-store-group { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; min-width: 0; }
+    .sv-store-groups { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem; min-width: 0; }
+    .sv-store-group { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; min-width: 0; }
     .sv-store-group-label {
         display: inline-flex; align-items: center; gap: .3rem; color: var(--sv-muted);
         font-size: .6rem; font-weight: 800; letter-spacing: .025em; text-transform: uppercase; white-space: nowrap;
@@ -156,11 +158,12 @@
         .sv-store-tab-list::-webkit-scrollbar { display: none; }
     }
     .sv-panel-summary {
-        display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .65rem; padding-top: .6rem; border-top: 1px solid var(--sv-line);
-        color: var(--sv-muted); font-size: .7rem; line-height: 1.35;
+        display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .55rem; padding: .45rem .6rem;
+        border: 1px solid color-mix(in srgb, var(--sv-line) 82%, transparent); border-radius: 10px;
+        background: color-mix(in srgb, var(--sv-soft) 55%, var(--sv-surface)); color: var(--sv-muted); font-size: .68rem; line-height: 1.35;
     }
     .sv-summary-item {
-        display: inline-flex; align-items: center; gap: .25rem; min-height: 28px;
+        display: inline-flex; align-items: center; gap: .25rem; min-height: 26px;
         color: var(--sv-muted); font-weight: 700; text-decoration: none;
     }
     .sv-summary-item strong { color: var(--sv-content); font-size: .76rem; font-variant-numeric: tabular-nums; }
@@ -169,6 +172,8 @@
     a.sv-summary-item:focus-visible { outline: 2px solid var(--sv-brand); outline-offset: 2px; }
     a.sv-summary-item.active { background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface)); color: var(--sv-brand-strong); }
     .sv-summary-item--warning strong { color: #b45309; }
+    .sv-summary-item--status { color: var(--sv-muted); }
+    .sv-summary-item--status i { color: var(--sv-brand); }
     .sv-scope-note { color: var(--sv-muted); font-size: .68rem; line-height: 1.35; }
     .sv-panel-title { margin: 0; color: var(--sv-content); font-size: .92rem; font-weight: 850; letter-spacing: -.015em; }
     .sv-panel-count {
@@ -356,6 +361,12 @@
         .sv-search-field { grid-column: auto; }
         .sv-records { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
+    @media (min-width: 992px) {
+        .sv-panel-head { grid-template-columns: minmax(190px, .62fr) minmax(0, 1.38fr); align-items: center; }
+        .sv-panel-title-row { grid-column: 1; }
+        .sv-scope-nav { grid-column: 2; }
+        .sv-store-picker-row, .sv-panel-summary { grid-column: 1 / -1; }
+    }
     @media (min-width: 1120px) {
         .sv-panel-head { padding: .75rem 1rem; }
         .sv-list-head, .sv-record {
@@ -504,9 +515,9 @@
             <div class="sv-panel-head">
                 <div class="sv-panel-title-row">
                     <div>
-                        <h2 class="sv-panel-title">{{ $stockScope === 'all' ? 'Semua variant' : ($stockScope === 'internal_empty_marketplace_stock' ? 'Perlu dicek' : 'Stok marketplace kosong') }}</h2>
+                        <h2 class="sv-panel-title">{{ $stockScope === 'all' ? 'Semua variant' : ($stockScope === 'internal_empty_marketplace_stock' ? 'Stok tidak sinkron' : 'Marketplace kosong') }}</h2>
                     </div>
-                    <span class="sv-panel-count">{{ number_format($variants->count()) }} di halaman ini</span>
+                    <span class="sv-panel-count">{{ number_format($variants->count()) }} variant</span>
                 </div>
 
                 <nav class="sv-scope-nav" aria-label="Mode pemeriksaan stok">
@@ -515,7 +526,7 @@
                        data-dashboard-link
                        href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => null, 'stock_status' => null])) }}">
                         <i class="bi bi-grid-3x3-gap"></i>
-                        <span>Semua</span>
+                        <span>Semua variant</span>
                         <span class="sv-badge" data-summary="scope_all">{{ number_format($mappedTotal) }}</span>
                     </a>
                     <a class="sv-scope-btn {{ $stockScope === 'marketplace_empty' ? 'active' : '' }}"
@@ -523,7 +534,7 @@
                        data-dashboard-link
                        href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => 'marketplace_empty', 'stock_status' => 'zero'])) }}">
                         <i class="bi bi-box-seam"></i>
-                        <span>MP 0 · Internal ada</span>
+                        <span>Marketplace kosong</span>
                         <span class="sv-badge" data-summary="scope_empty">{{ number_format($emptyScopeTotal) }}</span>
                     </a>
                     <a class="sv-scope-btn sv-scope-btn--warning {{ $stockScope === 'internal_empty_marketplace_stock' ? 'active' : '' }}"
@@ -531,7 +542,7 @@
                        data-dashboard-link
                        href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => 'internal_empty_marketplace_stock', 'stock_status' => null])) }}">
                         <i class="bi bi-exclamation-triangle"></i>
-                        <span>Internal 0 · MP ada</span>
+                        <span>Stok tidak sinkron</span>
                         <span class="sv-badge sv-badge--warning" data-summary="scope_internal_empty">{{ number_format($internalEmptyTotal) }}</span>
                     </a>
                 </nav>
@@ -539,7 +550,7 @@
                 <div class="sv-store-picker-row">
                     <span class="sv-store-picker-label"><i class="bi bi-shop"></i> Toko</span>
                     <div class="sv-store-groups" role="group" aria-label="Pilih toko marketplace">
-                        <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua Toko</a>
+                        <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua</a>
                         @foreach($storeGroups as $group)
                             @continue($group['stores']->isEmpty())
                             <section class="sv-store-group" aria-labelledby="svStoreGroup{{ ucfirst($group['key']) }}">
@@ -556,18 +567,17 @@
 
                 <nav class="sv-panel-summary" aria-label="Ringkasan dan filter stok">
                     @if($stockScope === 'internal_empty_marketplace_stock')
-                        <span class="sv-summary-item sv-summary-item--warning"><strong data-summary="internal_empty">{{ number_format($internalEmptyTotal) }}</strong> variant internal kosong</span>
+                        <span class="sv-summary-item sv-summary-item--warning"><strong data-summary="internal_empty">{{ number_format($internalEmptyTotal) }}</strong> variant</span>
                         <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
-                        <span class="sv-summary-item">Marketplace masih ada stok</span>
+                        <span class="sv-summary-item sv-summary-item--status"><i class="bi bi-info-circle"></i>Marketplace masih ada stok</span>
                     @elseif($stockScope === 'marketplace_empty')
-                        <span class="sv-summary-item"><strong data-summary="total">{{ number_format($emptyScopeTotal) }}</strong> variant siap diisi</span>
+                        <span class="sv-summary-item"><strong data-summary="total">{{ number_format($emptyScopeTotal) }}</strong> variant</span>
                         <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
-                        <a class="sv-summary-item {{ $stockStatus === 'zero' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'zero'])) }}">Stok 0: <strong data-summary="zero">{{ number_format($summary['zero']) }}</strong></a>
-                        <a class="sv-summary-item {{ $stockStatus === 'negative' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'negative'])) }}">Minus: <strong data-summary="negative">{{ number_format($summary['negative']) }}</strong></a>
+                        <a class="sv-summary-item {{ $stockStatus === 'zero' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'zero'])) }}">Stok 0 <strong data-summary="zero">{{ number_format($summary['zero']) }}</strong></a>
+                        <a class="sv-summary-item {{ $stockStatus === 'negative' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'negative'])) }}">Minus <strong data-summary="negative">{{ number_format($summary['negative']) }}</strong></a>
                     @else
                         <span class="sv-summary-item"><strong data-summary="total">{{ number_format($mappedTotal) }}</strong> variant</span>
                         <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
-                        <span class="sv-summary-item">Pilih mode stok untuk menyaring</span>
                     @endif
                 </nav>
             </div>
