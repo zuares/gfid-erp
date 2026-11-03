@@ -29,6 +29,21 @@
     .tt-finance-kpi strong { display:block; margin-top:.25rem; color:#111827; font-size:1rem; font-variant-numeric:tabular-nums; }
     .tt-finance-kpi.in strong { color:#047857; }
     .tt-finance-kpi.out strong { color:#b91c1c; }
+    .tt-finance-recon { margin-bottom:.9rem; padding:1rem; }
+    .tt-finance-recon-head { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:.8rem; }
+    .tt-finance-recon-title { color:#111827; font-size:.95rem; font-weight:850; }
+    .tt-finance-recon-note { color:#64748b; font-size:.72rem; line-height:1.5; }
+    .tt-finance-recon-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.65rem; }
+    .tt-finance-recon-item { padding:.72rem .8rem; border:1px solid #eef2f7; border-radius:10px; background:#fbfdff; }
+    .tt-finance-recon-item small { display:block; color:#64748b; font-size:.67rem; font-weight:750; }
+    .tt-finance-recon-item strong { display:block; margin-top:.2rem; color:#111827; font-size:.95rem; font-variant-numeric:tabular-nums; }
+    .tt-finance-recon-item.gmv strong { color:#b91c1c; }
+    .tt-finance-recon-item.billing strong { color:#9a3412; }
+    .tt-finance-recon-status { font-size:.72rem; font-weight:800; }
+    .tt-finance-recon-status.ready { color:#047857; }
+    .tt-finance-recon-status.warn { color:#a16207; }
+    @media (max-width: 900px) { .tt-finance-recon-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 600px) { .tt-finance-recon-grid { grid-template-columns:1fr 1fr; } }
     .tt-finance-table-wrap { overflow:auto; }
     .tt-finance-table { width:100%; min-width:900px; margin:0; font-size:.78rem; }
     .tt-finance-table th { padding:.72rem .8rem; color:#64748b; background:#f8fafc; font-size:.67rem; letter-spacing:.03em; text-transform:uppercase; white-space:nowrap; }
@@ -117,6 +132,20 @@
         <div class="tt-finance-card tt-finance-kpi"><small>Arah belum pasti</small><strong id="ttUnknown">0</strong></div>
     </section>
 
+    <section class="tt-finance-card tt-finance-recon" aria-label="Rekonsiliasi uang keluar">
+        <div class="tt-finance-recon-head">
+            <div><div class="tt-finance-recon-title">Rekonsiliasi uang keluar</div><div class="tt-finance-recon-note">Sumber sementara: transaksi GMV Pay dan billing yang sudah tersimpan di Finance TikTok. Dipakai untuk mencocokkan kas keluar, bukan menggantikan Cost iklan harian.</div></div>
+            <span id="ttReconStatus" class="tt-finance-recon-status">Belum dimuat</span>
+        </div>
+        <div class="tt-finance-recon-grid">
+            <div class="tt-finance-recon-item gmv"><small>GMV Pay</small><strong id="ttReconGmv">—</strong></div>
+            <div class="tt-finance-recon-item billing"><small>Billing iklan</small><strong id="ttReconBilling">—</strong></div>
+            <div class="tt-finance-recon-item"><small>Total kas keluar iklan terpetakan</small><strong id="ttReconTotal">—</strong></div>
+            <div class="tt-finance-recon-item"><small>Uang keluar belum terklasifikasi</small><strong id="ttReconOther">—</strong></div>
+        </div>
+        <div id="ttReconMeta" class="tt-finance-recon-note mt-2">Pilih toko dan periode, lalu muat data.</div>
+    </section>
+
     <section class="tt-finance-card">
         <div id="ttTableWrap" class="tt-finance-table-wrap">
             <div class="tt-finance-empty"><i class="bi bi-database"></i>Pilih toko dan periode, lalu muat transaksi dari database lokal.</div>
@@ -186,6 +215,9 @@
         $('ttTableWrap').innerHTML = '<div class="tt-finance-empty"><i class="bi bi-database"></i>Membaca database lokal…</div>';
         try {
             const response = await fetch(buildUrl(), { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+            const reconciliationPromise = $('ttStore').value
+                ? fetch(`/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/tiktok-financial-transactions/reconciliation?date_from=${encodeURIComponent($('ttFrom').value)}&date_to=${encodeURIComponent($('ttTo').value)}`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                : Promise.resolve(null);
             const json = await response.json().catch(() => ({}));
             if (!response.ok || json.success === false) throw new Error(json.message || `Gagal mengambil data (${response.status})`);
             const data = json.data || {}; const summary = data.summary || {}; const pagination = data.pagination || {};
@@ -194,6 +226,19 @@
             $('ttIn').textContent = money(summary.total_money_in); $('ttOut').textContent = money(summary.total_money_out); $('ttNet').textContent = money(summary.net_amount); $('ttUnknown').textContent = Number(summary.unknown_flow_count || 0).toLocaleString('id-ID');
             render(state.items); $('ttNext').disabled = !state.hasMore; $('ttPrev').disabled = state.page <= 1; $('ttPageInfo').textContent = `Halaman ${state.page} dari ${state.lastPage} · ${state.items.length} baris dari ${Number(pagination.total || summary.total_count || 0).toLocaleString('id-ID')} transaksi`;
             $('ttStorageStatus').textContent = data.last_synced_at ? `Sumber: database lokal · Sync terakhir ${new Date(data.last_synced_at).toLocaleString('id-ID')}` : 'Sumber: database lokal · Belum ada sinkronisasi untuk periode ini';
+            const reconResponse = await reconciliationPromise;
+            const reconJson = reconResponse ? await reconResponse.json().catch(() => ({})) : {};
+            if (reconResponse?.ok && reconJson.success) {
+                const recon = reconJson.data || {}; const bucket = key => (recon.buckets || []).find((item) => item.key === key);
+                const buckets = recon.buckets || [];
+                const gmv = buckets.find((item) => item.label === 'GMV Pay') || buckets[0] || {};
+                const billing = buckets.find((item) => item.label === 'Billing iklan') || buckets[1] || {};
+                $('ttReconGmv').textContent = money(gmv.amount || 0); $('ttReconBilling').textContent = money(billing.amount || 0);
+                $('ttReconTotal').textContent = money(recon.reconciled_ad_cash_out || 0); $('ttReconOther').textContent = money(recon.unclassified_money_out || 0);
+                $('ttReconStatus').textContent = recon.status === 'READY' ? 'Siap direkonsiliasi' : (recon.status === 'NO_DATA' ? 'Belum ada data' : 'Belum ada kas iklan');
+                $('ttReconStatus').className = `tt-finance-recon-status ${recon.status === 'READY' ? 'ready' : 'warn'}`;
+                $('ttReconMeta').textContent = `${recon.total_transactions || 0} transaksi · Kas keluar total ${money(recon.total_money_out || 0)} · Sync terakhir ${recon.last_synced_at ? new Date(recon.last_synced_at).toLocaleString('id-ID') : 'belum ada'} · ${recon.note || ''}`;
+            }
         } catch (error) {
             showError(error.message); $('ttTableWrap').innerHTML = `<div class="tt-finance-empty text-danger"><i class="bi bi-exclamation-triangle"></i>${escapeHtml(error.message)}</div>`; $('ttPageInfo').textContent = 'Gagal membaca database lokal';
         } finally { state.loading = false; $('ttLoad').disabled = false; }

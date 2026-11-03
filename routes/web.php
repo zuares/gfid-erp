@@ -176,6 +176,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/stores/{store}/shopee-transactions', [ShopeeTransactionController::class, 'data'])->name('marketplace.api.shopee-transactions');
     Route::get('/stores/{store}/shopee-transactions/export', [ShopeeTransactionController::class, 'export'])->name('marketplace.api.shopee-transactions.export');
     Route::get('/stores/{store}/tiktok-financial-transactions', [TikTokFinancialTransactionController::class, 'data'])->name('marketplace.api.tiktok-financial-transactions');
+    Route::get('/stores/{store}/tiktok-financial-transactions/reconciliation', [TikTokFinancialTransactionController::class, 'reconciliation'])->name('marketplace.api.tiktok-financial-transactions.reconciliation');
     Route::get('/stores/{store}/tiktok-financial-transactions/export', [TikTokFinancialTransactionController::class, 'export'])->name('marketplace.api.tiktok-financial-transactions.export');
     Route::post('/stores/{store}/tiktok-financial-transactions/sync', [TikTokFinancialTransactionController::class, 'sync'])
         ->name('marketplace.api.tiktok-financial-transactions.sync');

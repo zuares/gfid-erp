@@ -233,6 +233,103 @@ class TikTokFinancialTransactionService
     }
 
     /**
+     * Reconcile cash leaving TikTok using both local finance sources. This is
+     * a cash-control view: it is intentionally separate from ad-delivery Cost
+     * used by Marketplace Analytics profit metrics.
+     *
+     * @return array<string, mixed>
+     */
+    public function cashOutReconciliation(Store $store, Carbon $from, Carbon $to): array
+    {
+        $this->assertTikTok($store);
+
+        $rows = MarketplaceTikTokFinancialTransaction::query()
+            ->where('store_id', $store->id)
+            ->whereBetween('transaction_created_at', [$from, $to])
+            ->orderBy('transaction_created_at')
+            ->orderBy('id')
+            ->get();
+
+        $buckets = [
+            'gmv_pay' => ['label' => 'GMV Pay', 'count' => 0, 'amount' => 0.0, 'sources' => []],
+            'billing' => ['label' => 'Billing iklan', 'count' => 0, 'amount' => 0.0, 'sources' => []],
+            'other_out' => ['label' => 'Uang keluar lain', 'count' => 0, 'amount' => 0.0, 'sources' => []],
+        ];
+        $moneyOut = 0.0;
+        $moneyIn = 0.0;
+        $unknown = 0;
+        $latestSync = null;
+
+        foreach ($rows as $row) {
+            $flow = strtoupper((string) ($row->money_flow ?? 'UNKNOWN'));
+            $amount = (float) $row->amount;
+            $latestSync = $latestSync === null || $row->synced_at?->greaterThan($latestSync)
+                ? $row->synced_at
+                : $latestSync;
+
+            if ($flow === 'MONEY_IN') {
+                $moneyIn += $amount;
+
+                continue;
+            }
+            if ($flow !== 'MONEY_OUT') {
+                $unknown++;
+
+                continue;
+            }
+
+            $moneyOut += $amount;
+            $payloadText = strtoupper(json_encode($row->source_payload ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
+            $type = strtoupper((string) $row->transaction_type);
+            $isGmvPay = in_array($type, ['GMV_PAYMENT_FOR_ADS', 'GMV_PAY', 'GMV_PAYMENT'], true)
+                || str_contains($type, 'GMV_PAYMENT_FOR_ADS')
+                || (str_contains($payloadText, 'GMV') && str_contains($payloadText, 'AD'));
+            $isBilling = ! $isGmvPay && (
+                in_array($type, ['PAYMENT', 'BILLING', 'AD_BILLING', 'AD_PAYMENT', 'AD_CHARGE', 'TOP_UP'], true)
+                || str_contains($type, 'BILL')
+                || str_contains($type, 'AD_PAYMENT')
+                || str_contains($payloadText, 'BILLING')
+                || str_contains($payloadText, 'ADVERTIS')
+                || str_contains($payloadText, 'IKLAN')
+            );
+            $bucket = $isGmvPay ? 'gmv_pay' : ($isBilling ? 'billing' : 'other_out');
+            $buckets[$bucket]['count']++;
+            $buckets[$bucket]['amount'] += $amount;
+            $buckets[$bucket]['sources'][$row->source] = ($buckets[$bucket]['sources'][$row->source] ?? 0) + 1;
+        }
+
+        foreach ($buckets as &$bucket) {
+            $bucket['amount'] = round($bucket['amount'], 2);
+            $bucket['sources'] = collect($bucket['sources'])
+                ->map(fn ($count, $source): array => ['source' => $source, 'count' => (int) $count])
+                ->values()
+                ->all();
+        }
+        unset($bucket);
+
+        $reconciled = round($buckets['gmv_pay']['amount'] + $buckets['billing']['amount'], 2);
+
+        return [
+            'store_id' => (int) $store->id,
+            'store_name' => $store->name,
+            'date_from' => $from->toDateString(),
+            'date_to' => $to->toDateString(),
+            'status' => $rows->isEmpty() ? 'NO_DATA' : ($reconciled > 0 ? 'READY' : 'NO_AD_CASH_OUT'),
+            'source' => 'local_database',
+            'sources_present' => $rows->pluck('source')->unique()->values()->all(),
+            'last_synced_at' => $latestSync?->toISOString(),
+            'total_transactions' => $rows->count(),
+            'total_money_in' => round($moneyIn, 2),
+            'total_money_out' => round($moneyOut, 2),
+            'reconciled_ad_cash_out' => $reconciled,
+            'unclassified_money_out' => round($buckets['other_out']['amount'], 2),
+            'unknown_flow_count' => $unknown,
+            'buckets' => array_values($buckets),
+            'note' => 'GMV Pay dan billing adalah uang keluar untuk rekonsiliasi kas. Nilai ini tidak menggantikan Cost harian iklan pada profit analytics.',
+        ];
+    }
+
+    /**
      * Sync both local listing sources. This is called by the queue job and
      * scheduler command, never by the listing request.
      *

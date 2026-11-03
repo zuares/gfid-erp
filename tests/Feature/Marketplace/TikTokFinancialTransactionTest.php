@@ -126,6 +126,101 @@ class TikTokFinancialTransactionTest extends TestCase
         });
     }
 
+    public function test_cash_out_reconciliation_separates_gmv_pay_billing_and_other_outflows(): void
+    {
+        $store = $this->createStore();
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'GMV-PAY-1',
+            'source' => 'statement_transactions',
+            'transaction_type' => 'GMV_PAYMENT_FOR_ADS',
+            'amount' => 12000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_OUT',
+            'status' => 'SETTLED',
+            'transaction_created_at' => '2026-11-01 10:00:00',
+            'source_payload' => ['type' => 'GMV_PAYMENT_FOR_ADS'],
+            'synced_at' => '2026-11-01 11:00:00',
+        ]);
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'BILLING-1',
+            'source' => 'withdrawals',
+            'transaction_type' => 'PAYMENT',
+            'amount' => 8000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_OUT',
+            'status' => 'COMPLETED',
+            'transaction_created_at' => '2026-11-01 12:00:00',
+            'source_payload' => ['description' => 'TikTok Ads billing'],
+            'synced_at' => '2026-11-01 13:00:00',
+        ]);
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'OTHER-1',
+            'source' => 'statement_transactions',
+            'transaction_type' => 'PLATFORM_PENALTY',
+            'amount' => 3000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_OUT',
+            'status' => 'SETTLED',
+            'transaction_created_at' => '2026-11-01 14:00:00',
+            'source_payload' => ['description' => 'Penalty'],
+            'synced_at' => '2026-11-01 15:00:00',
+        ]);
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'IN-1',
+            'source' => 'statement_transactions',
+            'transaction_type' => 'ORDER',
+            'amount' => 100000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_IN',
+            'status' => 'SETTLED',
+            'transaction_created_at' => '2026-11-01 16:00:00',
+            'source_payload' => [],
+            'synced_at' => '2026-11-01 17:00:00',
+        ]);
+
+        $result = app(TikTokFinancialTransactionService::class)->cashOutReconciliation(
+            $store,
+            now()->setDate(2026, 11, 1)->startOfDay(),
+            now()->setDate(2026, 11, 1)->endOfDay(),
+        );
+
+        $this->assertSame('READY', $result['status']);
+        $this->assertSame(12000.0, $result['buckets'][0]['amount']);
+        $this->assertSame(8000.0, $result['buckets'][1]['amount']);
+        $this->assertSame(20000.0, $result['reconciled_ad_cash_out']);
+        $this->assertSame(3000.0, $result['unclassified_money_out']);
+        $this->assertSame(23000.0, $result['total_money_out']);
+        $this->assertSame(100000.0, $result['total_money_in']);
+    }
+
+    public function test_cash_out_reconciliation_endpoint_reads_both_sources(): void
+    {
+        $store = $this->createStore();
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'GMV-ENDPOINT-1',
+            'source' => 'statement_transactions',
+            'transaction_type' => 'GMV_PAYMENT_FOR_ADS',
+            'amount' => 4500,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_OUT',
+            'status' => 'SETTLED',
+            'transaction_created_at' => '2026-11-01 10:00:00',
+            'source_payload' => [],
+        ]);
+        $response = $this->actingAs($this->user())->getJson(route('marketplace.api.tiktok-financial-transactions.reconciliation', [
+            'store' => $store,
+            'date_from' => '2026-11-01',
+            'date_to' => '2026-11-01',
+        ]));
+
+        $response->assertOk()->assertJsonPath('data.reconciled_ad_cash_out', 4500);
+    }
+
     public function test_upsert_is_idempotent_and_non_tiktok_store_is_rejected(): void
     {
         $store = $this->createStore();

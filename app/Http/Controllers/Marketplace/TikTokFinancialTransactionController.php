@@ -95,6 +95,28 @@ class TikTokFinancialTransactionController extends Controller
         }
     }
 
+    public function reconciliation(Request $request, Store $store): JsonResponse
+    {
+        $validated = $request->validate([
+            'date_from' => ['required', 'date_format:Y-m-d'],
+            'date_to' => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        [$from, $to, $error] = $this->parseDateWindow($validated['date_from'], $validated['date_to']);
+        if ($error !== null) {
+            return response()->json(['success' => false, 'message' => $error], 422);
+        }
+
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => $this->service->cashOutReconciliation($store, $from, $to),
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     public function sync(Request $request, Store $store): JsonResponse
     {
         $validated = $request->validate([
