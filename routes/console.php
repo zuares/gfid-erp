@@ -327,7 +327,7 @@ Schedule::call(fn () => Artisan::call('queue:work', ['--queue' => 'heavy', '--st
 // timeout worker default. Worker legacy di atas tetap dipertahankan untuk job
 // heavy lama yang masih berada pada connection database default.
 Schedule::call(fn () => Artisan::call('queue:work', [
-    '--connection' => 'heavy',
+    'connection' => 'heavy',
     '--queue' => 'heavy',
     '--stop-when-empty' => true,
     '--max-time' => 280,
