@@ -6,29 +6,52 @@
 @push('head')
 <style>
     .tt-finance-page { max-width: 1280px; margin-inline: auto; padding-bottom: 1.5rem; }
-    .tt-finance-hero { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:.9rem; padding:1.2rem 1.3rem; border-radius:18px; color:#fff; background:linear-gradient(135deg,#111827,#374151 58%,#0f766e); box-shadow:0 14px 34px rgba(15,23,42,.18); }
+    .tt-finance-hero { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:.85rem; padding:1.1rem 1.25rem; border-radius:18px; color:#fff; background:linear-gradient(135deg,#111827,#1f2937 55%,#0f766e); box-shadow:0 14px 34px rgba(15,23,42,.18); }
     .tt-finance-hero h1 { margin:0 0 .35rem; font-size:1.28rem; font-weight:850; letter-spacing:-.03em; }
     .tt-finance-hero p { max-width:54rem; margin:0; color:#d1fae5; font-size:.8rem; line-height:1.5; }
     .tt-finance-badge { display:inline-flex; align-items:center; gap:.45rem; padding:.38rem .72rem; border:1px solid rgba(255,255,255,.25); border-radius:999px; color:#ccfbf1; background:rgba(0,0,0,.18); font-size:.72rem; font-weight:800; white-space:nowrap; }
     .tt-finance-badge i { width:8px; height:8px; border-radius:50%; background:#4ade80; box-shadow:0 0 0 4px rgba(74,222,128,.2); }
     .tt-finance-card { border:1px solid var(--border-color, #e5e7eb); border-radius:14px; background:var(--card, #fff); }
-    .tt-finance-filters { display:grid; grid-template-columns:1.25fr 1.25fr .8fr .8fr .8fr; gap:.75rem; align-items:end; padding:1rem; margin-bottom:.9rem; }
+    .tt-finance-filters { padding:1rem; margin-bottom:.85rem; }
+    .tt-finance-filters-grid { display:grid; grid-template-columns:minmax(180px,1.2fr) minmax(135px,.9fr) minmax(135px,.9fr) minmax(140px,1fr) minmax(160px,1.2fr); gap:.75rem; align-items:end; }
     .tt-finance-field label { display:block; margin-bottom:.3rem; color:#64748b; font-size:.68rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
     .tt-finance-field .form-control, .tt-finance-field .form-select { font-size:.82rem; border-radius:9px; }
-    .tt-finance-types { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:.45rem .8rem; padding-top:.2rem; }
+    .tt-finance-types { display:flex; flex-wrap:wrap; gap:.45rem .8rem; padding-top:.2rem; }
     .tt-finance-type { display:inline-flex; align-items:center; gap:.35rem; color:#475569; font-size:.76rem; }
-    .tt-finance-actions { grid-column:1 / -1; display:flex; justify-content:space-between; gap:.6rem; flex-wrap:wrap; align-items:center; }
-    .tt-finance-actions .btn { border-radius:9px; font-size:.78rem; font-weight:750; }
+    .tt-finance-preset-row { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; margin-top:.75rem; padding-top:.75rem; border-top:1px dashed #e5e7eb; }
+    .tt-finance-quick-presets { display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; }
+    .tt-finance-quick-label { margin-right:.2rem; color:#64748b; font-size:.67rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+    .tt-finance-quick-btn { padding:.22rem .55rem; border:1px solid #e5e7eb; border-radius:999px; color:#64748b; background:transparent; cursor:pointer; font-size:.7rem; font-weight:650; line-height:1.2; transition:all .15s ease-in-out; }
+    .tt-finance-quick-btn:hover { border-color:#99f6e4; color:#0f766e; background:#f0fdfa; }
+    .tt-finance-quick-btn.active { border-color:#0f766e; color:#fff; background:#0f766e; box-shadow:0 2px 6px rgba(15,118,110,.25); }
+    .tt-finance-search-bar { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; margin-top:.75rem; }
+    .tt-finance-search-wrap { position:relative; flex:1 1 280px; }
+    .tt-finance-search-wrap .search-icon { position:absolute; top:50%; left:.75rem; color:#64748b; font-size:.85rem; pointer-events:none; transform:translateY(-50%); }
+    .tt-finance-search-wrap input { padding-right:2.15rem; padding-left:2.15rem; border-radius:8px; font-size:.82rem; }
+    .tt-finance-search-clear { position:absolute; top:50%; right:.55rem; display:none; padding:0 .25rem; border:0; color:#64748b; background:transparent; cursor:pointer; font-size:1.1rem; line-height:1; transform:translateY(-50%); }
+    .tt-finance-search-clear.show { display:block; }
+    .tt-finance-actions { display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; margin-top:.75rem; }
+    .tt-finance-actions .btn { border-radius:999px; font-size:.78rem; font-weight:750; }
+    .tt-finance-actions-group { display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; }
+    .tt-finance-help { display:flex; align-items:center; gap:.4rem; margin-top:.65rem; color:#64748b; font-size:.73rem; }
     .tt-finance-alert { display:none; padding:.7rem .85rem; margin-bottom:.9rem; border:1px solid #fecaca; border-radius:10px; color:#991b1b; background:#fef2f2; font-size:.78rem; }
     .tt-finance-alert.show { display:block; }
     .tt-finance-alert.success { border-color:#bbf7d0; color:#166534; background:#f0fdf4; }
     .tt-finance-storage-status { color:#64748b; font-size:.72rem; }
-    .tt-finance-kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.7rem; margin-bottom:.9rem; }
+    .tt-finance-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.75rem; margin-bottom:.85rem; }
     .tt-finance-kpi { padding:.85rem 1rem; }
     .tt-finance-kpi small { display:block; color:#64748b; font-size:.68rem; font-weight:750; }
-    .tt-finance-kpi strong { display:block; margin-top:.25rem; color:#111827; font-size:1rem; font-variant-numeric:tabular-nums; }
+    .tt-finance-kpi strong { display:block; margin-top:.25rem; color:#111827; font-size:1.15rem; font-weight:900; line-height:1.25; font-variant-numeric:tabular-nums; }
+    .tt-finance-kpi-note { margin-top:.2rem; color:#64748b; font-size:.7rem; }
     .tt-finance-kpi.in strong { color:#047857; }
     .tt-finance-kpi.out strong { color:#b91c1c; }
+    .tt-finance-kpi.net strong { color:#2563eb; }
+    .tt-finance-breakdown { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.85rem; padding:.5rem .75rem; border:1px solid #e5e7eb; border-radius:10px; background:var(--card,#fff); }
+    .tt-finance-breakdown-label { color:#64748b; font-size:.68rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+    .tt-finance-breakdown-pills { display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; }
+    .tt-finance-pill-button { display:inline-flex; align-items:center; gap:.35rem; padding:.2rem .55rem; border:1px solid transparent; border-radius:999px; cursor:pointer; font-size:.7rem; font-weight:700; transition:all .15s; }
+    .tt-finance-pill-button:hover { box-shadow:0 2px 5px rgba(0,0,0,.08); transform:translateY(-1px); }
+    .tt-finance-pill-button.active { box-shadow:0 0 0 2px #0f766e; }
     .tt-finance-recon { margin-bottom:.9rem; padding:1rem; }
     .tt-finance-recon-head { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:.8rem; }
     .tt-finance-recon-title { color:#111827; font-size:.95rem; font-weight:850; }
@@ -44,10 +67,10 @@
     .tt-finance-recon-status.warn { color:#a16207; }
     @media (max-width: 900px) { .tt-finance-recon-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media (max-width: 600px) { .tt-finance-recon-grid { grid-template-columns:1fr 1fr; } }
-    .tt-finance-table-wrap { overflow:auto; }
-    .tt-finance-table { width:100%; min-width:900px; margin:0; font-size:.78rem; }
+    .tt-finance-table-wrap { overflow:auto; border-bottom-left-radius:0; border-bottom-right-radius:0; }
+    .tt-finance-table { width:100%; min-width:980px; margin:0; font-size:.78rem; }
     .tt-finance-table th { padding:.72rem .8rem; color:#64748b; background:#f8fafc; font-size:.67rem; letter-spacing:.03em; text-transform:uppercase; white-space:nowrap; }
-    .tt-finance-table td { padding:.75rem .8rem; vertical-align:top; border-top:1px solid #eef2f7; }
+    .tt-finance-table td { padding:.65rem .85rem; vertical-align:middle; border-top:1px solid #eef2f7; white-space:nowrap; }
     .tt-finance-table code { color:#334155; font-size:.72rem; }
     .tt-finance-pill { display:inline-flex; padding:.25rem .5rem; border-radius:999px; font-size:.68rem; font-weight:800; white-space:nowrap; }
     .tt-finance-pill.success { color:#047857; background:#ecfdf5; }
@@ -60,11 +83,24 @@
     .tt-finance-flow-unknown { color:#a16207; font-weight:800; }
     .tt-finance-empty { padding:3rem 1rem; color:#64748b; text-align:center; }
     .tt-finance-empty i { display:block; margin-bottom:.5rem; color:#94a3b8; font-size:1.8rem; }
-    .tt-finance-pagination { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.8rem 1rem; border-top:1px solid #eef2f7; color:#64748b; font-size:.74rem; }
-    .tt-finance-pagination .btn { border-radius:8px; font-size:.75rem; }
+    .tt-finance-pagination { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.75rem 1rem; border:1px solid #e5e7eb; border-top:0; border-radius:0 0 14px 14px; color:#64748b; background:var(--card,#fff); font-size:.74rem; }
+    .tt-finance-pagination .btn { border-radius:999px; font-size:.75rem; }
+    .tt-finance-modal-backdrop { position:fixed; inset:0; z-index:1050; display:none; align-items:flex-start; justify-content:center; overflow:auto; padding:1.2rem; background:rgba(15,23,42,.65); }
+    .tt-finance-modal-backdrop.show { display:flex; }
+    .tt-finance-modal { width:min(920px,100%); margin:3vh auto; overflow:hidden; border:1px solid #e5e7eb; border-radius:18px; background:var(--card,#fff); box-shadow:0 25px 80px rgba(15,23,42,.35); }
+    .tt-finance-modal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1rem 1.25rem; border-bottom:1px solid #e5e7eb; background:rgba(15,118,110,.04); }
+    .tt-finance-modal-title { color:#111827; font-size:1rem; font-weight:900; }
+    .tt-finance-modal-sub { margin-top:.2rem; color:#64748b; font-size:.72rem; }
+    .tt-finance-close { border:0; color:#64748b; background:transparent; cursor:pointer; font-size:1.35rem; line-height:1; }
+    .tt-finance-detail-body { padding:1.15rem; }
+    .tt-finance-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem; margin-bottom:1.1rem; }
+    .tt-finance-detail-card { padding:.65rem .85rem; border:1px solid #e5e7eb; border-radius:10px; background:rgba(148,163,184,.03); }
+    .tt-finance-detail-label { color:#64748b; font-size:.64rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+    .tt-finance-detail-value { margin-top:.25rem; color:#111827; font-size:.82rem; font-weight:800; word-break:break-word; }
+    .tt-finance-raw { max-height:320px; overflow:auto; margin:0; padding:.85rem; border-radius:10px; color:#cbd5e1; background:#0f172a; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.7rem; line-height:1.45; }
     .tt-finance-raw { max-width:280px; margin:.4rem 0 0; padding:.45rem; border-radius:7px; color:#475569; background:#f8fafc; font-size:.65rem; white-space:pre-wrap; word-break:break-word; }
-    @media (max-width: 900px) { .tt-finance-filters { grid-template-columns:1fr 1fr; } .tt-finance-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-    @media (max-width: 600px) { .tt-finance-filters { grid-template-columns:1fr; } .tt-finance-kpis { grid-template-columns:1fr 1fr; } .tt-finance-actions { align-items:stretch; } .tt-finance-actions .btn { flex:1; } }
+    @media (max-width: 992px) { .tt-finance-filters-grid { grid-template-columns:1fr 1fr; } .tt-finance-kpis { grid-template-columns:1fr 1fr; } .tt-finance-detail-grid { grid-template-columns:1fr; } }
+    @media (max-width: 600px) { .tt-finance-filters-grid { grid-template-columns:1fr; } .tt-finance-kpis { grid-template-columns:1fr 1fr; } .tt-finance-actions { align-items:stretch; } .tt-finance-actions .btn { flex:1; } }
 </style>
 @endpush
 
@@ -81,55 +117,84 @@
     <div id="ttAlert" class="tt-finance-alert" role="alert"></div>
 
     <section class="tt-finance-card tt-finance-filters" aria-label="Filter transaksi finansial TikTok">
-        <div class="tt-finance-field">
-            <label for="ttSource">Sumber data</label>
-            <select id="ttSource" class="form-select">
-                @foreach ($dataSources as $source)
-                    <option value="{{ $source['code'] }}">{{ $source['label'] }}</option>
-                @endforeach
-            </select>
+        <div class="tt-finance-filters-grid">
+            <div class="tt-finance-field">
+                <label for="ttStore">Toko TikTok</label>
+                <select id="ttStore" class="form-select">
+                    @forelse ($stores as $store)
+                        <option value="{{ $store->id }}">{{ $store->name }} · TikTok Shop</option>
+                    @empty
+                        <option value="">Tidak ada toko TikTok terhubung</option>
+                    @endforelse
+                </select>
+            </div>
+            <div class="tt-finance-field"><label for="ttFrom">Tanggal dari</label><input id="ttFrom" type="date" class="form-control"></div>
+            <div class="tt-finance-field"><label for="ttTo">Tanggal sampai</label><input id="ttTo" type="date" class="form-control"></div>
+            <div class="tt-finance-field">
+                <label for="ttSource">Sumber data</label>
+                <select id="ttSource" class="form-select">
+                    @foreach ($dataSources as $source)
+                        <option value="{{ $source['code'] }}">{{ $source['label'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="tt-finance-field"><label for="ttStatus">Status</label><select id="ttStatus" class="form-select"><option value="">Semua status</option>@foreach ($statuses as $status)<option value="{{ $status }}">{{ $status }}</option>@endforeach</select></div>
         </div>
-        <div class="tt-finance-field">
-            <label for="ttStore">Toko TikTok</label>
-            <select id="ttStore" class="form-select">
-                @forelse ($stores as $store)
-                    <option value="{{ $store->id }}">{{ $store->name }} · TikTok Shop</option>
-                @empty
-                    <option value="">Tidak ada toko TikTok terhubung</option>
-                @endforelse
-            </select>
-        </div>
-        <div class="tt-finance-field"><label for="ttFrom">Tanggal dari</label><input id="ttFrom" type="date" class="form-control"></div>
-        <div class="tt-finance-field"><label for="ttTo">Tanggal sampai</label><input id="ttTo" type="date" class="form-control"></div>
-        <div class="tt-finance-field"><label for="ttStatus">Status</label><select id="ttStatus" class="form-select"><option value="">Semua status</option>@foreach ($statuses as $status)<option value="{{ $status }}">{{ $status }}</option>@endforeach</select></div>
 
-        <div id="ttTypesField" class="tt-finance-field" style="grid-column:1 / -1">
-            <label>Tipe transaksi yang diminta ke TikTok</label>
+        <div class="tt-finance-preset-row">
+            <div class="tt-finance-quick-presets">
+                <span class="tt-finance-quick-label">Rentang cepat:</span>
+                <button type="button" class="tt-finance-quick-btn" data-preset="today">Hari ini</button>
+                <button type="button" class="tt-finance-quick-btn" data-preset="yesterday">Kemarin</button>
+                <button type="button" class="tt-finance-quick-btn" data-preset="7days">7 Hari</button>
+                <button type="button" class="tt-finance-quick-btn active" data-preset="15days">15 Hari</button>
+                <button type="button" class="tt-finance-quick-btn" data-preset="30days">30 Hari</button>
+                <button type="button" class="tt-finance-quick-btn" data-preset="thisMonth">Bulan Ini</button>
+                <button type="button" class="tt-finance-quick-btn" data-preset="lastMonth">Bulan Lalu</button>
+            </div>
+        </div>
+
+        <div class="tt-finance-search-bar">
+            <div class="tt-finance-search-wrap">
+                <i class="bi bi-search search-icon" aria-hidden="true"></i>
+                <input id="ttSearch" type="search" class="form-control" placeholder="Cari ID transaksi, order, statement, atau keterangan…" autocomplete="off">
+                <button id="ttSearchClear" type="button" class="tt-finance-search-clear" title="Hapus pencarian" aria-label="Hapus pencarian">×</button>
+            </div>
+            <div class="tt-finance-actions-group">
+                <button id="ttReset" type="button" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+                <button id="ttExport" type="button" class="btn btn-outline-secondary"><i class="bi bi-download me-1"></i>CSV</button>
+                <button id="ttSync" type="button" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Sync sekarang</button>
+                <button id="ttLoad" type="button" class="btn btn-primary"><i class="bi bi-database me-1"></i>Muat Data Lokal</button>
+            </div>
+        </div>
+
+        <div class="tt-finance-help">
+            <i class="bi bi-info-circle-fill text-success" aria-hidden="true"></i>
+            <span id="ttSourceHint">Data dibaca dari database lokal. Rentang maksimal 60 hari; Sync sekarang mengambil data terbaru dari TikTok.</span>
+        </div>
+        <div id="ttTypesField" class="tt-finance-field mt-3">
+            <label>Tipe transaksi untuk sync akun</label>
             <div class="tt-finance-types">
                 @foreach ($transactionTypes as $type)
                     <label class="tt-finance-type"><input type="checkbox" class="form-check-input tt-type" value="{{ $type['code'] }}" checked> {{ $type['label'] }} <code>{{ $type['code'] }}</code></label>
                 @endforeach
             </div>
-            <small id="ttSourceHint" class="text-muted d-block mt-2">Pagination memakai cursor TikTok untuk transaksi level akun.</small>
         </div>
-
         <div class="tt-finance-actions">
             <small id="ttStorageStatus" class="tt-finance-storage-status">Sumber: database lokal · Belum ada sinkronisasi</small>
-            <div class="d-flex gap-2">
-                <button id="ttReset" type="button" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
-                <button id="ttExport" type="button" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV</button>
-                <button id="ttSync" type="button" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Sync sekarang</button>
-                <button id="ttLoad" type="button" class="btn btn-primary"><i class="bi bi-database me-1"></i>Muat Data Lokal</button>
-            </div>
         </div>
     </section>
 
     <section class="tt-finance-kpis" aria-label="Ringkasan halaman">
-        <div class="tt-finance-card tt-finance-kpi"><small>Total transaksi</small><strong id="ttCount">0</strong></div>
-        <div class="tt-finance-card tt-finance-kpi in"><small>Dana masuk</small><strong id="ttIn">—</strong></div>
-        <div class="tt-finance-card tt-finance-kpi out"><small>Dana keluar</small><strong id="ttOut">—</strong></div>
-        <div class="tt-finance-card tt-finance-kpi"><small>Net terpetakan</small><strong id="ttNet">—</strong></div>
-        <div class="tt-finance-card tt-finance-kpi"><small>Arah belum pasti</small><strong id="ttUnknown">0</strong></div>
+        <div class="tt-finance-card tt-finance-kpi"><small>Total transaksi</small><strong id="ttCount">—</strong><div class="tt-finance-kpi-note">jumlah baris pada halaman</div></div>
+        <div class="tt-finance-card tt-finance-kpi in"><small>Total dana masuk (+)</small><strong id="ttIn">—</strong><div class="tt-finance-kpi-note">settlement dan dana masuk</div></div>
+        <div class="tt-finance-card tt-finance-kpi out"><small>Total dana keluar (-)</small><strong id="ttOut">—</strong><div class="tt-finance-kpi-note">penarikan dan biaya iklan</div></div>
+        <div class="tt-finance-card tt-finance-kpi net"><small>Perubahan bersih</small><strong id="ttNet">—</strong><div class="tt-finance-kpi-note">selisih dana masuk dan keluar</div></div>
+    </section>
+
+    <section id="ttBreakdownWrap" class="tt-finance-breakdown" style="display:none;" aria-label="Ringkasan tipe transaksi">
+        <span class="tt-finance-breakdown-label">Filter tipe:</span>
+        <div id="ttBreakdownPills" class="tt-finance-breakdown-pills"></div>
     </section>
 
     <section class="tt-finance-card tt-finance-recon" aria-label="Rekonsiliasi uang keluar">
@@ -157,18 +222,62 @@
     </section>
 </div>
 
+<div id="ttModalBackdrop" class="tt-finance-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ttModalTitle">
+    <div class="tt-finance-modal">
+        <div class="tt-finance-modal-head">
+            <div>
+                <div id="ttModalTitle" class="tt-finance-modal-title">Rincian Transaksi TikTok</div>
+                <div id="ttModalSub" class="tt-finance-modal-sub">Informasi detail dan raw response TikTok</div>
+            </div>
+            <button id="ttModalClose" type="button" class="tt-finance-close" aria-label="Tutup">×</button>
+        </div>
+        <div id="ttModalBody" class="tt-finance-detail-body"></div>
+    </div>
+</div>
+
 <script>
 (() => {
     const $ = (id) => document.getElementById(id);
     const state = { page: 1, lastPage: 1, hasMore: false, items: [], loading: false, syncing: false };
-    const today = new Date();
-    const iso = (date) => date.toISOString().slice(0, 10);
-    const from = new Date(today); from.setDate(from.getDate() - 14);
-    $('ttFrom').value = iso(from); $('ttTo').value = iso(today);
+    const pad = (value) => String(value).padStart(2, '0');
+    const formatDate = (date) => date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+    const setDateRange = (from, to, preset = null) => {
+        $('ttFrom').value = formatDate(from);
+        $('ttTo').value = formatDate(to);
+        document.querySelectorAll('.tt-finance-quick-btn').forEach((button) => {
+            button.classList.toggle('active', Boolean(preset && button.dataset.preset === preset));
+        });
+    };
+    const applyPreset = (preset) => {
+        const now = new Date();
+        const current = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (preset === 'today') return setDateRange(current, current, preset);
+        if (preset === 'yesterday') {
+            const yesterday = new Date(current);
+            yesterday.setDate(yesterday.getDate() - 1);
+            return setDateRange(yesterday, yesterday, preset);
+        }
+        if (preset === '7days') {
+            const from = new Date(current);
+            from.setDate(from.getDate() - 6);
+            return setDateRange(from, current, preset);
+        }
+        if (preset === '30days') {
+            const from = new Date(current);
+            from.setDate(from.getDate() - 29);
+            return setDateRange(from, current, preset);
+        }
+        if (preset === 'thisMonth') return setDateRange(new Date(current.getFullYear(), current.getMonth(), 1), current, preset);
+        if (preset === 'lastMonth') return setDateRange(new Date(current.getFullYear(), current.getMonth() - 1, 1), new Date(current.getFullYear(), current.getMonth(), 0), preset);
+        const from = new Date(current);
+        from.setDate(from.getDate() - 14);
+        return setDateRange(from, current, '15days');
+    };
+    applyPreset('15days');
 
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
     const selectedTypes = () => [...document.querySelectorAll('.tt-type:checked')].map((input) => input.value);
-    const money = (value, currency = 'IDR') => value === null || value === undefined || Number.isNaN(Number(value)) ? '—' : `${currency} ${Number(value).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const money = (value) => value === null || value === undefined || Number.isNaN(Number(value)) ? '—' : 'Rp ' + Math.round(Number(value)).toLocaleString('id-ID');
     const showMessage = (message, success = false) => { $('ttAlert').textContent = message; $('ttAlert').classList.toggle('success', success); $('ttAlert').classList.add('show'); };
     const showError = (message) => showMessage(message, false);
     const clearError = () => { $('ttAlert').textContent = ''; $('ttAlert').classList.remove('show', 'success'); };
@@ -207,6 +316,65 @@
         }).join('')}</tbody></table>`;
     };
 
+    const searchItems = (items) => {
+        const query = $('ttSearch').value.trim().toLowerCase();
+        if (!query) return items;
+        return items.filter((item) => [
+            item.transaction_id,
+            item.statement_id,
+            item.order_id,
+            item.adjustment_id,
+            item.transaction_type,
+            item.transaction_type_label,
+            item.reason,
+            item.status,
+        ].filter(Boolean).join(' ').toLowerCase().includes(query));
+    };
+
+    const renderBreakdown = (breakdowns) => {
+        const wrap = $('ttBreakdownWrap');
+        const container = $('ttBreakdownPills');
+        if (!breakdowns?.length) {
+            wrap.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+        wrap.style.display = 'flex';
+        container.innerHTML = breakdowns.map((breakdown) => {
+            const badge = breakdown.badge || 'secondary';
+            return '<button type="button" class="tt-finance-pill-button tt-finance-pill ' + escapeHtml(badge) + '" data-type="' + escapeHtml(breakdown.type) + '">' +
+                '<span>' + escapeHtml(breakdown.label) + '</span><span class="badge bg-dark-subtle text-dark">' + Number(breakdown.count || 0).toLocaleString('id-ID') + '</span></button>';
+        }).join('');
+        container.querySelectorAll('[data-type]').forEach((button) => button.addEventListener('click', () => {
+            $('ttSource').value = 'account';
+            document.querySelectorAll('.tt-type').forEach((input) => { input.checked = input.value === button.dataset.type; });
+            state.page = 1;
+            updateSourceControls();
+            load();
+        }));
+    };
+
+    const openDetailModal = (item) => {
+        if (!item) return;
+        const fields = [
+            ['ID Transaksi', item.transaction_id || '—'],
+            ['Toko', item.store_name || '—'],
+            ['Waktu transaksi', item.date_formatted || '—'],
+            ['Tipe transaksi', (item.transaction_type_label || '—') + ' (' + (item.transaction_type || '—') + ')'],
+            ['Arah dana', item.money_flow === 'MONEY_IN' ? 'Dana masuk (+)' : (item.money_flow === 'MONEY_OUT' ? 'Dana keluar (-)' : 'Belum ditentukan')],
+            ['Nominal', item.signed_formatted_amount || item.formatted_amount || '—'],
+            ['Statement ID', item.statement_id || '—'],
+            ['Order ID', item.order_id || '—'],
+            ['Adjustment ID', item.adjustment_id || '—'],
+            ['Status', item.status || '—'],
+            ['Keterangan', item.reason || '—'],
+        ];
+        $('ttModalTitle').textContent = 'Transaksi #' + (item.transaction_id || '—');
+        $('ttModalSub').textContent = (item.date_formatted || '—') + ' · ' + (item.transaction_type_label || item.transaction_type || 'Transaksi TikTok');
+        $('ttModalBody').innerHTML = '<div class="tt-finance-detail-grid">' + fields.map(([label, value]) => '<div class="tt-finance-detail-card"><div class="tt-finance-detail-label">' + escapeHtml(label) + '</div><div class="tt-finance-detail-value">' + escapeHtml(value) + '</div></div>').join('') + '</div><div class="mt-3"><h6 class="fw-bold mb-2 text-secondary" style="font-size:.78rem;"><i class="bi bi-filetype-json me-1"></i>Raw response TikTok</h6><pre class="tt-finance-raw">' + escapeHtml(JSON.stringify(item.raw_payload || item, null, 2)) + '</pre></div>';
+        $('ttModalBackdrop').classList.add('show');
+    };
+
     const load = async () => {
         clearError();
         const error = validate();
@@ -223,8 +391,19 @@
             const data = json.data || {}; const summary = data.summary || {}; const pagination = data.pagination || {};
             state.items = data.items || []; state.lastPage = Number(pagination.last_page || 1); state.hasMore = Boolean(pagination.has_more);
             $('ttCount').textContent = Number(summary.total_count || 0).toLocaleString('id-ID');
-            $('ttIn').textContent = money(summary.total_money_in); $('ttOut').textContent = money(summary.total_money_out); $('ttNet').textContent = money(summary.net_amount); $('ttUnknown').textContent = Number(summary.unknown_flow_count || 0).toLocaleString('id-ID');
-            render(state.items); $('ttNext').disabled = !state.hasMore; $('ttPrev').disabled = state.page <= 1; $('ttPageInfo').textContent = `Halaman ${state.page} dari ${state.lastPage} · ${state.items.length} baris dari ${Number(pagination.total || summary.total_count || 0).toLocaleString('id-ID')} transaksi`;
+            $('ttIn').textContent = money(summary.total_money_in); $('ttOut').textContent = money(summary.total_money_out); $('ttNet').textContent = money(summary.net_amount);
+            renderBreakdown(summary.type_breakdown || []);
+            const visibleItems = searchItems(state.items);
+            render(visibleItems);
+            document.querySelectorAll('.tt-finance-table details').forEach((details, index) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn-sm btn-outline-secondary btn-pill';
+                button.innerHTML = '<i class="bi bi-code-slash me-1"></i>Detail';
+                button.addEventListener('click', () => openDetailModal(visibleItems[index]));
+                details.replaceWith(button);
+            });
+            $('ttNext').disabled = !state.hasMore; $('ttPrev').disabled = state.page <= 1; $('ttPageInfo').textContent = `Halaman ${state.page} dari ${state.lastPage} · ${visibleItems.length} baris dari ${Number(pagination.total || summary.total_count || 0).toLocaleString('id-ID')} transaksi`;
             $('ttStorageStatus').textContent = data.last_synced_at ? `Sumber: database lokal · Sync terakhir ${new Date(data.last_synced_at).toLocaleString('id-ID')}` : 'Sumber: database lokal · Belum ada sinkronisasi untuk periode ini';
             const reconResponse = await reconciliationPromise;
             const reconJson = reconResponse ? await reconResponse.json().catch(() => ({})) : {};
@@ -278,13 +457,43 @@
         finally { state.syncing = false; $('ttSync').disabled = false; $('ttSync').innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Sync sekarang'; }
     };
 
-    const reset = () => { state.page = 1; state.lastPage = 1; state.hasMore = false; state.items = []; $('ttStatus').value = ''; document.querySelectorAll('.tt-type').forEach((input) => { input.checked = true; }); load(); };
+    const reset = () => {
+        state.page = 1; state.lastPage = 1; state.hasMore = false; state.items = [];
+        $('ttStatus').value = ''; $('ttSearch').value = ''; $('ttSearchClear').classList.remove('show');
+        applyPreset('15days');
+        document.querySelectorAll('.tt-type').forEach((input) => { input.checked = true; });
+        load();
+    };
     $('ttLoad').addEventListener('click', () => { state.page = 1; load(); });
     $('ttSync').addEventListener('click', syncNow);
     $('ttNext').addEventListener('click', () => { if (!state.loading && state.hasMore) { state.page++; load(); } });
     $('ttPrev').addEventListener('click', () => { if (!state.loading && state.page > 1) { state.page--; load(); } });
     $('ttReset').addEventListener('click', reset);
     $('ttExport').addEventListener('click', () => { const error = validate(); if (error) { showError(error); return; } window.location.href = buildUrl(true); });
+    document.querySelectorAll('.tt-finance-quick-btn').forEach((button) => button.addEventListener('click', () => {
+        applyPreset(button.dataset.preset);
+        state.page = 1;
+        load();
+    }));
+    let searchDebounce = null;
+    $('ttSearch').addEventListener('input', () => {
+        $('ttSearchClear').classList.toggle('show', Boolean($('ttSearch').value.trim()));
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => { state.page = 1; load(); }, 350);
+    });
+    $('ttSearchClear').addEventListener('click', () => {
+        $('ttSearch').value = '';
+        $('ttSearchClear').classList.remove('show');
+        state.page = 1;
+        load();
+    });
+    $('ttModalClose').addEventListener('click', () => $('ttModalBackdrop').classList.remove('show'));
+    $('ttModalBackdrop').addEventListener('click', (event) => {
+        if (event.target === $('ttModalBackdrop')) $('ttModalBackdrop').classList.remove('show');
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') $('ttModalBackdrop').classList.remove('show');
+    });
     const updateSourceControls = () => {
         const accountSource = $('ttSource').value === 'account';
         $('ttTypesField').style.opacity = accountSource ? '1' : '.62';
