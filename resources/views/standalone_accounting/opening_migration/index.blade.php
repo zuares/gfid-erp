@@ -7,6 +7,8 @@
         .opening-migration-page .migration-mapping { display:grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 1fr); gap:1rem; align-items:center; }
         .opening-migration-page .migration-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
         .opening-migration-page .migration-money { font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .opening-migration-page .migration-prefill { display:inline-flex; align-items:center; gap:.25rem; margin-left:.35rem; padding:.18rem .45rem; border:1px solid #bfdbfe; border-radius:999px; color:#1d4ed8; background:#eff6ff; font-size:.68rem; font-weight:750; vertical-align:middle; }
+        .opening-migration-page .migration-prefill i { font-size:.7rem; }
         .opening-migration-page .correction-line { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr); gap:.5rem; }
         @media(max-width:767px) {
             .opening-migration-page .migration-mapping, .opening-migration-page .migration-summary, .opening-migration-page .correction-line { grid-template-columns:1fr; }
@@ -16,6 +18,7 @@
 
 @section('content')
 @php($money = fn ($cents) => 'Rp '.number_format($cents / 100, 2, ',', '.'))
+@php($prefilledCount = collect($snapshot['rows'])->filter(fn ($row) => ! empty($row['target_id']))->count())
 <div class="opening-migration-page">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
@@ -65,6 +68,12 @@
         @if ($snapshot['issues'])
             <div class="alert alert-danger" role="alert"><strong>Posting belum tersedia</strong><ul class="mb-0">@foreach ($snapshot['issues'] as $issue)<li>{{ $issue }}</li>@endforeach</ul></div>
         @endif
+        @if (! $migration->posted_at && count($snapshot['rows']))
+            <div class="alert alert-secondary d-flex align-items-start gap-2 mb-3" role="status">
+                <i class="bi bi-magic mt-1" aria-hidden="true"></i>
+                <div><strong>{{ $prefilledCount }} mapping default terisi otomatis.</strong> Periksa dan ubah bila diperlukan sebelum meninjau selisih. Mapping default berasal dari COA Akuntansi Baru saat ini.</div>
+            </div>
+        @endif
         <form method="POST" action="{{ route('standalone-accounting.opening-migration.preview') }}">
             @csrf
             <input type="hidden" name="as_of" value="{{ $snapshot['as_of'] }}">
@@ -72,6 +81,9 @@
                 <div class="migration-mapping border-bottom py-3">
                     <div>
                         <label for="mapping-{{ $row['legacy_id'] }}" class="fw-semibold">{{ $row['code'] }} — {{ $row['name'] }}</label>
+                        @if (! $migration->posted_at && ! $previewToken && ! empty($row['target_id']))
+                            <span class="migration-prefill"><i class="bi bi-check2-circle" aria-hidden="true"></i>Prefill</span>
+                        @endif
                         <div class="small text-muted">{{ $row['type'] }} · {{ $row['net'] > 0 ? 'Debit' : 'Kredit' }} <span class="migration-money">{{ $money(abs($row['net'])) }}</span></div>
                     </div>
                     @if ($migration->posted_at || $previewToken)

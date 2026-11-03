@@ -80,7 +80,8 @@ it('previews the inclusive cutoff period with posted nonvoid journals and includ
         ->and($snapshot['issues'])->toBeEmpty();
 
     $this->get(route('standalone-accounting.opening-migration.index', ['as_of' => '2026-10-31']))
-        ->assertOk()->assertSee('Opening Migrasi')->assertSee('2026-08-31')->assertSee('WIP');
+        ->assertOk()->assertSee('Opening Migrasi')->assertSee('2026-08-31')->assertSee('WIP')
+        ->assertSee('mapping default terisi otomatis')->assertSee('Prefill');
 });
 
 it('provides default opening mappings for the current standalone chart of accounts', function () {
