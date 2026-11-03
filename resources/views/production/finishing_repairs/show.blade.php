@@ -28,6 +28,16 @@
 @endphp
 
 <div class="page-wrap">
+  @if ($errors->any())
+    <div class="alert alert-danger py-2">
+      <ul class="mb-0">
+        @foreach ($errors->all() as $error)
+          <li>{{ $error }}</li>
+        @endforeach
+      </ul>
+    </div>
+  @endif
+
   @if(session('status'))
     <div class="alert alert-success py-2">{{ session('status') }}</div>
   @endif
@@ -43,6 +53,13 @@
       </div>
       <div class="d-flex gap-2 flex-wrap justify-content-end">
         <span class="badge-status">{{ strtoupper($repair->status) }}</span>
+        @if($repair->status === 'posted')
+          <form method="POST" action="{{ route('production.finishing_repairs.unpost', $repair) }}"
+                onsubmit="return confirm('UNPOST perbaikan ini? Stok WH-PRD/WH-RTS akan dikembalikan ke REJ-FIN.');">
+            @csrf
+            <button type="submit" class="btn btn-outline-danger btn-sm btn-pill">UNPOST & Kembalikan</button>
+          </form>
+        @endif
         <a href="{{ route('production.finishing_repairs.index') }}" class="btn btn-outline-secondary btn-sm btn-pill">Kembali</a>
         <a href="{{ route('production.finishing_repairs.create') }}" class="btn btn-primary btn-sm btn-pill">Input Baru</a>
       </div>

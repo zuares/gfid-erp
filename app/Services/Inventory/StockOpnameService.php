@@ -10,6 +10,7 @@ use App\Models\ItemCostSnapshot;
 use App\Models\StockOpname;
 use App\Models\StockOpnameLine;
 use App\Services\Accounting\JournalService;
+use App\Services\Accounting\StandaloneInventoryAdjustmentPostingService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class StockOpnameService
     public function __construct(
         protected InventoryService $inventory,
         protected JournalService $journal,
+        protected StandaloneInventoryAdjustmentPostingService $standaloneInventoryAdjustmentPosting,
     ) {}
 
     /**
@@ -32,8 +34,22 @@ class StockOpnameService
         int $warehouseId,
         bool $onlyWithStock = true
     ): void {
+        $snapshotAt = $opname->snapshotAt();
+
         $query = InventoryMutation::selectRaw('item_id, SUM(qty_change) as qty')
             ->where('warehouse_id', $warehouseId)
+            ->where(function ($query) use ($snapshotAt) {
+                $date = $snapshotAt->toDateString();
+
+                $query->where('date', '<', $date)
+                    ->orWhere(function ($sameDate) use ($date, $snapshotAt) {
+                        $sameDate->whereDate('date', $date)
+                            ->where(function ($created) use ($snapshotAt) {
+                                $created->whereNull('created_at')
+                                    ->orWhere('created_at', '<=', $snapshotAt);
+                            });
+                    });
+            })
             ->groupBy('item_id');
 
         if ($onlyWithStock) {
@@ -63,7 +79,7 @@ class StockOpnameService
 
             // ✅ Hanya untuk SO PERIODIK:
             //    kalau ada HPP di master (kolom items.hpp), pakai itu
-            if (!$isOpening && $item && (float) $item->hpp > 0) {
+            if (! $isOpening && $item && (float) $item->hpp > 0) {
                 $unitCost = (float) $item->hpp;
             }
 
@@ -81,19 +97,19 @@ class StockOpnameService
             ];
         }
 
-        if (!empty($rows)) {
+        if (! empty($rows)) {
             StockOpnameLine::insert($rows);
         }
     }
 
     /**
      * Generate lines KHUSUS bahan baku RM (periodic):
-     * - system_qty = SUM(lots.qty_onhand WHERE status='open') per item
+     * - system_qty = SUM(inventory_mutations.qty_change) per item
      * - hanya item dengan item_role IN ('raw_material','production_supply') dan active=1
      * - semua item bahan baku masuk (termasuk yang saldo 0 agar tetap bisa dicek fisik)
      *
-     * Berbeda dari generateLinesFromWarehouse() yang pakai SUM(mutations).
-     * Untuk bahan baku kain/RIB, lots adalah sumber kebenaran saldo.
+     * Saldo lot bersifat global, sehingga tidak aman dipakai sebagai saldo
+     * satu gudang. Lot tetap dipakai saat posting koreksi fisik.
      */
     public function generateRawMaterialLines(StockOpname $opname, int $warehouseId): void
     {
@@ -110,38 +126,53 @@ class StockOpnameService
 
         $itemIds = $eligibleItems->pluck('id')->all();
 
-        // 2) system_qty dari SUM(lots.qty_onhand) — sumber kebenaran untuk bahan baku
-        $lotQtys = \Illuminate\Support\Facades\DB::table('lots')
+        // 2) system_qty harus scoped ke gudang dan cutoff opname.
+        // qty_onhand di lots bersifat global, sehingga tidak aman dipakai
+        // sebagai saldo satu gudang.
+        $mutationQtys = InventoryMutation::query()
             ->whereIn('item_id', $itemIds)
-            ->where('status', 'open')
+            ->where('warehouse_id', $warehouseId)
+            ->where(function ($query) use ($opname) {
+                $snapshotAt = $opname->snapshotAt();
+                $date = $snapshotAt->toDateString();
+
+                $query->where('date', '<', $date)
+                    ->orWhere(function ($sameDate) use ($date, $snapshotAt) {
+                        $sameDate->whereDate('date', $date)
+                            ->where(function ($created) use ($snapshotAt) {
+                                $created->whereNull('created_at')
+                                    ->orWhere('created_at', '<=', $snapshotAt);
+                            });
+                    });
+            })
             ->groupBy('item_id')
-            ->selectRaw('item_id, SUM(qty_onhand) as total_qty')
+            ->selectRaw('item_id, SUM(qty_change) as total_qty')
             ->get()
             ->keyBy('item_id');
 
-        $now  = now();
+        $now = now();
         $rows = [];
 
         foreach ($eligibleItems as $item) {
-            $lotRow    = $lotQtys->get($item->id);
+            $lotRow = $mutationQtys->get($item->id);
             $systemQty = $lotRow ? (float) $lotRow->total_qty : 0.0;
-            $unitCost  = ((float) ($item->hpp ?? 0)) > 0 ? (float) $item->hpp : null;
+            $unitCost = ((float) ($item->hpp ?? 0)) > 0 ? (float) $item->hpp : null;
 
             $rows[] = [
                 'stock_opname_id' => $opname->id,
-                'item_id'         => $item->id,
-                'system_qty'      => $systemQty,
-                'physical_qty'    => null,
-                'difference_qty'  => 0,
-                'is_counted'      => false,
-                'notes'           => null,
-                'unit_cost'       => $unitCost,
-                'created_at'      => $now,
-                'updated_at'      => $now,
+                'item_id' => $item->id,
+                'system_qty' => $systemQty,
+                'physical_qty' => null,
+                'difference_qty' => 0,
+                'is_counted' => false,
+                'notes' => null,
+                'unit_cost' => $unitCost,
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
         }
 
-        if (!empty($rows)) {
+        if (! empty($rows)) {
             StockOpnameLine::insert($rows);
         }
     }
@@ -165,7 +196,40 @@ class StockOpnameService
             $user = Auth::user();
             $isOwner = $user && (($user->role ?? null) === 'owner');
 
-            $opname->loadMissing(['warehouse', 'lines.item']);
+            if (! $isOwner) {
+                throw new \Illuminate\Auth\Access\AuthorizationException(
+                    'Hanya Owner yang boleh memfinalkan stock opname.'
+                );
+            }
+
+            /** @var StockOpname $opname */
+            $opname = StockOpname::query()
+                ->with(['warehouse', 'lines.item'])
+                ->whereKey($opname->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Retry finalize harus idempotent dan tidak boleh membuat
+            // adjustment/mutasi kedua.
+            $existingAdjustment = InventoryAdjustment::query()
+                ->where('source_type', StockOpname::class)
+                ->where('source_id', $opname->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($opname->status === StockOpname::STATUS_FINALIZED) {
+                if ($existingAdjustment) {
+                    return $existingAdjustment;
+                }
+
+                throw new \RuntimeException('Stock Opname sudah difinalkan tetapi adjustment sumber tidak ditemukan.');
+            }
+
+            if ($existingAdjustment) {
+                throw new \RuntimeException('Stock Opname sudah memiliki Inventory Adjustment dan tidak boleh difinalkan ulang.');
+            }
+
+            $this->assertNoMutationsSinceSnapshot($opname);
 
             $date = $opname->date ?? now()->toDateString();
             $warehouseId = (int) $opname->warehouse_id;
@@ -187,27 +251,27 @@ class StockOpnameService
                 if ($isOwner) {
                     [$resolvedCosts, $missingCostLines] = $this->resolveOpeningUnitCosts($opname);
 
-                    if (!empty($missingCostLines)) {
+                    if (! empty($missingCostLines)) {
                         $codes = collect($missingCostLines)
-                            ->map(fn(StockOpnameLine $line) => $line->item?->code ?? ('#' . $line->id))
+                            ->map(fn (StockOpnameLine $line) => $line->item?->code ?? ('#'.$line->id))
                             ->take(8)
                             ->implode(', ');
 
                         throw new \RuntimeException(
                             'Masih ada item opening dengan Qty fisik > 0 tetapi HPP (unit_cost) tidak ditemukan: '
-                            . $codes
-                            . '. Lengkapi HPP di item master / snapshot / input manual pada dokumen opening.'
+                            .$codes
+                            .'. Lengkapi HPP di item master / snapshot / input manual pada dokumen opening.'
                         );
                     }
                 }
 
-                $adjustment = new InventoryAdjustment();
+                $adjustment = new InventoryAdjustment;
                 $adjustment->code = $this->generateAdjustmentCodeForDate($date);
                 $adjustment->date = $date;
                 $adjustment->warehouse_id = $warehouseId;
                 $adjustment->source_type = StockOpname::class;
                 $adjustment->source_id = $opname->id;
-                $adjustment->reason = $reason ?: ('Saldo awal dari stock opname opening ' . $opname->code);
+                $adjustment->reason = $reason ?: ('Saldo awal dari stock opname opening '.$opname->code);
                 $adjustment->notes = $notes;
                 $adjustment->status = $isOwner ? InventoryAdjustment::STATUS_APPROVED : InventoryAdjustment::STATUS_PENDING;
                 $adjustment->created_by = $opname->created_by ?? $user?->id;
@@ -227,11 +291,9 @@ class StockOpnameService
                     $itemId = (int) $line->item_id;
                     $physicalQty = (float) $line->physical_qty;
 
-                    // realtime qty_before
-                    $qtyBefore = (float) $this->inventory->getOnHandQty(
-                        warehouseId: $warehouseId,
-                        itemId: $itemId
-                    );
+                    // qty_before adalah saldo yang sudah dibekukan saat
+                    // snapshot, bukan saldo terkini.
+                    $qtyBefore = (float) ($line->system_qty ?? 0);
 
                     $difference = $physicalQty - $qtyBefore; // SIGNED
 
@@ -253,7 +315,7 @@ class StockOpnameService
                         'lot_id' => null,
                     ]);
 
-                    if (!$isOwner) {
+                    if (! $isOwner) {
                         continue;
                     }
 
@@ -291,7 +353,7 @@ class StockOpnameService
                             'packaging_unit_cost' => 0,
                             'overhead_unit_cost' => 0,
                             'unit_cost' => (float) $unitCost,
-                            'notes' => $notes ?: ('Opening balance ' . $opname->code),
+                            'notes' => $notes ?: ('Opening balance '.$opname->code),
                             'is_active' => true,
                             'created_by' => $opname->created_by ?? Auth::id(),
                         ]);
@@ -308,19 +370,26 @@ class StockOpnameService
                 $opname->finalized_at = now();
                 $opname->save();
 
+                // Opening stock is an accounting event too: post the initial
+                // inventory value and mirror it into Akuntansi Baru. Both
+                // calls are inside this transaction so a missing account or
+                // mapping rolls back the stock opening as well.
+                $this->journal->postInventoryAdjustment($adjustment);
+                $this->standaloneInventoryAdjustmentPosting->post($adjustment);
+
                 return $adjustment;
             }
 
             // ==========================================================
             // PERIODIC (✅ realtime qty_before, bukan system_qty di line)
             // ==========================================================
-            $adjustment = new InventoryAdjustment();
+            $adjustment = new InventoryAdjustment;
             $adjustment->code = $this->generateAdjustmentCodeForDate($date);
             $adjustment->date = $date;
             $adjustment->warehouse_id = $warehouseId;
             $adjustment->source_type = StockOpname::class;
             $adjustment->source_id = $opname->id;
-            $adjustment->reason = $reason ?: ('Penyesuaian stok dari stock opname ' . $opname->code);
+            $adjustment->reason = $reason ?: ('Penyesuaian stok dari stock opname '.$opname->code);
             $adjustment->notes = $notes;
             $adjustment->status = $isOwner ? InventoryAdjustment::STATUS_APPROVED : InventoryAdjustment::STATUS_PENDING;
             $adjustment->created_by = $opname->created_by ?? $user?->id;
@@ -340,11 +409,9 @@ class StockOpnameService
                 $itemId = (int) $line->item_id;
                 $physicalQty = (float) $line->physical_qty;
 
-                // ✅ qty_before realtime (lebih benar)
-                $qtyBefore = (float) $this->inventory->getOnHandQty(
-                    warehouseId: $warehouseId,
-                    itemId: $itemId
-                );
+                // Gunakan saldo snapshot yang sama dengan yang dilihat
+                // petugas saat counting.
+                $qtyBefore = (float) ($line->system_qty ?? 0);
 
                 $difference = $physicalQty - $qtyBefore; // SIGNED
 
@@ -352,26 +419,29 @@ class StockOpnameService
                 $unitCost = null;
                 if ($line->unit_cost !== null && (float) $line->unit_cost > 0) {
                     $unitCost = (float) $line->unit_cost;
+                } elseif ((float) ($line->effective_unit_cost ?? 0) > 0) {
+                    $unitCost = (float) $line->effective_unit_cost;
                 } elseif ($line->item && (float) ($line->item->hpp ?? 0) > 0) {
                     $unitCost = (float) $line->item->hpp;
                 }
 
-                $direction    = $difference >= 0 ? 'in' : 'out';
-                $hasDiff      = abs($difference) >= 0.0000001;
-                $postedLotId  = null;
+                $direction = $difference >= 0 ? 'in' : 'out';
+                $hasDiff = abs($difference) >= 0.0000001;
+                $postedLotId = null;
 
                 // ── Non-owner: catat untuk audit saja, stok belum berubah ──
-                if (!$isOwner) {
+                if (! $isOwner) {
                     InventoryAdjustmentLine::create([
                         'inventory_adjustment_id' => $adjustment->id,
-                        'item_id'   => $itemId,
+                        'item_id' => $itemId,
                         'qty_before' => $qtyBefore,
-                        'qty_after'  => $physicalQty,
+                        'qty_after' => $physicalQty,
                         'qty_change' => $hasDiff ? $difference : 0,
-                        'direction'  => $direction,
-                        'notes'      => $line->notes,
-                        'lot_id'     => null,
+                        'direction' => $direction,
+                        'notes' => $line->notes,
+                        'lot_id' => null,
                     ]);
+
                     continue;
                 }
 
@@ -380,32 +450,32 @@ class StockOpnameService
 
                     if ($difference > 0) {
                         // SURPLUS → tambah ke LOT adjustment khusus ADJ-{ITEM_CODE}
-                        $adjLotCode = 'ADJ-' . ($line->item?->code ?? "item{$itemId}");
+                        $adjLotCode = 'ADJ-'.($line->item?->code ?? "item{$itemId}");
 
                         $adjLot = \App\Models\Lot::firstOrCreate(
                             ['code' => $adjLotCode, 'item_id' => $itemId],
                             [
-                                'initial_qty'  => 0,
+                                'initial_qty' => 0,
                                 'initial_cost' => 0,
-                                'qty_onhand'   => 0,
-                                'avg_cost'     => 0,
-                                'total_cost'   => 0,
-                                'status'       => 'open',
+                                'qty_onhand' => 0,
+                                'avg_cost' => 0,
+                                'total_cost' => 0,
+                                'status' => 'open',
                             ]
                         );
 
                         $postedLotId = $adjLot->id;
 
                         $this->inventory->stockIn(
-                            warehouseId:   $warehouseId,
-                            itemId:        $itemId,
-                            qty:           $difference,
-                            date:          $date,
-                            sourceType:    'stock_opname_adjustment',
-                            sourceId:      $adjustment->id,
-                            notes:         "Surplus opname {$opname->code}",
-                            lotId:         $adjLot->id,
-                            unitCost:      $unitCost,
+                            warehouseId: $warehouseId,
+                            itemId: $itemId,
+                            qty: $difference,
+                            date: $date,
+                            sourceType: 'stock_opname_adjustment',
+                            sourceId: $adjustment->id,
+                            notes: "Surplus opname {$opname->code}",
+                            lotId: $adjLot->id,
+                            unitCost: $unitCost,
                             affectLotCost: $unitCost !== null && $unitCost > 0,
                         );
 
@@ -431,16 +501,16 @@ class StockOpnameService
                             }
 
                             $this->inventory->stockOut(
-                                warehouseId:    $warehouseId,
-                                itemId:         $itemId,
-                                qty:            $deduct,
-                                date:           $date,
-                                sourceType:     'stock_opname_adjustment',
-                                sourceId:       $adjustment->id,
-                                notes:          "Shortage opname {$opname->code}",
-                                allowNegative:  false,
-                                lotId:          $openLot->id,
-                                affectLotCost:  true,
+                                warehouseId: $warehouseId,
+                                itemId: $itemId,
+                                qty: $deduct,
+                                date: $date,
+                                sourceType: 'stock_opname_adjustment',
+                                sourceId: $adjustment->id,
+                                notes: "Shortage opname {$opname->code}",
+                                allowNegative: false,
+                                lotId: $openLot->id,
+                                affectLotCost: true,
                             );
 
                             $remaining -= $deduct;
@@ -453,23 +523,23 @@ class StockOpnameService
                         // dikoreksi dan tidak match dengan qty_after di adjustment line.
                         if ($remaining > 0.0000001) {
                             $this->inventory->stockOut(
-                                warehouseId:      $warehouseId,
-                                itemId:           $itemId,
-                                qty:              $remaining,
-                                date:             $date,
-                                sourceType:       'stock_opname_adjustment',
-                                sourceId:         $adjustment->id,
-                                notes:            "Shortage opname {$opname->code} (tanpa lot)",
-                                allowNegative:    false,
-                                lotId:            null,
+                                warehouseId: $warehouseId,
+                                itemId: $itemId,
+                                qty: $remaining,
+                                date: $date,
+                                sourceType: 'stock_opname_adjustment',
+                                sourceId: $adjustment->id,
+                                notes: "Shortage opname {$opname->code} (tanpa lot)",
+                                allowNegative: false,
+                                lotId: null,
                                 unitCostOverride: $unitCost,
-                                affectLotCost:    false,
+                                affectLotCost: false,
                             );
 
                             \Illuminate\Support\Facades\Log::warning(
                                 "[StockOpname] {$opname->code}: shortage item #{$itemId} sebesar {$remaining} "
-                                . "diposting tanpa lot (lot open tidak mencukupi / item tidak ber-lot). "
-                                . "Ledger lot tidak berubah untuk porsi ini."
+                                .'diposting tanpa lot (lot open tidak mencukupi / item tidak ber-lot). '
+                                .'Ledger lot tidak berubah untuk porsi ini.'
                             );
                         }
                     }
@@ -478,24 +548,24 @@ class StockOpnameService
                 // ── Simpan adjustment line (dengan lot_id jika ada) ───────
                 InventoryAdjustmentLine::create([
                     'inventory_adjustment_id' => $adjustment->id,
-                    'item_id'    => $itemId,
+                    'item_id' => $itemId,
                     'qty_before' => $qtyBefore,
-                    'qty_after'  => $physicalQty,
+                    'qty_after' => $physicalQty,
                     'qty_change' => $hasDiff ? $difference : 0,
-                    'direction'  => $direction,
-                    'notes'      => $line->notes,
-                    'lot_id'     => $postedLotId,
+                    'direction' => $direction,
+                    'notes' => $line->notes,
+                    'lot_id' => $postedLotId,
                 ]);
 
                 // ── Snapshot HPP periodic ─────────────────────────────────
                 if ($hasDiff) {
                     $this->snapshotPeriodicCost(
-                        itemId:       $itemId,
-                        warehouseId:  $warehouseId,
+                        itemId: $itemId,
+                        warehouseId: $warehouseId,
                         snapshotDate: $date,
-                        qtyBasis:     $physicalQty,
-                        opname:       $opname,
-                        notes:        $notes
+                        qtyBasis: $physicalQty,
+                        opname: $opname,
+                        notes: $notes
                     );
                 }
             }
@@ -505,18 +575,17 @@ class StockOpnameService
             $opname->finalized_at = now();
             $opname->save();
 
+            // Keep inventory mutation, legacy journal, and Akuntansi Baru
+            // mirror in the same transaction. A mapping/posting failure must
+            // roll back the finalize instead of leaving stock unjournaled.
+            if ($adjustment->status === InventoryAdjustment::STATUS_APPROVED
+                && $opname->type !== StockOpname::TYPE_OPENING) {
+                $this->journal->postInventoryAdjustment($adjustment);
+                $this->standaloneInventoryAdjustmentPosting->post($adjustment);
+            }
+
             return $adjustment;
         });
-
-        // SO opening hanya membentuk saldo operasional/kartu stok. Nilai
-        // akuntansinya akan dicatat satu kali melalui Opening Balance Batch;
-        // jangan posting lagi sebagai selisih opname ke akun 6115.
-        if (
-            $adjustment?->status === InventoryAdjustment::STATUS_APPROVED
-            && $opname->type !== StockOpname::TYPE_OPENING
-        ) {
-            $this->journal->postInventoryAdjustment($adjustment);
-        }
 
         return $adjustment;
     }
@@ -566,6 +635,7 @@ class StockOpnameService
 
             if ($unitCost <= 0) {
                 $missing[] = $line;
+
                 continue;
             }
 
@@ -602,10 +672,12 @@ class StockOpnameService
         if ($line && $line->unit_cost !== null && (float) $line->unit_cost > 0) {
             $unitCost = (float) $line->unit_cost;
         } else {
-            // 2) Kalau belum ada HPP di line → ambil dari master item (kolom items.hpp)
+            // 2) Pakai snapshot HPP yang terlihat pada dokumen.
             $item = $line?->item ?: Item::find($itemId);
 
-            if ($item && (float) $item->hpp > 0) {
+            if ($line && (float) $line->effective_unit_cost > 0) {
+                $unitCost = (float) $line->effective_unit_cost;
+            } elseif ($item && (float) $item->hpp > 0) {
                 $unitCost = (float) $item->hpp;
             }
         }
@@ -633,7 +705,7 @@ class StockOpnameService
             'packaging_unit_cost' => 0,
             'overhead_unit_cost' => 0,
             'unit_cost' => $unitCost,
-            'notes' => $notes ?: ('SO periodic ' . $opname->code),
+            'notes' => $notes ?: ('SO periodic '.$opname->code),
             'is_active' => true,
             'created_by' => $opname->created_by ?? Auth::id(),
         ]);
@@ -649,15 +721,39 @@ class StockOpnameService
     }
 
     /**
+     * Stock opname tidak boleh diposting jika ada mutasi setelah cutoff.
+     * Tanpa kontrol ini, selisih fisik akan tercampur dengan transaksi yang
+     * terjadi selama proses counting/review.
+     */
+    protected function assertNoMutationsSinceSnapshot(StockOpname $opname): void
+    {
+        $snapshotAt = $opname->snapshotAt();
+        $itemIds = $opname->lines()->pluck('item_id');
+
+        $hasLaterMutation = InventoryMutation::query()
+            ->where('warehouse_id', $opname->warehouse_id)
+            ->whereIn('item_id', $itemIds)
+            ->where('created_at', '>', $snapshotAt)
+            ->exists();
+
+        if ($hasLaterMutation) {
+            throw new \RuntimeException(
+                'Ada mutasi stok setelah snapshot stock opname. '
+                .'Lakukan recount atau buat stock opname baru sebelum finalize.'
+            );
+        }
+    }
+
+    /**
      * Generate kode ADJ-YYYYMMDD-###
      */
     protected function generateAdjustmentCodeForDate(string $date): string
     {
         $d = Carbon::parse($date);
         $dateStr = $d->format('Ymd');
-        $prefix = 'ADJ-' . $dateStr . '-';
+        $prefix = 'ADJ-'.$dateStr.'-';
 
-        $last = InventoryAdjustment::where('code', 'like', $prefix . '%')
+        $last = InventoryAdjustment::where('code', 'like', $prefix.'%')
             ->orderByDesc('code')
             ->first();
 

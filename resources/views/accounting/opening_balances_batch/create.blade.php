@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Accounting • Saldo Awal')
+@section('title', 'Accounting • Saldo Awal Non-Persediaan')
 
 @push('head')
 @include('production.dashboard.partials._gf-styles')
@@ -139,11 +139,15 @@
     <div class="panel">
         <div class="panel-h">
             <div>
-                <div class="panel-title">Saldo Awal</div>
-                <div class="panel-sub">Input saldo awal akun — balance otomatis dicek</div>
+                <div class="panel-title">Saldo Awal Non-Persediaan</div>
+                <div class="panel-sub">Kas, bank, piutang, aset tetap, hutang, dan modal</div>
             </div>
-            <a href="{{ route('accounting.opening-balances-batch.index') }}"
-               class="btn btn-sm btn-outline-secondary" style="border-radius:999px;">Riwayat</a>
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+                <a href="{{ route('inventory.stock_opnames.create', ['type' => 'opening']) }}"
+                   class="btn btn-sm btn-outline-primary" style="border-radius:999px;">Opening Stock Opname</a>
+                <a href="{{ route('accounting.opening-balances-batch.index') }}"
+                   class="btn btn-sm btn-outline-secondary" style="border-radius:999px;">Riwayat</a>
+            </div>
         </div>
     </div>
 
@@ -172,7 +176,7 @@
                     <div class="field">
                         <label>Keterangan</label>
                         <input type="text" name="description" class="form-control"
-                               value="{{ old('description', 'Opening Balance') }}"
+                               value="{{ old('description', 'Saldo awal non-persediaan') }}"
                                placeholder="Saldo awal pembukaan">
                     </div>
                 </div>
@@ -180,7 +184,7 @@
                 {{-- Balance indicator --}}
                 <div class="balance-bar mt-3">
                     <div class="balance-col">
-                        <span class="balance-lbl">Total Aset</span>
+                        <span class="balance-lbl">Total Debit</span>
                         <div class="balance-val" id="sum-debit">0</div>
                     </div>
                     <div class="text-center">
@@ -188,7 +192,7 @@
                         <div id="selisih-info" class="mt-1" style="font-size:.65rem;color:var(--muted);font-weight:900;"></div>
                     </div>
                     <div class="balance-col text-end">
-                        <span class="balance-lbl">Total Hutang + Modal</span>
+                        <span class="balance-lbl">Total Kredit</span>
                         <div class="balance-val" id="sum-credit">0</div>
                     </div>
                 </div>
@@ -197,21 +201,23 @@
 
         {{-- Info note --}}
         <div class="info-note">
-            💡 Isi <strong>Saldo Awal</strong> masing-masing akun. Aset di kiri = Hutang + Modal di kanan.
+            <strong>Alur saldo awal:</strong> persediaan dicatat di <a href="{{ route('inventory.stock_opnames.create', ['type' => 'opening']) }}">Opening Stock Opname</a>.
+            Halaman ini hanya untuk kas, bank, piutang, aset tetap, hutang, dan modal.
+            Aset di kiri = Hutang + Modal di kanan.
             Kosongkan atau isi <strong>0</strong> untuk akun yang tidak punya saldo awal.
             <br><span style="color:#1d4ed8;">✦ Nilai bertanda <strong>auto</strong> dihitung berdasarkan data sampai cut-off
                 <strong>{{ \Illuminate\Support\Carbon::parse($cutoffDate ?? now()->toDateString())->format('d-m-Y') }}</strong>.
                 Periksa dan koreksi jika saldo fisik atau rekening koran berbeda.</span>
             @if($hasPrefill)
-            <br><span style="color:#1d4ed8;">✦ Beberapa saldo sudah terisi otomatis dari ledger, transaksi, dan data stok sistem.</span>
+            <br><span style="color:#1d4ed8;">✦ Beberapa saldo sudah terisi otomatis dari ledger dan transaksi lama. Periksa dengan bukti fisik atau rekening koran sebelum posting.</span>
             @endif
         </div>
 
         {{-- ASET --}}
         <div class="panel">
             <div class="panel-h">
-                <div class="panel-title">💰 Aset</div>
-                <span class="panel-sub">Kas, bank, persediaan, piutang</span>
+                <div class="panel-title">💰 Aset non-persediaan</div>
+                <span class="panel-sub">Kas, bank, piutang, dan aset tetap</span>
             </div>
             <div class="panel-b">
                 @foreach($assetAccounts as $acc)
@@ -220,11 +226,12 @@
                     $pdisp = $pval > 0 ? number_format($pval, 0, ',', '.') : '0';
                     $isAuto = $pval > 0;
                     $det = $details[$acc->code] ?? null;
+                    $isCreditAsset = in_array($acc->code, $creditAssetCodes ?? [], true);
                 @endphp
                 <div class="acc-row {{ $isAuto ? 'is-auto' : '' }}">
                     <input type="hidden" name="account_id[]" value="{{ $acc->id }}">
-                    <input type="hidden" class="js-debit" name="debit[]" value="{{ $pval }}">
-                    <input type="hidden" class="js-credit" name="credit[]" value="0">
+                    <input type="hidden" class="js-debit" name="debit[]" value="{{ $isCreditAsset ? 0 : $pval }}">
+                    <input type="hidden" class="js-credit" name="credit[]" value="{{ $isCreditAsset ? $pval : 0 }}">
                     <div class="acc-info">
                         <div class="acc-code">{{ $acc->code }}
                             @if($isAuto)<span class="auto-badge">auto</span>@endif
@@ -239,9 +246,9 @@
                     <div class="saldo-wrap">
                         <input type="text" inputmode="numeric"
                                class="saldo-input" value="{{ $pdisp }}"
-                               data-type="asset"
+                               data-type="{{ $isCreditAsset ? 'contra-asset' : 'asset' }}"
                                placeholder="0">
-                        <div class="saldo-hint">Debit</div>
+                        <div class="saldo-hint">{{ $isCreditAsset ? 'Kredit' : 'Debit' }}</div>
                     </div>
                 </div>
                 @endforeach
@@ -251,8 +258,8 @@
         {{-- KEWAJIBAN --}}
         <div class="panel">
             <div class="panel-h">
-                <div class="panel-title">📋 Kewajiban</div>
-                <span class="panel-sub">Hutang dagang, pinjaman</span>
+                <div class="panel-title">📋 Hutang</div>
+                <span class="panel-sub">Hutang supplier dan biaya produksi akrual</span>
             </div>
             <div class="panel-b">
                 @foreach($liabilityAccounts as $acc)
@@ -348,7 +355,7 @@
     };
 
     function recalc() {
-        let totalAsset = 0, totalLiability = 0, totalEquityManual = 0;
+        let totalAssetDebit = 0, totalAssetCredit = 0, totalLiability = 0, totalEquityManual = 0;
         const modalAutoRow = document.querySelector('.saldo-input[data-modal-auto="true"]');
 
         // Pass 1: sum asset + liability + manual equity (skip modal-auto)
@@ -357,13 +364,15 @@
             if (saldoInput === modalAutoRow) return;
             const type = saldoInput.dataset.type;
             const val  = toNum(saldoInput.value);
-            if (type === 'asset')    totalAsset += val;
+            if (type === 'asset')    totalAssetDebit += val;
+            else if (type === 'contra-asset') totalAssetCredit += val;
             else if (type === 'liability') totalLiability += val;
             else totalEquityManual += val; // prive, etc.
         });
 
-        // Auto-set Modal Pemilik = Aset − Hutang − Ekuitas manual lainnya
-        const modalVal = Math.max(0, totalAsset - totalLiability - totalEquityManual);
+        // Auto-set Modal Pemilik = debit asset − contra asset − hutang −
+        // ekuitas manual lainnya.
+        const modalVal = Math.max(0, totalAssetDebit - totalAssetCredit - totalLiability - totalEquityManual);
         if (modalAutoRow) {
             modalAutoRow.value = modalVal > 0 ? fmt(modalVal) : '0';
         }
@@ -381,6 +390,10 @@
                 debitHidden.value  = val > 0 ? val : 0;
                 creditHidden.value = 0;
                 totalDebit += val;
+            } else if (type === 'contra-asset') {
+                debitHidden.value  = 0;
+                creditHidden.value = val > 0 ? val : 0;
+                totalCredit += val;
             } else {
                 creditHidden.value = val > 0 ? val : 0;
                 debitHidden.value  = 0;

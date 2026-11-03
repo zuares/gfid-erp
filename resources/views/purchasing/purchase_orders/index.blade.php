@@ -187,6 +187,63 @@
         border-color: rgba(124, 58, 237, .25);
     }
 
+    .po-receive-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: .18rem .5rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        border-radius: 999px;
+        color: #64748b;
+        background: rgba(148, 163, 184, .08);
+        font-size: .7rem;
+        font-weight: 800;
+        line-height: 1.1;
+        white-space: nowrap;
+    }
+
+    .po-receive-badge.is-received {
+        color: #15803d;
+        background: rgba(22, 163, 74, .08);
+        border-color: rgba(22, 163, 74, .2);
+    }
+
+    .po-receive-badge.is-partial {
+        color: #a16207;
+        background: rgba(234, 179, 8, .1);
+        border-color: rgba(234, 179, 8, .25);
+    }
+
+    .po-receive-badge.is-cancelled {
+        color: #b91c1c;
+        background: rgba(239, 68, 68, .08);
+        border-color: rgba(239, 68, 68, .2);
+    }
+
+    .po-receive-badge.is-stale {
+        color: #9a3412;
+        background: rgba(249, 115, 22, .1);
+        border-color: rgba(249, 115, 22, .28);
+    }
+
+    body[data-theme="dark"] .po-receive-badge {
+        color: #cbd5e1;
+        background: rgba(148, 163, 184, .12);
+        border-color: rgba(148, 163, 184, .32);
+    }
+
+    body[data-theme="dark"] .po-receive-badge.is-received {
+        color: #bbf7d0;
+        background: rgba(22, 163, 74, .14);
+        border-color: rgba(74, 222, 128, .35);
+    }
+
+    body[data-theme="dark"] .po-receive-badge.is-partial {
+        color: #fde68a;
+        background: rgba(234, 179, 8, .14);
+        border-color: rgba(250, 204, 21, .35);
+    }
+
     .po-filter-main {
         gap: .45rem !important;
     }
@@ -447,6 +504,7 @@
                 </th>
             @endif
             <th style="width: 150px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);">Status Keuangan</th>
+            <th style="width: 140px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide">Penerimaan</th>
             <th style="width: 90px; position: sticky; top: 0; z-index: 10; background: var(--card, #fff);" class="mobile-hide"></th>
         </tr>
     </x-slot>
@@ -454,6 +512,12 @@
     @foreach ($orders as $order)
         @php
             $grnCount = $order->purchaseReceipts?->count() ?? 0;
+            $draftGrns = ($order->purchaseReceipts ?? collect())
+                ->filter(fn ($grn) => ($grn->status ?? 'draft') === 'draft')
+                ->sortBy('created_at')
+                ->values();
+            $staleDraftDays = max(1, (int) config('purchasing.draft_grn_stale_days', 3));
+            $staleDraftGrn = $draftGrns->first(fn ($grn) => optional($grn->created_at)->lt(now()->subDays($staleDraftDays)));
             $ps = (string) ($order->payment_status ?? 'unpaid');
             $rcv = $order->received_status ?? 'not_received';
 
@@ -554,6 +618,9 @@
                         <span class="po-mobile-status {{ $rcv === 'fully_received' ? 'is-received' : ($rcv === 'partial' ? 'is-partial' : '') }}">
                             {{ $rcvLabel }}
                         </span>
+                        @if ($staleDraftGrn)
+                            <span class="po-mobile-status is-partial" title="Draft GRN belum diposting lebih dari {{ $staleDraftDays }} hari">Draft GRN tertahan</span>
+                        @endif
                         @if ($canSeeMoney)
                             <span class="po-mobile-status {{ in_array($payUiState, ['ap_paid', 'paid'], true) ? 'is-approved' : (in_array($payUiState, ['awaiting_offset', 'ap_outstanding', 'partial', 'dp_recorded'], true) ? 'is-partial' : ($payUiState === 'overpaid' ? 'is-overpaid' : '')) }}">
                                 {{ $payLabel }}
@@ -602,6 +669,22 @@
                     <span class="badge {{ $payBadge(in_array($payUiState, ['ap_paid', 'paid'], true) ? 'paid' : (in_array($payUiState, ['awaiting_offset', 'ap_outstanding', 'partial', 'dp_recorded'], true) ? 'partial' : ($payUiState === 'overpaid' ? 'overpaid' : 'unpaid'))) }} py-1 px-2" style="font-weight: 600; font-size: .75rem; border-radius: 6px;">{{ $payLabel }}</span>
                 @else
                     <span class="text-muted" style="font-size: .8rem;">-</span>
+                @endif
+            </td>
+
+            <td class="mobile-hide">
+                <span class="po-receive-badge {{ $rcv === 'fully_received' ? 'is-received' : ($rcv === 'partial' ? 'is-partial' : ($uiStatus === 'cancelled' ? 'is-cancelled' : '')) }}">
+                    {{ $rcvLabel }}
+                </span>
+                @if ($staleDraftGrn)
+                    <div class="mt-1">
+                        <span class="po-receive-badge is-stale" title="Draft GRN {{ $staleDraftGrn->code ?? $staleDraftGrn->id }} belum diposting lebih dari {{ $staleDraftDays }} hari">
+                            <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Draft tertahan
+                        </span>
+                    </div>
+                @endif
+                @if ($grnCount > 0)
+                    <div class="text-muted mt-1" style="font-size:.68rem;">{{ $grnCount }} GRN</div>
                 @endif
             </td>
 

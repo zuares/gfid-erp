@@ -148,11 +148,11 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             Route::prefix('purchase-receipts/{purchase_receipt}/qc')
                 ->name('purchase_receipts.qc.')
                 ->group(function () {
-                    Route::get('create',  [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'create'])->name('create');
-                    Route::post('',       [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'store'])->name('store');
-                    Route::get('edit',    [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'edit'])->name('edit');
-                    Route::put('',        [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'update'])->name('update');
-                    Route::delete('',     [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'cancel'])->name('cancel');
+                    Route::get('create', [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'create'])->name('create');
+                    Route::post('', [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'store'])->name('store');
+                    Route::get('edit', [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'edit'])->name('edit');
+                    Route::put('', [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'update'])->name('update');
+                    Route::delete('', [\App\Http\Controllers\Purchasing\PurchaseReceiptQcController::class, 'cancel'])->name('cancel');
                 });
 
             // Create GRN from PO
@@ -176,14 +176,20 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
             ->name('supplier_invoices.show');
         Route::post('supplier-invoices/{supplierInvoice}/post', [SupplierInvoiceController::class, 'post'])
             ->name('supplier_invoices.post');
+
+        // Settlement langsung dari invoice; tetap memakai PurchasePayment
+        // agar jurnal lama dan mirror akuntansi baru konsisten.
+        Route::middleware('role:owner')->post('supplier-invoices/{supplierInvoice}/payments', [PurchasePaymentController::class, 'storeForSupplierInvoice'])
+            ->name('supplier_invoices.payments.store');
+
         Route::delete('supplier-invoices/{supplierInvoice}/void', [SupplierInvoiceController::class, 'void'])
             ->name('supplier_invoices.void');
 
         // OWNER + ADMIN — read + edit return (draft only), close PO, cancel PO
         Route::middleware('role:owner,admin')->group(function () {
 
-            // Approval PO sementara disembunyikan/nonaktif. Route tetap
-            // didaftarkan agar URL lama memberi pesan yang jelas, bukan 404.
+            // Approval PO tetap terdaftar agar lifecycle PO dapat diaudit dan
+            // URL lama memberi pesan yang jelas, bukan 404.
             Route::post('purchase-orders/{purchase_order}/approve', [PurchaseOrderController::class, 'approve'])
                 ->name('purchase_orders.approve');
 
@@ -194,7 +200,7 @@ Route::middleware(['web', 'auth', 'access:purchasing'])
 
             Route::get('purchase-returns/search-by-item', [PurchaseReturnController::class, 'searchByItem'])
                 ->name('purchase_returns.search_by_item');
-                
+
             Route::get('purchase-returns', [PurchaseReturnController::class, 'index'])
                 ->name('purchase_returns.index');
 

@@ -11,10 +11,10 @@ Route::middleware(['web', 'auth', 'access:sales'])
     ->group(function () {
 
         /**
-     * =========================
-     *  SHIPMENTS
-     * =========================
-     */
+         * =========================
+         *  SHIPMENTS
+         * =========================
+         */
         Route::prefix('shipments')
             ->as('shipments.')
             ->controller(ShipmentController::class)
@@ -33,7 +33,9 @@ Route::middleware(['web', 'auth', 'access:sales'])
 
                 Route::get('{shipment}', 'show')->name('show');
                 Route::get('{shipment}/scan-order', 'editOrderFirst')->name('scan_order');
-                Route::get('{shipment}/cancel', 'cancelForm')->name('cancel_form');
+                Route::get('{shipment}/cancel', 'cancelForm')
+                    ->name('cancel_form')
+                    ->middleware('role:owner');
                 Route::get('{shipment}/edit', 'edit')->name('edit');
                 Route::delete('{shipment}', 'destroy')->name('destroy');
 
@@ -62,7 +64,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::get('/{shipment}/rekon', fn (\App\Models\Shipment $shipment) => redirect()
                     ->route('sales.shipments.confirm_orders', $shipment))
                     ->name('rekon');
-                Route::get('/{shipment}/confirm',      'confirmOrders')->name('confirm_orders');
+                Route::get('/{shipment}/confirm', 'confirmOrders')->name('confirm_orders');
                 // Endpoint lama dibiarkan untuk kompatibilitas data/scan yang
                 // masih dipakai halaman pembuatan shipment lama; tidak ada UI
                 // operator yang mengarah ke editor rekonsiliasi.
@@ -88,10 +90,10 @@ Route::middleware(['web', 'auth', 'access:sales'])
             ->middleware('role:owner');
 
         /**
-     * =========================
-     *  SHIPMENT RETURNS
-     * =========================
-     */
+         * =========================
+         *  SHIPMENT RETURNS
+         * =========================
+         */
         Route::prefix('shipment-returns')
             ->as('shipment_returns.')
             ->controller(ShipmentReturnController::class)
@@ -143,18 +145,22 @@ Route::middleware(['web', 'auth', 'access:sales'])
         // AJAX: lookup shipment by code (for return create form)
         Route::get('api/shipments/lookup', function (\Illuminate\Http\Request $req) {
             $code = strtoupper(trim($req->query('code', '')));
-            if (!$code) return response()->json(null);
+            if (! $code) {
+                return response()->json(null);
+            }
 
             $shipment = Shipment::with('store:id,code,name')
                 ->where('code', $code)
                 ->first(['id', 'code', 'store_id', 'date']);
 
-            if (!$shipment) return response()->json(null);
+            if (! $shipment) {
+                return response()->json(null);
+            }
 
             return response()->json([
-                'id'         => $shipment->id,
-                'code'       => $shipment->code,
-                'store_id'   => $shipment->store_id,
+                'id' => $shipment->id,
+                'code' => $shipment->code,
+                'store_id' => $shipment->store_id,
                 'store_code' => $shipment->store?->code,
                 'store_name' => $shipment->store?->name,
             ]);

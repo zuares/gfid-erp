@@ -103,7 +103,9 @@ class CashExpenseReclassificationTest extends TestCase
 
     private function account(string $code, string $name, bool $isCash = false): Account
     {
-        return Account::create([
+        return Account::firstOrCreate([
+            'code' => $code,
+        ], [
             'code' => $code,
             'name' => $name,
             'type' => $isCash ? 'asset' : 'expense',

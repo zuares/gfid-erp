@@ -85,7 +85,7 @@
     </div>
 
     {{-- KPI --}}
-    <div class="rc-kpis" style="grid-template-columns:repeat(4,1fr)">
+    <div class="rc-kpis" style="grid-template-columns:repeat(5,1fr)">
         <div class="rc-kpi">
             <div class="rc-kpi-label">Stok Negatif</div>
             <div class="rc-kpi-val {{ $negativeStocks->count() > 0 ? 'err' : 'ok' }}">
@@ -114,6 +114,42 @@
                 <span style="font-size:.75rem;font-weight:700;color:#94a3b8">baris</span>
             </div>
         </div>
+        <div class="rc-kpi">
+            <div class="rc-kpi-label">Auto BOM Shortage</div>
+            <div class="rc-kpi-val {{ $autoBomShortages->count() > 0 ? 'warn' : 'ok' }}">
+                {{ $autoBomShortages->count() }}
+                <span style="font-size:.75rem;font-weight:700;color:#94a3b8">baris</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- Auto BOM Sewing Pickup: issued penuh, tetapi stok RM tercatat minus --}}
+    <div class="rc-section">
+        <div class="rc-section-head">
+            <div class="rc-section-title">
+                🧰 Auto BOM Sewing Pickup — Shortage Stok
+                <span class="rc-badge {{ $autoBomShortages->count() > 0 ? 'warn' : 'ok' }}">{{ $autoBomShortages->count() }}</span>
+            </div>
+            <span style="font-size:.75rem;color:#64748b">Selesaikan dengan GRN/material receipt</span>
+        </div>
+        @if ($autoBomShortages->isEmpty())
+            <div class="rc-empty"><span class="rc-empty-icon">✅</span>Tidak ada shortage auto BOM aktif</div>
+        @else
+            <table class="rc-table">
+                <thead><tr><th>Pickup</th><th>Material</th><th class="rc-num">Butuh</th><th class="rc-num">Stok snapshot</th><th class="rc-num">Shortage</th></tr></thead>
+                <tbody>
+                    @foreach ($autoBomShortages as $row)
+                        <tr>
+                            <td><div class="rc-code">{{ $row->pickup_code }}</div><div class="rc-meta">{{ \Carbon\Carbon::parse($row->pickup_date)->format('d/m/Y') }}</div></td>
+                            <td><div class="rc-code">{{ $row->item_code }}</div><div class="rc-name">{{ $row->item_name }}</div></td>
+                            <td class="rc-num">{{ number_format((float) $row->required_qty, 3, ',', '.') }} {{ $row->uom }}</td>
+                            <td class="rc-num">{{ number_format((float) $row->stock_available_snapshot, 3, ',', '.') }}</td>
+                            <td class="rc-num rc-neg">{{ number_format((float) $row->stock_shortage_qty, 3, ',', '.') }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
     </div>
 
     @if ($totalGaps === 0)

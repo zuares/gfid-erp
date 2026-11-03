@@ -10,9 +10,9 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
 use App\Models\PurchaseReceiptLine;
 use App\Models\PurchaseReturn;
-use App\Models\SystemSetting;
 use App\Models\Supplier;
 use App\Models\SupplierLoan;
+use App\Models\SystemSetting;
 use App\Models\WhatsAppMessage;
 use App\Services\Accounting\JournalService;
 use App\Services\Purchasing\PurchaseOrderService;
@@ -386,7 +386,7 @@ class PurchaseOrderController extends Controller
             'purchaseReceipts',
             'purchaseRequest', // PR-D: relasi ke PR asal (nullable)
             'payments' => function ($q) {
-                $q->with(['paymentMethod', 'cashAccount'])
+                $q->with(['paymentMethod', 'cashAccount', 'standaloneJournal'])
                     ->orderByDesc('date')
                     ->orderByDesc('id');
             },
@@ -832,7 +832,7 @@ class PurchaseOrderController extends Controller
      */
     public function approve(Request $request, PurchaseOrder $purchase_order)
     {
-        if (!config('purchasing.po_approval_enabled', false)) {
+        if (! config('purchasing.po_approval_enabled', false)) {
             return redirect()
                 ->route('purchasing.purchase_orders.show', $purchase_order->id)
                 ->with('error', 'Approval PO sedang dinonaktifkan sementara.');
@@ -1092,6 +1092,23 @@ class PurchaseOrderController extends Controller
 
     protected function validateData(Request $request, ?PurchaseOrder $existingOrder = null): array
     {
+        // Tipe pembayaran PO ditetapkan otomatis sebagai Hutang/Tempo.
+        // Tetap pertahankan metode lama saat edit agar menyembunyikan field
+        // di UI tidak mengubah data historis PO secara tidak sengaja.
+        if (! $request->filled('payment_method_id')) {
+            $defaultPaymentMethodId = $existingOrder?->payment_method_id
+                ?: PaymentMethod::query()
+                    ->where('is_active', 1)
+                    ->where('mode', 'credit')
+                    ->where('code', '!=', 'DP_APPLY')
+                    ->orderBy('sort_order')
+                    ->value('id');
+
+            if ($defaultPaymentMethodId) {
+                $request->merge(['payment_method_id' => $defaultPaymentMethodId]);
+            }
+        }
+
         $rules = [
             'date' => ['required', 'date'],
             'supplier_id' => [

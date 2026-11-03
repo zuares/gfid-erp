@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class InventoryAdjustment extends Model
@@ -14,15 +15,20 @@ class InventoryAdjustment extends Model
     //  STATUS CONSTANTS
     // ==========================
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_VOID = 'void'; // / cancelled
 
     // ==============================
     // SOURCE TYPE (untuk inventory_mutations)
     // ==============================
     public const SOURCE_MANUAL = 'inventory_adjustment_manual';
+
     public const SOURCE_SO_OPENING = 'stock_opname_opening';
+
     public const SOURCE_SO_PERIODIC = 'stock_opname_periodic';
 
     protected $fillable = [
@@ -51,16 +57,26 @@ class InventoryAdjustment extends Model
     ];
 
     // ── Action WIP Cleanup ──
-    public const ACTION_KEEP_OPEN   = 'keep_open';
-    public const ACTION_MOVE        = 'move';
-    public const ACTION_FINISH      = 'finish';       // → WH-PRD / FG
-    public const ACTION_REPAIR      = 'repair';
-    public const ACTION_REJECT      = 'reject';
-    public const ACTION_WRITE_OFF   = 'write_off';    // fisik tidak ditemukan
+    public const ACTION_KEEP_OPEN = 'keep_open';
+
+    public const ACTION_MOVE = 'move';
+
+    public const ACTION_FINISH = 'finish';       // → WH-PRD / FG
+
+    public const ACTION_REPAIR = 'repair';
+
+    public const ACTION_REJECT = 'reject';
+
+    public const ACTION_WRITE_OFF = 'write_off';    // fisik tidak ditemukan
+
     public const ACTION_LINK_BUNDLE = 'link_bundle';
+
     public const ACTION_CLOSE_LEGACY = 'close_legacy';
-    public const ACTION_NORMALIZE   = 'normalize';    // hasil opname WIP
+
+    public const ACTION_NORMALIZE = 'normalize';    // hasil opname WIP
+
     public const ACTION_PICKUP_SETTLE = 'pickup_settle'; // tutup pickup: dianggap disetor → WIP-FIN
+
     public const ACTION_PICKUP_CANCEL = 'pickup_cancel'; // tutup pickup: batalkan → balik WIP-CUT
 
     /** Action "besar" yang wajib approval owner/admin. */
@@ -104,6 +120,20 @@ class InventoryAdjustment extends Model
     public function source(): MorphTo
     {
         return $this->morphTo(null, 'source_type', 'source_id');
+    }
+
+    /**
+     * Active mirror journal in Akuntansi Baru for this adjustment.
+     *
+     * The adjustment remains the operational source of truth; this relation
+     * only exposes the read-only accounting trace without creating another
+     * inventory event.
+     */
+    public function standaloneJournal(): HasOne
+    {
+        return $this->hasOne(StandaloneAccountingJournal::class, 'source_id')
+            ->where('source_type', 'inventory_adjustment')
+            ->whereNull('voided_at');
     }
 
     // 🔍 Scope helper
@@ -151,10 +181,11 @@ class InventoryAdjustment extends Model
     {
         return in_array($this->status, [self::STATUS_VOID, 'cancelled'], true);
     }
-/**
- * Human readable source label
- */
-    public static function sourceLabel(string | null $sourceType, ?string $fallback = null): string
+
+    /**
+     * Human readable source label
+     */
+    public static function sourceLabel(?string $sourceType, ?string $fallback = null): string
     {
         return match ($sourceType) {
             self::SOURCE_MANUAL => 'Adjustment Manual',
@@ -171,7 +202,7 @@ class InventoryAdjustment extends Model
      */
     public function canApprove(): bool
     {
-        return $this->isPending() && !$this->approved_by;
+        return $this->isPending() && ! $this->approved_by;
     }
 
     public function isOpening(): bool
@@ -195,5 +226,4 @@ class InventoryAdjustment extends Model
     {
         return $this->source_type === null;
     }
-
 }

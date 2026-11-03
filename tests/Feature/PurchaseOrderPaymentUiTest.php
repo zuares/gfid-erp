@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
-use App\Models\PaymentMethod;
 use App\Models\Item;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderLine;
 use App\Models\PurchasePayment;
@@ -23,14 +23,14 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-PO-PAY-REDIRECT-' . uniqid(),
+            'employee_code' => 'OWNER-PO-PAY-REDIRECT-'.uniqid(),
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-PO-PAY-REDIRECT-' . uniqid(),
+            'code' => 'SUP-PO-PAY-REDIRECT-'.uniqid(),
             'name' => 'Supplier Payment Redirect',
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-PAY-REDIRECT-' . uniqid(),
+            'code' => 'PO-PAY-REDIRECT-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000000,
@@ -39,14 +39,14 @@ class PurchaseOrderPaymentUiTest extends TestCase
 
         $this->actingAs($owner)
             ->get(route('purchasing.purchase_orders.payments.index', $order))
-            ->assertRedirect(route('purchasing.purchase_orders.show', $order) . '#payments');
+            ->assertRedirect(route('purchasing.purchase_orders.show', $order).'#payments');
     }
 
     public function test_owner_can_pay_a_posted_grn_and_payment_is_allocated_to_it(): void
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-GRN-PAY-' . uniqid(),
+            'employee_code' => 'OWNER-GRN-PAY-'.uniqid(),
         ]);
         $ap = Account::create([
             'code' => JournalService::CODE_AP,
@@ -60,32 +60,31 @@ class PurchaseOrderPaymentUiTest extends TestCase
             'type' => 'asset',
             'is_active' => true,
         ]);
-        $cash = Account::create([
-            'code' => '1101',
+        $cash = Account::firstOrCreate(['code' => '1101'], [
             'name' => 'Kas',
             'type' => 'asset',
             'is_cash' => true,
             'is_active' => true,
         ]);
         $method = PaymentMethod::create([
-            'code' => 'GRN-CASH-' . uniqid(),
+            'code' => 'GRN-CASH-'.uniqid(),
             'name' => 'Cash GRN Test',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-GRN-PAY-' . uniqid(),
+            'code' => 'SUP-GRN-PAY-'.uniqid(),
             'name' => 'Supplier GRN Payment',
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-GRN-PAY-' . uniqid(),
+            'code' => 'PO-GRN-PAY-'.uniqid(),
             'date' => '2026-09-11',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000000,
             'status' => 'approved',
         ]);
         $receipt = PurchaseReceipt::create([
-            'code' => 'GRN-GRN-PAY-' . uniqid(),
+            'code' => 'GRN-GRN-PAY-'.uniqid(),
             'date' => '2026-09-11',
             'purchase_order_id' => $order->id,
             'supplier_id' => $supplier->id,
@@ -122,7 +121,7 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-COMBINED-PAY-' . uniqid(),
+            'employee_code' => 'OWNER-COMBINED-PAY-'.uniqid(),
         ]);
         Account::create([
             'code' => JournalService::CODE_AP,
@@ -136,21 +135,20 @@ class PurchaseOrderPaymentUiTest extends TestCase
             'type' => 'asset',
             'is_active' => true,
         ]);
-        $cash = Account::create([
-            'code' => '1101',
+        $cash = Account::firstOrCreate(['code' => '1101'], [
             'name' => 'Kas',
             'type' => 'asset',
             'is_cash' => true,
             'is_active' => true,
         ]);
         $method = PaymentMethod::create([
-            'code' => 'COMBINED-CASH-' . uniqid(),
+            'code' => 'COMBINED-CASH-'.uniqid(),
             'name' => 'Cash Combined Test',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-COMBINED-' . uniqid(),
+            'code' => 'SUP-COMBINED-'.uniqid(),
             'name' => 'Supplier Combined Payment',
         ]);
 
@@ -212,14 +210,14 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-COMBINED-MIXED-' . uniqid(),
+            'employee_code' => 'OWNER-COMBINED-MIXED-'.uniqid(),
         ]);
         $supplierA = Supplier::create([
-            'code' => 'SUP-COMBINED-A-' . uniqid(),
+            'code' => 'SUP-COMBINED-A-'.uniqid(),
             'name' => 'Supplier Combined A',
         ]);
         $supplierB = Supplier::create([
-            'code' => 'SUP-COMBINED-B-' . uniqid(),
+            'code' => 'SUP-COMBINED-B-'.uniqid(),
             'name' => 'Supplier Combined B',
         ]);
         $orders = collect([$supplierA, $supplierB])->map(function (Supplier $supplier, int $index) {
@@ -244,13 +242,12 @@ class PurchaseOrderPaymentUiTest extends TestCase
             return $order;
         });
         $method = PaymentMethod::create([
-            'code' => 'MIXED-CASH-' . uniqid(),
+            'code' => 'MIXED-CASH-'.uniqid(),
             'name' => 'Cash Mixed Supplier Test',
             'mode' => 'cash',
             'is_active' => true,
         ]);
-        $cash = Account::create([
-            'code' => '1101',
+        $cash = Account::firstOrCreate(['code' => '1101'], [
             'name' => 'Kas',
             'type' => 'asset',
             'is_cash' => true,
@@ -274,27 +271,27 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-PO-PAY-UI-' . uniqid(),
+            'employee_code' => 'OWNER-PO-PAY-UI-'.uniqid(),
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-PO-PAY-UI-' . uniqid(),
+            'code' => 'SUP-PO-PAY-UI-'.uniqid(),
             'name' => 'Supplier Payment UI',
         ]);
         $paymentMethod = PaymentMethod::create([
-            'code' => 'UI-CASH-' . uniqid(),
+            'code' => 'UI-CASH-'.uniqid(),
             'name' => 'Cash UI Test',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-PAY-UI-' . uniqid(),
+            'code' => 'PO-PAY-UI-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000000,
             'status' => 'draft',
         ]);
         $item = Item::create([
-            'code' => 'ITEM-PO-PAY-UI-' . uniqid(),
+            'code' => 'ITEM-PO-PAY-UI-'.uniqid(),
             'name' => 'Item Payment UI',
             'unit' => 'pcs',
             'type' => 'material',
@@ -334,27 +331,27 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-PO-PAY-FULL-' . uniqid(),
+            'employee_code' => 'OWNER-PO-PAY-FULL-'.uniqid(),
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-PO-PAY-FULL-' . uniqid(),
+            'code' => 'SUP-PO-PAY-FULL-'.uniqid(),
             'name' => 'Supplier Full DP UI',
         ]);
         $paymentMethod = PaymentMethod::create([
-            'code' => 'UI-FULL-CASH-' . uniqid(),
+            'code' => 'UI-FULL-CASH-'.uniqid(),
             'name' => 'Cash Full DP UI Test',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-PAY-FULL-' . uniqid(),
+            'code' => 'PO-PAY-FULL-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000000,
             'status' => 'approved',
         ]);
         $item = Item::create([
-            'code' => 'ITEM-PO-PAY-FULL-' . uniqid(),
+            'code' => 'ITEM-PO-PAY-FULL-'.uniqid(),
             'name' => 'Item Full DP UI',
             'unit' => 'pcs',
             'type' => 'material',
@@ -389,20 +386,20 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-PO-OFFSET-UI-' . uniqid(),
+            'employee_code' => 'OWNER-PO-OFFSET-UI-'.uniqid(),
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-PO-OFFSET-UI-' . uniqid(),
+            'code' => 'SUP-PO-OFFSET-UI-'.uniqid(),
             'name' => 'Supplier Offset UI',
         ]);
         $paymentMethod = PaymentMethod::create([
-            'code' => 'UI-OFFSET-CASH-' . uniqid(),
+            'code' => 'UI-OFFSET-CASH-'.uniqid(),
             'name' => 'Cash Offset UI Test',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-OFFSET-UI-' . uniqid(),
+            'code' => 'PO-OFFSET-UI-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 100000,
@@ -412,7 +409,7 @@ class PurchaseOrderPaymentUiTest extends TestCase
             'paid_amount' => 100000,
         ]);
         PurchaseReceipt::create([
-            'code' => 'GRN-OFFSET-UI-' . uniqid(),
+            'code' => 'GRN-OFFSET-UI-'.uniqid(),
             'date' => '2026-08-31',
             'purchase_order_id' => $order->id,
             'supplier_id' => $supplier->id,
@@ -443,14 +440,14 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $admin = User::factory()->create([
             'role' => 'admin',
-            'employee_code' => 'ADMIN-PO-PAY-UI-' . uniqid(),
+            'employee_code' => 'ADMIN-PO-PAY-UI-'.uniqid(),
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-PO-ADMIN-UI-' . uniqid(),
+            'code' => 'SUP-PO-ADMIN-UI-'.uniqid(),
             'name' => 'Supplier Admin Payment UI',
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-ADMIN-PAY-UI-' . uniqid(),
+            'code' => 'PO-ADMIN-PAY-UI-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000000,
@@ -458,7 +455,7 @@ class PurchaseOrderPaymentUiTest extends TestCase
             'payment_status' => 'unpaid',
         ]);
         $item = Item::create([
-            'code' => 'ITEM-PO-ADMIN-UI-' . uniqid(),
+            'code' => 'ITEM-PO-ADMIN-UI-'.uniqid(),
             'name' => 'Item Admin Payment UI',
             'unit' => 'pcs',
             'type' => 'material',
@@ -488,14 +485,14 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-PO-CANCEL-UI-' . uniqid(),
+            'employee_code' => 'OWNER-PO-CANCEL-UI-'.uniqid(),
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-PO-CANCEL-UI-' . uniqid(),
+            'code' => 'SUP-PO-CANCEL-UI-'.uniqid(),
             'name' => 'Supplier Cancel UI',
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-CANCEL-UI-' . uniqid(),
+            'code' => 'PO-CANCEL-UI-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000000,
@@ -515,20 +512,20 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-PO-EDIT-UI-' . uniqid(),
+            'employee_code' => 'OWNER-PO-EDIT-UI-'.uniqid(),
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-PO-EDIT-UI-' . uniqid(),
+            'code' => 'SUP-PO-EDIT-UI-'.uniqid(),
             'name' => 'Supplier Edit UI',
         ]);
         $paymentMethod = PaymentMethod::create([
-            'code' => 'UI-EDIT-CASH-' . uniqid(),
+            'code' => 'UI-EDIT-CASH-'.uniqid(),
             'name' => 'Cash Edit UI Test',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-EDIT-UI-' . uniqid(),
+            'code' => 'PO-EDIT-UI-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000000,
@@ -569,20 +566,20 @@ class PurchaseOrderPaymentUiTest extends TestCase
     {
         $owner = User::factory()->create([
             'role' => 'owner',
-            'employee_code' => 'OWNER-PO-REPAY-UI-' . uniqid(),
+            'employee_code' => 'OWNER-PO-REPAY-UI-'.uniqid(),
         ]);
         $supplier = Supplier::create([
-            'code' => 'SUP-PO-REPAY-UI-' . uniqid(),
+            'code' => 'SUP-PO-REPAY-UI-'.uniqid(),
             'name' => 'Supplier Repay UI',
         ]);
         $paymentMethod = PaymentMethod::create([
-            'code' => 'UI-REPAY-CASH-' . uniqid(),
+            'code' => 'UI-REPAY-CASH-'.uniqid(),
             'name' => 'Cash Repay UI Test',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PO-REPAY-UI-' . uniqid(),
+            'code' => 'PO-REPAY-UI-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000000,

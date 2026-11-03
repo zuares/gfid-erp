@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Production;
 use App\Http\Controllers\Controller;
 use App\Models\FinishingRepair;
 use App\Models\FinishingRepairLine;
+use App\Models\InventoryMutation;
 use App\Models\Item;
 use App\Models\ItemRole;
 use App\Models\Warehouse;
@@ -20,9 +21,7 @@ use Illuminate\View\View;
 
 class FinishingRepairController extends Controller
 {
-    public function __construct(private InventoryService $inventory)
-    {
-    }
+    public function __construct(private InventoryService $inventory) {}
 
     public function index(): View
     {
@@ -61,13 +60,13 @@ class FinishingRepairController extends Controller
         ]);
 
         $rows = collect($validated['results'])
-            ->map(fn($row) => [
+            ->map(fn ($row) => [
                 'finishing_job_line_id' => (int) ($row['finishing_job_line_id'] ?? 0),
                 'qty_ok' => (float) ($row['qty_ok'] ?? 0),
                 'qty_reject' => (float) ($row['qty_reject'] ?? 0),
                 'notes' => trim((string) ($row['notes'] ?? '')),
             ])
-            ->filter(fn($row) => $row['finishing_job_line_id'] > 0 && ($row['qty_ok'] + $row['qty_reject']) > 0.000001)
+            ->filter(fn ($row) => $row['finishing_job_line_id'] > 0 && ($row['qty_ok'] + $row['qty_reject']) > 0.000001)
             ->values();
 
         if ($rows->isEmpty()) {
@@ -81,7 +80,7 @@ class FinishingRepairController extends Controller
             $whPrd = Warehouse::query()->where('code', 'WH-PRD')->first();
             $whRts = Warehouse::query()->where('code', 'WH-RTS')->first();
 
-            if (!$rejFin || !$whPrd || !$whRts) {
+            if (! $rejFin || ! $whPrd || ! $whRts) {
                 throw ValidationException::withMessages(['results' => 'Gudang REJ-FIN / WH-PRD / WH-RTS belum lengkap.']);
             }
 
@@ -90,7 +89,7 @@ class FinishingRepairController extends Controller
 
             foreach ($rows as $row) {
                 $available = $lineMap->get($row['finishing_job_line_id']);
-                if (!$available) {
+                if (! $available) {
                     throw ValidationException::withMessages(['results' => 'Ada baris reject finishing yang tidak valid atau sudah selesai.']);
                 }
 
@@ -139,13 +138,14 @@ class FinishingRepairController extends Controller
                         qty: $qtyOk,
                         date: $date,
                         sourceType: 'finishing_repair',
-                        sourceId: (int) $available->finishing_job_line_id,
+                        sourceId: (int) $repair->id,
                         notes: "Perbaikan finishing {$repair->code} OUT REJ-FIN",
                         allowNegative: false,
                         lotId: null,
                         unitCostOverride: $unitCost > 0 ? $unitCost : null,
                         affectLotCost: false,
                         cuttingJobBundleId: (int) $available->bundle_id ?: null,
+                        sourceLineId: (int) $available->finishing_job_line_id,
                     );
 
                     $this->inventory->stockIn(
@@ -154,12 +154,13 @@ class FinishingRepairController extends Controller
                         qty: $qtyOk,
                         date: $date,
                         sourceType: 'finishing_repair',
-                        sourceId: (int) $available->finishing_job_line_id,
+                        sourceId: (int) $repair->id,
                         notes: "Perbaikan finishing {$repair->code} IN WH-PRD",
                         lotId: null,
                         unitCost: $unitCost > 0 ? $unitCost : null,
                         affectLotCost: false,
                         cuttingJobBundleId: (int) $available->bundle_id ?: null,
+                        sourceLineId: (int) $available->finishing_job_line_id,
                     );
                 }
 
@@ -170,13 +171,14 @@ class FinishingRepairController extends Controller
                         qty: $qtyReject,
                         date: $date,
                         sourceType: 'finishing_reject_convert',
-                        sourceId: (int) $available->finishing_job_line_id,
+                        sourceId: (int) $repair->id,
                         notes: "Tidak bisa diperbaiki {$repair->code} OUT SKU asli",
                         allowNegative: false,
                         lotId: null,
                         unitCostOverride: $unitCost > 0 ? $unitCost : null,
                         affectLotCost: false,
                         cuttingJobBundleId: (int) $available->bundle_id ?: null,
+                        sourceLineId: (int) $available->finishing_job_line_id,
                     );
 
                     $this->inventory->stockIn(
@@ -185,19 +187,20 @@ class FinishingRepairController extends Controller
                         qty: $qtyReject,
                         date: $date,
                         sourceType: 'finishing_reject_convert',
-                        sourceId: (int) $available->finishing_job_line_id,
+                        sourceId: (int) $repair->id,
                         notes: "Tidak bisa diperbaiki {$repair->code} IN WH-RTS {$rejectItem->code}",
                         lotId: null,
                         unitCost: $unitCost > 0 ? $unitCost : null,
                         affectLotCost: false,
                         cuttingJobBundleId: (int) $available->bundle_id ?: null,
+                        sourceLineId: (int) $available->finishing_job_line_id,
                     );
                 }
             }
 
             return redirect()
                 ->route('production.finishing_repairs.show', $repair)
-                ->with('status', "Perbaikan {$repair->code} berhasil disimpan. Qty tidak bisa masuk WH-RTS sebagai SKU reject kategori.");
+                ->with('status', "Perbaikan {$repair->code} berhasil disimpan. Qty tidak bisa masuk WH-RTS sebagai SKU REJ-{kode item}.");
         });
     }
 
@@ -216,19 +219,141 @@ class FinishingRepairController extends Controller
         ]);
     }
 
+    public function unpost(Request $request, FinishingRepair $finishingRepair): RedirectResponse
+    {
+        abort_unless(
+            $request->user()?->isOwner(),
+            403,
+            'Hanya owner/developer yang boleh UNPOST Perbaikan Reject Finishing.'
+        );
+
+        try {
+            $this->reversePostedRepair($finishingRepair);
+
+            return redirect()
+                ->route('production.finishing_repairs.show', $finishingRepair->id)
+                ->with('status', 'Perbaikan Reject Finishing berhasil di-UNPOST. Stok sudah dikembalikan ke REJ-FIN.');
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withErrors([
+                'finishing_repair' => 'UNPOST Perbaikan Reject Finishing gagal: '.$e->getMessage(),
+            ]);
+        }
+    }
+
+    private function reversePostedRepair(FinishingRepair $finishingRepair): void
+    {
+        DB::transaction(function () use ($finishingRepair): void {
+            $repair = FinishingRepair::query()
+                ->whereKey($finishingRepair->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($repair->status === 'draft') {
+                return;
+            }
+
+            if ($repair->status !== 'posted') {
+                throw ValidationException::withMessages([
+                    'finishing_repair' => "Perbaikan {$repair->code} berstatus {$repair->status}; hanya POSTED yang dapat di-UNPOST.",
+                ]);
+            }
+
+            $lines = FinishingRepairLine::query()
+                ->where('finishing_repair_id', $repair->id)
+                ->lockForUpdate()
+                ->get();
+
+            $reversedCount = 0;
+            foreach ($lines as $line) {
+                $reversedCount += $this->reverseRepairMutations(
+                    $repair,
+                    $line,
+                    ['finishing_repair'],
+                    'finishing_repair_reverse',
+                );
+                $reversedCount += $this->reverseRepairMutations(
+                    $repair,
+                    $line,
+                    ['finishing_reject_convert'],
+                    'finishing_reject_convert_reverse',
+                );
+            }
+
+            if ($reversedCount === 0 && $lines->isNotEmpty()) {
+                throw new \RuntimeException("Mutasi aktif tidak ditemukan untuk repair {$repair->code}.");
+            }
+
+            $repair->update(['status' => 'draft']);
+        });
+    }
+
+    private function reverseRepairMutations(
+        FinishingRepair $repair,
+        FinishingRepairLine $line,
+        array $sourceTypes,
+        string $reverseSourceType,
+    ): int {
+        $rows = InventoryMutation::query()
+            ->whereIn('source_type', $sourceTypes)
+            ->where('notes', 'like', '%'.$repair->code.'%')
+            ->where(function ($query) use ($repair, $line): void {
+                // Repair baru memakai source_id=repair_id; data lama memakai
+                // source_id=finishing_job_line_id. Notes membatasi dokumen
+                // agar reversal tidak mengambil repair lain pada line sama.
+                $query->where('source_id', (int) $repair->id)
+                    ->orWhere('source_id', (int) $line->finishing_job_line_id);
+            })
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $reversed = 0;
+        foreach ($rows as $mutation) {
+            $alreadyReversed = InventoryMutation::query()
+                ->where('source_type', $reverseSourceType)
+                ->where('source_id', (int) $repair->id)
+                ->where('notes', 'like', '%reverse mut#'.$mutation->id.'%')
+                ->exists();
+
+            if ($alreadyReversed) {
+                continue;
+            }
+
+            $this->inventory->adjustByDifference(
+                warehouseId: (int) $mutation->warehouse_id,
+                itemId: (int) $mutation->item_id,
+                qtyChange: -((float) $mutation->qty_change),
+                date: $repair->date,
+                sourceType: $reverseSourceType,
+                sourceId: (int) $repair->id,
+                notes: "UNPOST {$repair->code} reverse mut#{$mutation->id} | {$mutation->notes}",
+                lotId: $mutation->lot_id ? (int) $mutation->lot_id : null,
+                allowNegative: false,
+                unitCostOverride: $mutation->unit_cost !== null ? (float) $mutation->unit_cost : null,
+                affectLotCost: false,
+                cuttingJobBundleId: $mutation->cutting_job_bundle_id ? (int) $mutation->cutting_job_bundle_id : null,
+            );
+
+            $reversed++;
+        }
+
+        return $reversed;
+    }
+
     private function availableRejectLines(?array $lineIds = null, bool $lock = false)
     {
         $rejFin = Warehouse::query()->where('code', 'REJ-FIN')->first();
-        if (!$rejFin) {
+        if (! $rejFin) {
             return collect();
         }
 
-        $consumedSub = DB::table('inventory_mutations')
-            ->whereIn('source_type', ['finishing_repair', 'finishing_reject_convert'])
-            ->where('warehouse_id', $rejFin->id)
-            ->where('direction', 'out')
-            ->groupBy('source_id')
-            ->selectRaw('source_id as finishing_job_line_id, SUM(ABS(qty_change)) as qty_consumed');
+        $consumedSub = DB::table('finishing_repair_lines as frl')
+            ->join('finishing_repairs as fr', 'fr.id', '=', 'frl.finishing_repair_id')
+            ->where('fr.status', 'posted')
+            ->groupBy('frl.finishing_job_line_id')
+            ->selectRaw('frl.finishing_job_line_id, SUM(COALESCE(frl.qty_ok,0) + COALESCE(frl.qty_reject,0)) as qty_consumed');
 
         $query = DB::table('finishing_job_lines as fl')
             ->join('finishing_jobs as f', 'f.id', '=', 'fl.finishing_job_id')
@@ -246,7 +371,7 @@ class FinishingRepairController extends Controller
                 $q->whereNull('fl.reject_cause')
                     ->orWhere('fl.reject_cause', 'finishing');
             })
-            ->when($lineIds, fn($q) => $q->whereIn('fl.id', $lineIds))
+            ->when($lineIds, fn ($q) => $q->whereIn('fl.id', $lineIds))
             ->selectRaw("
                 fl.id as finishing_job_line_id,
                 f.code as finishing_code,
@@ -280,25 +405,19 @@ class FinishingRepairController extends Controller
 
                 return $row;
             })
-            ->filter(fn($row) => (float) $row->remaining_qty > 0.000001)
+            ->filter(fn ($row) => (float) $row->remaining_qty > 0.000001)
             ->values();
     }
 
     private function resolveRejectItem(int $sourceItemId): Item
     {
-        $source = Item::query()
-            ->with('category')
-            ->findOrFail($sourceItemId);
+        $source = Item::query()->findOrFail($sourceItemId);
 
-        $category = $source->category;
-        $categoryCode = $category?->code
-            ? Str::upper(Str::slug($category->code, '-'))
-            : Str::upper(Str::slug($category?->name ?: 'REJECT', '-'));
-
-        // SKU standar reject: REJ-{KODE_KATEGORI}, misalnya REJ-LJR.
-        // Kode lama *-RJCT tetap dipertahankan sebagai histori.
-        $rejectCode = 'REJ-' . trim($categoryCode, '-');
-        $rejectName = trim(($category?->name ?: $categoryCode) . ' Reject');
+        // Reject finishing harus tetap dapat ditelusuri ke SKU asal.
+        // Contoh: K7BLK menjadi REJ-K7BLK, bukan REJ-{kode kategori}.
+        $sourceCode = Str::upper(Str::slug((string) ($source->code ?: ('ITEM-'.$sourceItemId)), '-'));
+        $rejectCode = 'REJ-'.trim($sourceCode, '-');
+        $rejectName = trim(($source->name ?: $sourceCode).' Reject');
 
         $attributes = [
             'name' => $rejectName,

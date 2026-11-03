@@ -135,7 +135,7 @@ class PurchaseOrder extends Model
     /** Closed ditandai oleh closed_at (additive — status = closed) */
     public function isClosed(): bool
     {
-        return $this->status === 'closed' || !is_null($this->closed_at);
+        return $this->status === 'closed' || ! is_null($this->closed_at);
     }
 
     /**
@@ -144,7 +144,8 @@ class PurchaseOrder extends Model
      */
     public function evaluateAutoClose(): void
     {
-        if (in_array($this->status, ['draft', 'cancelled'])) {
+        if ($this->status === 'cancelled'
+            || ($this->status === 'draft' && config('purchasing.po_approval_enabled', false))) {
             return;
         }
 
@@ -160,8 +161,8 @@ class PurchaseOrder extends Model
             $this->status = 'closed';
             $this->closed_at = now();
             $this->save();
-        } elseif (!$isComplete && $this->status === 'closed') {
-            $this->status = 'approved';
+        } elseif (! $isComplete && $this->status === 'closed') {
+            $this->status = config('purchasing.po_approval_enabled', false) ? 'approved' : 'draft';
             $this->closed_at = null;
             $this->closed_by = null;
             $this->save();
@@ -174,15 +175,14 @@ class PurchaseOrder extends Model
      */
     public function isLocked(): bool
     {
-        return !is_null($this->locked_at);
+        return ! is_null($this->locked_at);
     }
 
     /**
      * Status yang boleh menjadi acuan GRN.
      *
-     * Saat approval PO dinonaktifkan sementara, PO draft tetap dapat dipakai
-     * sebagai acuan GRN. Approval lama tetap didukung bila fitur diaktifkan
-     * kembali melalui config/purchasing.php.
+     * Saat approval aktif hanya PO approved yang boleh diproses. Saat approval
+     * dinonaktifkan, PO Draft langsung dapat menjadi acuan GRN.
      */
     public function isReceivableForGrn(): bool
     {
@@ -190,8 +190,8 @@ class PurchaseOrder extends Model
             return true;
         }
 
-        return !config('purchasing.po_approval_enabled', false)
-            && $this->status === 'draft';
+        return $this->status === 'draft'
+            && (! config('purchasing.po_approval_enabled', false) || $this->isLocked());
     }
 
     /** Label turunan untuk UI: Draft / Receiving / Partially Received / Fully Received / Locked. */
@@ -209,6 +209,7 @@ class PurchaseOrder extends Model
         if ($this->isLocked()) {
             return 'Receiving';
         }
+
         return ucfirst($this->status ?? 'draft');
     }
 
@@ -303,5 +304,4 @@ class PurchaseOrder extends Model
 
         return static::normalizePaymentRemainder($this->accountsPayableDebt() - $settled);
     }
-
 }

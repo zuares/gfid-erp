@@ -102,11 +102,275 @@
         .row-has-reject { background: rgba(248,113,113,.04) }
         .row-has-reject .cell-reject { color: #dc2626; font-weight: 600 }
         .row-no-qc { background: rgba(148,163,184,.04) }
+        .row-corrected { background: rgba(245,158,11,.07) }
+        .row-corrected td { color: var(--muted) }
+        .row-corrected .cell-corrected { color: #b45309; font-weight: 700 }
 
         .cell-ok { font-variant-numeric: tabular-nums }
 
         .small-muted { font-size: .8rem; color: var(--muted) }
         .badge-soft  { border-radius: 999px; padding: .2rem .6rem; font-size: .75rem }
+
+        .accounting-trace-table { font-size: .78rem }
+        .accounting-trace-table th { white-space: nowrap; color: var(--muted); font-weight: 700 }
+        .accounting-trace-table td, .accounting-trace-table th { padding: .42rem .5rem }
+        .accounting-trace-table .trace-time { white-space: nowrap; color: var(--muted) }
+        .accounting-trace-note { display: block; margin-top: .12rem; color: var(--muted); font-size: .7rem; line-height: 1.35 }
+        .accounting-trace-explainer { border: 1px solid rgba(37, 99, 235, .15); border-radius: 9px; background: rgba(239, 246, 255, .55); color: var(--muted); font-size: .74rem; line-height: 1.45; padding: .5rem .65rem; margin-bottom: .65rem }
+        body[data-theme="dark"] .accounting-trace-explainer { background: rgba(30, 58, 138, .18); border-color: rgba(96, 165, 250, .25) }
+
+        .correction-section {
+            border-color: rgba(245, 158, 11, .25);
+            background: linear-gradient(135deg, rgba(255, 251, 235, .72), rgba(248, 250, 252, .94));
+        }
+
+        .correction-section > summary {
+            background: rgba(245, 158, 11, .06);
+            border-bottom: 1px solid rgba(245, 158, 11, .16);
+        }
+
+        .correction-section .production-financial-title { color: #b45309; }
+        .correction-section > summary::after { color: #b45309; }
+        .correction-table { font-size: .76rem; }
+        .correction-table th { color: var(--muted); font-size: .68rem; text-transform: uppercase; white-space: nowrap; }
+        .correction-table td, .correction-table th { padding: .42rem .45rem; vertical-align: middle; }
+        .correction-note { font-size: .72rem; color: var(--muted); line-height: 1.4; }
+
+        body[data-theme="dark"] .correction-section {
+            border-color: rgba(245, 158, 11, .35);
+            background: linear-gradient(135deg, rgba(120, 53, 15, .25), rgba(15, 23, 42, .7));
+        }
+
+        /* Accordion financial sections: konsisten dengan form Cutting Job. */
+        .production-financial-section {
+            overflow: hidden;
+            padding: 0;
+        }
+
+        .production-financial-section > summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .75rem;
+            padding: 1rem 1.25rem;
+        }
+
+        .production-financial-section > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .production-financial-section > summary::after {
+            content: '⌄';
+            margin-left: auto;
+            color: #0f766e;
+            font-size: 1rem;
+            font-weight: 800;
+            line-height: 1;
+            transition: transform .15s ease;
+        }
+
+        .production-financial-section[open] > summary::after {
+            transform: rotate(180deg);
+        }
+
+        .production-financial-section-body {
+            padding: 0 1.25rem 1rem;
+        }
+
+        .production-financial-title {
+            color: #0f766e;
+            font-size: .86rem;
+            font-weight: 800;
+        }
+
+        .production-financial-subtitle {
+            color: var(--muted);
+            font-size: .76rem;
+            line-height: 1.35;
+            margin-top: .15rem;
+        }
+
+        .production-financial-section.hpp-section {
+            border-color: rgba(37, 99, 235, .2);
+            background: linear-gradient(135deg, rgba(239, 246, 255, .62), rgba(248, 250, 252, .9));
+        }
+
+        .production-financial-section.hpp-section > summary {
+            background: rgba(37, 99, 235, .04);
+            border-bottom: 1px solid rgba(37, 99, 235, .12);
+        }
+
+        .production-financial-section.summary-section > summary {
+            background: rgba(148, 163, 184, .045);
+            border-bottom: 1px solid rgba(148, 163, 184, .16);
+        }
+
+        .summary-section .production-financial-title {
+            color: var(--text);
+        }
+
+        .summary-output-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+            gap: .85rem 1rem;
+        }
+
+        .summary-output-item .help {
+            margin-bottom: .18rem;
+        }
+
+        .summary-output-item .mono {
+            font-size: .9rem;
+            font-weight: 700;
+        }
+
+        .production-financial-section.fabric-remnant-section > summary {
+            background: rgba(245, 158, 11, .045);
+            border-bottom: 1px solid rgba(245, 158, 11, .16);
+        }
+
+        .fabric-remnant-section .production-financial-title {
+            color: #b45309;
+        }
+
+        .hpp-section > summary::after {
+            color: #1d4ed8;
+        }
+
+        .hpp-section .production-financial-title {
+            color: #1d4ed8;
+        }
+
+        .hpp-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .5rem;
+            margin-bottom: .55rem;
+        }
+
+        .hpp-summary-item {
+            min-width: 0;
+            padding: .45rem .55rem;
+            border: 1px solid rgba(148, 163, 184, .2);
+            border-radius: 9px;
+            background: rgba(255, 255, 255, .62);
+        }
+
+        .hpp-summary-item span {
+            display: block;
+            color: var(--muted);
+            font-size: .64rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .hpp-summary-item strong {
+            display: block;
+            color: var(--text);
+            font-size: .82rem;
+            margin-top: .08rem;
+        }
+
+        .hpp-summary-item.is-total {
+            border-color: rgba(59, 130, 246, .25);
+            background: rgba(219, 234, 254, .68);
+        }
+
+        .hpp-summary-item.is-total strong {
+            color: #1d4ed8;
+        }
+
+        .hpp-detail-table {
+            font-size: .76rem;
+        }
+
+        .hpp-detail-table th {
+            color: var(--muted);
+            font-size: .68rem;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .hpp-detail-table td,
+        .hpp-detail-table th {
+            padding: .4rem .45rem;
+            vertical-align: middle;
+        }
+
+        .hpp-unit-cost {
+            color: var(--muted);
+            font-size: .64rem;
+            font-weight: 500;
+            line-height: 1.25;
+            white-space: nowrap;
+        }
+
+        .hpp-warning {
+            color: #92400e;
+            background: rgba(254, 243, 199, .72);
+            border: 1px solid rgba(245, 158, 11, .35);
+            border-radius: 8px;
+            padding: .38rem .55rem;
+            font-size: .72rem;
+            line-height: 1.4;
+        }
+
+        body[data-theme="dark"] .production-financial-section.hpp-section {
+            border-color: rgba(96, 165, 250, .35);
+            background: linear-gradient(135deg, rgba(23, 37, 84, .48), rgba(15, 23, 42, .68));
+        }
+
+        body[data-theme="dark"] .production-financial-section.hpp-section > summary {
+            background: rgba(37, 99, 235, .12);
+            border-bottom-color: rgba(96, 165, 250, .25);
+        }
+
+        body[data-theme="dark"] .hpp-summary-item {
+            background: rgba(15, 23, 42, .42);
+            border-color: rgba(148, 163, 184, .2);
+        }
+
+        body[data-theme="dark"] .hpp-summary-item strong {
+            color: #e2e8f0;
+        }
+
+        body[data-theme="dark"] .production-financial-section.fabric-remnant-section > summary {
+            background: rgba(245, 158, 11, .1);
+            border-bottom-color: rgba(245, 158, 11, .25);
+        }
+
+        @media (max-width: 767.98px) {
+            .production-financial-section > summary {
+                padding: .8rem .9rem;
+            }
+
+            .production-financial-section-body {
+                padding: 0 .9rem .8rem;
+            }
+
+            .hpp-summary-grid {
+                gap: .3rem;
+            }
+
+            .hpp-summary-item {
+                padding: .35rem .4rem;
+            }
+
+            .hpp-summary-item strong {
+                font-size: .7rem;
+            }
+
+            .hpp-detail-table {
+                min-width: 610px;
+            }
+
+            .summary-output-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .7rem .8rem;
+            }
+        }
 
         /* WIP pills (same as edit page) */
         .wip-inline { display: flex; flex-wrap: wrap; gap: .18rem; margin-top: .18rem }
@@ -281,6 +545,44 @@
             background: rgba(245, 158, 11, .08)
         }
 
+        .cutting-confirm-card {
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: .85rem 1rem;
+            border-color: rgba(34, 197, 94, .28);
+            background: linear-gradient(135deg, rgba(240, 253, 244, .9), rgba(248, 250, 252, .94));
+        }
+
+        .cutting-confirm-card-title {
+            color: #166534;
+            font-size: .84rem;
+            font-weight: 800;
+        }
+
+        .cutting-confirm-card-help {
+            color: var(--muted);
+            font-size: .74rem;
+            line-height: 1.35;
+            margin-top: .12rem;
+        }
+
+        .cutting-confirm-card .btn-success {
+            flex-shrink: 0;
+            border-radius: 999px;
+            padding-inline: 1rem;
+            box-shadow: 0 7px 16px rgba(22, 163, 74, .22);
+        }
+
+        body[data-theme="dark"] .cutting-confirm-card {
+            border-color: rgba(74, 222, 128, .32);
+            background: linear-gradient(135deg, rgba(20, 83, 45, .35), rgba(15, 23, 42, .7));
+        }
+
+        body[data-theme="dark"] .cutting-confirm-card-title {
+            color: #86efac;
+        }
+
         /* mobile floating */
         @media (max-width:767.98px) {
             .cutting-mobile-actions {
@@ -351,8 +653,10 @@
 @section('content')
     @php
         // ========= FLAGS =========
-        $userRole = auth()->user()->role ?? null;
-        $isOwner = $userRole === 'owner';
+        $user = auth()->user();
+        $userRole = $user->role ?? null;
+        $isOwner = $user?->isOwner() ?? false;
+        $canSeeProductionAccounting = $isOwner;
         $status = $job->status ?? 'draft';
 
         $firstBundle = $job->bundles->first();
@@ -432,6 +736,7 @@
         $totalBundles = $job->bundles->count();
         $totalQtyPcs = (float) $job->bundles->sum('qty_pcs');
         $totalUsedFabric = (float) $job->bundles->sum('qty_used_fabric');
+        $fabricPerPcs = $totalQtyPcs > 0 ? $totalUsedFabric / $totalQtyPcs : 0.0;
 
         $qcTotalOk = 0.0;
         $qcTotalReject = 0.0;
@@ -487,6 +792,30 @@
 
         $dotClass = fn($n) => $stepCurrent === $n ? 'current' : ($stepCurrent > $n ? 'active' : '');
         $lblClass = fn($n) => $stepCurrent === $n ? 'current' : ($stepCurrent > $n ? 'done' : '');
+
+        $accountingEntries = $accountingJournalEntries ?? collect();
+        $bundleCorrections = $bundleCorrections ?? collect();
+        $correctionByBundleId = $bundleCorrections->keyBy(fn ($correction) => (int) $correction->cutting_job_bundle_id);
+        $hasBundleCorrections = $bundleCorrections->isNotEmpty();
+        $accountingIsInternalTrace = fn ($journal): bool => str_starts_with((string) $journal->source_type, 'cutting_wip');
+        $accountingInternalEntries = $accountingEntries->filter($accountingIsInternalTrace)->values();
+        $accountingFinancialEntries = $accountingEntries->reject($accountingIsInternalTrace)->values();
+        $accountingActiveEntries = $accountingFinancialEntries->whereNull('voided_at');
+        $accountingInternalActiveEntries = $accountingInternalEntries->whereNull('voided_at');
+        $accountingPostedTotalDebit = (float) $accountingActiveEntries->sum(fn ($journal) => $journal->lines->sum('debit'));
+        $accountingPostedTotalCredit = (float) $accountingActiveEntries->sum(fn ($journal) => $journal->lines->sum('credit'));
+        $accountingTypeLabel = function (string $sourceType): string {
+            return match (true) {
+                str_starts_with($sourceType, 'cutting_job_wage') => 'Upah cutting',
+                str_starts_with($sourceType, 'cutting_wip') => 'QC → WIP cutting',
+                str_starts_with($sourceType, 'cutting_qc_sewing_supply') => 'Auto BOM kelengkapan jahit',
+                str_starts_with($sourceType, 'cutting_job') => 'Bahan baku → WIP',
+                $sourceType === 'cutting_bundle_material_return' => 'Koreksi → bahan baku',
+                $sourceType === 'cutting_bundle_correction_wip_void' => 'Reversal WIP-CUT',
+                $sourceType === 'cutting_bundle_correction_wage_void' => 'Reversal upah cutting',
+                default => $sourceType,
+            };
+        };
     @endphp
 
     <div class="page-wrap">
@@ -523,11 +852,8 @@
                 echo '<div class="' . e($wrapClass) . '">';
 
                 // Selesai Cutting (Quick OK)
-                if ($canQuickOkCutting) {
+                if ($canQuickOkCutting && $isMobile) {
                     echo '<button type="button" class="' . e($btn) . ' btn-success" data-bs-toggle="modal" data-bs-target="#modalSelesaiCutting"><i class="bi bi-check-circle me-1"></i>Simpan & Konfirmasi</button>';
-                    if (!$isMobile) {
-                        echo '<form id="formQuickOk" action="' . e(route('production.qc.cutting.quick_ok', $job)) . '" method="post" style="display:none;">' . csrf_field() . '</form>';
-                    }
                 }
 
                 // Input QC / Kirim QC
@@ -603,6 +929,11 @@
                             @if ($job->date) 
                                 <span class="badge" style="background: rgba(37, 99, 235, 0.1); color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.2); font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 6px;">
                                     <i class="bi bi-calendar3 me-1"></i>{{ $job->date->format('d M Y') }}
+                                </span>
+                            @endif
+                            @if ($hasBundleCorrections)
+                                <span class="badge bg-warning-subtle text-warning-emphasis border" style="font-size:.68rem;">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>{{ $bundleCorrections->count() }} koreksi bahan
                                 </span>
                             @endif
                         </div>
@@ -745,7 +1076,8 @@
                         @php
                             $qc          = $row->qcResults->where('stage','cutting')->sortByDesc('qc_date')->first();
                             $bundleHasQc = $qc !== null;
-                            $canInputThis = $canBundleQcRoute && !$bundleHasQc;
+                            $bundleCorrection = $correctionByBundleId->get((int) $row->id);
+                            $canInputThis = $canBundleQcRoute && !$bundleHasQc && !$bundleCorrection;
 
                             $qtyPcs  = (float) ($row->qty_pcs ?? 0);
                             $qtyOk   = $bundleHasQc
@@ -766,20 +1098,22 @@
                             $isReject = $bundleHasQc && $qtyRej > 0 && $qtyOk <= 0;
                             $isMixed  = $bundleHasQc && $qtyRej > 0 && $qtyOk > 0;
 
-                            $rowClass = $isReject || $isMixed ? 'row-has-reject'
-                                : ($canInputThis ? 'row-no-qc' : '');
+                            $rowClass = $bundleCorrection ? 'row-corrected'
+                                : ($isReject || $isMixed ? 'row-has-reject'
+                                : ($canInputThis ? 'row-no-qc' : ''));
                             $trHide   = $isAllOk ? 'bq-row-ok' : '';
 
                             if ($qtyRej > 0) $hasAnyReject = true;
 
-                            $bundleStatus = $bundleHasQc
+                            $bundleStatus = $bundleCorrection ? 'corrected' : ($bundleHasQc
                                 ? ($isAllOk ? 'qc_ok' : ($isReject ? 'qc_reject' : 'qc_mixed'))
-                                : ($canInputThis ? 'pending' : '—');
+                                : ($canInputThis ? 'pending' : '—'));
                             $statusBadge  = [
                                 'qc_ok'     => 'bg-success',
                                 'qc_mixed'  => 'bg-warning',
                                 'qc_reject' => 'bg-danger',
                                 'pending'   => 'bg-secondary',
+                                'corrected' => 'bg-warning text-dark',
                             ][$bundleStatus] ?? 'bg-secondary';
                         @endphp
                         <tr class="{{ $rowClass }} {{ $trHide }}" data-bundle-id="{{ $row->id }}">
@@ -793,6 +1127,11 @@
                             <td>
                                 <div class="fw-bold" style="font-size:.92rem;letter-spacing:.01em;">{{ $row->finishedItem?->code ?? '-' }}</div>
                                 <div class="small-muted d-none d-md-block">{{ $row->finishedItem?->name ?? '' }}</div>
+                                @if ($bundleCorrection)
+                                    <div class="cell-corrected small" style="font-size:.68rem;">
+                                        Dikoreksi → {{ $bundleCorrection->replacementItem?->code ?? $bundleCorrection->metadata['replacement_item_code'] ?? '-' }}
+                                    </div>
+                                @endif
                             </td>
 
                             {{-- Cut --}}
@@ -868,6 +1207,7 @@
                                         'qc_reject' => ['icon' => 'bi-x-circle-fill',            'color' => '#ef4444', 'title' => 'QC Reject'],
                                         'qc_mixed'  => ['icon' => 'bi-exclamation-triangle-fill', 'color' => '#f59e0b', 'title' => 'QC Mixed'],
                                         'pending'   => ['icon' => 'bi-hourglass-split',           'color' => '#94a3b8', 'title' => 'Pending'],
+                                        'corrected' => ['icon' => 'bi-arrow-counterclockwise',     'color' => '#d97706', 'title' => 'Dikoreksi ke bahan baku'],
                                         default     => null,
                                     };
                                 @endphp
@@ -923,57 +1263,392 @@
             @endif
         </div>
 
+        @if ($canQuickOkCutting)
+            {{-- CTA utama ditempatkan setelah tabel agar mengikuti alur input QC. --}}
+            <div class="card cutting-confirm-card mb-4 d-none d-md-flex">
+                <div>
+                    <div class="cutting-confirm-card-title">
+                        <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+                        Semua data bundle sudah siap?
+                    </div>
+                    <div class="cutting-confirm-card-help">
+                        Simpan hasil cutting, catat sisa kain per LOT, lalu masukkan seluruh bundle ke WIP-CUT.
+                    </div>
+                </div>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalSelesaiCutting">
+                    <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+                    Simpan &amp; Konfirmasi
+                </button>
+            </div>
+        @endif
+
+        @if ($canSeeProductionAccounting && $hasBundleCorrections)
+        {{-- ===========================
+            KOREKSI BUNDLE
+        ============================ --}}
+        <details class="card mb-4 production-financial-section correction-section">
+            <summary>
+                <div>
+                    <div class="production-financial-title">
+                        <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Koreksi Bundle
+                    </div>
+                    <div class="production-financial-subtitle">
+                        Bahan yang dikembalikan ke bahan baku, item pengganti, dan reversal biaya produksi.
+                    </div>
+                </div>
+                <span class="badge bg-warning-subtle text-warning-emphasis border">
+                    {{ $bundleCorrections->count() }} dikoreksi
+                </span>
+            </summary>
+            <div class="production-financial-section-body">
+                <div class="table-wrap">
+                    <table class="table table-sm align-middle correction-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Bundle</th>
+                                <th>Item lama → pengganti</th>
+                                <th class="text-end">Bahan kembali</th>
+                                <th>LOT / gudang</th>
+                                <th>Audit biaya</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($bundleCorrections as $correction)
+                                @php
+                                    $correctionMeta = is_array($correction->metadata) ? $correction->metadata : [];
+                                    $oldItemCode = $correction->bundle?->finishedItem?->code
+                                        ?? ($correctionMeta['original_bundle_item_code'] ?? '-');
+                                    $newItemCode = $correction->replacementItem?->code
+                                        ?? ($correctionMeta['replacement_item_code'] ?? '-');
+                                    $wageReversalAmount = (float) ($correctionMeta['wage_reversal_amount'] ?? 0);
+                                    $wageReversalStatus = (string) ($correctionMeta['wage_reversal_status'] ?? '');
+                                    $wipReversalStatus = (string) ($correctionMeta['wip_reversal_status'] ?? '');
+                                @endphp
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold mono">{{ $correction->bundle?->bundle_code ?? ('Bundle #' . $correction->cutting_job_bundle_id) }}</div>
+                                        <div class="correction-note">Koreksi #{{ $correction->id }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="mono">{{ $oldItemCode }} <span class="text-muted">→</span> <strong>{{ $newItemCode }}</strong></div>
+                                        @if (!empty($correction->reason))
+                                            <div class="correction-note">{{ $correction->reason }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="text-end mono">
+                                        <div class="fw-semibold">{{ number_format((float) $correction->return_fabric_qty, 4, ',', '.') }} Kg</div>
+                                        <div class="correction-note">Rp {{ number_format((float) $correction->return_cost, 2, ',', '.') }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="mono">{{ $correction->bundle?->lot?->code ?? '-' }}</div>
+                                        <div class="correction-note">Kembali ke gudang bahan baku</div>
+                                    </td>
+                                    <td>
+                                        <div class="correction-note">
+                                            @if ($wipReversalStatus === 'posted' || !empty($correctionMeta['wip_reversal_journal_id']))
+                                                <span class="text-success">WIP-CUT dibalik</span>
+                                            @else
+                                                <span class="text-success">Saldo WIP-CUT 0</span>
+                                            @endif
+                                        </div>
+                                        @if ($wageReversalStatus === 'posted' && $wageReversalAmount > 0)
+                                            <div class="correction-note text-success">Upah dibalik Rp {{ number_format($wageReversalAmount, 2, ',', '.') }}</div>
+                                        @elseif ($wageReversalStatus === 'not_required')
+                                            <div class="correction-note">Upah tidak perlu dibalik</div>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning text-dark">{{ strtoupper((string) $correction->status) }}</span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="correction-note mt-2">
+                    Koreksi ini hanya menambah jejak reversal di akuntansi baru; jurnal legacy tetap dipertahankan sebagai audit trail.
+                </div>
+            </div>
+        </details>
+        @endif
+
+
+        {{-- ===========================
+            JEJAK AKUNTANSI BARU
+        ============================ --}}
+        @if ($canSeeProductionAccounting)
+        <details class="card mb-4 production-financial-section accounting-section">
+            <summary>
+                <div>
+                    <div class="production-financial-title">
+                        <i class="bi bi-journal-check me-1" aria-hidden="true"></i> Akuntansi Baru
+                    </div>
+                    <div class="production-financial-subtitle">Jejak jurnal Cutting Job ini, termasuk repost dan reversal.</div>
+                </div>
+                @if ($accountingActiveEntries->isNotEmpty() || $accountingInternalActiveEntries->isNotEmpty())
+                    <span class="d-flex gap-1 flex-wrap justify-content-end">
+                        @if ($accountingActiveEntries->isNotEmpty())
+                            <span class="badge bg-success">{{ $accountingActiveEntries->count() }} JURNAL FINANSIAL</span>
+                        @endif
+                        @if ($accountingInternalActiveEntries->isNotEmpty())
+                            <span class="badge bg-secondary">{{ $accountingInternalActiveEntries->count() }} JEJAK INTERNAL</span>
+                        @endif
+                    </span>
+                @else
+                    <span class="badge bg-warning text-dark">BELUM POSTING</span>
+                @endif
+            </summary>
+            <div class="production-financial-section-body">
+
+            @if ($accountingActiveEntries->isNotEmpty())
+                <div class="small-muted mb-1">Total jurnal finansial aktif</div>
+                <div class="d-flex gap-3 flex-wrap small-muted mb-2 mono">
+                    <span>Debit Rp {{ number_format($accountingPostedTotalDebit, 2, ',', '.') }}</span>
+                    <span>Kredit Rp {{ number_format($accountingPostedTotalCredit, 2, ',', '.') }}</span>
+                    <span class="{{ abs($accountingPostedTotalDebit - $accountingPostedTotalCredit) <= 0.01 ? 'text-success' : 'text-danger' }}">
+                        {{ abs($accountingPostedTotalDebit - $accountingPostedTotalCredit) <= 0.01 ? 'Balance' : 'Perlu review' }}
+                    </span>
+                </div>
+                <div class="accounting-trace-explainer">
+                    <strong>Total di atas hanya jurnal finansial.</strong>
+                    Jejak <em>QC → WIP cutting</em> dipisahkan karena debit dan kreditnya memakai akun WIP yang sama,
+                    sehingga efek saldonya netto Rp0. Auto BOM kelengkapan jahit tetap dicatat sebagai jurnal finansial terpisah.
+                </div>
+            @endif
+
+            @if ($accountingFinancialEntries->isEmpty() && $accountingInternalEntries->isEmpty())
+                <div class="small-muted">Belum ada jurnal akuntansi baru untuk dokumen ini.</div>
+            @elseif ($accountingFinancialEntries->isNotEmpty())
+                <div class="table-wrap">
+                    <table class="table table-sm align-middle accounting-trace-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Transaksi</th>
+                                <th>Referensi</th>
+                                <th class="text-end">Debit</th>
+                                <th class="text-end">Kredit</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($accountingFinancialEntries as $journal)
+                                @php
+                                    $journalDebit = (float) $journal->lines->sum('debit');
+                                    $journalCredit = (float) $journal->lines->sum('credit');
+                                    $isVoided = !empty($journal->voided_at);
+                                @endphp
+                                <tr class="{{ $isVoided ? 'text-muted' : '' }}">
+                                    <td class="trace-time mono">{{ optional($journal->posted_at)->format('d/m/Y H:i') ?? '-' }}</td>
+                                    <td>
+                                        <div>{{ $accountingTypeLabel((string) $journal->source_type) }}</div>
+                                        @if (str_starts_with((string) $journal->source_type, 'cutting_qc_sewing_supply'))
+                                            <small class="accounting-trace-note">Konsumsi BOM · masuk ke nilai WIP</small>
+                                        @endif
+                                    </td>
+                                    <td class="mono">{{ $journal->reference ?? '-' }}</td>
+                                    <td class="text-end mono">Rp {{ number_format($journalDebit, 2, ',', '.') }}</td>
+                                    <td class="text-end mono">Rp {{ number_format($journalCredit, 2, ',', '.') }}</td>
+                                    <td>
+                                        <span class="badge {{ $isVoided ? 'bg-secondary' : 'bg-success' }}">
+                                            {{ $isVoided ? 'VOID' : 'POSTED' }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        @if (Route::has('standalone-accounting.journals.show'))
+                                            <a href="{{ route('standalone-accounting.journals.show', $journal) }}" class="btn btn-sm btn-outline-secondary">Detail</a>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+
+            @if ($accountingInternalEntries->isNotEmpty())
+                <div class="mt-3 pt-3 border-top">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <strong class="small">Jejak produksi internal</strong>
+                        <span class="badge bg-secondary-subtle text-secondary border">Tidak memengaruhi saldo</span>
+                    </div>
+                    <div class="small-muted mb-2">QC → WIP Cutting hanya menjadi jejak perpindahan proses karena debit dan kredit memakai akun WIP yang sama.</div>
+                    <div class="table-wrap">
+                        <table class="table table-sm align-middle accounting-trace-table mb-0">
+                            <thead>
+                                <tr><th>Waktu</th><th>Transaksi</th><th>Referensi</th><th class="text-end">Debit</th><th class="text-end">Kredit</th><th>Status</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($accountingInternalEntries as $journal)
+                                    @php
+                                        $journalDebit = (float) $journal->lines->sum('debit');
+                                        $journalCredit = (float) $journal->lines->sum('credit');
+                                        $isVoided = !empty($journal->voided_at);
+                                    @endphp
+                                    <tr class="{{ $isVoided ? 'text-muted' : '' }}">
+                                        <td class="trace-time mono">{{ optional($journal->posted_at)->format('d/m/Y H:i') ?? '-' }}</td>
+                                        <td><div>QC → WIP cutting</div><small class="accounting-trace-note">Transfer internal · efek saldo netto Rp0</small></td>
+                                        <td class="mono">{{ $journal->reference ?? '-' }}</td>
+                                        <td class="text-end mono">Rp {{ number_format($journalDebit, 2, ',', '.') }}</td>
+                                        <td class="text-end mono">Rp {{ number_format($journalCredit, 2, ',', '.') }}</td>
+                                        <td><span class="badge {{ $isVoided ? 'bg-secondary' : 'bg-success' }}">{{ $isVoided ? 'VOID' : 'POSTED' }}</span></td>
+                                        <td class="text-end">
+                                            @if (Route::has('standalone-accounting.journals.show'))
+                                                <a href="{{ route('standalone-accounting.journals.show', $journal) }}" class="btn btn-sm btn-outline-secondary">Detail</a>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+            </div>
+        </details>
+        @endif
+
+        @if ($canSeeProductionAccounting)
+        {{-- ===========================
+            ESTIMASI HPP CUTTING
+        ============================ --}}
+        <details class="card mb-4 production-financial-section hpp-section">
+            <summary>
+                <div>
+                    <div class="production-financial-title">
+                        <i class="bi bi-calculator me-1" aria-hidden="true"></i> Estimasi HPP Cutting
+                    </div>
+                    <div class="production-financial-subtitle">
+                        Estimasi bahan + upah yang masuk ke WIP Cutting, bukan HPP penjualan.
+                    </div>
+                </div>
+                <span class="badge bg-primary-subtle text-primary border">Read-only</span>
+            </summary>
+            <div class="production-financial-section-body">
+                <div class="hpp-summary-grid">
+                    <div class="hpp-summary-item">
+                        <span>Bahan</span>
+                        <strong class="mono">Rp {{ number_format((float) ($cuttingHppTotals['material'] ?? 0), 2, ',', '.') }}</strong>
+                    </div>
+                    <div class="hpp-summary-item">
+                        <span>Upah</span>
+                        <strong class="mono">Rp {{ number_format((float) ($cuttingHppTotals['wage'] ?? 0), 2, ',', '.') }}</strong>
+                    </div>
+                    <div class="hpp-summary-item is-total">
+                        <span>Total HPP</span>
+                        <strong class="mono">Rp {{ number_format((float) ($cuttingHppTotals['total'] ?? 0), 2, ',', '.') }}</strong>
+                    </div>
+                </div>
+
+                @php
+                    $hppHasMissingMapping = collect($cuttingHppRows ?? [])->contains(
+                        fn ($row) => $row['material_cost_missing'] || $row['wage_rate_missing']
+                    );
+                @endphp
+                @if ($hppHasMissingMapping)
+                    <div class="hpp-warning mb-2">
+                        Sebagian biaya belum dapat dihitung karena biaya LOT atau tarif upah belum tersedia.
+                        Lengkapi master biaya sebelum menjadikan angka ini dasar posting.
+                    </div>
+                @endif
+
+                @if (collect($cuttingHppRows ?? [])->isEmpty())
+                    <div class="small-muted">Belum ada bundle untuk dihitung.</div>
+                @else
+                    <div class="table-wrap">
+                        <table class="table table-sm align-middle hpp-detail-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Bundle / Item</th>
+                                    <th class="text-end">Qty</th>
+                                    <th class="text-end">Bahan</th>
+                                    <th class="text-end">Upah</th>
+                                    <th class="text-end">HPP / pcs</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($cuttingHppRows as $hppRow)
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">{{ $hppRow['item_code'] }}</div>
+                                            <div class="small-muted">{{ $hppRow['bundle_code'] }}</div>
+                                        </td>
+                                        <td class="text-end mono">{{ number_format($hppRow['qty_pcs'], 2, ',', '.') }}</td>
+                                        <td class="text-end mono">
+                                            <div>Rp {{ number_format($hppRow['material_cost'], 2, ',', '.') }}</div>
+                                            <div class="hpp-unit-cost">@ Rp {{ number_format($hppRow['material_unit_cost'], 2, ',', '.') }}/Kg</div>
+                                        </td>
+                                        <td class="text-end mono">
+                                            <div>Rp {{ number_format($hppRow['wage_cost'], 2, ',', '.') }}</div>
+                                            <div class="hpp-unit-cost">@ Rp {{ number_format($hppRow['wage_rate'], 2, ',', '.') }}/pcs</div>
+                                        </td>
+                                        <td class="text-end mono">Rp {{ number_format($hppRow['unit_cost'], 2, ',', '.') }}</td>
+                                        <td class="text-end mono fw-semibold">Rp {{ number_format($hppRow['total_cost'], 2, ',', '.') }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </details>
+        @endif
 
         {{-- ===========================
             SUMMARY
         ============================ --}}
-        <div class="card p-3 mb-3 d-none d-md-block">
-            <h2 class="h6 mb-2">Ringkasan Output</h2>
-
-            <div class="row g-3">
-                <div class="col-md-3 col-6">
-                    <div class="help mb-1">Jumlah Bundle</div>
-                    <div class="mono">{{ $totalBundles }}</div>
-                </div>
-
-                <div class="col-md-3 col-6">
-                    <div class="help mb-1">Total Qty Cutting (pcs)</div>
-                    <div class="mono">{{ number_format($totalQtyPcs, 2, ',', '.') }}</div>
-                </div>
-
-                <div class="col-md-3 col-6">
-                    <div class="help mb-1">Total Pemakaian Kain</div>
-                    <div class="mono">{{ number_format($totalUsedFabric, 2, ',', '.') }}</div>
-                </div>
-
-                @if ($hasQcCutting)
-                    <div class="col-md-3 col-6">
-                        <div class="help mb-1">Total OK Produksi / Reject QC</div>
-                        <div class="mono">
-                            OK: {{ number_format($qcTotalOk, 2, ',', '.') }}
-                            /
-                            <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
-                                Reject: {{ number_format($qcTotalReject, 2, ',', '.') }}
-                            </span>
-                        </div>
+        <details class="card mb-3 production-financial-section summary-section">
+            <summary>
+                <div>
+                    <div class="production-financial-title">
+                        <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i> Ringkasan Output
                     </div>
-                @endif
-            </div>
-        </div>
+                    <div class="production-financial-subtitle">
+                        Ringkasan kuantitas hasil cutting dan pemakaian kain.
+                    </div>
+                </div>
+                <span class="badge bg-secondary-subtle text-secondary border">{{ $totalBundles }} bundle</span>
+            </summary>
+            <div class="production-financial-section-body">
+                <div class="summary-output-grid">
+                    <div class="summary-output-item">
+                        <div class="help">Jumlah Bundle</div>
+                        <div class="mono">{{ $totalBundles }}</div>
+                    </div>
 
-        <div class="card p-2 mb-3 d-block d-md-none">
-            <div class="summary-bar-mobile">
-                <span>{{ $totalBundles }} bundle</span>
-                <span>{{ number_format($totalQtyPcs, 0, ',', '.') }} pcs</span>
-                <span>{{ number_format($totalUsedFabric, 2, ',', '.') }} Kg kain</span>
-                @if ($hasQcCutting)
-                    <span>OK {{ number_format($qcTotalOk, 0, ',', '.') }}</span>
-                    <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
-                        Reject {{ number_format($qcTotalReject, 0, ',', '.') }}
-                    </span>
-                @endif
+                    <div class="summary-output-item">
+                        <div class="help">Total Qty Cutting</div>
+                        <div class="mono">{{ number_format($totalQtyPcs, 2, ',', '.') }} pcs</div>
+                    </div>
+
+                    <div class="summary-output-item">
+                        <div class="help">Total Pemakaian Kain</div>
+                        <div class="mono">{{ number_format($totalUsedFabric, 2, ',', '.') }} Kg</div>
+                    </div>
+
+                    <div class="summary-output-item">
+                        <div class="help">Pemakaian Kain / pcs</div>
+                        <div class="mono">{{ number_format($fabricPerPcs, 4, ',', '.') }} Kg/pcs</div>
+                    </div>
+
+                    @if ($hasQcCutting)
+                        <div class="summary-output-item">
+                            <div class="help">Total OK / Reject QC</div>
+                            <div class="mono">
+                                OK: {{ number_format($qcTotalOk, 2, ',', '.') }}
+                                /
+                                <span class="{{ $qcTotalReject > 0 ? 'text-danger fw-semibold' : '' }}">
+                                    Reject: {{ number_format($qcTotalReject, 2, ',', '.') }}
+                                </span>
+                            </div>
+                        </div>
+                    @endif
+                </div>
             </div>
-        </div>
+        </details>
 
         {{-- ===========================
             SISA KAIN PER LOT
@@ -983,8 +1658,27 @@
             $lotsWithSisa = $job->lots->filter(fn($l) => $l->sisa_recorded_at);
             $lotsNeedSisa = $job->lots->filter(fn($l) => !$l->sisa_recorded_at && (float)($l->used_fabric_qty ?? 0) > 0);
         @endphp
-        <div class="card p-3 mb-3">
-            <h2 class="h6 mb-2">Sisa Kain per LOT</h2>
+        <details class="card mb-3 production-financial-section fabric-remnant-section">
+            <summary>
+                <div>
+                    <div class="production-financial-title">
+                        <i class="bi bi-box-seam me-1" aria-hidden="true"></i> Sisa Kain per LOT
+                    </div>
+                    <div class="production-financial-subtitle">
+                        Rekap sisa layak, scrap, dan status pencatatan setiap LOT.
+                    </div>
+                </div>
+                @if ($lotsNeedSisa->isNotEmpty())
+                    <span class="badge bg-warning-subtle text-warning-emphasis border">
+                        {{ $lotsNeedSisa->count() }} perlu dicatat
+                    </span>
+                @else
+                    <span class="badge bg-success-subtle text-success border">
+                        Selesai
+                    </span>
+                @endif
+            </summary>
+            <div class="production-financial-section-body">
 
             {{-- Sudah tercatat --}}
             @if ($lotsWithSisa->isNotEmpty())
@@ -1059,13 +1753,19 @@
             @if ($lotsWithSisa->isEmpty())
             <div class="text-muted small">Kain sisa belum dicatat atau digunakan penuh. Sisa kain bisa dicatat melalui tombol Simpan & Konfirmasi.</div>
             @endif
-        </div>
+            </div>
+        </details>
         @endif
 
         {{-- =========================================================
             MODAL KONFIRMASI SELESAI CUTTING + CATAT SISA (wajib)
         ========================================================= --}}
         @if (($canQuickOkCutting ?? false))
+        {{-- Form finalisasi tetap berada di DOM karena dipanggil setelah AJAX sisa kain sukses. --}}
+        <form id="formQuickOk" action="{{ route('production.qc.cutting.quick_ok', $job) }}" method="post" style="display:none;">
+            @csrf
+        </form>
+
         <div class="modal fade" id="modalSelesaiCutting" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
@@ -1169,6 +1869,7 @@
             const token = "{{ csrf_token() }}";
             const errBox = document.getElementById('modalSisaError');
             const btn = document.getElementById('btnConfirmSelesai');
+            const quickForm = document.getElementById('formQuickOk');
 
             function showErr(m) { errBox.textContent = m; errBox.style.display = 'block'; }
             function clearErr() { errBox.style.display = 'none'; }
@@ -1190,6 +1891,11 @@
 
             btn.addEventListener('click', async function () {
                 clearErr();
+                if (!quickForm) {
+                    showErr('Form finalisasi tidak tersedia. Refresh halaman lalu coba lagi.');
+                    return;
+                }
+
                 const rows = Array.from(modal.querySelectorAll('.modal-sisa-row'));
                 for (const r of rows) {
                     const s = r.querySelector('.m-sisa').value;
@@ -1227,9 +1933,10 @@
                             return;
                         }
                     }
-                    document.getElementById('formQuickOk').submit();
+                    quickForm.submit();
                 } catch (e) {
-                    showErr('Terjadi kesalahan jaringan. Coba lagi.');
+                    console.error('Finalisasi Cutting gagal:', e);
+                    showErr('Gagal menyelesaikan Cutting. Periksa koneksi lalu coba lagi.');
                     btn.disabled = false;
                 }
             });

@@ -29,8 +29,10 @@ class ReconcileController extends Controller
 
         // Guard: kolom baru hanya ada setelah php artisan migrate dijalankan
         $schema = DB::getSchemaBuilder();
-        $hasBomGapsCol     = $schema->hasColumn('finishing_job_lines', 'bom_has_gaps');
+        $hasBomGapsCol = $schema->hasColumn('finishing_job_lines', 'bom_has_gaps');
         $hasPendingCostCol = $schema->hasColumn('sewing_pickup_supply_lines', 'pending_cost');
+        $hasAutoShortageCols = $schema->hasColumn('sewing_pickup_supply_lines', 'stock_shortage_qty')
+            && $schema->hasColumn('sewing_pickup_supply_lines', 'stock_shortage_status');
 
         // 2. Finishing job lines dengan BOM gap
         $bomGapLines = $hasBomGapsCol
@@ -66,8 +68,8 @@ class ReconcileController extends Controller
                     ->join('items as mat', 'mat.id', '=', 'ibl.material_item_id')
                     ->leftJoin('inventory_mutations as im', function ($join) use ($rmId) {
                         $join->on('im.item_id', '=', 'ibl.material_item_id')
-                             ->where('im.warehouse_id', '=', $rmId)
-                             ->where('im.direction', '=', 'in');
+                            ->where('im.warehouse_id', '=', $rmId)
+                            ->where('im.direction', '=', 'in');
                     })
                     ->whereIn('ib.item_id', $fgItemIds)
                     ->where('ib.active', true)
@@ -135,10 +137,40 @@ class ReconcileController extends Controller
                 ->get()
             : collect();
 
+        // 5. Auto BOM Sewing Pickup yang sengaja meneruskan kebutuhan penuh
+        // walau stok RM kurang. Ini berbeda dari "belum dikeluarkan": issued_qty
+        // sudah penuh, tetapi gap stok sistem tetap perlu ditelusuri sampai GRN.
+        $autoBomShortages = $hasAutoShortageCols
+            ? DB::table('sewing_pickup_supply_lines as sl')
+                ->join('sewing_pickups as sp', 'sp.id', '=', 'sl.sewing_pickup_id')
+                ->join('items as i', 'i.id', '=', 'sl.material_item_id')
+                ->where('sl.stock_shortage_qty', '>', 0)
+                ->where('sl.stock_shortage_status', '!=', 'void')
+                ->where('sp.status', '!=', 'void')
+                ->select([
+                    'sp.id as pickup_id',
+                    'sp.code as pickup_code',
+                    'sp.date as pickup_date',
+                    'i.code as item_code',
+                    'i.name as item_name',
+                    'sl.required_qty',
+                    'sl.issued_qty',
+                    'sl.stock_available_snapshot',
+                    'sl.stock_shortage_qty',
+                    'sl.stock_shortage_status',
+                    'sl.uom',
+                ])
+                ->orderBy('sp.date', 'desc')
+                ->orderBy('sp.code', 'desc')
+                ->orderBy('i.code')
+                ->get()
+            : collect();
+
         $totalGaps = $negativeStocks->count()
             + $bomGapLines->count()
             + $unissuedSupplies->count()
-            + $pendingSupplies->count();
+            + $pendingSupplies->count()
+            + $autoBomShortages->count();
 
         return view('production.reconcile.index', compact(
             'negativeStocks',
@@ -146,6 +178,7 @@ class ReconcileController extends Controller
             'missingMaterials',
             'unissuedSupplies',
             'pendingSupplies',
+            'autoBomShortages',
             'totalGaps'
         ));
     }

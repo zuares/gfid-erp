@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Production;
 
-use App\Models\Employee;
 use App\Models\CuttingJob;
 use App\Models\CuttingJobBundle;
+use App\Models\Employee;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Lot;
 use App\Models\PieceRate;
+use App\Models\QcResult;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,9 +74,41 @@ class CuttingJobCreateOperatorTest extends TestCase
         $this->actingAs($owner)
             ->get(route('production.cutting_jobs.create'))
             ->assertOk()
+            ->assertSee('Akuntansi Baru')
+            ->assertSee('<details class="cutting-card cutting-accounting-card"', false)
+            ->assertDontSee('<details class="cutting-card cutting-accounting-card" open', false)
+            ->assertSee('Estimasi HPP Cutting')
+            ->assertSee('<details class="cutting-card cutting-hpp-panel"', false)
+            ->assertDontSee('<details class="cutting-card cutting-hpp-panel" open', false)
+            ->assertSee('WIP Cutting, bukan HPP penjualan')
+            ->assertSee('1-151-01')
+            ->assertSee('1-150')
             ->assertSee('CUT-CONFIGURED - Operator Cutting Terdaftar')
             ->assertSee('CUT-CONFIGURED-OTHER-ROLE - Operator Cutting Role Lain')
             ->assertDontSee('CUT-NOT-CONFIGURED - Operator Cutting Belum Terdaftar');
+
+        $operating = User::factory()->create([
+            'role' => 'operating',
+            'employee_code' => 'CUT-UI-OPERATING',
+        ]);
+
+        $this->actingAs($operating)
+            ->get(route('production.cutting_jobs.create'))
+            ->assertOk()
+            ->assertDontSee('Akuntansi Baru')
+            ->assertDontSee('Estimasi HPP Cutting');
+
+        $developer = User::factory()->create([
+            'role' => 'operating',
+            'is_developer' => true,
+            'employee_code' => 'CUT-UI-DEV',
+        ]);
+
+        $this->actingAs($developer)
+            ->get(route('production.cutting_jobs.create'))
+            ->assertOk()
+            ->assertSee('Akuntansi Baru')
+            ->assertSee('Estimasi HPP Cutting');
     }
 
     public function test_edit_form_lists_configured_operator_even_when_employee_role_is_not_cutting(): void
@@ -166,5 +199,64 @@ class CuttingJobCreateOperatorTest extends TestCase
             ->get(route('production.cutting_jobs.edit', $job))
             ->assertOk()
             ->assertSee('CUT-UI-EDIT-OWN - Owner Cutting Test');
+
+        $this->actingAs($owner)
+            ->get(route('production.cutting_jobs.show', $job))
+            ->assertOk()
+            ->assertSee('Akuntansi Baru')
+            ->assertSee('Estimasi HPP Cutting')
+            ->assertSee('/Kg')
+            ->assertSee('/pcs')
+            ->assertSee('Semua data bundle sudah siap?')
+            ->assertSee('id="formQuickOk"', false)
+            ->assertSee('Ringkasan Output')
+            ->assertSee('Pemakaian Kain / pcs')
+            ->assertDontSee('<details class="card mb-4 production-financial-section accounting-section" open', false)
+            ->assertDontSee('<details class="card mb-4 production-financial-section hpp-section" open', false)
+            ->assertDontSee('<details class="card mb-3 production-financial-section summary-section" open', false);
+
+        $this->actingAs(User::factory()->create([
+            'role' => 'operating',
+            'employee_code' => 'CUT-UI-SHOW-OPERATING',
+        ]))
+            ->get(route('production.cutting_jobs.show', $job))
+            ->assertOk()
+            ->assertDontSee('Akuntansi Baru')
+            ->assertDontSee('Estimasi HPP Cutting');
+
+        $this->actingAs($owner)
+            ->get(route('production.qc.cutting.edit', $job))
+            ->assertOk()
+            ->assertSee('Akuntansi Baru')
+            ->assertSee('Estimasi HPP Cutting')
+            ->assertSee('Ringkasan Output')
+            ->assertSee('Tidak ada reject Cutting')
+            ->assertSee('Koreksi Bundle')
+            ->assertSee('Koreksi &amp; Kembalikan', false)
+            ->assertDontSee('<details class="qcs-section qcs-financial-section accounting-section" open', false)
+            ->assertDontSee('<details class="qcs-section qcs-financial-section hpp-section" open', false)
+            ->assertDontSee('<details class="qcs-section qcs-financial-section summary-section" open', false);
+
+        QcResult::create([
+            'stage' => QcResult::STAGE_CUTTING,
+            'cutting_job_bundle_id' => $job->bundles()->first()->id,
+            'cutting_job_id' => $job->id,
+            'qc_date' => '2026-09-03',
+            'qty_ok' => 0,
+            'qty_reject' => 1,
+            'reject_reason' => 'Bercak',
+            'operator_id' => $configuredOwner->id,
+            'status' => 'reject',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('production.qc.cutting.edit', $job))
+            ->assertOk()
+            ->assertSee('Reject Cutting')
+            ->assertSee('REJ-CUT')
+            ->assertSee('1-153')
+            ->assertSee('BELUM POSTING')
+            ->assertSee('<details class="qcs-reject-subsection"', false)
+            ->assertDontSee('<details class="qcs-reject-subsection" open', false);
     }
 }

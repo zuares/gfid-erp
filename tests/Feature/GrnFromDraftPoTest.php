@@ -10,8 +10,10 @@ use App\Models\Journal;
 use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
 use App\Models\PurchasePayment;
-use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReturn;
+use App\Models\StandaloneAccountingJournal;
 use App\Models\Supplier;
+use App\Models\SupplierInvoice;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
@@ -23,7 +25,7 @@ use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
- * UAT: Flow Purchase Order (draft) → approved → GRN → PO Locked.
+ * UAT: Flow Purchase Order (draft) → GRN → PO Locked.
  *
  * Menguji: penguncian PO, keamanan harga (server-side), validasi relasi
  * header/line PO, over-receipt, dan konsistensi stok/jurnal/AP saat posting.
@@ -33,19 +35,29 @@ class GrnFromDraftPoTest extends TestCase
     use RefreshDatabase;
 
     protected User $owner;
+
     protected User $admin;
+
     protected Warehouse $warehouse;
+
     protected Warehouse $prdWarehouse;
+
     protected Warehouse $rtsWarehouse;
+
     protected Supplier $supplier;
+
     protected Supplier $supplierOther;
+
     protected Item $item;
+
     protected PurchaseOrderService $poService;
+
     protected GoodsReceiptService $grnService;
 
     protected function setUp(): void
     {
         parent::setUp();
+        config(['purchasing.po_approval_enabled' => false]);
 
         $this->owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWN']);
         $this->admin = User::factory()->create(['role' => 'admin', 'employee_code' => 'ADM']);
@@ -114,6 +126,7 @@ class GrnFromDraftPoTest extends TestCase
     protected function makeGrnPayload(PurchaseOrder $po, float $qtyReceived, float $reqPrice = 0, ?int $supplierId = null): array
     {
         $poLine = $po->lines()->first();
+
         return [
             'date' => now()->toDateString(),
             'supplier_id' => $supplierId ?? $po->supplier_id,
@@ -164,7 +177,7 @@ class GrnFromDraftPoTest extends TestCase
         $response = $this->get(route('purchasing.purchase_receipts.index', ['q' => $po->code]));
 
         $response->assertOk()
-            ->assertSee('PO ' . $po->code, false)
+            ->assertSee('PO '.$po->code, false)
             ->assertSee('Cari GRN / PO / item / SJ...', false);
     }
 
@@ -255,8 +268,8 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertEqualsWithDelta(20, (float) $updated->lines()->first()->qty, 0.001);
     }
 
-    // 2. Approval PO dinonaktifkan sementara: draft langsung bisa menjadi GRN.
-    public function test_grn_from_draft_po_is_allowed_without_approval(): void
+    // 2. Tanpa approval, PO draft dapat langsung menjadi GRN.
+    public function test_grn_from_draft_po_can_go_directly_to_grn(): void
     {
         $po = $this->makeDraftPo();
         $this->assertSame('draft', $po->status);
@@ -264,9 +277,10 @@ class GrnFromDraftPoTest extends TestCase
         $grn = $this->grnService->create($this->makeGrnPayload($po, 5));
 
         $this->assertSame($po->id, $grn->purchase_order_id);
+        $this->assertTrue($po->fresh()->isLocked());
     }
 
-    public function test_owner_cannot_approve_draft_po_while_approval_is_disabled(): void
+    public function test_approve_endpoint_is_disabled_when_approval_is_disabled(): void
     {
         $po = $this->makeDraftPo();
 
@@ -277,11 +291,10 @@ class GrnFromDraftPoTest extends TestCase
         $this->assertDatabaseHas('purchase_orders', [
             'id' => $po->id,
             'status' => 'draft',
-            'approved_by' => null,
         ]);
     }
 
-    public function test_po_ui_hides_approval_and_shows_grn_action_for_draft(): void
+    public function test_po_ui_allows_grn_action_for_draft_without_approval(): void
     {
         $po = $this->makeDraftPo();
 
@@ -289,7 +302,8 @@ class GrnFromDraftPoTest extends TestCase
             ->get(route('purchasing.purchase_orders.show', $po))
             ->assertOk()
             ->assertDontSee('Approve PO', false)
-            ->assertSee('>Terima</span>', false);
+            ->assertDontSee('Approve PO terlebih dahulu sebelum membuat GRN', false)
+            ->assertSee('Terima', false);
     }
 
     // 3. GRN dari PO approved → PO terkunci (locked_at, first_grn_id).
@@ -470,6 +484,62 @@ class GrnFromDraftPoTest extends TestCase
 
         // received_status PO harus fully_received setelah GRN diposting.
         $this->assertSame('fully_received', $po->fresh()->received_status);
+    }
+
+    public function test_posting_and_unposting_grn_mirrors_new_accounting(): void
+    {
+        $po = $this->makeApprovedPo(10, 1000);
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 10));
+        $grn = $this->grnService->post($grn);
+
+        $mirror = StandaloneAccountingJournal::query()
+            ->where('source_type', 'purchase_receipt_post')
+            ->where('source_id', $grn->id)
+            ->whereNull('voided_at')
+            ->with('lines.account')
+            ->firstOrFail();
+
+        $this->assertEqualsWithDelta(10000, (float) $mirror->lines->sum('debit'), 0.01);
+        $this->assertEqualsWithDelta(10000, (float) $mirror->lines->sum('credit'), 0.01);
+        $this->assertEqualsWithDelta(
+            10000,
+            (float) $mirror->lines->where('account.code', '1-150')->sum('debit'),
+            0.01
+        );
+        $this->assertEqualsWithDelta(
+            10000,
+            (float) $mirror->lines->where('account.code', '2-110')->sum('credit'),
+            0.01
+        );
+
+        $this->grnService->unpost($grn);
+
+        $this->assertFalse(
+            StandaloneAccountingJournal::query()
+                ->where('source_type', 'purchase_receipt_post')
+                ->where('source_id', $grn->id)
+                ->whereNull('voided_at')
+                ->exists()
+        );
+        $this->assertGreaterThanOrEqual(
+            2,
+            StandaloneAccountingJournal::query()
+                ->where('source_type', 'like', 'purchase_receipt_post%')
+                ->where('source_id', $grn->id)
+                ->whereNotNull('voided_at')
+                ->count()
+        );
+
+        $reposted = $this->grnService->post($grn->fresh());
+        $this->assertSame('posted', $reposted->status);
+        $this->assertSame(
+            1,
+            StandaloneAccountingJournal::query()
+                ->where('source_id', $grn->id)
+                ->where('source_type', 'like', 'purchase_receipt_post%')
+                ->whereNull('voided_at')
+                ->count()
+        );
     }
 
     public function test_posting_grn_auto_applies_existing_dp_to_ap(): void
@@ -770,5 +840,170 @@ class GrnFromDraftPoTest extends TestCase
 
         $this->expectException(ValidationException::class);
         $this->grnService->create($this->makeGrnPayload($po, 5)); // 7 + 5 > 10
+    }
+
+    public function test_supplier_invoice_create_requires_posted_grn_and_uses_posted_value(): void
+    {
+        $po = $this->makeApprovedPo(10, 1000);
+
+        $this->actingAs($this->owner)
+            ->post(route('purchasing.supplier_invoices.store'), [
+                'purchase_order_id' => $po->id,
+                'supplier_id' => $po->supplier_id,
+                'invoice_date' => now()->toDateString(),
+                'subtotal' => '999999',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('purchase_order_id');
+
+        $this->assertDatabaseMissing('supplier_invoices', [
+            'purchase_order_id' => $po->id,
+        ]);
+
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 7));
+        $this->grnService->post($grn);
+
+        $this->actingAs($this->owner)
+            ->post(route('purchasing.supplier_invoices.store'), [
+                'purchase_order_id' => $po->id,
+                'supplier_id' => $po->supplier_id,
+                'invoice_date' => now()->toDateString(),
+                'subtotal' => '1',
+                'discount_amount' => '999999',
+                'return_deduction_amount' => '999999',
+            ])
+            ->assertRedirect();
+
+        $invoice = SupplierInvoice::where('purchase_order_id', $po->id)->latest('id')->firstOrFail();
+        $this->assertEqualsWithDelta(7000, (float) $invoice->subtotal, 0.01);
+        $this->assertEqualsWithDelta(0, (float) $invoice->discount_amount, 0.01);
+        $this->assertEqualsWithDelta(0, (float) $invoice->return_deduction_amount, 0.01);
+        $this->assertEqualsWithDelta(7000, (float) $invoice->total_amount, 0.01);
+    }
+
+    public function test_posted_grn_page_offers_supplier_invoice_action(): void
+    {
+        $po = $this->makeApprovedPo(2, 1000);
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 1));
+
+        $this->actingAs($this->owner)
+            ->get(route('purchasing.purchase_receipts.show', $grn))
+            ->assertOk()
+            ->assertDontSee('Buat Invoice Supplier');
+
+        $this->grnService->post($grn);
+
+        $this->actingAs($this->owner)
+            ->get(route('purchasing.purchase_receipts.show', $grn))
+            ->assertOk()
+            ->assertSee('Buat Invoice Supplier')
+            ->assertSee(route('purchasing.supplier_invoices.create', ['purchase_order_id' => $po->id]), false);
+    }
+
+    public function test_supplier_invoice_po_dropdown_only_contains_po_with_posted_grn(): void
+    {
+        $withoutGrn = $this->makeApprovedPo(1, 1000);
+        $withGrn = $this->makeApprovedPo(2, 1000);
+        $grn = $this->grnService->create($this->makeGrnPayload($withGrn, 1));
+        $this->grnService->post($grn);
+
+        $this->actingAs($this->owner)
+            ->get(route('purchasing.supplier_invoices.create'))
+            ->assertOk()
+            ->assertSee($withGrn->code)
+            ->assertDontSee($withoutGrn->code);
+    }
+
+    public function test_supplier_invoice_automatically_deducts_posted_return(): void
+    {
+        $po = $this->makeApprovedPo(10, 1000);
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 7));
+        $this->grnService->post($grn);
+
+        PurchaseReturn::create([
+            'code' => 'RET-INV-'.uniqid(),
+            'date' => now()->toDateString(),
+            'purchase_receipt_id' => $grn->id,
+            'purchase_order_id' => $po->id,
+            'supplier_id' => $po->supplier_id,
+            'status' => 'posted',
+            'total' => 1500,
+            'resolution_type' => 'refund',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post(route('purchasing.supplier_invoices.store'), [
+                'purchase_order_id' => $po->id,
+                'supplier_id' => $po->supplier_id,
+                'invoice_date' => now()->toDateString(),
+                'return_deduction_amount' => '1',
+            ])
+            ->assertRedirect();
+
+        $invoice = SupplierInvoice::where('purchase_order_id', $po->id)->latest('id')->firstOrFail();
+        $this->assertEqualsWithDelta(7000, (float) $invoice->subtotal, 0.01);
+        $this->assertEqualsWithDelta(1500, (float) $invoice->return_deduction_amount, 0.01);
+        $this->assertEqualsWithDelta(5500, (float) $invoice->total_amount, 0.01);
+    }
+
+    public function test_supplier_invoice_requires_posted_grn_and_matches_receipt_value(): void
+    {
+        $po = $this->makeApprovedPo(2, 1000);
+        $invoice = SupplierInvoice::create([
+            'invoice_no' => 'INV-GRN-CONTROL-1',
+            'supplier_invoice_ref' => 'SUP-1',
+            'supplier_id' => $po->supplier_id,
+            'purchase_order_id' => $po->id,
+            'invoice_date' => now()->toDateString(),
+            'subtotal' => 2000,
+            'total_amount' => 2000,
+            'paid_amount' => 0,
+            'status' => 'draft',
+            'created_by' => $this->owner->id,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post(route('purchasing.supplier_invoices.post', $invoice))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Faktur supplier belum dapat di-post karena belum ada GRN Posted.');
+
+        $this->assertSame('draft', $invoice->fresh()->status);
+
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 2));
+        $this->grnService->post($grn);
+
+        $this->actingAs($this->owner)
+            ->post(route('purchasing.supplier_invoices.post', $invoice))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame('posted', $invoice->fresh()->status);
+    }
+
+    public function test_supplier_invoice_cannot_exceed_posted_grn_value(): void
+    {
+        $po = $this->makeApprovedPo(1, 1000);
+        $grn = $this->grnService->create($this->makeGrnPayload($po, 1));
+        $this->grnService->post($grn);
+
+        $invoice = SupplierInvoice::create([
+            'invoice_no' => 'INV-GRN-CONTROL-2',
+            'supplier_invoice_ref' => 'SUP-2',
+            'supplier_id' => $po->supplier_id,
+            'purchase_order_id' => $po->id,
+            'invoice_date' => now()->toDateString(),
+            'subtotal' => 2000,
+            'total_amount' => 2000,
+            'paid_amount' => 0,
+            'status' => 'draft',
+            'created_by' => $this->owner->id,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post(route('purchasing.supplier_invoices.post', $invoice))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('draft', $invoice->fresh()->status);
     }
 }

@@ -130,7 +130,9 @@ class ProfitLossTest extends TestCase
 
     private function account(string $code, string $name, string $type): Account
     {
-        return Account::create([
+        return Account::firstOrCreate([
+            'code' => $code,
+        ], [
             'code' => $code,
             'name' => $name,
             'type' => $type,

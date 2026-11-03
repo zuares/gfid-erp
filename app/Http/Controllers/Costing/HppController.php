@@ -6,13 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\Warehouse;
-use App\Services\Costing\FgHppAutoService;
+use App\Services\Costing\HppService;
+use App\Services\Costing\LegacyHppRebuildService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class HppController extends Controller
 {
     public function __construct(
-        protected FgHppAutoService $fgHpp,
+        protected LegacyHppRebuildService $legacyHpp,
+        protected HppService $hpp,
     ) {}
 
     /**
@@ -42,25 +45,26 @@ class HppController extends Controller
 
         $query = ItemCostSnapshot::query()
             ->with(['item', 'warehouse', 'creator'])
+            ->whereHas('item', fn ($q) => $q->where('type', 'finished_good'))
             ->orderByDesc('snapshot_date')
             ->orderByDesc('id');
 
         // Filter item
-        if (!empty($filters['item_id'])) {
+        if (! empty($filters['item_id'])) {
             $query->where('item_id', $filters['item_id']);
         }
 
         // Filter gudang
-        if (!empty($filters['warehouse_id'])) {
+        if (! empty($filters['warehouse_id'])) {
             $query->where('warehouse_id', $filters['warehouse_id']);
         }
 
         // Filter tanggal
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->whereDate('snapshot_date', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->whereDate('snapshot_date', '<=', $filters['date_to']);
         }
 
@@ -70,6 +74,7 @@ class HppController extends Controller
         // 🔍 Ringkasan HPP aktif per item (opsional per gudang)
         $activeSnapshots = ItemCostSnapshot::query()
             ->with(['item', 'warehouse'])
+            ->whereHas('item', fn ($q) => $q->where('type', 'finished_good'))
             ->where('is_active', true)
             ->orderBy('item_id')
             ->orderBy('warehouse_id')
@@ -92,7 +97,10 @@ class HppController extends Controller
     public function generate(Request $request)
     {
         $data = $request->validate([
-            'item_id' => ['required', 'exists:items,id'],
+            'item_id' => [
+                'required',
+                Rule::exists('items', 'id')->where(fn ($query) => $query->where('type', 'finished_good')),
+            ],
             'warehouse_id' => ['nullable', 'exists:warehouses,id'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
@@ -105,12 +113,7 @@ class HppController extends Controller
         $dateTo = $data['date_to'];
         $notes = $data['notes'] ?? null;
 
-        // Panggil service sesuai definisi yg kamu kirim:
-        // calculateAndSnapshotForFinishedItem(
-        //     int $itemId, string $dateFrom, string $dateTo,
-        //     ?int $warehouseId = null, ?string $notes = null
-        // )
-        $snapshot = $this->fgHpp->calculateAndSnapshotForFinishedItem(
+        $this->legacyHpp->rebuild(
             itemId: $itemId,
             dateFrom: $dateFrom,
             dateTo: $dateTo,
@@ -130,19 +133,12 @@ class HppController extends Controller
      * Set satu snapshot sebagai HPP aktif untuk item (dan opsional per gudang).
      * Route: POST costing.hpp.set_active
      */
-    public function setActive(ItemCostSnapshot $snapshot, Request $request)
+    public function setActive(ItemCostSnapshot $snapshot)
     {
-        // Matikan semua snapshot lain untuk item yang sama (dan gudang yang sama kalau diisi)
-        ItemCostSnapshot::where('item_id', $snapshot->item_id)
-            ->when($snapshot->warehouse_id, function ($q) use ($snapshot) {
-                $q->where('warehouse_id', $snapshot->warehouse_id);
-            })
-            ->update(['is_active' => false]);
+        $snapshot->loadMissing('item');
+        abort_unless($snapshot->item?->type === 'finished_good', 404);
 
-        // Set yang ini jadi aktif
-        $snapshot->update([
-            'is_active' => true,
-        ]);
+        $this->hpp->setActiveSnapshot($snapshot);
 
         return back()->with('success', 'Snapshot HPP berhasil di-set sebagai HPP aktif.');
     }

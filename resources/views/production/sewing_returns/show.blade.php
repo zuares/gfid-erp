@@ -69,6 +69,63 @@
   .row-ok{ background: rgba(240,253,244,.96); }
   .row-rj{ background: rgba(254,242,242,.96); }
 
+  .financial-section{ border-radius:16px; overflow:hidden; border:1px solid rgba(148,163,184,.25); }
+  .financial-section summary{ list-style:none; cursor:pointer; padding:.85rem 1rem; }
+  .financial-section summary::-webkit-details-marker{ display:none; }
+  .financial-section summary:focus-visible{ outline:2px solid currentColor; outline-offset:-2px; }
+  .financial-section summary .chevron{ transition:transform .18s ease; }
+  .financial-section[open] summary .chevron{ transform:rotate(180deg); }
+  .financial-section .financial-body{ padding:.85rem 1rem 1rem; border-top:1px solid rgba(148,163,184,.18); }
+  .financial-section .financial-heading{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+  .financial-section .financial-title{ font-size:.9rem; font-weight:900; }
+  .financial-section .financial-subtitle{ font-size:.75rem; color:var(--muted); margin-top:.1rem; }
+  .financial-section .financial-summary{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; margin-bottom:.8rem; }
+  @media(min-width:768px){ .financial-section .financial-summary{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
+  .financial-section .financial-kpi{ padding:.6rem .7rem; border-radius:12px; background:rgba(255,255,255,.62); border:1px solid rgba(148,163,184,.18); }
+  .financial-section .financial-label{ color:var(--muted); font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; }
+  .financial-section .financial-value{ font-weight:900; font-size:.88rem; margin-top:.15rem; }
+  .financial-section .financial-table{ margin-bottom:0; }
+  .financial-section .financial-table th{ font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); border-top:0; white-space:nowrap; }
+  .financial-section .financial-table td{ font-size:.78rem; vertical-align:middle; }
+  .financial-section .financial-note{ color:var(--muted); font-size:.75rem; margin-top:.7rem; }
+  .financial-section.accounting-section{ color:#0f766e; background:linear-gradient(180deg,rgba(240,253,250,.9),rgba(255,255,255,.85)); }
+  .financial-section.hpp-section{ color:#1d4ed8; background:linear-gradient(180deg,rgba(239,246,255,.9),rgba(255,255,255,.85)); }
+  .financial-section.mutation-section{ color:#475569; background:linear-gradient(180deg,rgba(248,250,252,.95),rgba(255,255,255,.85)); }
+  .financial-section.accounting-section .financial-body,
+  .financial-section.hpp-section .financial-body,
+  .financial-section.mutation-section .financial-body{ color:var(--text,#0f172a); }
+  .financial-section .badge-mini{ border:1px solid currentColor; border-radius:999px; padding:.14rem .55rem; font-size:.66rem; font-weight:800; white-space:nowrap; }
+  .financial-section .row-reversal{ opacity:.58; }
+  @media(prefers-color-scheme:dark){
+    .financial-section .financial-kpi{ background:rgba(15,23,42,.22); }
+    .financial-section.accounting-section{ background:linear-gradient(180deg,rgba(19,78,74,.25),rgba(15,23,42,.25)); }
+    .financial-section.hpp-section{ background:linear-gradient(180deg,rgba(30,64,175,.2),rgba(15,23,42,.25)); }
+    .financial-section.mutation-section{ background:linear-gradient(180deg,rgba(51,65,85,.22),rgba(15,23,42,.25)); }
+  }
+
+  .detail-bundle-wrap{ overflow-x:auto; }
+  .detail-bundle-table{ min-width:900px; table-layout:fixed; }
+  .detail-bundle-table .detail-item-col{ width:150px; }
+  .detail-bundle-table .detail-bundle-col{ width:170px; }
+  .detail-bundle-table .detail-compact-col{ width:155px; }
+  .detail-bundle-table .detail-note-col{ width:150px; }
+  .detail-bundle-table .detail-item-cell,
+  .detail-bundle-table .detail-bundle-cell,
+  .detail-bundle-table .detail-completeness-cell,
+  .detail-bundle-table .detail-note-cell{ min-width:0; overflow:hidden; }
+  .detail-bundle-table .detail-code{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .detail-bundle-table .detail-name,
+  .detail-bundle-table .detail-completeness{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; line-height:1.25; }
+  .detail-bundle-table .detail-bundle-code{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .detail-bundle-table .detail-supply-line{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  @media(max-width:767.98px){
+    .detail-bundle-table{ min-width:820px; }
+    .detail-bundle-table .detail-item-col{ width:130px; }
+    .detail-bundle-table .detail-bundle-col{ width:145px; }
+    .detail-bundle-table .detail-compact-col{ width:125px; }
+    .detail-bundle-table .detail-note-col{ width:125px; }
+  }
+
   .header-actions{
     display:flex; gap:.45rem; flex-wrap:wrap; justify-content:flex-end;
   }
@@ -99,7 +156,10 @@
   $user = auth()->user();
   $role = strtolower((string)($user->role ?? ''));
 
-  $isOwner = $role === 'owner';
+  // Developer flag mengikuti capability owner melalui User::isOwner().
+  // Ini harus sama dengan guard backend agar tombol VOID tidak tersembunyi
+  // ketika backend memang mengizinkan aksi tersebut.
+  $isOwner = $user?->isOwner() ?? false;
 
   $lines = $return->lines ?? collect();
   $hasReject = ((float)($totalReject ?? 0)) > 0.000001;
@@ -190,6 +250,42 @@
     })
     ->sortBy('code')
     ->values();
+
+  $sourceWarehouseCode = strtoupper((string) ($return->warehouse?->code ?? ''));
+  $destinationWarehouseCode = strtoupper((string) ($return->destinationWarehouse?->code ?? ''));
+  $sourceAccountCode = $sourceWarehouseCode === 'REJ-SEW' ? '1-153' : '1-151-02';
+  $sourceAccountLabel = $sourceWarehouseCode === 'REJ-SEW' ? 'Persediaan reject jahit' : 'WIP Sewing';
+  $destinationAccountCode = $destinationWarehouseCode === 'WIP-FIN' ? '1-151-03' : '1-152';
+  $destinationAccountLabel = $destinationWarehouseCode === 'WIP-FIN' ? 'WIP Finishing' : 'Persediaan Barang Jadi';
+  $accountingHasActivePosting = ($accountingActiveEntries ?? collect())->isNotEmpty();
+  $accountingIsBalanced = abs((float) ($accountingPostedTotalDebit ?? 0) - (float) ($accountingPostedTotalCredit ?? 0)) < 0.000001;
+  $accountingStatusLabel = $accountingHasActivePosting
+    ? ($accountingIsBalanced ? 'BALANCE' : 'TIDAK BALANCE')
+    : (($accountingJournalEntries ?? collect())->isNotEmpty() ? 'VOID' : 'BELUM POSTING');
+  $mutationStatusLabel = ($mutationRows ?? collect())->isNotEmpty() ? 'TERCATAT' : 'BELUM ADA MUTASI';
+
+  $accountingSourceLabel = function ($sourceType): string {
+    return match (true) {
+      str_contains((string) $sourceType, 'reversal') => 'Reversal',
+      str_contains((string) $sourceType, 'repost') => 'Repost',
+      (string) $sourceType === 'sewing_return_reject' => 'Sewing Return Reject',
+      (string) $sourceType === 'sewing_reject_rework_ok' => 'Sewing Rework OK',
+      default => 'Sewing Return OK',
+    };
+  };
+
+  $mutationSourceLabel = function ($sourceType): string {
+    return match ((string) $sourceType) {
+      'sewing_return_reject' => 'Return Reject',
+      'sewing_reject_rework_ok' => 'Rework OK',
+      'sewing_qc_in' => 'QC Sewing Masuk',
+      'sewing_qc_reject' => 'QC Sewing Reject',
+      'sewing_return_void_ok' => 'Reversal Return OK',
+      'sewing_return_void_reject' => 'Reversal Return Reject',
+      'sewing_reject_rework_void' => 'Reversal Rework',
+      default => 'Return OK',
+    };
+  };
 @endphp
 
 <div class="page-wrap">
@@ -336,6 +432,182 @@
     </div>
   </div>
 
+  {{-- ACCOUNTING / HPP / MUTATION TRACE --}}
+  @if($isOwner)
+    <details class="financial-section accounting-section mb-2">
+      <summary>
+        <div class="financial-heading">
+          <div>
+            <div class="financial-title"><i class="bi bi-journal-check me-1"></i>Akuntansi Baru</div>
+            <div class="financial-subtitle">Jejak jurnal Sewing Return ini. Jurnal VOID tetap tampil sebagai audit, tetapi tidak masuk saldo aktif.</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge-mini">{{ $accountingStatusLabel }}</span>
+            <i class="bi bi-chevron-down chevron"></i>
+          </div>
+        </div>
+      </summary>
+      <div class="financial-body">
+        <div class="financial-summary">
+          <div class="financial-kpi">
+            <div class="financial-label">Debit aktif</div>
+            <div class="financial-value mono">Rp {{ number_format((float) ($accountingPostedTotalDebit ?? 0), 0, ',', '.') }}</div>
+          </div>
+          <div class="financial-kpi">
+            <div class="financial-label">Kredit aktif</div>
+            <div class="financial-value mono">Rp {{ number_format((float) ($accountingPostedTotalCredit ?? 0), 0, ',', '.') }}</div>
+          </div>
+          <div class="financial-kpi">
+            <div class="financial-label">Mapping</div>
+            <div class="financial-value mono">{{ $sourceAccountCode }} → {{ $destinationAccountCode }}</div>
+          </div>
+          <div class="financial-kpi">
+            <div class="financial-label">Jurnal</div>
+            <div class="financial-value mono">{{ ($accountingJournalEntries ?? collect())->count() }} total / {{ ($accountingActiveEntries ?? collect())->count() }} aktif</div>
+          </div>
+        </div>
+
+        @if(($accountingJournalEntries ?? collect())->isEmpty())
+          <div class="small text-muted">Belum ada jurnal akuntansi baru untuk Sewing Return ini.</div>
+        @else
+          <div class="table-responsive">
+            <table class="table table-sm financial-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Transaksi</th>
+                  <th>Referensi</th>
+                  <th class="text-end">Debit</th>
+                  <th class="text-end">Kredit</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach($accountingJournalEntries as $journal)
+                  @php
+                    $journalDebit = (float) $journal->lines->sum('debit');
+                    $journalCredit = (float) $journal->lines->sum('credit');
+                    $journalVoided = !is_null($journal->voided_at);
+                  @endphp
+                  <tr class="{{ $journalVoided ? 'row-reversal' : '' }}">
+                    <td class="mono text-muted">{{ optional($journal->created_at)->format('d/m/Y H:i') ?? '-' }}</td>
+                    <td>{{ $accountingSourceLabel($journal->source_type) }}</td>
+                    <td class="mono">{{ $journal->reference ?: '—' }}</td>
+                    <td class="text-end mono">Rp {{ number_format($journalDebit, 0, ',', '.') }}</td>
+                    <td class="text-end mono">Rp {{ number_format($journalCredit, 0, ',', '.') }}</td>
+                    <td><span class="badge-mini">{{ $journalVoided ? 'VOID' : 'POSTED' }}</span></td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        @endif
+        <div class="financial-note">Mapping aktif: Debit {{ $destinationAccountCode }} {{ $destinationAccountLabel }}; Kredit {{ $sourceAccountCode }} {{ $sourceAccountLabel }}. Nominal bersumber dari posting aktual.</div>
+      </div>
+    </details>
+
+    <details class="financial-section hpp-section mb-2">
+      <summary>
+        <div class="financial-heading">
+          <div>
+            <div class="financial-title"><i class="bi bi-calculator me-1"></i>Estimasi HPP Sewing Return</div>
+            <div class="financial-subtitle">Realisasi nilai yang keluar dari sumber dan masuk ke tujuan berdasarkan mutasi aktual.</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge-mini">{{ ($hppRows ?? collect())->count() }} item</span>
+            <i class="bi bi-chevron-down chevron"></i>
+          </div>
+        </div>
+      </summary>
+      <div class="financial-body">
+        <div class="financial-summary">
+          <div class="financial-kpi">
+            <div class="financial-label">Nilai sumber</div>
+            <div class="financial-value mono">Rp {{ number_format(abs((float) ($sourceNetValue ?? 0)), 0, ',', '.') }}</div>
+          </div>
+          <div class="financial-kpi">
+            <div class="financial-label">Qty masuk tujuan</div>
+            <div class="financial-value mono">{{ number_format((float) ($destinationNetQty ?? 0), 2, ',', '.') }} pcs</div>
+          </div>
+          <div class="financial-kpi">
+            <div class="financial-label">Total masuk {{ $destinationWarehouseCode ?: 'tujuan' }}</div>
+            <div class="financial-value mono">Rp {{ number_format((float) ($destinationNetValue ?? 0), 0, ',', '.') }}</div>
+          </div>
+          <div class="financial-kpi">
+            <div class="financial-label">HPP / pcs</div>
+            <div class="financial-value mono">Rp {{ number_format(abs((float) ($destinationNetQty ?? 0)) > 0.000001 ? ((float) ($destinationNetValue ?? 0) / (float) $destinationNetQty) : 0, 0, ',', '.') }}</div>
+          </div>
+        </div>
+        @if(($hppRows ?? collect())->isEmpty())
+          <div class="small text-muted">Belum ada mutasi tujuan untuk menghitung HPP.</div>
+        @else
+          <div class="table-responsive">
+            <table class="table table-sm financial-table">
+              <thead><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">HPP / pcs</th><th class="text-end">Total</th></tr></thead>
+              <tbody>
+                @foreach($hppRows as $hpp)
+                  <tr>
+                    <td><span class="mono fw-bold">{{ $hpp['item_code'] }}</span><span class="small text-muted ms-1">{{ $hpp['item_name'] }}</span></td>
+                    <td class="text-end mono">{{ number_format($hpp['qty'], 2, ',', '.') }}</td>
+                    <td class="text-end mono">Rp {{ number_format($hpp['unit_cost'], 0, ',', '.') }}</td>
+                    <td class="text-end mono">Rp {{ number_format($hpp['value'], 0, ',', '.') }}</td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        @endif
+        <div class="financial-note">Upah jahit tidak ditambahkan ulang pada Sewing Return karena sudah masuk saat Ambil Jahit.</div>
+      </div>
+    </details>
+  @endif
+
+  <details class="financial-section mutation-section mb-2">
+    <summary>
+      <div class="financial-heading">
+        <div>
+          <div class="financial-title"><i class="bi bi-arrow-left-right me-1"></i>Mutasi Stok</div>
+          <div class="financial-subtitle">Perpindahan stok aktual, termasuk baris reversal saat dokumen di-VOID.</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge-mini">{{ $mutationStatusLabel }}</span>
+          <i class="bi bi-chevron-down chevron"></i>
+        </div>
+      </div>
+    </summary>
+    <div class="financial-body">
+      <div class="financial-summary">
+        <div class="financial-kpi"><div class="financial-label">Qty masuk</div><div class="financial-value mono">{{ number_format((float) ($mutationQtyIn ?? 0), 2, ',', '.') }}</div></div>
+        <div class="financial-kpi"><div class="financial-label">Qty keluar</div><div class="financial-value mono">{{ number_format((float) ($mutationQtyOut ?? 0), 2, ',', '.') }}</div></div>
+        <div class="financial-kpi"><div class="financial-label">Nilai masuk</div><div class="financial-value mono">Rp {{ number_format((float) ($mutationValueIn ?? 0), 0, ',', '.') }}</div></div>
+        <div class="financial-kpi"><div class="financial-label">Net qty / nilai</div><div class="financial-value mono">{{ number_format((float) ($mutationNetQty ?? 0), 2, ',', '.') }} / Rp {{ number_format((float) ($mutationNetValue ?? 0), 0, ',', '.') }}</div></div>
+      </div>
+      @if(($mutationRows ?? collect())->isEmpty())
+        <div class="small text-muted">Belum ada mutasi stok untuk Sewing Return ini.</div>
+      @else
+        <div class="table-responsive">
+          <table class="table table-sm financial-table">
+            <thead><tr><th>Transaksi</th><th>Gudang</th><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit cost</th><th class="text-end">Nilai</th><th>Status</th></tr></thead>
+            <tbody>
+              @foreach($mutationRows as $mutation)
+                @php $isReversalMutation = str_contains((string) $mutation->source_type, 'void'); @endphp
+                <tr class="{{ $isReversalMutation ? 'row-reversal' : '' }}">
+                  <td>{{ $mutationSourceLabel($mutation->source_type) }}</td>
+                  <td><span class="mono">{{ $mutation->warehouse_code ?: '-' }}</span><div class="small text-muted">{{ $mutation->warehouse_name ?: '' }}</div></td>
+                  <td><span class="mono fw-bold">{{ $mutation->item_code ?: '-' }}</span><div class="small text-muted">{{ $mutation->item_name ?: '' }}</div></td>
+                  <td class="text-end mono">{{ number_format((float) $mutation->qty_change, 2, ',', '.') }}</td>
+                  <td class="text-end mono">Rp {{ number_format((float) $mutation->unit_cost, 0, ',', '.') }}</td>
+                  <td class="text-end mono">Rp {{ number_format((float) $mutation->total_cost, 0, ',', '.') }}</td>
+                  <td><span class="badge-mini">{{ $isReversalMutation ? 'REVERSAL' : 'POSTED' }}</span></td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+      @endif
+    </div>
+  </details>
+
   {{-- PER ITEM --}}
   <div class="card mb-2">
     <div class="card-section">
@@ -395,18 +667,19 @@
     <div class="card-section">
       <div class="section-title mb-2">Detail Bundle</div>
 
-      <table class="table table-sm align-middle mono mb-0">
+      <div class="detail-bundle-wrap">
+      <table class="table table-sm align-middle mono detail-bundle-table mb-0">
         <thead>
           <tr>
             <th style="width:40px;">#</th>
-            <th style="width:150px;">Item</th>
-            <th>Bundle / LOT</th>
+            <th class="detail-item-col">Item</th>
+            <th class="detail-bundle-col">Bundle / LOT</th>
             <th class="text-end" style="width:110px;">Setor</th>
             <th class="text-end" style="width:110px;">Reject</th>
             <th class="text-end" style="width:110px;">Dadakan</th>
             <th class="text-end" style="width:110px;">Belum Setor</th>
-            <th style="width:220px;">Kelengkapan</th>
-            <th style="width:220px;">Catatan</th>
+            <th class="detail-compact-col">Kelengkapan</th>
+            <th class="detail-note-col">Catatan</th>
           </tr>
         </thead>
         <tbody>
@@ -439,15 +712,15 @@
 
             <tr class="{{ $rj > 0 && $setor == 0 ? 'row-rj' : ($setor > 0 && $rj == 0 ? 'row-ok' : '') }}">
               <td class="text-muted">{{ $i + 1 }}</td>
-              <td>
-                <div class="fw-bold">{{ $item?->code ?? '-' }}</div>
-                <div class="small text-muted">{{ $item?->name ?? '' }}</div>
+              <td class="detail-item-cell" title="{{ trim(($item?->code ?? '-') . ' ' . ($item?->name ?? '')) }}">
+                <div class="fw-bold detail-code">{{ $item?->code ?? '-' }}</div>
+                <div class="small text-muted detail-name">{{ $item?->name ?? '' }}</div>
               </td>
-              <td>
-                <div class="small">
+              <td class="detail-bundle-cell" title="{{ trim(($bundle?->bundle_code ?? '-') . ' ' . ($lot ? 'LOT ' . $lot->code : '')) }}">
+                <div class="small detail-bundle-code">
                   {{ $bundle?->bundle_code ?? '-' }}
                   @if($lot)
-                    • LOT <span class="mono">{{ $lot->code }}</span>
+                    • LOT {{ $lot->code }}
                   @endif
                 </div>
                 <div class="small text-muted mt-1">
@@ -459,11 +732,11 @@
               <td class="text-end">{{ number_format($rj, 2, ',', '.') }}</td>
               <td class="text-end">{{ number_format($directPickAll, 2, ',', '.') }}</td>
               <td class="text-end">{{ number_format($remainingRow, 2, ',', '.') }}</td>
-              <td>
+              <td class="detail-completeness-cell">
                 <div class="fw-bold small">{{ $supplyStatusLabel }}</div>
                 @if($supplyLines->isNotEmpty())
                   @foreach($supplyLines as $supply)
-                    <div class="small text-muted">
+                    <div class="small text-muted detail-supply-line" title="{{ $supply->materialItem?->code ?? 'Bahan' }} {{ number_format((float) $supply->issued_qty, 4, ',', '.') }}/{{ number_format((float) $supply->required_qty, 4, ',', '.') }} {{ $supply->uom ?: $supply->materialItem?->unit }}">
                       {{ $supply->materialItem?->code ?? 'Bahan' }}
                       {{ number_format((float) $supply->issued_qty, 4, ',', '.') }}/{{ number_format((float) $supply->required_qty, 4, ',', '.') }}
                       {{ $supply->uom ?: $supply->materialItem?->unit }}
@@ -474,7 +747,7 @@
                 @endif
               </td>
 
-              <td>{{ $line->notes ?: '—' }}</td>
+              <td class="detail-note-cell" title="{{ $line->notes ?: '—' }}">{{ $line->notes ?: '—' }}</td>
             </tr>
           @empty
             <tr>
@@ -483,6 +756,7 @@
           @endforelse
         </tbody>
       </table>
+      </div>
 
       @if($return->notes)
         <hr class="my-2">

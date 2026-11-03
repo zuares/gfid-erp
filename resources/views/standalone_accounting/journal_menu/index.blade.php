@@ -29,6 +29,8 @@
             </div>
             <div class="d-flex gap-2 flex-wrap">
                 <a class="journal-menu-btn" href="{{ route('standalone-accounting.journals.index') }}">Jurnal Umum</a>
+                <a class="journal-menu-btn" href="{{ route('standalone-accounting.journals.create', ['mode' => 'opening']) }}">Saldo Awal</a>
+                <a class="journal-menu-btn" href="{{ route('standalone-accounting.opening-migration.index') }}">Opening Migrasi</a>
                 <a class="journal-menu-btn primary" href="{{ route('standalone-accounting.journals.create') }}">+ Posting Jurnal</a>
             </div>
         </div>
@@ -57,6 +59,17 @@
                         <span class="journal-menu-icon"><i class="bi bi-calendar-check" aria-hidden="true"></i></span>
                         <h6>Neraca Saldo Periode Akhir</h6>
                         <p>Menampilkan saldo akun sampai tanggal akhir periode yang dipilih.</p>
+                        <span class="journal-menu-status">Laporan tersedia</span>
+                        <span class="menu-link mt-3">Buka laporan <span aria-hidden="true">→</span></span>
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-4">
+                <div class="journal-menu-card">
+                    <a href="{{ route('standalone-accounting.stock-opname-variance.index') }}">
+                        <span class="journal-menu-icon"><i class="bi bi-clipboard2-data" aria-hidden="true"></i></span>
+                        <h6>Stock Opname &amp; Variance</h6>
+                        <p>Monitoring read-only dokumen opname, cutoff, nilai selisih, approval, dan jurnal mirror.</p>
                         <span class="journal-menu-status">Laporan tersedia</span>
                         <span class="menu-link mt-3">Buka laporan <span aria-hidden="true">→</span></span>
                     </a>

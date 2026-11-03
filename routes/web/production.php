@@ -1,11 +1,8 @@
 <?php
 
 use App\Http\Controllers\Inventory\InventoryAdjustmentController;
-use App\Http\Controllers\Production\CuttingJobController;
 use App\Http\Controllers\Production\BundleAssemblyController;
-use App\Http\Controllers\Production\WipOpnameController;
-use App\Http\Controllers\Production\WipCleanupController;
-use App\Http\Controllers\Production\WipNormalizationController;
+use App\Http\Controllers\Production\CuttingJobController;
 use App\Http\Controllers\Production\FinishingJobController;
 use App\Http\Controllers\Production\FinishingRepairController;
 use App\Http\Controllers\Production\PackingJobController;
@@ -17,6 +14,9 @@ use App\Http\Controllers\Production\ReconcileController;
 use App\Http\Controllers\Production\SewingPickupController;
 use App\Http\Controllers\Production\SewingRejectReturnController;
 use App\Http\Controllers\Production\SewingReturnController;
+use App\Http\Controllers\Production\WipCleanupController;
+use App\Http\Controllers\Production\WipNormalizationController;
+use App\Http\Controllers\Production\WipOpnameController;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,12 +39,12 @@ Route::middleware(['web', 'auth', 'access:production'])
         |----------------------------------------------------------------------
          */
         Route::prefix('wip-opname')->name('wip_opname.')->group(function () {
-            Route::get('/',         [WipOpnameController::class, 'index'])->name('index');
-            Route::get('/create',   [WipOpnameController::class, 'create'])->name('create');
-            Route::post('/',        [WipOpnameController::class, 'store'])->name('store');
-            Route::get('/{wipOpnamePeriod}',  [WipOpnameController::class, 'show'])->name('show');
+            Route::get('/', [WipOpnameController::class, 'index'])->name('index');
+            Route::get('/create', [WipOpnameController::class, 'create'])->name('create');
+            Route::post('/', [WipOpnameController::class, 'store'])->name('store');
+            Route::get('/{wipOpnamePeriod}', [WipOpnameController::class, 'show'])->name('show');
             Route::post('/{wipOpnamePeriod}/lines/{line}/update', [WipOpnameController::class, 'updateLine'])->name('update_line');
-            Route::post('/{wipOpnamePeriod}/submit',  [WipOpnameController::class, 'submitForApproval'])->name('submit');
+            Route::post('/{wipOpnamePeriod}/submit', [WipOpnameController::class, 'submitForApproval'])->name('submit');
             Route::post('/{wipOpnamePeriod}/approve', [WipOpnameController::class, 'approve'])->name('approve');
         });
 
@@ -56,13 +56,13 @@ Route::middleware(['web', 'auth', 'access:production'])
         Route::get('log', [\App\Http\Controllers\Production\ProductionLogController::class, 'index'])->name('log.index');
 
         Route::prefix('wip-cleanup')->name('wip_cleanup.')->group(function () {
-            Route::get('/',            [WipCleanupController::class, 'index'])->name('index');
-            Route::get('/action',      [WipCleanupController::class, 'actionForm'])->name('action');
-            Route::post('/action',     [WipCleanupController::class, 'storeAction'])->name('store_action');
-            Route::get('/pickup-close',  [WipCleanupController::class, 'pickupCloseForm'])->name('pickup_close');
+            Route::get('/', [WipCleanupController::class, 'index'])->name('index');
+            Route::get('/action', [WipCleanupController::class, 'actionForm'])->name('action');
+            Route::post('/action', [WipCleanupController::class, 'storeAction'])->name('store_action');
+            Route::get('/pickup-close', [WipCleanupController::class, 'pickupCloseForm'])->name('pickup_close');
             Route::post('/pickup-close', [WipCleanupController::class, 'pickupCloseStore'])->name('pickup_close_store');
-            Route::get('/{wipCleanup}',        [WipCleanupController::class, 'show'])->name('show');
-            Route::post('/{wipCleanup}/void',  [WipCleanupController::class, 'void'])->name('void');
+            Route::get('/{wipCleanup}', [WipCleanupController::class, 'show'])->name('show');
+            Route::post('/{wipCleanup}/void', [WipCleanupController::class, 'void'])->name('void');
         });
 
         /*
@@ -71,12 +71,12 @@ Route::middleware(['web', 'auth', 'access:production'])
         |----------------------------------------------------------------------
          */
         Route::prefix('wip-normalization')->name('wip_normalization.')->group(function () {
-            Route::get('/',        [WipNormalizationController::class, 'index'])->name('index');
-            Route::get('/create',  [WipNormalizationController::class, 'create'])->name('create');
-            Route::post('/',       [WipNormalizationController::class, 'store'])->name('store');
-            Route::get('/{wipNormalization}',          [WipNormalizationController::class, 'show'])->name('show');
+            Route::get('/', [WipNormalizationController::class, 'index'])->name('index');
+            Route::get('/create', [WipNormalizationController::class, 'create'])->name('create');
+            Route::post('/', [WipNormalizationController::class, 'store'])->name('store');
+            Route::get('/{wipNormalization}', [WipNormalizationController::class, 'show'])->name('show');
             Route::post('/{wipNormalization}/approve', [WipNormalizationController::class, 'approve'])->name('approve');
-            Route::post('/{wipNormalization}/void',    [WipNormalizationController::class, 'void'])->name('void');
+            Route::post('/{wipNormalization}/void', [WipNormalizationController::class, 'void'])->name('void');
         });
 
         Route::prefix('cutting-jobs')->name('cutting_jobs.')->group(function () {
@@ -144,6 +144,9 @@ Route::middleware(['web', 'auth', 'access:production'])
             Route::post('/cutting/{cuttingJob}/bundles/{bundle}/cancel', [QcController::class, 'cancelCuttingBundle'])
                 ->middleware('role:owner')
                 ->name('cutting.bundle_cancel');
+
+            Route::post('/cutting/{cuttingJob}/bundles/{bundle}/correct-to-raw', [QcController::class, 'correctCuttingBundle'])
+                ->name('cutting.bundle_correct_to_raw');
 
             Route::post('/cutting/{cuttingJob}/bundles/{bundle}/update-item', [QcController::class, 'updateCuttingBundleItem'])
                 ->middleware('role:owner')
@@ -248,10 +251,16 @@ Route::middleware(['web', 'auth', 'access:production'])
         Route::post('finishing_jobs/{finishing_job}/unpost', [FinishingJobController::class, 'unpost'])
             ->name('finishing_jobs.unpost');
 
+        Route::post('finishing_jobs/{finishing_job}/void', [FinishingJobController::class, 'void'])
+            ->name('finishing_jobs.void');
+
         Route::post('finishing_jobs/{finishingJob}/force-post', [FinishingJobController::class, 'forcePost'])
             ->name('finishing_jobs.force_post');
 
         Route::resource('finishing_jobs', FinishingJobController::class)->except(['destroy']);
+
+        Route::post('finishing-repairs/{finishing_repair}/unpost', [FinishingRepairController::class, 'unpost'])
+            ->name('finishing_repairs.unpost');
 
         Route::resource('finishing-repairs', FinishingRepairController::class)
             ->only(['index', 'create', 'store', 'show'])

@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Journal;
 use App\Models\JournalLine;
+use App\Services\Accounting\StandaloneOpeningBalancePostingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class OpeningBalanceController extends Controller
 {
+    public function __construct(
+        protected StandaloneOpeningBalancePostingService $standaloneOpeningBalancePosting,
+    ) {}
+
     /**
      * List opening balances (aktif & void) + filter tanggal.
      * Optional filter:
@@ -41,7 +46,7 @@ class OpeningBalanceController extends Controller
             }
         }
 
-        $openingJournals = $q->paginate(30)->withQueryString();
+        $openingJournals = $q->with('standaloneJournal')->paginate(30)->withQueryString();
 
         return view('accounting.opening_balances.index', compact('openingJournals'));
     }
@@ -60,7 +65,7 @@ class OpeningBalanceController extends Controller
             ->orderBy('name')
             ->get();
 
-        $defaultEquity = $equityAccounts->firstWhere('code', '3001')?->id ?? $equityAccounts->first()?->id;
+        $defaultEquity = $equityAccounts->firstWhere('code', '3101')?->id ?? $equityAccounts->first()?->id;
 
         return view('accounting.opening_balances.create', compact(
             'cashAccounts',
@@ -84,7 +89,7 @@ class OpeningBalanceController extends Controller
             $cash = Account::query()->whereKey($data['cash_account_id'])->lockForUpdate()->firstOrFail();
             $equity = Account::query()->whereKey($data['equity_account_id'])->lockForUpdate()->firstOrFail();
 
-            if (!$cash->is_cash) {
+            if (! $cash->is_cash) {
                 throw ValidationException::withMessages([
                     'cash_account_id' => 'Akun yang dipilih bukan kas/bank (is_cash=1).',
                 ]);
@@ -134,6 +139,8 @@ class OpeningBalanceController extends Controller
                 'credit' => $data['amount'],
             ]);
 
+            $this->standaloneOpeningBalancePosting->post($j);
+
             return redirect()
                 ->route('accounting.opening-balances.index')
                 ->with('status', 'ok')
@@ -158,7 +165,7 @@ class OpeningBalanceController extends Controller
                 ]);
             }
 
-            if (!$locked->posted_at) {
+            if (! $locked->posted_at) {
                 throw ValidationException::withMessages([
                     'journal' => 'Journal belum POSTED.',
                 ]);
@@ -189,15 +196,13 @@ class OpeningBalanceController extends Controller
 
             $locked->load('lines.account');
 
-            $cashLine = $locked->lines->first(fn($l) =>
-                $l->account?->is_cash && (float) $l->debit > 0 && (float) $l->credit == 0
+            $cashLine = $locked->lines->first(fn ($l) => $l->account?->is_cash && (float) $l->debit > 0 && (float) $l->credit == 0
             );
 
-            $equityLine = $locked->lines->first(fn($l) =>
-                $l->account?->type === 'equity' && (float) $l->credit > 0 && (float) $l->debit == 0
+            $equityLine = $locked->lines->first(fn ($l) => $l->account?->type === 'equity' && (float) $l->credit > 0 && (float) $l->debit == 0
             );
 
-            if (!$cashLine || !$equityLine) {
+            if (! $cashLine || ! $equityLine) {
                 throw ValidationException::withMessages([
                     'journal' => 'Format opening balance tidak valid (harus cash debit & equity credit).',
                 ]);
@@ -210,9 +215,9 @@ class OpeningBalanceController extends Controller
                 ]);
             }
 
-            $desc = 'REVERSAL: ' . ($locked->description ?: 'Opening Balance');
-            if (!empty($data['reason'])) {
-                $desc .= ' | ' . $data['reason'];
+            $desc = 'REVERSAL: '.($locked->description ?: 'Opening Balance');
+            if (! empty($data['reason'])) {
+                $desc .= ' | '.$data['reason'];
             }
 
             // ✅ tandai void di journal opening original
@@ -244,6 +249,8 @@ class OpeningBalanceController extends Controller
                 'debit' => 0,
                 'credit' => $amount,
             ]);
+
+            $this->standaloneOpeningBalancePosting->voidForSource((int) $locked->id);
 
             return redirect()
                 ->route('accounting.opening-balances.index')

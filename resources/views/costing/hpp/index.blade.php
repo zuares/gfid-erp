@@ -145,7 +145,7 @@
                     HPP (COGS) • Per Item
                 </h1>
                 <p class="text-muted mb-0" style="font-size: .86rem;">
-                    Generate HPP dari periode produksi & payroll, simpan sebagai snapshot per item, dan tandai HPP aktif
+                    Rebuild HPP dari data produksi legacy, simpan sebagai snapshot per item, dan tandai HPP aktif
                     yang akan dipakai di modul Sales Invoice.
                 </p>
             </div>
@@ -155,11 +155,11 @@
         <div class="card card-main mb-3">
             <div class="card-body">
                 <h2 class="h6 mb-2">
-                    Generate HPP Baru
+                    Rebuild HPP Legacy
                 </h2>
                 <p class="text-muted mb-3" style="font-size: .8rem;">
-                    Pilih item finished goods dan periode tanggal. Sistem akan membaca data Cutting + Payroll Cutting &
-                    Sewing, lalu menyimpan snapshot HPP terbaru.
+                    Pilih item finished goods dan periode tanggal. Sistem membaca output Finishing posted, bundle Cutting,
+                    inventory cost legacy, upah Sewing, dan batch BOM finishing terbaru. Accounting standalone tidak dipakai.
                 </p>
 
                 <form action="{{ route('costing.hpp.generate') }}" method="POST" class="row g-3 align-items-end">
@@ -242,7 +242,7 @@
                         </div>
                         <div>
                             <button type="submit" class="btn btn-sm btn-primary">
-                                Generate HPP dari Periode Ini
+                                Rebuild HPP Legacy
                             </button>
                         </div>
                     </div>

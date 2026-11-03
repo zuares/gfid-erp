@@ -7,6 +7,8 @@ use App\Models\Account;
 use App\Models\Journal;
 use App\Models\JournalLine;
 use App\Models\SystemSetting;
+use App\Models\StandaloneAccountingAccountMapping;
+use App\Services\Accounting\StandaloneOpeningBalancePostingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,10 +18,24 @@ use Illuminate\Validation\ValidationException;
 
 class OpeningBalanceBatchController extends Controller
 {
+    /**
+     * Persediaan awal memiliki sumber dan proses tersendiri: Opening Stock
+     * Opname. Jangan tampilkan akun-akun ini di batch saldo awal accounting,
+     * karena nilainya dapat tercatat dua kali.
+     */
+    private const INVENTORY_ACCOUNT_CODES = [
+        '1201', '1202', '1203', '1204', '1205', '1210',
+    ];
+    private const CREDIT_ASSET_CODES = ['1591'];
+
     private const EXCLUDED_JOURNAL_SOURCES = [
         'opening_balance_void',
         'opening_balance_batch_void',
     ];
+
+    public function __construct(
+        protected StandaloneOpeningBalancePostingService $standaloneOpeningBalancePosting,
+    ) {}
 
     public function index(Request $request)
     {
@@ -60,8 +76,24 @@ class OpeningBalanceBatchController extends Controller
         // mengikuti tanggal saat halaman dibuka.
         $cutoffDate = SystemSetting::cutoffDateString() ?? now()->toDateString();
 
+        // Batch ini dipakai untuk saldo awal yang juga dapat dimirror ke
+        // Akuntansi Baru. Hanya tampilkan akun non-persediaan yang memiliki
+        // mapping aktif dan akun tujuan yang aktif.
+        $mappedLegacyCodes = StandaloneAccountingAccountMapping::query()
+            ->where('is_active', true)
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('standalone_accounting_accounts as saa')
+                    ->whereColumn('saa.code', 'standalone_accounting_account_mappings.standalone_account_code')
+                    ->where('saa.is_active', true);
+            })
+            ->pluck('legacy_account_code');
+
         $accounts = Account::query()
             ->where('is_active', true)
+            ->whereIn('type', ['asset', 'liability', 'equity'])
+            ->whereIn('code', $mappedLegacyCodes)
+            ->whereNotIn('code', self::INVENTORY_ACCOUNT_CODES)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type', 'is_cash']);
 
@@ -495,11 +527,7 @@ class OpeningBalanceBatchController extends Controller
         // berbeda dari saldo sistem.
         $prefill = [];
         foreach ([
-            ['1202', $wipTotal],
-            ['1203', $fgTotal],
-            ['1204', $rejectTotal],
             ['1301', $customerReceivableTotal],
-            ['1302', $marketplaceReceivableTotal],
             ['2102', $payrollPayableTotal],
         ] as [$code, $val]) {
             $account = $accounts->firstWhere('code', $code);
@@ -516,7 +544,7 @@ class OpeningBalanceBatchController extends Controller
         $ledgerBalances = $this->journalNetBalancesAsOf($cutoffDate);
 
         // Kas / bank: ambil saldo bersih ledger sampai tanggal cut-off.
-        foreach (['1101', '1111', '1112'] as $code) {
+        foreach (['1101', '1111', '1112', '1113', '1114'] as $code) {
             $account = $accountByCode->get($code);
             $value = max(0, (float) ($ledgerBalances[$account?->id] ?? 0));
             if ($account && $value > 0 && !isset($prefill[$account->id])) {
@@ -530,25 +558,37 @@ class OpeningBalanceBatchController extends Controller
             $prefill[$accountByCode->get('2101')->id] = round($tradePayable, 2);
         }
 
-        // Bahan baku dan packaging: nilai mutasi persediaan bersih sampai
-        // cut-off, dikelompokkan berdasarkan item_role.
-        $inventoryByRole = $this->inventoryValuesByRoleAsOf($cutoffDate);
-        foreach ([
-            '1201' => ['raw_material', 'production_supply'],
-            '1205' => ['shipping_supply'],
-        ] as $code => $roles) {
-            $account = $accountByCode->get($code);
-            $value = collect($roles)->sum(fn ($role) => (float) ($inventoryByRole[$role] ?? 0));
-            if ($account && $value > 0 && !isset($prefill[$account->id])) {
+        // Prefill akun non-persediaan lain dari saldo bersih legacy. Nilainya
+        // tetap draft dan dapat dikoreksi berdasarkan bukti saldo aktual.
+        foreach ($accounts as $account) {
+            if (isset($prefill[$account->id]) || $account->type === 'equity') {
+                continue;
+            }
+
+            $net = (float) ($ledgerBalances[$account->id] ?? 0);
+            $value = match (true) {
+                $account->type === 'asset' && in_array($account->code, self::CREDIT_ASSET_CODES, true)
+                    => max(0, -$net),
+                $account->type === 'asset'
+                    => max(0, $net),
+                $account->type === 'liability'
+                    => max(0, -$net),
+                default => 0,
+            };
+
+            if ($value > 0) {
                 $prefill[$account->id] = round($value, 2);
             }
         }
+
+        $creditAssetCodes = self::CREDIT_ASSET_CODES;
 
         return view('accounting.opening_balances_batch.create', compact(
             'accounts',
             'prefill',
             'details',
-            'cutoffDate'
+            'cutoffDate',
+            'creditAssetCodes'
         ));
     }
 
@@ -732,7 +772,7 @@ class OpeningBalanceBatchController extends Controller
                 ]);
             }
 
-            $desc = $data['description'] ?: 'Opening Balance (Batch)';
+            $desc = $data['description'] ?: 'Saldo Awal Non-Persediaan (Batch)';
 
             $j = Journal::create([
                 'date' => $data['date'],
@@ -752,10 +792,14 @@ class OpeningBalanceBatchController extends Controller
                 ]);
             }
 
+            // Legacy tetap menjadi sumber transaksi lama, lalu dimirror ke
+            // Akuntansi Baru dengan mapping COA yang sama-sama tervalidasi.
+            $this->standaloneOpeningBalancePosting->post($j);
+
             return redirect()
                 ->route('accounting.opening-balances-batch.index')
                 ->with('status', 'ok')
-                ->with('message', 'Opening Balance (batch) berhasil diposting.');
+                ->with('message', 'Saldo awal non-persediaan berhasil diposting ke accounting lama dan Akuntansi Baru.');
         });
     }
 
@@ -797,7 +841,7 @@ class OpeningBalanceBatchController extends Controller
             // tandai void original
             $locked->update(['voided_at' => now()]);
 
-            $desc = 'REVERSAL: ' . ($locked->description ?: 'Opening Balance (Batch)');
+            $desc = 'REVERSAL: ' . ($locked->description ?: 'Saldo Awal Non-Persediaan (Batch)');
             if (!empty($data['reason'])) {
                 $desc .= ' | ' . $data['reason'];
             }
@@ -821,10 +865,14 @@ class OpeningBalanceBatchController extends Controller
                 ]);
             }
 
+            // Reversal harus berjalan di kedua ledger agar saldo lama dan
+            // Akuntansi Baru tidak berbeda setelah batch dibatalkan.
+            $this->standaloneOpeningBalancePosting->voidForSource((int) $locked->id);
+
             return redirect()
                 ->route('accounting.opening-balances-batch.index')
                 ->with('status', 'ok')
-                ->with('message', 'Opening Balance berhasil di-VOID (reversal batch dibuat).');
+                ->with('message', 'Saldo awal non-persediaan berhasil di-VOID di accounting lama dan Akuntansi Baru.');
         });
     }
 }

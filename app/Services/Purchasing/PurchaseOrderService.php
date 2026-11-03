@@ -33,7 +33,7 @@ class PurchaseOrderService
             $suppCode = DB::table('suppliers')
                 ->where('id', (int) ($payload['supplier_id'] ?? 0))
                 ->value('code');
-            $prefix = $suppCode ? 'PO-' . strtoupper($suppCode) : 'PO';
+            $prefix = $suppCode ? 'PO-'.strtoupper($suppCode) : 'PO';
             $payload['code'] = CodeGenerator::make($prefix);
         }
 
@@ -147,6 +147,15 @@ class PurchaseOrderService
         return DB::transaction(function () use ($order) {
             $subtotal = 0.0;
             $lines = $order->lines()->with('item')->get();
+
+            // PO legacy tertentu hanya menyimpan total header tanpa detail
+            // baris. Jangan menimpa total historis menjadi Rp0 saat halaman
+            // detail/payment dibuka; PO baru tetap menghitung normal karena
+            // barisnya tersedia sejak proses simpan.
+            if ($lines->isEmpty()) {
+                return $order->fresh(['lines.item', 'supplier', 'paymentMethod']);
+            }
+
             foreach ($lines as $line) {
                 $lineTotal = $line->calculatedLineTotal();
                 $subtotal += $lineTotal;
@@ -193,7 +202,7 @@ class PurchaseOrderService
                 ]);
             }
 
-            if (!$order->lines()->exists()) {
+            if (! $order->lines()->exists()) {
                 throw ValidationException::withMessages([
                     'lines' => 'PO harus memiliki minimal satu barang sebelum di-approve.',
                 ]);
@@ -213,7 +222,7 @@ class PurchaseOrderService
     {
         return DB::transaction(function () use ($order, $cancelledBy) {
 
-            if (!in_array($order->status, ['draft', 'approved'], true)) {
+            if (! in_array($order->status, ['draft', 'approved'], true)) {
                 return $order->fresh(['supplier', 'lines', 'paymentMethod']);
             }
 
@@ -251,8 +260,8 @@ class PurchaseOrderService
 
         $order->forceFill([
             'receiving_started_at' => $order->receiving_started_at ?? now(),
-            'locked_at'   => now(),
-            'locked_by'   => $userId,
+            'locked_at' => now(),
+            'locked_by' => $userId,
             'lock_reason' => $reason ?: 'GRN pertama dibuat dari PO ini.',
             'first_grn_id' => $grnId,
         ])->save();
@@ -272,7 +281,7 @@ class PurchaseOrderService
      */
     public function maybeUnlock(PurchaseOrder $order): bool
     {
-        if (!$order->isLocked()) {
+        if (! $order->isLocked()) {
             return false;
         }
 
@@ -294,8 +303,8 @@ class PurchaseOrderService
         }
 
         $order->forceFill([
-            'locked_at'   => null,
-            'locked_by'   => null,
+            'locked_at' => null,
+            'locked_by' => null,
             'lock_reason' => null,
             'first_grn_id' => null,
             'receiving_started_at' => null,
@@ -385,15 +394,15 @@ class PurchaseOrderService
                 $requiredMin += (float) ($receivedByLineId[$ln->id] ?? 0);
             }
 
-            if (!array_key_exists($itemId, $incomingByItem)) {
-                $name = $itemsById[$itemId]->name ?? ('#' . $itemId);
+            if (! array_key_exists($itemId, $incomingByItem)) {
+                $name = $itemsById[$itemId]->name ?? ('#'.$itemId);
                 throw ValidationException::withMessages([
                     'lines' => "Item \"{$name}\" sudah dirujuk GRN dan tidak boleh dihapus dari PO terkunci.",
                 ]);
             }
 
-            if ($incomingByItem[$itemId] + 0.0001 < $requiredMin) {
-                $name = $itemsById[$itemId]->name ?? ('#' . $itemId);
+            if ($requiredMin > $incomingByItem[$itemId] + 0.0001) {
+                $name = $itemsById[$itemId]->name ?? ('#'.$itemId);
                 throw ValidationException::withMessages([
                     'lines' => "Qty item \"{$name}\" tidak boleh diturunkan di bawah qty yang sudah diterima ({$requiredMin}).",
                 ]);
@@ -425,14 +434,14 @@ class PurchaseOrderService
             }
 
             $item = $itemsById->get($itemId);
-            if (!$item) {
+            if (! $item) {
                 continue;
             }
 
             // Line yang sudah dipakai GRN wajib mempertahankan snapshot satuannya.
             // Baris baru boleh memakai pilihan satuan dari form.
             $referenced = $referencedByItem[$itemId] ?? [];
-            $isReferencedItem = !empty($referenced) && !in_array($itemId, $consumedReferenced, true);
+            $isReferencedItem = ! empty($referenced) && ! in_array($itemId, $consumedReferenced, true);
             if ($isReferencedItem) {
                 $snapshotLine = $referenced[0];
                 $purchaseUnit = trim((string) ($snapshotLine->purchase_unit ?: $item->purchaseUnit())) ?: $item->purchaseUnit();
@@ -464,11 +473,11 @@ class PurchaseOrderService
                     $fromLine = $row['expense_account_id'] ?? null;
                     if ($fromLine !== null && $fromLine !== '' && (int) $fromLine > 0) {
                         $keep->expense_account_id = (int) $fromLine;
-                    } elseif ($hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
+                    } elseif ($hasItemDefaultExpAcc && ! empty($item->default_expense_account_id)) {
                         $keep->expense_account_id = (int) $item->default_expense_account_id;
                     }
 
-                    if (!empty($keep->expense_account_id)) {
+                    if (! empty($keep->expense_account_id)) {
                         $this->assertExpenseAccount((int) $keep->expense_account_id);
                     }
                 }
@@ -492,7 +501,7 @@ class PurchaseOrderService
                     $fromLine = $row['expense_account_id'] ?? null;
                     if ($fromLine !== null && $fromLine !== '' && (int) $fromLine > 0) {
                         $expenseAccountId = (int) $fromLine;
-                    } elseif ($hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
+                    } elseif ($hasItemDefaultExpAcc && ! empty($item->default_expense_account_id)) {
                         $expenseAccountId = (int) $item->default_expense_account_id;
                     }
 
@@ -503,7 +512,7 @@ class PurchaseOrderService
 
                 $payload = [
                     'item_id' => $itemId,
-                    'lot_id' => !empty($row['lot_id']) ? (int) $row['lot_id'] : null,
+                    'lot_id' => ! empty($row['lot_id']) ? (int) $row['lot_id'] : null,
                     'qty' => round($qty, 4),
                     'purchase_unit' => $purchaseUnit,
                     'stock_unit' => $stockUnit,
@@ -635,8 +644,8 @@ class PurchaseOrderService
         // preload items
         $itemIds = collect($linesData)
             ->pluck('item_id')
-            ->filter(fn($v) => $v !== null && $v !== '')
-            ->map(fn($v) => (int) $v)
+            ->filter(fn ($v) => $v !== null && $v !== '')
+            ->map(fn ($v) => (int) $v)
             ->unique()
             ->values()
             ->all();
@@ -675,7 +684,7 @@ class PurchaseOrderService
 
             /** @var Item|null $item */
             $item = $itemsById->get($itemId);
-            if (!$item) {
+            if (! $item) {
                 continue;
             }
 
@@ -710,7 +719,7 @@ class PurchaseOrderService
                     }
                 }
 
-                if (!$expenseAccountId && $hasItemDefaultExpAcc && !empty($item->default_expense_account_id)) {
+                if (! $expenseAccountId && $hasItemDefaultExpAcc && ! empty($item->default_expense_account_id)) {
                     $expenseAccountId = (int) $item->default_expense_account_id;
                     if ($expenseAccountId <= 0) {
                         $expenseAccountId = null;
@@ -799,7 +808,7 @@ class PurchaseOrderService
             ->where('is_active', 1)
             ->first();
 
-        if (!$acc) {
+        if (! $acc) {
             throw ValidationException::withMessages([
                 'account' => "Account code {$code} tidak ditemukan / tidak aktif.",
             ]);
@@ -816,7 +825,7 @@ class PurchaseOrderService
             ->where('is_active', true)
             ->exists();
 
-        if (!$valid) {
+        if (! $valid) {
             throw ValidationException::withMessages([
                 'lines' => "Akun biaya #{$accountId} tidak aktif atau bukan akun expense.",
             ]);
@@ -826,6 +835,7 @@ class PurchaseOrderService
     protected function normalizeOrderType(?string $value): string
     {
         $v = strtolower(trim((string) $value));
+
         return in_array($v, ['material', 'finished_good', 'packing'], true) ? $v : 'material';
     }
 
@@ -846,12 +856,14 @@ class PurchaseOrderService
         if (strpos($value, ',') !== false) {
             $value = str_replace('.', '', $value);
             $value = str_replace(',', '.', $value);
+
             return (float) $value;
         }
 
         // ribuan: 1.234.567
         if (preg_match('/^\d{1,3}(\.\d{3})+$/', $value)) {
             $value = str_replace('.', '', $value);
+
             return (float) $value;
         }
 

@@ -35,6 +35,8 @@
   .btn-ship-primary:hover{ background:var(--shp-accent-2)!important; border-color:var(--shp-accent-2)!important; color:#fff!important; }
   .btn-ship-outline{ color:#475569!important; background:transparent!important; border:1px solid rgba(148,163,184,.35)!important; }
   .btn-ship-outline:hover{ background:rgba(148,163,184,.08)!important; color:#111827!important; }
+  .grn-action-menu .dropdown-menu { min-width: 170px; border-radius: 10px; padding: .35rem 0; }
+  .grn-action-menu .dropdown-item { padding: .55rem .75rem; font-size: .8rem; }
 
   /* Cards */
   .card-info {
@@ -185,15 +187,20 @@
   $canSeeMoney = $isOwner;          // hanya owner
   $canManage = $isOwner || $isAdmin;
 
+  // ===== ROUTE SAFE CHECK =====
+  $router = app('router');
+
   $isDraft = $receipt->status === 'draft';
   $isPosted = $receipt->status === 'posted';
+  $canCreateSupplierInvoice = $isPosted
+      && ($isOwner || in_array($role, ['accounting', 'developer'], true))
+      && !$receipt->is_replacement
+      && $receipt->order
+      && $router->has('purchasing.supplier_invoices.create');
   $canPayReceipt = $isPosted
       && $canSeeMoney
       && !$receipt->is_replacement
       && (float) ($receiptPaymentOutstanding ?? 0) > \App\Models\PurchaseOrder::paymentRoundingTolerance();
-
-  // ===== ROUTE SAFE CHECK =====
-  $router = app('router');
 
   $returnCreateRouteName = null;
   foreach ([
@@ -268,38 +275,19 @@
           <i class="bi bi-arrow-left me-1"></i>Kembali
         </a>
 
-        @if ($canPayReceipt)
-          <button type="button" class="btn btn-success btn-pill btn-sm" data-bs-toggle="modal" data-bs-target="#modalGrnPayment">
-            <i class="bi bi-cash-coin me-1"></i>Bayar GRN
-          </button>
-        @endif
-
-        @if ($receipt->order)
-          <a href="{{ route('purchasing.purchase_orders.show', $receipt->order->id) }}"
-             class="btn btn-ship-primary btn-pill btn-sm">
-            <i class="bi bi-file-earmark-text me-1"></i>Kembali ke PO
+        @if ($canCreateSupplierInvoice)
+          <a href="{{ route('purchasing.supplier_invoices.create', ['purchase_order_id' => $receipt->order->id]) }}"
+             class="btn btn-primary btn-pill btn-sm"
+             title="Buat draft invoice dari GRN Posted">
+            <i class="bi bi-receipt me-1"></i>Buat Invoice Supplier
           </a>
         @endif
-
-        <a href="{{ route('purchasing.purchase_receipts.barcode', $receipt->id) }}"
-           class="btn btn-ship-outline btn-pill btn-sm" target="_blank">
-          <i class="bi bi-upc-scan me-1"></i>Cetak Barcode
-        </a>
 
         @if ($isDraft && $canManage)
           <a href="{{ route('purchasing.purchase_receipts.edit', $receipt->id) }}"
              class="btn btn-ship-outline btn-pill btn-sm">
             <i class="bi bi-pencil me-1"></i>Edit
           </a>
-
-          <form action="{{ route('purchasing.purchase_receipts.destroy', $receipt->id) }}" method="POST"
-                onsubmit="return confirm('Hapus dokumen Draft Penerimaan Barang ini?');" class="d-inline">
-            @csrf
-            @method('DELETE')
-            <button type="submit" class="btn btn-outline-danger btn-sm">
-              <i class="bi bi-trash me-1"></i>Hapus Draft
-            </button>
-          </form>
 
           @if ($isAdmin && !$grnHasPrice)
             <button type="button" class="btn btn-success btn-pill btn-sm disabled"
@@ -341,14 +329,60 @@
           @endif
         @endif
 
-        @if ($canUnpostSafely)
-          <form action="{{ route('purchasing.purchase_receipts.unpost', $receipt->id) }}" method="POST"
-                onsubmit="if(confirm('UNPOST GRN ini? Stok akan dibalik dan jurnal di-void.')){ this.querySelector('button[type=submit]').disabled = true; return true; } return false;">
-            @csrf
-            <button type="submit" class="btn btn-outline-danger btn-pill btn-sm">
-              <i class="bi bi-x me-1"></i>Unpost
+        @if (($isDraft && $canManage) || $isPosted)
+          <div class="dropdown grn-action-menu d-inline-block">
+            <button class="btn btn-ship-outline btn-pill btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Aksi lainnya">
+              <i class="bi bi-three-dots-vertical me-1"></i><span class="d-none d-md-inline">Lainnya</span>
             </button>
-          </form>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+              @if ($canPayReceipt)
+                <li>
+                  <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalGrnPayment">
+                    <i class="bi bi-cash-coin me-2"></i>Bayar GRN
+                  </button>
+                </li>
+              @endif
+              @if ($receipt->order)
+                <li>
+                  <a href="{{ route('purchasing.purchase_orders.show', $receipt->order->id) }}" class="dropdown-item">
+                    <i class="bi bi-file-earmark-text me-2"></i>Kembali ke PO
+                  </a>
+                </li>
+              @endif
+              <li>
+                <a href="{{ route('purchasing.purchase_receipts.barcode', $receipt->id) }}"
+                   class="dropdown-item" target="_blank">
+                  <i class="bi bi-upc-scan me-2"></i>Cetak Barcode
+                </a>
+              </li>
+              @if (($isDraft && $canManage) || $canUnpostSafely)
+                <li><hr class="dropdown-divider"></li>
+              @endif
+              @if ($isDraft && $canManage)
+                <li>
+                  <form action="{{ route('purchasing.purchase_receipts.destroy', $receipt->id) }}" method="POST"
+                        onsubmit="return confirm('Hapus dokumen Draft Penerimaan Barang ini?');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="dropdown-item text-danger">
+                      <i class="bi bi-trash me-2"></i>Hapus Draft
+                    </button>
+                  </form>
+                </li>
+              @endif
+              @if ($canUnpostSafely)
+                <li>
+                  <form action="{{ route('purchasing.purchase_receipts.unpost', $receipt->id) }}" method="POST"
+                        onsubmit="if(confirm('UNPOST GRN ini? Stok akan dibalik dan jurnal di-void.')){ this.querySelector('button[type=submit]').disabled = true; return true; } return false;">
+                    @csrf
+                    <button type="submit" class="dropdown-item text-danger">
+                      <i class="bi bi-x-circle me-2"></i>Unpost GRN
+                    </button>
+                  </form>
+                </li>
+              @endif
+            </ul>
+          </div>
         @endif
       </div>
     </div>
@@ -359,6 +393,24 @@
     @endif
     @if (session('error'))
       <div class="alert alert-danger py-2 mb-3">{{ session('error') }}</div>
+    @endif
+
+    @if ($isDraft)
+      <div class="alert alert-info d-flex align-items-start gap-2 py-2 mb-3" style="font-size:.84rem;">
+        <i class="bi bi-info-circle mt-1" aria-hidden="true"></i>
+        <div>
+          <strong>Draft GRN belum berdampak ke akuntansi.</strong>
+          Stok dan jurnal hutang belum berubah. Setelah qty, reject, gudang, dan harga diverifikasi, gunakan <b>Post GRN</b> untuk mencatat penerimaan.
+        </div>
+      </div>
+    @elseif ($isPosted)
+      <div class="alert alert-success d-flex align-items-start gap-2 py-2 mb-3" style="font-size:.84rem;">
+        <i class="bi bi-check-circle mt-1" aria-hidden="true"></i>
+        <div>
+          <strong>GRN sudah Posted.</strong>
+          Stok dan jurnal hutang sudah tercatat. Pembayaran supplier tetap dilakukan terpisah melalui tahap <b>Bayar</b> atau <b>Offset DP</b>.
+        </div>
+      </div>
     @endif
 
     {{-- WARNING admin: belum bisa post, tanpa menyebut harga --}}
@@ -447,15 +499,15 @@
           </div>
           <div class="text-end">
             <div class="text-muted" style="font-size:.72rem;">Sisa GRN</div>
-            <div class="mono fw-bold {{ ($receiptPaymentOutstanding ?? 0) > 0.0001 ? 'text-danger' : 'text-success' }}">
-              {{ rupiah($receiptPaymentOutstanding ?? 0) }}
-            </div>
+            @if ($isPosted)
+              <div class="mono fw-bold {{ ($receiptPaymentOutstanding ?? 0) > 0.0001 ? 'text-danger' : 'text-success' }}">
+                {{ rupiah($receiptPaymentOutstanding ?? 0) }}
+              </div>
+            @else
+              <div class="mono fw-bold text-muted">—</div>
+              <div class="text-muted" style="font-size:.68rem;">Post GRN dulu</div>
+            @endif
           </div>
-          @if ($canPayReceipt)
-            <button type="button" class="btn btn-sm btn-success btn-pill" data-bs-toggle="modal" data-bs-target="#modalGrnPayment">
-              Bayar Sisa
-            </button>
-          @endif
         </div>
 
         @if ($receipt->payments->whereNull('voided_at')->where('type', 'payment')->isNotEmpty())

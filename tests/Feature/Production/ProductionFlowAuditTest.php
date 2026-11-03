@@ -38,6 +38,172 @@ class ProductionFlowAuditTest extends TestCase
         $this->assertContains('HPP_FORMULA_MISMATCH', $codes);
     }
 
+    public function test_direct_posted_sewing_return_uses_return_lines_without_qc_record(): void
+    {
+        config(['accounting.sewing_return_requires_qc' => false]);
+        $fixture = $this->flowFixture();
+
+        DB::table('qc_results')
+            ->where('sewing_job_id', $fixture['return_id'])
+            ->delete();
+
+        DB::table('inventory_mutations')
+            ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+            ->where('source_type', 'sewing_qc_out')
+            ->update(['source_type' => 'sewing_return_ok']);
+        DB::table('inventory_mutations')
+            ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+            ->where('source_type', 'sewing_qc_in')
+            ->update(['source_type' => 'sewing_return_ok']);
+        DB::table('inventory_mutations')
+            ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+            ->where('source_type', 'sewing_qc_reject')
+            ->update(['source_type' => 'sewing_return_reject']);
+
+        $report = app(ProductionFlowAuditService::class)->audit($fixture['bundle_id']);
+
+        $this->assertSame('PASS', $report['summary']['status']);
+        $this->assertSame(0, $report['summary']['issues']);
+        $this->assertSame([], $report['unassigned_movements']);
+    }
+
+    public function test_audit_excludes_voided_pickup_line_when_stock_is_reversed(): void
+    {
+        $fixture = $this->flowFixture();
+
+        DB::table('sewing_pickup_lines')
+            ->where('id', $fixture['pickup_line_id'])
+            ->update([
+                'status' => 'void',
+                'qty_returned_ok' => 0,
+                'qty_returned_reject' => 0,
+            ]);
+
+        DB::table('sewing_returns')
+            ->where('id', $fixture['return_id'])
+            ->update(['status' => 'void']);
+
+        DB::table('sewing_return_lines')
+            ->where('sewing_return_id', $fixture['return_id'])
+            ->delete();
+
+        DB::table('qc_results')
+            ->where('sewing_job_id', $fixture['return_id'])
+            ->delete();
+
+        DB::table('inventory_mutations')
+            ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+            ->where('source_id', $fixture['return_id'])
+            ->whereIn('source_type', ['sewing_qc_out', 'sewing_qc_in', 'sewing_qc_reject'])
+            ->delete();
+
+        // Reversal line: WIP-CUT menerima kembali 10 pcs dan WIP-SEW
+        // mengeluarkan kembali 10 pcs dengan source yang sama.
+        foreach ([
+            [$fixture['wip_cut_id'], 10, 'in'],
+            [$fixture['wip_sew_id'], -10, 'out'],
+        ] as [$warehouseId, $qty, $direction]) {
+            DB::table('inventory_mutations')->insert([
+                'date' => '2026-09-02',
+                'warehouse_id' => $warehouseId,
+                'item_id' => $fixture['item_id'],
+                'qty_change' => $qty,
+                'direction' => $direction,
+                'source_type' => 'App\\Models\\SewingPickup',
+                'source_id' => $fixture['pickup_id'],
+                'cutting_job_bundle_id' => $fixture['bundle_id'],
+                'unit_cost' => 105,
+                'total_cost' => $qty * 105,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $report = app(ProductionFlowAuditService::class)->audit($fixture['bundle_id']);
+        $codes = collect($report['issues'])->pluck('code')->all();
+
+        $this->assertSame('PASS', $report['summary']['status']);
+        $this->assertNotContains('PICKUP_WIP_CUT_QTY_MISMATCH', $codes);
+        $this->assertNotContains('PICKUP_WIP_SEW_QTY_MISMATCH', $codes);
+    }
+
+    public function test_audit_accounts_for_sewing_pickup_reject_as_direct_rej_sew_flow(): void
+    {
+        $fixture = $this->flowFixture();
+
+        DB::table('sewing_pickup_lines')
+            ->where('id', $fixture['pickup_line_id'])
+            ->update([
+                'qty_bundle' => 8,
+                'qty_rejected' => 2,
+                'qty_returned_ok' => 6,
+                'qty_returned_reject' => 2,
+            ]);
+        DB::table('sewing_return_lines')
+            ->where('sewing_pickup_line_id', $fixture['pickup_line_id'])
+            ->update(['qty_ok' => 6, 'qty_reject' => 2]);
+        DB::table('qc_results')
+            ->where('sewing_job_id', $fixture['return_id'])
+            ->update(['qty_ok' => 6, 'qty_reject' => 2]);
+
+        DB::table('inventory_mutations')
+            ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+            ->where('source_type', 'App\\Models\\SewingPickup')
+            ->where('warehouse_id', $fixture['wip_cut_id'])
+            ->update(['qty_change' => -8, 'total_cost' => -840]);
+        DB::table('inventory_mutations')
+            ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+            ->where('source_type', 'App\\Models\\SewingPickup')
+            ->where('warehouse_id', $fixture['wip_sew_id'])
+            ->update(['qty_change' => 8, 'total_cost' => 840]);
+        DB::table('inventory_mutations')
+            ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+            ->where('source_type', 'sewing_qc_out')
+            ->update(['qty_change' => -8, 'total_cost' => -840]);
+        DB::table('inventory_mutations')
+            ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+            ->where('source_type', 'sewing_qc_in')
+            ->update(['qty_change' => 6, 'total_cost' => 630]);
+        DB::table('inventory_mutations')->insert([
+            [
+                'date' => '2026-09-02',
+                'warehouse_id' => $fixture['wip_cut_id'],
+                'item_id' => $fixture['item_id'],
+                'qty_change' => -2,
+                'direction' => 'out',
+                'source_type' => 'sewing_pickup_reject',
+                'source_id' => $fixture['pickup_id'],
+                'source_line_id' => $fixture['pickup_line_id'],
+                'cutting_job_bundle_id' => $fixture['bundle_id'],
+                'unit_cost' => 100,
+                'total_cost' => -200,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'date' => '2026-09-02',
+                'warehouse_id' => $fixture['rej_sew_id'],
+                'item_id' => $fixture['item_id'],
+                'qty_change' => 2,
+                'direction' => 'in',
+                'source_type' => 'sewing_pickup_reject',
+                'source_id' => $fixture['pickup_id'],
+                'source_line_id' => $fixture['pickup_line_id'],
+                'cutting_job_bundle_id' => $fixture['bundle_id'],
+                'unit_cost' => 100,
+                'total_cost' => 200,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $report = app(ProductionFlowAuditService::class)->audit($fixture['bundle_id']);
+
+        $this->assertSame('PASS', $report['summary']['status']);
+        $this->assertSame(0, $report['summary']['issues']);
+        $this->assertSame([], $report['unassigned_movements']);
+    }
+
     private function flowFixture(): array
     {
         $warehouses = [];
@@ -194,6 +360,15 @@ class ProductionFlowAuditTest extends TestCase
             ]);
         }
 
-        return ['bundle_id' => $bundleId];
+        return [
+            'bundle_id' => $bundleId,
+            'pickup_id' => $pickupId,
+            'pickup_line_id' => $pickupLineId,
+            'return_id' => $returnId,
+            'item_id' => $itemId,
+            'wip_cut_id' => $warehouses['WIP-CUT'],
+            'wip_sew_id' => $warehouses['WIP-SEW'],
+            'rej_sew_id' => $warehouses['REJ-SEW'],
+        ];
     }
 }

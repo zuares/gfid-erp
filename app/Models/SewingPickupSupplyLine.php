@@ -17,16 +17,19 @@ class SewingPickupSupplyLine extends Model
         'stock_available_snapshot',
         'pending_cost',
         'issued_unit_cost',
+        'stock_shortage_qty',
+        'stock_shortage_status',
     ];
 
     protected $casts = [
-        'required_qty'             => 'float',
-        'issued_qty'               => 'float',
-        'required_pcs'             => 'float',
-        'issued_pcs'               => 'float',
+        'required_qty' => 'float',
+        'issued_qty' => 'float',
+        'required_pcs' => 'float',
+        'issued_pcs' => 'float',
         'stock_available_snapshot' => 'float',
-        'pending_cost'             => 'boolean',
-        'issued_unit_cost'         => 'float',
+        'pending_cost' => 'boolean',
+        'issued_unit_cost' => 'float',
+        'stock_shortage_qty' => 'float',
     ];
 
     public function pickup()

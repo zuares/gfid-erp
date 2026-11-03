@@ -623,6 +623,22 @@
     .qcs-row-cancelled .qcs-item-code {
         color: var(--gf-warn);
     }
+    .qcs-row-corrected {
+        background: rgba(220,38,38,.045) !important;
+    }
+    .qcs-row-corrected .qcs-item-code {
+        color: var(--gf-rej);
+    }
+    .qcs-correction-note {
+        margin-top: 5px;
+        padding: 5px 7px;
+        border-radius: 7px;
+        background: var(--gf-rej-soft);
+        color: var(--gf-rej);
+        font-size: 10px;
+        line-height: 1.35;
+        font-weight: 700;
+    }
 
     /* ── Summary card ────────────────────────────────── */
     .qcs-summary {
@@ -965,6 +981,77 @@
         padding: 1rem 1.25rem;
         margin-bottom: .75rem;
     }
+    /* Financial accordions keep the same compact behavior on desktop and
+       mobile even though the generic QC card rules appear later in this file. */
+    .qc-cutting-page .qcs-financial-section {
+        padding: 0;
+        overflow: hidden;
+    }
+    .qc-cutting-page .qcs-financial-section > summary {
+        padding: 1rem 1.25rem;
+    }
+    .qc-cutting-page .qcs-financial-body {
+        padding: 0 1.25rem 1rem;
+    }
+    .qcs-reject-subsection {
+        margin-top: .85rem;
+        border: 1px solid rgba(220, 38, 38, .16);
+        border-radius: 10px;
+        overflow: hidden;
+        background: rgba(220, 38, 38, .02);
+    }
+    .qcs-reject-subsection > summary {
+        list-style: none;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: .75rem;
+        padding: .75rem .85rem;
+        background: rgba(220, 38, 38, .045);
+    }
+    .qcs-reject-subsection > summary::-webkit-details-marker { display: none; }
+    .qcs-reject-subsection > summary::after {
+        content: '⌄';
+        margin-left: auto;
+        color: var(--gf-mid);
+        font-size: .95rem;
+        font-weight: 900;
+        line-height: 1;
+        transition: transform .15s ease;
+    }
+    .qcs-reject-subsection[open] > summary::after { transform: rotate(180deg); }
+    .qcs-reject-title {
+        color: #b91c1c;
+        font-size: .78rem;
+        font-weight: 900;
+    }
+    .qcs-reject-body { padding: .8rem .85rem .85rem; }
+    .qcs-reject-empty-note {
+        display: flex;
+        align-items: flex-start;
+        gap: .55rem;
+        margin-top: .85rem;
+        padding: .65rem .75rem;
+        border: 1px solid rgba(22, 163, 74, .16);
+        border-radius: 9px;
+        background: rgba(22, 163, 74, .04);
+        color: var(--gf-mid);
+        font-size: .7rem;
+        line-height: 1.4;
+    }
+    .qcs-reject-empty-note > i {
+        color: #15803d;
+        font-size: .85rem;
+        line-height: 1.1;
+    }
+    .qcs-reject-empty-note strong {
+        display: block;
+        color: #166534;
+        font-size: .72rem;
+        font-weight: 900;
+    }
+    .qcs-reject-empty-note span { display: block; margin-top: .1rem; }
     .qcs-section-title {
         font-size: .78rem;
         font-weight: 700;
@@ -1051,6 +1138,161 @@
     }
 
     /* ── Mobile ──────────────────────────────────────── */
+    /* Section finansial & ringkasan: behavior sama dengan detail Cutting Job. */
+    .qcs-financial-section {
+        padding: 0;
+        overflow: hidden;
+    }
+    .qcs-financial-section > summary {
+        list-style: none;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: .75rem;
+        padding: 1rem 1.25rem;
+    }
+    .qcs-financial-section > summary::-webkit-details-marker { display: none; }
+    .qcs-financial-section > summary::after {
+        content: '⌄';
+        margin-left: auto;
+        color: var(--gf-mid);
+        font-size: 1rem;
+        font-weight: 900;
+        line-height: 1;
+        transition: transform .15s ease;
+    }
+    .qcs-financial-section[open] > summary::after { transform: rotate(180deg); }
+    .qcs-financial-title {
+        color: var(--gf-ink);
+        font-size: .82rem;
+        font-weight: 900;
+    }
+    .qcs-financial-subtitle {
+        color: var(--gf-mid);
+        font-size: .72rem;
+        line-height: 1.35;
+        margin-top: .15rem;
+    }
+    .qcs-financial-body { padding: 0 1.25rem 1rem; }
+    .qcs-material-subsection {
+        overflow: hidden;
+        border: 1px solid var(--gf-line);
+        border-radius: 10px;
+        background: var(--gf-white);
+    }
+    .qcs-material-subsection + .qcs-material-subsection { margin-top: .85rem; }
+    .qcs-material-subsection-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: .75rem;
+        padding: .75rem .85rem;
+        background: rgba(148, 163, 184, .045);
+        border-bottom: 1px solid var(--gf-line);
+    }
+    .qcs-material-subsection-bom .qcs-material-subsection-head {
+        background: rgba(245, 158, 11, .045);
+        border-bottom-color: rgba(245, 158, 11, .18);
+    }
+    .qcs-material-subsection-bom .qcs-financial-title { color: #b45309; }
+    .qcs-material-subsection-body { padding: .85rem; }
+    .qcs-financial-section.accounting-section > summary {
+        background: rgba(20, 184, 166, .045);
+        border-bottom: 1px solid rgba(20, 184, 166, .14);
+    }
+    .qcs-financial-section.accounting-section .qcs-financial-title { color: #0f766e; }
+    .qcs-financial-section.hpp-section > summary {
+        background: rgba(37, 99, 235, .045);
+        border-bottom: 1px solid rgba(37, 99, 235, .14);
+    }
+    .qcs-financial-section.hpp-section .qcs-financial-title { color: #1d4ed8; }
+    .qcs-financial-section.summary-section > summary {
+        background: rgba(148, 163, 184, .045);
+        border-bottom: 1px solid rgba(148, 163, 184, .16);
+    }
+    .qcs-financial-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+        gap: .7rem;
+    }
+    .qcs-financial-stat {
+        min-width: 0;
+        padding: .42rem .52rem;
+        border: 1px solid var(--gf-line);
+        border-radius: 9px;
+        background: var(--gf-soft);
+    }
+    .qcs-financial-stat-label {
+        color: var(--gf-mid);
+        font-size: .62rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .qcs-financial-stat-value {
+        color: var(--gf-ink);
+        font-family: var(--gf-mono);
+        font-size: .82rem;
+        font-weight: 800;
+        margin-top: .08rem;
+    }
+    .qcs-financial-table {
+        font-size: .72rem;
+        width: 100%;
+    }
+    .qcs-financial-table th {
+        color: var(--gf-mid);
+        font-size: .62rem;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .qcs-financial-table td,
+    .qcs-financial-table th { padding: .38rem .42rem; vertical-align: middle; }
+    .qcs-financial-table .unit-muted {
+        color: var(--gf-mid);
+        font-size: .6rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+    .lot-inventory-balance {
+        display: inline-block;
+        margin-top: .12rem;
+        color: #0f766e;
+        font-family: var(--gf-mono);
+        font-size: .72rem;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+    body[data-theme="dark"] .lot-inventory-balance { color: #5eead4; }
+    .qcs-financial-note {
+        color: var(--gf-mid);
+        font-size: .68rem;
+        line-height: 1.4;
+    }
+    .qcs-accounting-explainer {
+        border: 1px solid rgba(37, 99, 235, .15);
+        border-radius: 9px;
+        background: rgba(239, 246, 255, .55);
+        color: var(--gf-mid);
+        font-size: .68rem;
+        line-height: 1.45;
+        padding: .5rem .65rem;
+    }
+    .qcs-internal-trace {
+        border-top: 1px solid var(--gf-line);
+    }
+    body[data-theme="dark"] .qcs-accounting-explainer {
+        background: rgba(30, 58, 138, .18);
+        border-color: rgba(96, 165, 250, .25);
+    }
+
+    @media (max-width: 767.98px) {
+        .qcs-financial-section > summary { padding: .75rem .85rem; }
+        .qcs-financial-body { padding: 0 .85rem .75rem; }
+        .qcs-financial-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+        .qcs-financial-table { min-width: 560px; }
+    }
+
     @media (max-width: 767.98px) {
         .qc-cutting-page .page-wrap {
             padding: 0 8px 96px;
@@ -1216,10 +1458,6 @@
             font-size: 17px;
         }
 
-        .qcs-lot-usage-section {
-            display: none;
-        }
-
         .qcs-action-bar {
             padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
             box-shadow: none;
@@ -1366,6 +1604,9 @@
         .qcs-page-title { font-size: 1rem; }
         .qcs-section { padding: .7rem .85rem; border-radius: 12px; }
         .qcs-qty-input { width: 64px !important; min-height: 34px; }
+        .qc-cutting-page .qcs-financial-section { padding: 0; }
+        .qc-cutting-page .qcs-financial-section > summary { padding: .75rem .85rem; }
+        .qc-cutting-page .qcs-financial-body { padding: 0 .85rem .75rem; }
     }
 </style>
 @endpush
@@ -1382,7 +1623,7 @@
             : (auth()->user()?->name ?: 'User login');
 
         $userRole = auth()->user()->role ?? null;
-        $isOwner = $userRole === 'owner';
+        $isOwner = auth()->user()?->isOwner() ?? false;
         $isErrorBag = $errors instanceof \Illuminate\Support\ViewErrorBag;
 
         $defaultQcDate = old('qc_date', optional($cuttingJob->qc_date ?? ($cuttingJob->date ?? now()))->toDateString());
@@ -1431,6 +1672,22 @@
             $hasExistingQc &&
             in_array($cuttingJob->status, ['qc_done', 'qc_ok', 'qc_mixed', 'qc_reject'], true) &&
             Route::has('production.qc.cutting.bundle_adjust');
+
+        $totalQtyPcs = (float) collect($rows)->sum('qty_pcs');
+        $totalUsedFabric = (float) $jobLots->sum('used_fabric_qty');
+        if ($totalUsedFabric <= 0) {
+            $totalUsedFabric = (float) collect($rows)->sum('qty_used_fabric');
+        }
+        $fabricPerPcs = $totalQtyPcs > 0 ? $totalUsedFabric / $totalQtyPcs : 0.0;
+        $accountingTypeLabel = function (string $sourceType): string {
+            return match (true) {
+                str_starts_with($sourceType, 'cutting_job_wage') => 'Upah cutting',
+                                str_starts_with($sourceType, 'cutting_qc_sewing_supply') => 'Auto BOM kelengkapan jahit',
+                str_starts_with($sourceType, 'cutting_wip') => 'QC → WIP cutting',
+                str_starts_with($sourceType, 'cutting_job') => 'Bahan baku → WIP',
+                default => $sourceType,
+            };
+        };
     @endphp
 
     <div class="qc-cutting-page">
@@ -1631,6 +1888,8 @@
 
                                         $st = $row['status'] ?: 'cut';
                                         $isPartialCancelled = (bool) ($row['is_partial_cancelled'] ?? false);
+                                        $isCorrected = (bool) ($row['is_corrected'] ?? false);
+                                        $isPosted = ((bool) ($row['is_posted'] ?? false) && !$isPartialCancelled) || $isCorrected;
                                         $stBadge = [
                                             'cut' => 'secondary',
                                             'qc_ok' => 'success',
@@ -1641,18 +1900,23 @@
                                         if ($isPartialCancelled) {
                                             $stBadge = 'warning';
                                         }
-                                        $stLabel = $isPartialCancelled ? 'Dibatalkan QC' : $st;
+                                        if ($isCorrected) {
+                                            $stBadge = 'danger';
+                                        }
+                                        $stLabel = $isCorrected ? 'Dikoreksi ke bahan baku' : ($isPartialCancelled ? 'Dibatalkan QC' : $st);
 
                                         $modalId = 'qcAdjustModal_' . $bundleId;
                                     @endphp
 
-                                    <tr class="{{ $qtyReject > 0 ? 'row-has-reject ' : '' }}{{ $isPartialCancelled ? 'qcs-row-cancelled' : '' }}" data-bundle-id="{{ $bundleId }}">
+                                    <tr class="{{ $qtyReject > 0 ? 'row-has-reject ' : '' }}{{ $isPartialCancelled ? 'qcs-row-cancelled ' : '' }}{{ $isCorrected ? 'qcs-row-corrected' : '' }}" data-bundle-id="{{ $bundleId }}">
                                         <td style="text-align:center; vertical-align:middle;">
-                                            <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
-                                                value="{{ $bundleId }}">
-                                            <input type="hidden" name="results[{{ $i }}][qty_ok]"
-                                                class="input-ok-hidden" value="{{ old("results.$i.qty_ok", $qtyOkCalc) }}">
-                                            <input type="checkbox" class="form-check-input bundle-check" style="cursor:pointer">
+                                            @if (!$isCorrected)
+                                                <input type="hidden" name="results[{{ $i }}][cutting_job_bundle_id]"
+                                                    value="{{ $bundleId }}">
+                                                <input type="hidden" name="results[{{ $i }}][qty_ok]"
+                                                    class="input-ok-hidden" value="{{ old("results.$i.qty_ok", $qtyOkCalc) }}">
+                                            @endif
+                                            <input type="checkbox" class="form-check-input bundle-check" style="cursor:pointer" {{ $isCorrected ? 'disabled' : '' }}>
                                         </td>
                                         <td>
                                             <span class="qcs-bundle-pill">#{{ $i + 1 }}</span>
@@ -1665,6 +1929,14 @@
                                         <td>
                                             <div class="qcs-item-code">{{ $row['item_code'] }}</div>
                                             <div class="qcs-item-name qcs-hide-mobile">{{ $row['item_name'] ?? '' }}</div>
+                                            @if ($isCorrected)
+                                                <div class="qcs-correction-note" role="status">
+                                                    Dikoreksi ke bahan baku
+                                                    @if (!empty($row['replacement_item_code']))
+                                                        · item baru {{ $row['replacement_item_code'] }}
+                                                    @endif
+                                                </div>
+                                            @endif
                                             @if ($isPartialCancelled)
                                                 <div class="qcs-lot-ref" style="color:var(--gf-warn);font-weight:800;">Menunggu item pengganti</div>
                                             @endif
@@ -1687,6 +1959,7 @@
                                                 class="qcs-qty-input is-reject input-reject {{ $rejectError ? 'is-invalid' : '' }}"
                                                 value="{{ old("results.$i.qty_reject", $qtyReject) }}"
                                                 data-bundle="{{ $bundleQty }}"
+                                                {{ $isPosted ? 'readonly' : '' }} {{ $isCorrected ? 'disabled' : '' }}
                                                 onfocus="this.select()">
                                             @if ($rejectError)
                                                 <div class="qcs-error-text" style="font-size:10px;">{{ $rejectError }}</div>
@@ -1702,7 +1975,7 @@
                                                 class="qcs-notes-input {{ $notesError ? 'is-invalid' : '' }}"
                                                 value="{{ old("results.$i.notes", $row['notes'] ?? '') }}"
                                                 placeholder="catatan"
-                                                maxlength="200">
+                                                maxlength="200" {{ $isPosted ? 'readonly' : '' }} {{ $isCorrected ? 'disabled' : '' }}>
                                             @if ($notesError)
                                                 <div class="qcs-error-text" style="font-size:10px;">{{ $notesError }}</div>
                                             @endif
@@ -1815,6 +2088,21 @@
                                                     </button>
                                                 @endif
 
+                                                @if (($row['can_correct_to_raw'] ?? false) && Route::has('production.qc.cutting.bundle_correct_to_raw'))
+                                                    <button type="button" class="qcs-row-btn qcs-row-action qcs-row-action-danger"
+                                                        title="Koreksi bundle dan kembalikan bahan baku"
+                                                        data-bs-toggle="modal" data-bs-target="#qcCorrectToRawModal_{{ $bundleId }}">
+                                                        <span class="qcs-action-icon">↶</span>
+                                                        <span class="qcs-action-text">Koreksi</span>
+                                                    </button>
+                                                @endif
+
+                                                @if ($isCorrected)
+                                                    <span class="qcs-badge qcs-badge-danger" title="Bahan sudah dikembalikan ke LOT asal">
+                                                        Bahan dikembalikan
+                                                    </span>
+                                                @endif
+
                                                 @if (($row['can_update_item'] ?? false) && Route::has('production.qc.cutting.bundle_update_item'))
                                                     <button type="button" class="qcs-row-btn qcs-row-action qcs-row-action-primary"
                                                         title="Ganti item bundle"
@@ -1870,25 +2158,58 @@
                     </div>
                 </section>
 
-                {{-- MULTI-LOT --}}
-                @if ($jobLots->count() > 0)
-                    <section class="qcs-section qcs-lot-usage-section" style="padding:0;overflow:hidden;">
-                        <div style="padding:16px 16px 0;">
-                            <div class="qcs-section-title" style="margin-bottom:0;">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
-                                Pemakaian Kain per LOT
+                {{-- PEMAKAIAN MATERIAL PRODUKSI --}}
+                @if ($jobLots->count() > 0 || ($isOwner && ($cuttingQcAutoBomEnabled ?? false)))
+                    <details class="qcs-section qcs-financial-section qcs-material-consumption-section">
+                        <summary>
+                            <div>
+                                <div class="qcs-financial-title"><i class="bi bi-box-seam me-1" aria-hidden="true"></i> Pemakaian Material Produksi</div>
+                                <div class="qcs-financial-subtitle">Pemakaian kain per LOT dan Auto BOM kelengkapan jahit dalam satu ringkasan material.</div>
                             </div>
-                        </div>
+                            <span class="qcs-badge qcs-badge-primary">{{ $jobLots->count() }} LOT · {{ ($cuttingQcAutoBomRows ?? collect())->count() }} item BOM</span>
+                        </summary>
+                        <div class="qcs-financial-body">
+                            @if ($jobLots->count() > 0)
+                            <div class="qcs-material-subsection">
+                                <div class="qcs-material-subsection-head">
+                                    <div>
+                                        <div class="qcs-financial-title"><i class="bi bi-box-seam me-1" aria-hidden="true"></i> Pemakaian Kain per LOT</div>
+                                        <div class="qcs-financial-subtitle">Rencana berasal dari input bundle atau BOM main material; jika BOM tidak ada, sistem memakai fallback distribusi saldo LOT.</div>
+                                    </div>
+                                    <span class="qcs-badge qcs-badge-primary">{{ $jobLots->count() }} LOT</span>
+                                </div>
+                            <div class="qcs-financial-grid mb-2">
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Stok RM tersedia</div>
+                                    <div class="qcs-financial-stat-value" id="lot-stock-before-total">{{ number_format((float) collect($lotStockBeforeById ?? [])->sum(), 2, ',', '.') }} Kg</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Total kebutuhan</div>
+                                    <div class="qcs-financial-stat-value" id="lot-planned-total">{{ number_format((float) $jobLots->sum('planned_fabric_qty'), 2, ',', '.') }} Kg</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Qty dipakai</div>
+                                    <div class="qcs-financial-stat-value" id="lot-used-total">{{ number_format($totalUsedFabric, 2, ',', '.') }} Kg</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Est. sisa stok</div>
+                                    <div class="qcs-financial-stat-value text-primary" id="lot-current-total">{{ number_format((float) collect($lotInventoryNowById ?? [])->sum(), 2, ',', '.') }} Kg</div>
+                                </div>
+                            </div>
+                            <div class="qcs-financial-note mb-2">Menampilkan saldo Inventory aktual setelah mutasi produksi.</div>
 
                         <div class="qcs-table-wrap">
-                            <table class="qcs-table">
+                            <table class="table table-sm align-middle qcs-financial-table mb-0">
                                 <thead>
                                     <tr>
-                                        <th style="text-align:left;width:150px;">LOT</th>
-                                        <th class="qcs-hide-mobile" style="text-align:left">Item</th>
-                                        <th style="text-align:right;width:130px;">Rencana</th>
-                                        <th style="text-align:right;width:150px;">Dipakai (QC)</th>
-                                        <th class="qcs-hide-mobile" style="text-align:right;width:130px;">Est. Sisa</th>
+                                        <th>Material / LOT</th>
+                                        <th class="text-end">Stok RM tersedia</th>
+                                        <th class="text-end">Stok RM / pcs</th>
+                                        <th class="text-end">Qty OK</th>
+                                        <th class="text-end">Total kebutuhan</th>
+                                        <th class="text-end">Rp / pcs</th>
+                                        <th class="text-end">Total HPP</th>
+                                        <th class="text-end">Est. sisa stok</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1908,7 +2229,15 @@
                                             if ($planned > 0 && $used > $planned) {
                                                 $used = $planned;
                                             }
-                                            $balance = $planned - $used;
+                                            $stockBefore = (float) ($lotStockBeforeById[$jobLot->lot_id] ?? ((float) ($lotModel?->qty_onhand ?? 0) + (float) ($jobLot->used_fabric_qty ?? 0)));
+                                            $lotQtyPcs = (float) $cuttingJob->bundles
+                                                ->where('lot_id', $jobLot->lot_id)
+                                                ->sum('qty_pcs');
+                                            $stockBeforePerPcs = $lotQtyPcs > 0 ? $stockBefore / $lotQtyPcs : 0;
+                                            $lotQtyOk = (float) ($lotQtyOkById[$jobLot->lot_id] ?? 0);
+                                            $lotUnitCost = (float) ($lotModel?->avg_cost ?: ($lotModel?->item?->effective_unit_cost ?? 0));
+                                            $lotTotalCost = round($used * $lotUnitCost, 2);
+                                            $lotCostPerPcs = $lotQtyPcs > 0 ? round($lotTotalCost / $lotQtyPcs, 2) : 0;
 
                                             $fieldUsed = "lots.$j.used_fabric_qty";
                                             $usedError = $isErrorBag ? $errors->first($fieldUsed) : null;
@@ -1919,37 +2248,40 @@
                                                 value="{{ $jobLot->id }}">
 
                                             <td>
-                                                <div class="qcs-item-code qcs-hide-mobile">{{ $lotModel?->code ?? 'LOT ?' }}</div>
-                                                <div style="display:none;" class="qcs-item-name" id="lot-mobile-{{ $j }}">{{ $lotModel?->item?->name ?? '-' }}</div>
-                                                <div class="qcs-lot-ref qcs-hide-mobile">{{ $lotModel?->item?->code ?? '-' }}</div>
-                                                {{-- Mobile --}}
-                                                <div class="qcs-item-name" style="display:none;" id="lot-mobile-name-{{ $j }}">{{ $lotModel?->item?->name ?? '-' }}</div>
-                                                <div class="qcs-lot-ref" style="font-size:10px;">
-                                                    <span class="qcs-hide-mobile" style="display:none;">{{ $lotModel?->code ?? '-' }} · {{ $lotModel?->item?->code ?? '-' }}</span>
-                                                </div>
+                                                <div class="fw-semibold">{{ $lotModel?->code ?? 'LOT ?' }}</div>
+                                                <div class="qcs-financial-note">{{ $lotModel?->item?->code ?? '-' }} · {{ $lotModel?->item?->name ?? '-' }}</div>
                                             </td>
 
-                                            <td class="qcs-hide-mobile">
-                                                <div class="qcs-item-name">{{ $lotModel?->item?->name ?? '-' }}</div>
-                                                <div class="qcs-lot-ref">Gudang {{ $warehouse?->code ?? '-' }}</div>
+                                            <td class="text-end font-monospace">{{ number_format($stockBefore, 2, ',', '.') }} Kg</td>
+
+                                            <td class="text-end font-monospace">
+                                                <div>{{ $lotQtyPcs > 0 ? number_format($stockBeforePerPcs, 4, ',', '.') . ' Kg' : '-' }}</div>
                                             </td>
 
-                                            <td style="text-align:right">
-                                                <span class="qcs-qty-display" style="font-size:13px;">{{ number_format($planned, 2, ',', '.') }}</span>
-                                            </td>
+                                            <td class="text-end font-monospace">{{ number_format($lotQtyOk, 2, ',', '.') }} pcs</td>
 
-                                            <td style="text-align:right">
+                                            <td class="text-end">
                                                 <x-number-input name="lots[{{ $j }}][used_fabric_qty]"
                                                     mode="decimal" :value="$used" decimals="2" min="0"
                                                     class="qcs-lot-input input-lot-used {{ $usedError ? 'is-invalid' : '' }}"
-                                                    data-planned="{{ $planned }}" />
+                                                    data-planned="{{ $planned }}"
+                                                    data-stock-before="{{ $stockBefore }}" />
+                                                <div class="unit-muted">Kg</div>
                                                 @if ($usedError)
                                                     <div class="qcs-error-text" style="font-size:10px;">{{ $usedError }}</div>
                                                 @endif
                                             </td>
 
-                                            <td class="qcs-hide-mobile" style="text-align:right">
-                                                <span class="qcs-qty-display lot-balance-desktop" style="font-size:13px;">{{ number_format($balance, 2, ',', '.') }}</span>
+                                            <td class="text-end font-monospace">
+                                                Rp {{ number_format($lotCostPerPcs, 0, ',', '.') }}
+                                            </td>
+
+                                            <td class="text-end font-monospace fw-semibold">
+                                                Rp {{ number_format($lotTotalCost, 0, ',', '.') }}
+                                            </td>
+
+                                            <td class="text-end font-monospace">
+                                                <div class="lot-inventory-balance">{{ number_format((float) ($lotInventoryNowById[$jobLot->lot_id] ?? ($lotModel?->qty_onhand ?? 0)), 2, ',', '.') }} Kg</div>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -1957,7 +2289,7 @@
                             </table>
                         </div>
 
-                        <div style="padding:0 16px 12px;">
+                        <div class="mt-2">
                             @php $lotsError = $isErrorBag ? $errors->first('lots') : null; @endphp
                             @if ($lotsError)
                                 <div class="qcs-error-text">{{ $lotsError }}</div>
@@ -1967,10 +2299,533 @@
                                 ⚠️ Pemakaian per LOT tidak boleh melebihi qty rencana. Nilai otomatis dikunci ke batas maksimum.
                             </div>
                         </div>
-                    </section>
+                        </div>
+                            @endif
+
+                        @if ($isOwner && ($cuttingQcAutoBomEnabled ?? false))
+                            <div class="qcs-material-subsection qcs-material-subsection-bom">
+                                <div class="qcs-material-subsection-head">
+                                    <div>
+                                        <div class="qcs-financial-title"><i class="bi bi-box-arrow-down me-1" aria-hidden="true"></i> Auto BOM Kelengkapan Jahit</div>
+                                        <div class="qcs-financial-subtitle">Saat QC disimpan, BOM <code>sewing_supply</code> dipotong dari RM berdasarkan Qty OK.</div>
+                                    </div>
+                                    <span class="qcs-badge qcs-badge-warning">AKTIF · {{ ($cuttingQcAutoBomRows ?? collect())->count() }} item</span>
+                                </div>
+                                <div class="qcs-material-subsection-body">
+                                    <div class="qcs-alert qcs-alert-info mb-0">
+                                        Qty reject tidak mengonsumsi kelengkapan jahit. Posting memakai lot RM FIFO yang memiliki saldo dan HPP; jika lot asal atau HPP tidak dapat ditelusuri, posting dihentikan agar tidak membuat jurnal tanpa jejak. Sewing Pickup tidak memotong BOM lagi.
+                                    </div>
+                                    @if (($cuttingQcAutoBomRows ?? collect())->isEmpty())
+                                        <div class="qcs-financial-note mt-2">Belum ada BOM <code>sewing_supply</code> aktif untuk item pada Cutting Job ini.</div>
+                                    @else
+                                        <div class="qcs-financial-note mt-2">Stok RM sebelum QC memperhitungkan net pemakaian Auto BOM job ini. Untuk QC yang belum diposting, nilainya sama dengan stok RM sekarang.</div>
+                                        <div class="qcs-table-wrap mt-2">
+                                            <table class="table table-sm align-middle qcs-financial-table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Material</th>
+                                                        <th class="text-end">Stok RM sebelum QC</th>
+                                                        <th class="text-end">BOM / pcs</th>
+                                                        <th class="text-end">Qty OK</th>
+                                                        <th class="text-end">Total kebutuhan</th>
+                                                        <th class="text-end">Rp / pcs</th>
+                                                        <th class="text-end">Total HPP</th>
+                                                        <th class="text-end">Est. sisa stok</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($cuttingQcAutoBomRows as $bomRow)
+                                                        <tr>
+                                                            <td>
+                                                                <div class="fw-semibold">{{ $bomRow['material_code'] }}</div>
+                                                                <div class="qcs-financial-note">{{ $bomRow['material_name'] }}</div>
+                                                            </td>
+                                                            <td class="text-end font-monospace">
+                                                                {{ number_format($bomRow['stock_before_qc_qty'] ?? $bomRow['available_qty'], 4, ',', '.') }} {{ $bomRow['uom'] }}
+                                                                <div class="qcs-financial-note">Sekarang: {{ number_format($bomRow['stock_now_qty'] ?? $bomRow['available_qty'], 4, ',', '.') }} {{ $bomRow['uom'] }}</div>
+                                                            </td>
+                                                            <td class="text-end font-monospace">{{ number_format($bomRow['qty_per_pcs'], 4, ',', '.') }} {{ $bomRow['uom'] }}</td>
+                                                            <td class="text-end font-monospace">{{ number_format($bomRow['qty_ok'], 2, ',', '.') }} pcs</td>
+                                                            <td class="text-end font-monospace fw-semibold">{{ number_format($bomRow['required_qty'], 4, ',', '.') }} {{ $bomRow['uom'] }}</td>
+                                                            <td class="text-end font-monospace">Rp {{ number_format($bomRow['cost_per_pcs'] ?? 0, 0, ',', '.') }}</td>
+                                                            <td class="text-end font-monospace fw-semibold">Rp {{ number_format($bomRow['total_cost'] ?? 0, 0, ',', '.') }}</td>
+                                                            <td class="text-end font-monospace fw-semibold {{ $bomRow['estimated_balance_qty'] < 0 ? 'text-danger' : 'text-success' }}">
+                                                                {{ number_format($bomRow['estimated_balance_qty'], 4, ',', '.') }} {{ $bomRow['uom'] }}
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @endif
+
+                                    @if (($cuttingQcBomLotRows ?? collect())->isNotEmpty())
+                                        <div class="qcs-financial-note mt-3 mb-2">Jejak lot aktual — termasuk mutasi reversal/return bila pernah dilakukan.</div>
+                                        <div class="qcs-table-wrap">
+                                            <table class="table table-sm align-middle qcs-financial-table mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Material</th>
+                                                        <th>LOT</th>
+                                                        <th class="text-end">Qty</th>
+                                                        <th class="text-end">Rp / unit</th>
+                                                        <th class="text-end">Nilai</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($cuttingQcBomLotRows as $lotRow)
+                                                        <tr>
+                                                            <td>
+                                                                <div class="fw-semibold">{{ $lotRow['item_code'] }}</div>
+                                                                <div class="qcs-financial-note">{{ $lotRow['item_name'] }}</div>
+                                                            </td>
+                                                            <td class="font-monospace">
+                                                                {{ $lotRow['lot_code'] }}
+                                                                @if ($lotRow['lot_id'])
+                                                                    <div class="qcs-financial-note">#{{ $lotRow['lot_id'] }}</div>
+                                                                @endif
+                                                            </td>
+                                                            <td class="text-end font-monospace">{{ number_format($lotRow['qty'], 4, ',', '.') }} {{ $lotRow['uom'] }}</td>
+                                                            <td class="text-end font-monospace">Rp {{ number_format($lotRow['unit_cost'], 0, ',', '.') }}</td>
+                                                            <td class="text-end font-monospace">Rp {{ number_format($lotRow['total_cost'], 0, ',', '.') }}</td>
+                                                            <td>
+                                                                <span class="qcs-badge {{ $lotRow['status'] === 'TERTELUSUR' ? 'qcs-badge-success' : 'qcs-badge-warning' }}">{{ $lotRow['status'] }}</span>
+                                                                <div class="qcs-financial-note">{{ $lotRow['direction'] === 'out' ? 'Keluar' : 'Masuk' }}</div>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @elseif (($accountingActiveEntries ?? collect())->contains(fn ($journal): bool => $journal->source_type === 'cutting_qc_sewing_supply' || str_starts_with((string) $journal->source_type, 'cutting_qc_sewing_supply_repost_')))
+                                        <div class="qcs-alert qcs-alert-warning mt-3 mb-0">Jurnal Auto BOM aktif, tetapi belum ada mutasi lot aktual yang dapat ditampilkan. Periksa audit lot sebelum melanjutkan pilot.</div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                        </div>
+                    </details>
+                @endif
+
+                @if ($isOwner)
+
+                    {{-- AKUNTANSI BARU --}}
+                    @php
+                        $accountingInternalActiveEntries = $accountingInternalEntries->whereNull('voided_at');
+                        $hasActiveQcWipJournal = $accountingActiveEntries->contains(
+                            fn ($journal): bool => $journal->source_type === 'cutting_wip'
+                                || str_starts_with((string) $journal->source_type, 'cutting_wip_repost_')
+                        );
+                        $hasActiveAutoBomJournal = $accountingActiveEntries->contains(
+                            fn ($journal): bool => $journal->source_type === 'cutting_qc_sewing_supply'
+                                || str_starts_with((string) $journal->source_type, 'cutting_qc_sewing_supply_repost_')
+                        );
+                    @endphp
+                    <details class="qcs-section qcs-financial-section accounting-section">
+                        <summary>
+                            <div>
+                                <div class="qcs-financial-title"><i class="bi bi-journal-check me-1" aria-hidden="true"></i> Akuntansi Baru</div>
+                                <div class="qcs-financial-subtitle">Jejak jurnal QC Cutting, termasuk posting, repost, dan reversal.</div>
+                            </div>
+                            @if ($accountingFinancialActiveEntries->isNotEmpty() || $accountingInternalActiveEntries->isNotEmpty())
+                                <span class="d-flex gap-1 flex-wrap justify-content-end">
+                                    @if ($accountingFinancialActiveEntries->isNotEmpty())
+                                        <span class="qcs-badge qcs-badge-success">{{ $accountingFinancialActiveEntries->count() }} JURNAL FINANSIAL</span>
+                                    @endif
+                                    @if ($accountingInternalActiveEntries->isNotEmpty())
+                                        <span class="qcs-badge qcs-badge-secondary">{{ $accountingInternalActiveEntries->count() }} JEJAK INTERNAL</span>
+                                    @endif
+                                </span>
+                            @elseif ($accountingActiveEntries->isNotEmpty())
+                                <span class="qcs-badge qcs-badge-warning">POSTED · QC BELUM AKTIF</span>
+                            @else
+                                <span class="qcs-badge qcs-badge-warning">BELUM POSTING</span>
+                            @endif
+                        </summary>
+                        <div class="qcs-financial-body">
+                            @if (! $hasActiveQcWipJournal)
+                                <div class="qcs-alert qcs-alert-warning mb-2">
+                                    QC belum disimpan. Jurnal <strong>QC → WIP</strong> dan Auto BOM belum terbentuk; jurnal bahan dan upah di atas adalah posting tahap Cutting.
+                                </div>
+                            @elseif (($cuttingQcAutoBomEnabled ?? false) && ! $hasActiveAutoBomJournal)
+                                <div class="qcs-alert qcs-alert-warning mb-2">
+                                    Jurnal QC → WIP sudah terbentuk, tetapi Auto BOM belum tercatat. Periksa BOM <code>sewing_supply</code> aktif dan Qty OK.
+                                </div>
+                            @endif
+                            <div class="qcs-financial-grid mb-2">
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Debit jurnal finansial</div>
+                                    <div class="qcs-financial-stat-value">Rp {{ number_format($accountingPostedTotalDebit, 2, ',', '.') }}</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Kredit jurnal finansial</div>
+                                    <div class="qcs-financial-stat-value">Rp {{ number_format($accountingPostedTotalCredit, 2, ',', '.') }}</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Balance</div>
+                                    <div class="qcs-financial-stat-value {{ abs($accountingPostedTotalDebit - $accountingPostedTotalCredit) <= 0.01 ? 'text-success' : 'text-danger' }}">
+                                        {{ abs($accountingPostedTotalDebit - $accountingPostedTotalCredit) <= 0.01 ? 'Balance' : 'Review' }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="qcs-accounting-explainer mb-2">
+                                <strong>Total di atas hanya jurnal finansial.</strong>
+                                Jejak <em>QC → WIP cutting</em> dipisahkan karena debit dan kreditnya memakai akun WIP yang sama,
+                                sehingga efek saldonya netto Rp0. Auto BOM kelengkapan jahit tetap dihitung sebagai jurnal finansial.
+                            </div>
+
+                            @if ($cuttingQcAutoBomEnabled ?? false)
+                                @php
+                                    $autoBomEstimateRows = collect($cuttingQcAutoBomRows ?? []);
+                                    $autoBomEstimateTotal = round((float) $autoBomEstimateRows->sum('total_cost'), 2);
+                                    $autoBomEstimateQtyOk = round((float) $autoBomEstimateRows->sum('qty_ok'), 2);
+                                @endphp
+                                <div class="qcs-material-subsection qcs-material-subsection-bom mb-2">
+                                    <div class="qcs-material-subsection-head">
+                                        <div>
+                                            <div class="qcs-financial-title"><i class="bi bi-calculator me-1" aria-hidden="true"></i> Estimasi Kelengkapan Jahit</div>
+                                            <div class="qcs-financial-subtitle">Preview nilai Auto BOM yang akan masuk ke jurnal Akuntansi Baru saat QC disimpan.</div>
+                                        </div>
+                                        <span class="qcs-badge {{ $hasActiveAutoBomJournal ? 'qcs-badge-success' : 'qcs-badge-warning' }}">
+                                            {{ $hasActiveAutoBomJournal ? 'POSTED' : 'PREVIEW' }}
+                                        </span>
+                                    </div>
+                                    <div class="qcs-material-subsection-body">
+                                        @if ($autoBomEstimateRows->isEmpty())
+                                            <div class="qcs-financial-note">Belum ada BOM <code>sewing_supply</code> aktif atau Qty OK untuk dihitung.</div>
+                                        @else
+                                            <div class="qcs-financial-grid mb-2">
+                                                <div class="qcs-financial-stat">
+                                                    <div class="qcs-financial-stat-label">Debit WIP · 1-151</div>
+                                                    <div class="qcs-financial-stat-value">Rp {{ number_format($autoBomEstimateTotal, 0, ',', '.') }}</div>
+                                                </div>
+                                                <div class="qcs-financial-stat">
+                                                    <div class="qcs-financial-stat-label">Kredit RM · 1-150</div>
+                                                    <div class="qcs-financial-stat-value">Rp {{ number_format($autoBomEstimateTotal, 0, ',', '.') }}</div>
+                                                </div>
+                                                <div class="qcs-financial-stat">
+                                                    <div class="qcs-financial-stat-label">Qty OK</div>
+                                                    <div class="qcs-financial-stat-value">{{ number_format($autoBomEstimateQtyOk, 2, ',', '.') }} pcs</div>
+                                                </div>
+                                            </div>
+                                            <div class="qcs-financial-note mb-2">Posting Auto BOM: debit WIP dan kredit Persediaan bahan/material. Nilai ini termasuk dalam total jurnal di atas.</div>
+                                            <div class="qcs-table-wrap">
+                                                <table class="table table-sm align-middle qcs-financial-table mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Material</th>
+                                                            <th class="text-end">Kebutuhan</th>
+                                                            <th class="text-end">Rp / pcs</th>
+                                                            <th class="text-end">Total HPP</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($autoBomEstimateRows as $bomRow)
+                                                            <tr>
+                                                                <td>
+                                                                    <div class="fw-semibold">{{ $bomRow['material_code'] }}</div>
+                                                                    <div class="qcs-financial-note">{{ $bomRow['material_name'] }}</div>
+                                                                </td>
+                                                                <td class="text-end font-monospace">{{ number_format($bomRow['required_qty'], 4, ',', '.') }} {{ $bomRow['uom'] }}</td>
+                                                                <td class="text-end font-monospace">Rp {{ number_format($bomRow['cost_per_pcs'] ?? 0, 0, ',', '.') }}</td>
+                                                                <td class="text-end font-monospace fw-semibold">Rp {{ number_format($bomRow['total_cost'] ?? 0, 0, ',', '.') }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if ($accountingFinancialEntries->isEmpty() && $accountingInternalEntries->isEmpty())
+                                <div class="qcs-financial-note">Belum ada jurnal akuntansi baru untuk dokumen ini.</div>
+                            @elseif ($accountingFinancialEntries->isNotEmpty())
+                                <div class="qcs-table-wrap">
+                                    <table class="table table-sm align-middle qcs-financial-table mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Transaksi</th>
+                                                <th>Referensi</th>
+                                                <th class="text-end">Debit</th>
+                                                <th class="text-end">Kredit</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach ($accountingFinancialEntries as $journal)
+                                                @php
+                                                    $journalDebit = (float) $journal->lines->sum('debit');
+                                                    $journalCredit = (float) $journal->lines->sum('credit');
+                                                    $isVoided = !empty($journal->voided_at);
+                                                @endphp
+                                                <tr class="{{ $isVoided ? 'text-muted' : '' }}">
+                                                    <td>{{ $accountingTypeLabel((string) $journal->source_type) }}</td>
+                                                    <td class="font-monospace">{{ $journal->reference ?? '-' }}</td>
+                                                    <td class="text-end font-monospace">Rp {{ number_format($journalDebit, 2, ',', '.') }}</td>
+                                                    <td class="text-end font-monospace">Rp {{ number_format($journalCredit, 2, ',', '.') }}</td>
+                                                    <td><span class="qcs-badge {{ $isVoided ? 'qcs-badge-secondary' : 'qcs-badge-success' }}">{{ $isVoided ? 'VOID' : 'POSTED' }}</span></td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+
+                            @if ($accountingInternalEntries->isNotEmpty())
+                                <div class="qcs-internal-trace mt-3 pt-3">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <strong class="qcs-financial-note">Jejak produksi internal</strong>
+                                        <span class="qcs-badge qcs-badge-secondary">Tidak memengaruhi saldo</span>
+                                    </div>
+                                    <div class="qcs-financial-note mb-2">QC → WIP Cutting hanya menjadi jejak perpindahan proses karena debit dan kredit memakai akun WIP yang sama.</div>
+                                    <div class="qcs-table-wrap">
+                                        <table class="table table-sm align-middle qcs-financial-table mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Transaksi</th>
+                                                    <th>Referensi</th>
+                                                    <th class="text-end">Debit</th>
+                                                    <th class="text-end">Kredit</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($accountingInternalEntries as $journal)
+                                                    @php
+                                                        $journalDebit = (float) $journal->lines->sum('debit');
+                                                        $journalCredit = (float) $journal->lines->sum('credit');
+                                                        $isVoided = !empty($journal->voided_at);
+                                                    @endphp
+                                                    <tr class="{{ $isVoided ? 'text-muted' : '' }}">
+                                                        <td>
+                                                            <div>QC → WIP cutting</div>
+                                                            <div class="qcs-financial-note">Transfer internal · efek saldo netto Rp0</div>
+                                                        </td>
+                                                        <td class="font-monospace">{{ $journal->reference ?? '-' }}</td>
+                                                        <td class="text-end font-monospace">Rp {{ number_format($journalDebit, 2, ',', '.') }}</td>
+                                                        <td class="text-end font-monospace">Rp {{ number_format($journalCredit, 2, ',', '.') }}</td>
+                                                        <td><span class="qcs-badge {{ $isVoided ? 'qcs-badge-secondary' : 'qcs-badge-success' }}">{{ $isVoided ? 'VOID' : 'POSTED' }}</span></td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- REJECT CUTTING DI DALAM AKUNTANSI BARU --}}
+                            @if (($cuttingRejectAccounting['qty'] ?? 0) > 0)
+                                @php
+                                    // Baris reject hanya debit; balance dinilai dari
+                                    // seluruh jurnal induk cutting_wip.
+                                    $rejectAccountingBalance = (bool) ($cuttingRejectAccounting['active_parent_balance'] ?? false);
+                                    $rejectPostingStatus = ($cuttingRejectAccounting['mapping_status'] ?? 'MISSING') !== 'PASS'
+                                        ? 'MAPPING BELUM ADA'
+                                        : (($cuttingRejectAccounting['active_journal_count'] ?? 0) > 0
+                                            ? 'POSTED'
+                                            : (($cuttingRejectAccounting['voided_journal_count'] ?? 0) > 0 ? 'VOID ONLY' : 'BELUM POSTING'));
+                                @endphp
+                                <details class="qcs-reject-subsection">
+                                    <summary>
+                                        <div>
+                                            <div class="qcs-reject-title"><i class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i> Reject Cutting</div>
+                                            <div class="qcs-financial-subtitle">Detail reject, REJ-CUT, mapping, dan jurnalnya.</div>
+                                        </div>
+                                        <span class="qcs-badge {{ $rejectPostingStatus === 'POSTED' ? 'qcs-badge-success' : ($rejectPostingStatus === 'MAPPING BELUM ADA' ? 'qcs-badge-danger' : 'qcs-badge-warning') }}">
+                                            {{ $rejectPostingStatus }} · {{ number_format($cuttingRejectAccounting['qty'], 2, ',', '.') }} pcs
+                                        </span>
+                                    </summary>
+                                    <div class="qcs-reject-body">
+                                        <div class="qcs-financial-grid mb-2">
+                                            <div class="qcs-financial-stat">
+                                                <div class="qcs-financial-stat-label">Qty Reject</div>
+                                                <div class="qcs-financial-stat-value text-danger">{{ number_format($cuttingRejectAccounting['qty'], 2, ',', '.') }} pcs</div>
+                                            </div>
+                                            <div class="qcs-financial-stat">
+                                                <div class="qcs-financial-stat-label">Debit Aktif Reject</div>
+                                                <div class="qcs-financial-stat-value">Rp {{ number_format($cuttingRejectAccounting['active_debit'], 2, ',', '.') }}</div>
+                                            </div>
+                                            <div class="qcs-financial-stat">
+                                                <div class="qcs-financial-stat-label">Balance Jurnal Induk</div>
+                                                <div class="qcs-financial-stat-value {{ $rejectAccountingBalance ? 'text-success' : 'text-danger' }}">
+                                                    {{ $rejectAccountingBalance ? 'Balance' : 'Review' }}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="qcs-financial-note mb-2">
+                                            Mutasi stok: <strong>REJ-CUT</strong> · Mapping legacy <strong>1204</strong>
+                                            → akun baru
+                                            @if ($cuttingRejectAccounting['mapping_code'])
+                                                <strong>{{ $cuttingRejectAccounting['mapping_code'] }}</strong>
+                                            @else
+                                                <strong class="text-danger">belum tersedia</strong>
+                                            @endif
+                                            . Komponen reject berada di jurnal <strong>cutting_wip</strong> yang sama dengan output QC.
+                                        </div>
+
+                                        @if (($cuttingRejectAccounting['mapping_status'] ?? 'MISSING') !== 'PASS')
+                                            <div class="qcs-financial-note text-danger mb-2">
+                                                Posting reject harus dihentikan sampai mapping akun 1204 tersedia dan aktif.
+                                            </div>
+                                        @elseif ($cuttingRejectAccounting['rows']->isEmpty())
+                                            <div class="qcs-financial-note">
+                                                Reject sudah tersimpan secara operasional, tetapi belum ada mirror jurnal akuntansi baru aktif.
+                                            </div>
+                                        @else
+                                            <div class="qcs-table-wrap">
+                                                <table class="table table-sm align-middle qcs-financial-table mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Sumber</th>
+                                                            <th>Akun Reject</th>
+                                                            <th class="text-end">Debit</th>
+                                                            <th class="text-end">Kredit</th>
+                                                            <th>Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($cuttingRejectAccounting['rows'] as $rejectRow)
+                                                            <tr class="{{ $rejectRow['voided'] ? 'text-muted' : '' }}">
+                                                                <td>
+                                                                    <div class="fw-semibold">{{ $accountingTypeLabel($rejectRow['source_type']) }}</div>
+                                                                    <div class="qcs-financial-note font-monospace">{{ $rejectRow['reference'] }}</div>
+                                                                </td>
+                                                                <td>
+                                                                    <div class="fw-semibold">{{ $rejectRow['account_code'] }}</div>
+                                                                    <div class="qcs-financial-note">{{ $rejectRow['account_name'] }}</div>
+                                                                </td>
+                                                                <td class="text-end font-monospace">Rp {{ number_format($rejectRow['debit'], 2, ',', '.') }}</td>
+                                                                <td class="text-end font-monospace">Rp {{ number_format($rejectRow['credit'], 2, ',', '.') }}</td>
+                                                                <td><span class="qcs-badge {{ $rejectRow['voided'] ? 'qcs-badge-secondary' : 'qcs-badge-success' }}">{{ $rejectRow['voided'] ? 'VOID' : 'POSTED' }}</span></td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </details>
+                            @else
+                                <div class="qcs-reject-empty-note" role="status">
+                                    <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>Tidak ada reject Cutting</strong>
+                                        <span>Dokumen ini seluruhnya tercatat sebagai output OK; subsection jurnal reject tidak diperlukan.</span>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </details>
+
+                    {{-- ESTIMASI HPP CUTTING --}}
+                    <details class="qcs-section qcs-financial-section hpp-section">
+                        <summary>
+                            <div>
+                                <div class="qcs-financial-title"><i class="bi bi-calculator me-1" aria-hidden="true"></i> Estimasi HPP Cutting</div>
+                                <div class="qcs-financial-subtitle">Estimasi bahan + upah yang masuk ke WIP Cutting, bukan HPP penjualan.</div>
+                            </div>
+                            <span class="qcs-badge qcs-badge-primary">Read-only</span>
+                        </summary>
+                        <div class="qcs-financial-body">
+                            <div class="qcs-financial-grid mb-2">
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Bahan baku</div>
+                                    <div class="qcs-financial-stat-value">Rp {{ number_format($cuttingHppTotals['raw_material'] ?? $cuttingHppTotals['material'] ?? 0, 2, ',', '.') }}</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Bahan pendukung</div>
+                                    <div class="qcs-financial-stat-value">Rp {{ number_format($cuttingHppTotals['supply'] ?? 0, 2, ',', '.') }}</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Lain-lain</div>
+                                    <div class="qcs-financial-stat-value">Rp {{ number_format($cuttingHppTotals['other'] ?? 0, 2, ',', '.') }}</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Upah</div>
+                                    <div class="qcs-financial-stat-value">Rp {{ number_format($cuttingHppTotals['wage'] ?? 0, 2, ',', '.') }}</div>
+                                </div>
+                                <div class="qcs-financial-stat">
+                                    <div class="qcs-financial-stat-label">Total HPP</div>
+                                    <div class="qcs-financial-stat-value text-primary">Rp {{ number_format($cuttingHppTotals['total'] ?? 0, 2, ',', '.') }}</div>
+                                </div>
+                            </div>
+                            <div class="qcs-table-wrap">
+                                <table class="table table-sm align-middle qcs-financial-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Bundle / Item</th>
+                                            <th class="text-end">Qty</th>
+                                            <th class="text-end">Bahan baku</th>
+                                            <th class="text-end">Bahan pendukung</th>
+                                            <th class="text-end">Lain-lain</th>
+                                            <th class="text-end">Upah</th>
+                                            <th class="text-end">HPP / pcs</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($cuttingHppRows as $hppRow)
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold">{{ $hppRow['item_code'] }}</div>
+                                                    <div class="qcs-financial-note">{{ $hppRow['bundle_code'] }}</div>
+                                                </td>
+                                                <td class="text-end font-monospace">{{ number_format($hppRow['qty_pcs'], 2, ',', '.') }}</td>
+                                                <td class="text-end font-monospace">
+                                                    <div>Rp {{ number_format($hppRow['material_cost'], 2, ',', '.') }}</div>
+                                                    <div class="unit-muted">@ Rp {{ number_format($hppRow['material_unit_cost_per_pcs'] ?? 0, 2, ',', '.') }}/pcs</div>
+                                                </td>
+                                                <td class="text-end font-monospace">
+                                                    <div>Rp {{ number_format($hppRow['support_cost'] ?? 0, 2, ',', '.') }}</div>
+                                                    <div class="unit-muted">@ Rp {{ number_format($hppRow['support_unit_cost'] ?? 0, 2, ',', '.') }}/pcs</div>
+                                                </td>
+                                                <td class="text-end font-monospace">Rp {{ number_format($hppRow['other_cost'] ?? 0, 2, ',', '.') }}</td>
+                                                <td class="text-end font-monospace">
+                                                    <div>Rp {{ number_format($hppRow['wage_cost'], 2, ',', '.') }}</div>
+                                                    <div class="unit-muted">@ Rp {{ number_format($hppRow['wage_rate'], 2, ',', '.') }}/pcs</div>
+                                                </td>
+                                                <td class="text-end font-monospace fw-semibold">Rp {{ number_format($hppRow['unit_cost'], 2, ',', '.') }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr><td colspan="7" class="qcs-financial-note">Belum ada bundle untuk dihitung.</td></tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+
+                    {{-- RINGKASAN OUTPUT --}}
+                    @php
+                        $qcTotalOk = (float) collect($rows)->sum('qty_ok');
+                        $qcTotalReject = (float) collect($rows)->sum('qty_reject');
+                    @endphp
+                    <details class="qcs-section qcs-financial-section summary-section">
+                        <summary>
+                            <div>
+                                <div class="qcs-financial-title"><i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i> Ringkasan Output</div>
+                                <div class="qcs-financial-subtitle">Kuantitas cutting, pemakaian kain, dan hasil QC.</div>
+                            </div>
+                            <span class="qcs-badge qcs-badge-secondary">{{ count($rows) }} bundle</span>
+                        </summary>
+                        <div class="qcs-financial-body">
+                            <div class="qcs-financial-grid">
+                                <div class="qcs-financial-stat"><div class="qcs-financial-stat-label">Qty Cutting</div><div class="qcs-financial-stat-value">{{ number_format($totalQtyPcs, 2, ',', '.') }} pcs</div></div>
+                                <div class="qcs-financial-stat"><div class="qcs-financial-stat-label">Pemakaian Kain</div><div class="qcs-financial-stat-value">{{ number_format($totalUsedFabric, 2, ',', '.') }} Kg</div></div>
+                                <div class="qcs-financial-stat"><div class="qcs-financial-stat-label">Pemakaian / pcs</div><div class="qcs-financial-stat-value">{{ number_format($fabricPerPcs, 4, ',', '.') }} Kg/pcs</div></div>
+                                <div class="qcs-financial-stat"><div class="qcs-financial-stat-label">OK / Reject QC</div><div class="qcs-financial-stat-value"><span class="text-success">{{ number_format($qcTotalOk, 2, ',', '.') }}</span> / <span class="{{ $qcTotalReject > 0 ? 'text-danger' : '' }}">{{ number_format($qcTotalReject, 2, ',', '.') }}</span></div></div>
+                            </div>
+                        </div>
+                    </details>
                 @endif
 
                 {{-- ACTION BAR --}}
+                @php
+                    $hasEditableQcRows = collect($rows)->contains(fn ($row) => !($row['is_corrected'] ?? false));
+                @endphp
                 <div class="qcs-action-bar">
                     <div class="qcs-action-inner">
                         <div class="qcs-action-info">
@@ -1979,10 +2834,16 @@
                         </div>
                         <div class="qcs-btn-group">
                             <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="qcs-btn-cancel">Batal</a>
-                            <button type="submit" class="qcs-btn-save">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                Simpan QC
-                            </button>
+                            @if ($hasEditableQcRows)
+                                <button type="submit" class="qcs-btn-save">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                    Simpan QC
+                                </button>
+                            @else
+                                <span class="qcs-btn-save" style="opacity:.6;cursor:not-allowed;" title="Semua bundle sudah dikoreksi">
+                                    Semua bundle sudah dikoreksi
+                                </span>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -1996,6 +2857,64 @@
                     $bundleCode = $row['bundle_code'] ?? 'Bundle';
                     $itemCode = $row['item_code'] ?? '-';
                 @endphp
+
+                @if (($row['can_correct_to_raw'] ?? false) && Route::has('production.qc.cutting.bundle_correct_to_raw'))
+                    <div class="modal fade qcs-modal" id="qcCorrectToRawModal_{{ $bundleId }}" tabindex="-1"
+                        aria-labelledby="qcCorrectToRawModalLabel_{{ $bundleId }}" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <div>
+                                        <div class="modal-title-main" id="qcCorrectToRawModalLabel_{{ $bundleId }}">Koreksi Bundle</div>
+                                        <div class="modal-title-sub">{{ $bundleCode }} · Item saat ini {{ $itemCode }}</div>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                                </div>
+
+                                <form action="{{ route('production.qc.cutting.bundle_correct_to_raw', [$cuttingJob, $bundleId]) }}" method="post">
+                                    @csrf
+                                    <div class="modal-body">
+                                        <div class="qcs-hint-box" style="margin-bottom:14px;">
+                                            Sistem akan membalik QC/WIP jika ada, mengembalikan bahan ke LOT asal,
+                                            dan menutup bundle ini sebagai <b>dikoreksi</b>. Setelah itu buat Cutting
+                                            baru menggunakan item pengganti.
+                                        </div>
+
+                                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                            <div>
+                                                <label class="qcs-field-label" for="qcReturnFabricQty_{{ $bundleId }}">Bahan dikembalikan</label>
+                                                <input id="qcReturnFabricQty_{{ $bundleId }}" name="return_fabric_qty" type="number"
+                                                    class="qcs-modal-field" min="0.0001" step="0.0001"
+                                                    value="{{ number_format((float) ($row['qty_used_fabric'] ?? 0), 4, '.', '') }}" required>
+                                                <div style="font-size:10px;color:var(--gf-mid);font-weight:600;margin-top:4px;">Wajib sama dengan pemakaian bundle.</div>
+                                            </div>
+                                            <div>
+                                                <label class="qcs-field-label" for="qcReplacementItem_{{ $bundleId }}">Kode item pengganti</label>
+                                                <input id="qcReplacementItem_{{ $bundleId }}" name="replacement_item_code" type="text"
+                                                    class="qcs-modal-field" maxlength="100" placeholder="Contoh: K7BLK" required>
+                                                <div style="font-size:10px;color:var(--gf-mid);font-weight:600;margin-top:4px;">Boleh sama atau berbeda; item harus aktif dan memiliki BOM.</div>
+                                            </div>
+                                        </div>
+
+                                        <div style="margin-top:14px;">
+                                            <label class="qcs-field-label" for="qcCorrectionReason_{{ $bundleId }}">Alasan koreksi</label>
+                                            <textarea id="qcCorrectionReason_{{ $bundleId }}" name="reason" class="qcs-modal-field"
+                                                style="height:88px;padding-top:10px;resize:vertical;" maxlength="500" required
+                                                placeholder="Contoh: Salah pilih kode item saat input cutting"></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="qcs-modal-btn qcs-modal-btn-outline" data-bs-dismiss="modal">Kembali</button>
+                                        <button type="submit" class="qcs-modal-btn qcs-modal-btn-warn"
+                                            onclick="return confirm('Koreksi bundle, balikkan bahan ke LOT, dan tutup bundle lama?')">
+                                            <span>↶</span> Koreksi &amp; Kembalikan
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 @if (($row['can_partial_cancel'] ?? false) && Route::has('production.qc.cutting.bundle_cancel'))
                     <div class="modal fade qcs-modal" id="qcCancelModal_{{ $bundleId }}" tabindex="-1"
@@ -2155,14 +3074,28 @@
             // ===== MULTI-LOT =====
             const lotInputs = document.querySelectorAll('.input-lot-used');
             const lotWarningEl = document.getElementById('lot-warning');
+            const lotStockBeforeTotalEl = document.getElementById('lot-stock-before-total');
+            const lotPlannedTotalEl = document.getElementById('lot-planned-total');
+            const lotUsedTotalEl = document.getElementById('lot-used-total');
 
+            const formatLotKg = value => Number(value || 0).toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }) + ' Kg';
             function recalcLotBalances() {
                 let anyOver = false;
+                let stockBeforeTotal = 0;
+                let plannedTotal = 0;
+                let usedTotal = 0;
 
                 lotInputs.forEach(input => {
-                    const planned = parseFloat(input.dataset.planned || '0') || 0;
-                    let used = parseFloat(input.value || '0');
+                    const planned = parseFloat(String(input.dataset.planned || '0').replace(',', '.')) || 0;
+                    const stockBefore = parseFloat(String(input.dataset.stockBefore || '0').replace(',', '.')) || 0;
+                    let used = parseFloat(String(input.value || '0').replace(',', '.'));
                     if (isNaN(used) || used < 0) used = 0;
+
+                    stockBeforeTotal += stockBefore;
+                    plannedTotal += planned;
 
                     if (planned > 0 && used > planned) {
                         used = planned;
@@ -2170,17 +3103,16 @@
                         input.value = used;
                     }
 
-                    const balance = planned - used;
+                    usedTotal += used;
                     const tr = input.closest('tr');
                     if (!tr) return;
 
-                    const balDesktop = tr.querySelector('.lot-balance-desktop');
-                    const text = balance.toFixed(2).replace('.', ',');
-
-                    if (balDesktop) balDesktop.textContent = text;
                 });
 
                 if (lotWarningEl) lotWarningEl.style.display = anyOver ? 'block' : 'none';
+                if (lotStockBeforeTotalEl) lotStockBeforeTotalEl.textContent = formatLotKg(stockBeforeTotal);
+                if (lotPlannedTotalEl) lotPlannedTotalEl.textContent = formatLotKg(plannedTotal);
+                if (lotUsedTotalEl) lotUsedTotalEl.textContent = formatLotKg(usedTotal);
             }
 
             lotInputs.forEach(input => {

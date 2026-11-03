@@ -21,6 +21,18 @@
                class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('standalone-accounting.journals.*') ? 'active' : '' }}">
                 <span class="icon"><i class="bi bi-journal-text"></i></span><span>Jurnal Baru</span>
             </a>
+            <a href="{{ route('standalone-accounting.journals.create', ['mode' => 'opening']) }}"
+               class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('standalone-accounting.journals.create') && request('mode') === 'opening' ? 'active' : '' }}">
+                <span class="icon"><i class="bi bi-wallet2"></i></span><span>Saldo Awal</span>
+            </a>
+            <a href="{{ route('standalone-accounting.stock-opname-variance.index') }}"
+               class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('standalone-accounting.stock-opname-variance.*') ? 'active' : '' }}">
+                <span class="icon"><i class="bi bi-clipboard2-data"></i></span><span>Stock Opname &amp; Variance</span>
+            </a>
+            <a href="{{ route('standalone-accounting.opening-migration.index') }}"
+               class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('standalone-accounting.opening-migration.*') ? 'active' : '' }}">
+                <span class="icon"><i class="bi bi-box-arrow-in-right"></i></span><span>Opening Migrasi</span>
+            </a>
             <a href="{{ route('standalone-accounting.accounts.index') }}"
                class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('standalone-accounting.accounts.*') ? 'active' : '' }}">
                 <span class="icon"><i class="bi bi-folder2-open"></i></span><span>Daftar Akun</span>

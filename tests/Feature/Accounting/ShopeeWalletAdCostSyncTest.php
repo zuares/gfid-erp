@@ -109,7 +109,7 @@ class ShopeeWalletAdCostSyncTest extends TestCase
             ->map(fn (array $record) => [
                 $record[0]->data()['create_time_from'],
                 $record[0]->data()['create_time_to'],
-                $record[0]->data()['transaction_type'],
+                $record[0]->data()['transaction_type'] ?? null,
             ])
             ->all();
 

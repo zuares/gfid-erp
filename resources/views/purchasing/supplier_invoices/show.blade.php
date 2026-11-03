@@ -11,6 +11,12 @@
     $isPosted    = $inv->isPosted();
     $isVoid      = $inv->isVoid();
     $outstanding = $inv->outstanding();
+    $paymentAvailable = (float) ($paymentAvailable ?? 0);
+    $canPayInvoice = $isOwner
+        && in_array($inv->status, ['posted', 'partial_paid'], true)
+        && $paymentAvailable > \App\Models\PurchaseOrder::paymentRoundingTolerance();
+    $cash1101 = collect($cashAccounts ?? [])->firstWhere('code', '1101');
+    $transferBanks = collect($cashAccounts ?? [])->filter(fn ($account) => in_array((string) $account->code, ['1111', '1112', '1113', '1114'], true))->values();
 
     $statusLabel = match($inv->status) {
         'posted'       => 'POSTED',
@@ -72,6 +78,27 @@
         font-size: .82rem;
         color: #1d4ed8;
     }
+
+    .invoice-payment-modal .modal-content { border: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 18px 55px rgba(15,23,42,.2); }
+    .invoice-payment-modal .modal-header { background: #f8f9ff; border-bottom: 1px solid var(--line); padding: 1rem 1.15rem; }
+    .invoice-payment-modal .modal-body { padding: 1.15rem; }
+    .invoice-payment-modal .modal-footer { padding: .8rem 1.15rem; border-top: 1px solid var(--line); }
+    .invoice-payment-modal .payment-context { display: flex; gap: .65rem; align-items: flex-start; margin-bottom: 1rem; padding: .75rem; border: 1px solid #dbe4ff; border-radius: 10px; background: #f6f8ff; color: #334155; font-size: .78rem; line-height: 1.45; }
+    .invoice-payment-modal .payment-context i { color: #4f46e5; font-size: 1rem; }
+    .invoice-payment-modal .outstanding-pill { display: inline-flex; align-items: center; gap: .35rem; margin-top: .25rem; padding: .25rem .55rem; border-radius: 999px; background: #fff1f2; color: #be123c; font-size: .72rem; font-weight: 700; }
+    .invoice-payment-modal .form-label { margin-bottom: .35rem; font-size: .78rem; font-weight: 600; color: #334155; }
+    .invoice-payment-modal .form-control, .invoice-payment-modal .form-select { min-height: 40px; border-radius: 9px; }
+    .invoice-payment-modal .form-control:focus, .invoice-payment-modal .form-select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.13); }
+    .invoice-payment-modal .amount-group .btn { min-width: 78px; }
+    .payment-history-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem 0; border-bottom: 1px solid var(--line); font-size: .82rem; }
+    .payment-history-row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .payment-history-meta { color: var(--muted); font-size: .74rem; }
+    @media (max-width: 575.98px) {
+        .invoice-payment-modal .modal-dialog { margin: .5rem; }
+        .invoice-payment-modal .modal-footer { flex-direction: column-reverse; align-items: stretch; gap: .5rem; }
+        .invoice-payment-modal .modal-footer .btn { width: 100%; min-height: 42px; }
+        .payment-history-row { align-items: flex-start; }
+    }
 </style>
 @endpush
 
@@ -100,6 +127,12 @@
             <div class="text-muted small mono">Dibuat {{ id_date($inv->invoice_date) }}</div>
         </div>
         <div class="action-bar">
+            @if ($canPayInvoice)
+                <button type="button" class="btn btn-sm btn-primary btn-action" data-bs-toggle="modal" data-bs-target="#supplierInvoicePaymentModal">
+                    <i class="bi bi-wallet2 me-1" aria-hidden="true"></i> Bayar Invoice
+                </button>
+            @endif
+
             @if ($isDraft && $canSeeMoney)
                 <form method="POST" action="{{ route('purchasing.supplier_invoices.post', $inv->id) }}"
                       onsubmit="return confirm('Post faktur ini? Pastikan nilainya sudah benar.')">
@@ -255,63 +288,193 @@
         </div>
     </div>
 
+    @if ($canSeeMoney && ($paymentRows ?? collect())->isNotEmpty())
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-semibold small text-uppercase text-muted">Riwayat Pembayaran Invoice</div>
+                <span class="text-muted small">{{ $paymentRows->count() }} transaksi</span>
+            </div>
+            @foreach ($paymentRows as $payment)
+                <div class="payment-history-row">
+                    <div>
+                        <div class="fw-semibold">{{ id_date($payment->date) }} · {{ $payment->paymentMethod?->name ?? '—' }}</div>
+                        <div class="payment-history-meta">
+                            {{ $payment->cashAccount?->code ?? '—' }} · {{ $payment->ref_no ?: 'Tanpa referensi' }}
+                            @if ($payment->createdBy) · {{ $payment->createdBy->name }} @endif
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="mono fw-semibold {{ $payment->voided_at ? 'text-decoration-line-through text-muted' : 'text-success' }}">
+                            {{ rupiah($payment->amount) }}
+                        </div>
+                        @if ($payment->voided_at)
+                            <span class="badge bg-danger-subtle text-danger">VOID</span>
+                        @else
+                            <span class="text-muted small">Dr Hutang / Cr Kas-Bank</span>
+                        @endif
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- GRN warning jika tidak ada GRN --}}
     @if ($order && $grnPostedTotal <= 0)
         <div class="warn-box mb-3">
-            ⚠️ PO {{ $order->code }} belum ada GRN yang di-post. Nilai faktur ini mungkin perlu diverifikasi manual.
+            ⚠️ PO {{ $order->code }} belum memiliki GRN Posted. Invoice tidak dapat di-post.
         </div>
     @endif
 
-    {{-- ═══════════════════════════════════════════════════════════
-         Tahap 9 — Potongan Retur / Klaim (manual, owner+accounting)
-         Hanya tampil jika invoice belum void dan belum lunas penuh
-    ═══════════════════════════════════════════════════════════ --}}
-    @if (!$inv->isVoid() && !$inv->isPaid() && Route::has('purchasing.supplier_invoices.set_deduction'))
-      @php
-        $canSetDeduction = ($isOwner ?? false)
-            || in_array(auth()->user()?->role ?? '', ['accounting', 'developer'], true);
-      @endphp
-      @if ($canSetDeduction)
-      <div class="card mb-3">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span style="font-size:.9rem;">✂️</span>
-            <strong style="font-size:.85rem;">Potongan Retur / Klaim</strong>
-          </div>
-          <div class="text-muted mb-3" style="font-size:.78rem;">
-            Isi potongan retur/klaim secara manual berdasarkan hasil QC atau kesepakatan dengan supplier.
-            Nilai ini akan mengurangi Total Faktur dan perlu disimpan untuk berlaku.
-          </div>
-          <form method="POST"
-                action="{{ route('purchasing.supplier_invoices.set_deduction', $inv->id) }}">
-            @csrf
-            <div class="d-flex align-items-end gap-3 flex-wrap">
-              <div>
-                <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:.25rem;">
-                  Potongan Retur/Klaim (Rp)
-                </label>
-                <input type="number"
-                       name="return_deduction_amount"
-                       min="0"
-                       step="0.01"
-                       class="form-control form-control-sm"
-                       style="width:180px;border-radius:8px;font-size:.85rem;"
-                       value="{{ number_format((float)($inv->return_deduction_amount ?? 0), 2, '.', '') }}"
-                       placeholder="0">
-              </div>
-              <div>
-                <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius:10px;">
-                  Simpan Potongan
-                </button>
-              </div>
-            </div>
-          </form>
+    @if ($order && $grnPostedTotal > 0)
+        <div class="info-box mb-3">
+            Nilai invoice bersumber dari GRN Posted dikurangi retur Posted. Potongan tidak dapat diubah manual.
         </div>
-      </div>
-      @endif
     @endif
 
     @endif {{-- end canSeeMoney --}}
+
+    @if ($canPayInvoice)
+    <div class="modal fade invoice-payment-modal" id="supplierInvoicePaymentModal" tabindex="-1"
+         aria-labelledby="supplierInvoicePaymentTitle" aria-describedby="supplierInvoicePaymentHint" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <div class="text-muted text-uppercase small fw-semibold">Settlement supplier</div>
+                        <h2 class="modal-title h6 mb-0" id="supplierInvoicePaymentTitle">Bayar Invoice</h2>
+                        <div class="outstanding-pill"><i class="bi bi-wallet2" aria-hidden="true"></i> Bisa dibayar {{ rupiah($paymentAvailable) }}</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup modal pembayaran"></button>
+                </div>
+
+                <form method="POST" action="{{ route('purchasing.supplier_invoices.payments.store', $inv->id) }}" id="supplierInvoicePaymentForm">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="payment-context" id="supplierInvoicePaymentHint" role="status" aria-live="polite">
+                            <i class="bi bi-journal-check" aria-hidden="true"></i>
+                            <span>GRN sudah mencatat hutang. Pembayaran ini hanya melunasi invoice: <strong>Dr Hutang Dagang / Cr Kas atau Bank</strong> di akuntansi lama dan akuntansi baru.</span>
+                        </div>
+                        @if ($paymentAvailable + \App\Models\PurchaseOrder::paymentRoundingTolerance() < $outstanding)
+                            <div class="warn-box mb-3">Sebagian hutang PO sudah dibayar melalui PO/GRN. Nominal maksimal pada modal ini adalah {{ rupiah($paymentAvailable) }}.</div>
+                        @endif
+
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label" for="supplierInvoicePaymentDate">Tanggal</label>
+                                <input type="date" class="form-control" id="supplierInvoicePaymentDate" name="date" value="{{ old('date', now()->toDateString()) }}" required>
+                            </div>
+
+                            <div class="col-6">
+                                <label class="form-label" for="supplierInvoicePaymentAmount">Nominal</label>
+                                <div class="input-group amount-group">
+                                    <span class="input-group-text">Rp</span>
+                                    <input type="text" class="form-control mono" id="supplierInvoicePaymentAmount" name="amount" value="{{ old('amount', number_format($paymentAvailable, 0, ',', '.')) }}" data-max="{{ $paymentAvailable }}" inputmode="decimal" required>
+                                    <button type="button" class="btn btn-outline-secondary" id="fillSupplierInvoiceOutstanding">Sisa</button>
+                                </div>
+                                <div class="invalid-feedback" id="supplierInvoicePaymentAmountError">Nominal tidak boleh melebihi outstanding invoice.</div>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label" for="supplierInvoicePaymentMethod">Metode pembayaran</label>
+                                <select class="form-select" id="supplierInvoicePaymentMethod" name="payment_method_id" required>
+                                    @foreach ($paymentMethods as $method)
+                                        <option value="{{ $method->id }}" data-mode="{{ strtolower($method->mode ?? '') }}">
+                                            {{ $method->name }}{{ $method->mode ? ' — '.strtoupper($method->mode) : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label" for="supplierInvoiceCashAccount">Kas / Bank</label>
+                                <select class="form-select" id="supplierInvoiceCashAccount" name="cash_account_id" required>
+                                    <option value="">Pilih akun kas</option>
+                                    @if ($cash1101)
+                                        <option value="{{ $cash1101->id }}" data-mode="cash">1101 — {{ $cash1101->name }}</option>
+                                    @endif
+                                    @foreach ($transferBanks as $account)
+                                        <option value="{{ $account->id }}" data-mode="transfer">{{ $account->code }} — {{ $account->name }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text" id="supplierInvoiceCashAccountHint">Pilih akun yang digunakan untuk mengeluarkan pembayaran.</div>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label" for="supplierInvoicePaymentRef">No. referensi <span class="fw-normal text-muted">(opsional)</span></label>
+                                <input type="text" class="form-control mono" id="supplierInvoicePaymentRef" name="ref_no" maxlength="100" placeholder="Contoh: transfer / bukti kas">
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label" for="supplierInvoicePaymentNotes">Catatan <span class="fw-normal text-muted">(opsional)</span></label>
+                                <input type="text" class="form-control" id="supplierInvoicePaymentNotes" name="notes" maxlength="255" placeholder="Tambahkan catatan bila diperlukan">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary" id="submitSupplierInvoicePayment"><i class="bi bi-check2 me-1" aria-hidden="true"></i> Simpan Pembayaran</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+        (() => {
+            const method = document.getElementById('supplierInvoicePaymentMethod');
+            const account = document.getElementById('supplierInvoiceCashAccount');
+            const amount = document.getElementById('supplierInvoicePaymentAmount');
+            const fill = document.getElementById('fillSupplierInvoiceOutstanding');
+            const form = document.getElementById('supplierInvoicePaymentForm');
+            if (!method || !account || !amount || !form) return;
+
+            const parseAmount = (value) => {
+                const raw = String(value || '').replace(/\s/g, '');
+                if (raw.includes(',')) return Number(raw.replace(/\./g, '').replace(',', '.')) || 0;
+                if (/^\d{1,3}(\.\d{3})+$/.test(raw)) return Number(raw.replace(/\./g, '')) || 0;
+                return Number(raw) || 0;
+            };
+
+            const syncAccounts = () => {
+                const mode = method.options[method.selectedIndex]?.dataset.mode || '';
+                let hasSelected = false;
+                [...account.options].forEach((option) => {
+                    if (!option.value) return;
+                    const visible = option.dataset.mode === mode;
+                    option.hidden = !visible;
+                    if (visible && !hasSelected) {
+                        option.selected = true;
+                        hasSelected = true;
+                    }
+                });
+                account.required = true;
+                document.getElementById('supplierInvoiceCashAccountHint').textContent = mode === 'cash'
+                    ? 'Pembayaran tunai akan mengurangi akun 1101 Kas.'
+                    : 'Transfer akan mengurangi akun bank/ewallet yang dipilih.';
+            };
+
+            method.addEventListener('change', syncAccounts);
+            fill?.addEventListener('click', () => {
+                amount.value = amount.dataset.max || '';
+                amount.classList.remove('is-invalid');
+            });
+            form.addEventListener('submit', (event) => {
+                const max = Number(amount.dataset.max || 0);
+                const value = parseAmount(amount.value);
+                if (value <= 0 || value > max + 0.01) {
+                    event.preventDefault();
+                    amount.classList.add('is-invalid');
+                    amount.focus();
+                }
+            });
+            syncAccounts();
+        })();
+    </script>
+    @endpush
+    @endif
 
     {{-- Link PO untuk non-owner yang tetap boleh lihat --}}
     @if ($order && !$canSeeMoney)

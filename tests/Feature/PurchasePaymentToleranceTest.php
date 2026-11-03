@@ -29,19 +29,19 @@ class PurchasePaymentToleranceTest extends TestCase
 
     public function test_purchase_payment_journal_debits_accounts_payable(): void
     {
-        $ap = Account::create([
+        $ap = Account::firstOrCreate(['code' => JournalService::CODE_AP], [
             'code' => JournalService::CODE_AP,
             'name' => 'Hutang Dagang',
             'type' => 'liability',
             'is_active' => true,
         ]);
-        $advance = Account::create([
+        $advance = Account::firstOrCreate(['code' => JournalService::CODE_ADV_PURCHASE], [
             'code' => JournalService::CODE_ADV_PURCHASE,
             'name' => 'Uang Muka Pembelian',
             'type' => 'asset',
             'is_active' => true,
         ]);
-        $cash = Account::create([
+        $cash = Account::firstOrCreate(['code' => '1101'], [
             'code' => '1101',
             'name' => 'Kas',
             'type' => 'asset',
@@ -49,17 +49,17 @@ class PurchasePaymentToleranceTest extends TestCase
             'is_active' => true,
         ]);
         $method = PaymentMethod::create([
-            'code' => 'PAY-CASH-' . uniqid(),
+            'code' => 'PAY-CASH-'.uniqid(),
             'name' => 'Cash Payment',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $supplier = Supplier::create([
-            'code' => 'PAY-SUP-' . uniqid(),
+            'code' => 'PAY-SUP-'.uniqid(),
             'name' => 'Payment Supplier',
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'PAY-PO-' . uniqid(),
+            'code' => 'PAY-PO-'.uniqid(),
             'date' => '2026-08-27',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000,
@@ -88,11 +88,11 @@ class PurchasePaymentToleranceTest extends TestCase
     public function test_ap_outstanding_treats_one_rupiah_rounding_remainder_as_paid(): void
     {
         $supplier = Supplier::create([
-            'code' => 'TOL-SUP-' . uniqid(),
+            'code' => 'TOL-SUP-'.uniqid(),
             'name' => 'Tolerance Supplier',
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'TOL-PO-' . uniqid(),
+            'code' => 'TOL-PO-'.uniqid(),
             'date' => '2026-08-27',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000,
@@ -101,13 +101,13 @@ class PurchasePaymentToleranceTest extends TestCase
             'paid_amount' => 999,
         ]);
         $method = PaymentMethod::create([
-            'code' => 'TOL-CASH-' . uniqid(),
+            'code' => 'TOL-CASH-'.uniqid(),
             'name' => 'Tolerance Cash',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         PurchaseReceipt::create([
-            'code' => 'TOL-GRN-' . uniqid(),
+            'code' => 'TOL-GRN-'.uniqid(),
             'date' => '2026-08-27',
             'purchase_order_id' => $order->id,
             'supplier_id' => $supplier->id,
@@ -133,11 +133,11 @@ class PurchasePaymentToleranceTest extends TestCase
     public function test_payment_status_recalc_marks_one_rupiah_remainder_as_paid_in_both_flows(): void
     {
         $supplier = Supplier::create([
-            'code' => 'TOL-STATUS-SUP-' . uniqid(),
+            'code' => 'TOL-STATUS-SUP-'.uniqid(),
             'name' => 'Tolerance Status Supplier',
         ]);
         $method = PaymentMethod::create([
-            'code' => 'TOL-STATUS-CASH-' . uniqid(),
+            'code' => 'TOL-STATUS-CASH-'.uniqid(),
             'name' => 'Tolerance Status Cash',
             'mode' => 'cash',
             'is_active' => true,
@@ -145,7 +145,7 @@ class PurchasePaymentToleranceTest extends TestCase
 
         $orders = collect([
             PurchaseOrder::create([
-                'code' => 'TOL-STATUS-A-' . uniqid(),
+                'code' => 'TOL-STATUS-A-'.uniqid(),
                 'date' => '2026-08-27',
                 'supplier_id' => $supplier->id,
                 'grand_total' => 1000,
@@ -153,7 +153,7 @@ class PurchasePaymentToleranceTest extends TestCase
                 'payment_status' => 'partial',
             ]),
             PurchaseOrder::create([
-                'code' => 'TOL-STATUS-B-' . uniqid(),
+                'code' => 'TOL-STATUS-B-'.uniqid(),
                 'date' => '2026-08-27',
                 'supplier_id' => $supplier->id,
                 'grand_total' => 1000,
@@ -193,17 +193,17 @@ class PurchasePaymentToleranceTest extends TestCase
     public function test_dp_only_cannot_auto_close_po_before_ap_is_offset(): void
     {
         $supplier = Supplier::create([
-            'code' => 'AUTO-CLOSE-DP-SUP-' . uniqid(),
+            'code' => 'AUTO-CLOSE-DP-SUP-'.uniqid(),
             'name' => 'Auto Close DP Supplier',
         ]);
         $method = PaymentMethod::create([
-            'code' => 'AUTO-CLOSE-DP-CASH-' . uniqid(),
+            'code' => 'AUTO-CLOSE-DP-CASH-'.uniqid(),
             'name' => 'Auto Close DP Cash',
             'mode' => 'cash',
             'is_active' => true,
         ]);
         $order = PurchaseOrder::create([
-            'code' => 'AUTO-CLOSE-DP-PO-' . uniqid(),
+            'code' => 'AUTO-CLOSE-DP-PO-'.uniqid(),
             'date' => '2026-08-31',
             'supplier_id' => $supplier->id,
             'grand_total' => 1000,
@@ -213,7 +213,7 @@ class PurchasePaymentToleranceTest extends TestCase
             'paid_amount' => 1000,
         ]);
         PurchaseReceipt::create([
-            'code' => 'AUTO-CLOSE-DP-GRN-' . uniqid(),
+            'code' => 'AUTO-CLOSE-DP-GRN-'.uniqid(),
             'date' => '2026-08-31',
             'purchase_order_id' => $order->id,
             'supplier_id' => $supplier->id,
@@ -257,11 +257,11 @@ class PurchasePaymentToleranceTest extends TestCase
     public function test_supplier_invoice_uses_the_same_rounding_tolerance(): void
     {
         $supplier = Supplier::create([
-            'code' => 'TOL-INV-SUP-' . uniqid(),
+            'code' => 'TOL-INV-SUP-'.uniqid(),
             'name' => 'Tolerance Invoice Supplier',
         ]);
         $invoice = SupplierInvoice::create([
-            'invoice_no' => 'TOL-INV-' . uniqid(),
+            'invoice_no' => 'TOL-INV-'.uniqid(),
             'supplier_id' => $supplier->id,
             'invoice_date' => '2026-08-27',
             'total_amount' => 1000,

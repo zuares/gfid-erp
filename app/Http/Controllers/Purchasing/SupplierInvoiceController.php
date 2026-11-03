@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Purchasing;
 
 use App\Helpers\CodeGenerator;
 use App\Http\Controllers\Controller;
+use App\Models\Account;
+use App\Models\PaymentMethod;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use App\Models\SupplierInvoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,9 +44,9 @@ class SupplierInvoiceController extends Controller
             $s = trim($request->search);
             $query->where(function ($q) use ($s) {
                 $q->where('invoice_no', 'like', "%{$s}%")
-                  ->orWhere('supplier_invoice_ref', 'like', "%{$s}%")
-                  ->orWhereHas('supplier', fn($sq) => $sq->where('name', 'like', "%{$s}%")
-                      ->orWhere('code', 'like', "%{$s}%"));
+                    ->orWhere('supplier_invoice_ref', 'like', "%{$s}%")
+                    ->orWhereHas('supplier', fn ($sq) => $sq->where('name', 'like', "%{$s}%")
+                        ->orWhere('code', 'like', "%{$s}%"));
             });
         }
 
@@ -51,8 +54,8 @@ class SupplierInvoiceController extends Controller
 
         $tolerance = PurchaseOrder::paymentRoundingTolerance();
         $summary = (object) [
-            'total'        => SupplierInvoice::count(),
-            'draft_count'  => SupplierInvoice::where('status', 'draft')->count(),
+            'total' => SupplierInvoice::count(),
+            'draft_count' => SupplierInvoice::where('status', 'draft')->count(),
             'posted_count' => SupplierInvoice::whereIn('status', ['posted', 'partial_paid', 'paid'])->count(),
             'unpaid_total' => SupplierInvoice::whereIn('status', ['posted', 'partial_paid'])
                 ->whereRaw('ROUND(total_amount - paid_amount, 2) > ?', [$tolerance])
@@ -60,8 +63,13 @@ class SupplierInvoiceController extends Controller
         ];
 
         $suppliers = \App\Models\Supplier::orderBy('name')->get(['id', 'name', 'code']);
+        $hasReceivableOrders = PurchaseOrder::query()
+            ->whereHas('purchaseReceipts', fn ($query) => $this->scopeNonReplacementPostedGrn($query))
+            ->exists();
 
-        return view('purchasing.supplier_invoices.index', compact('invoices', 'summary', 'suppliers'));
+        return view('purchasing.supplier_invoices.index', compact(
+            'invoices', 'summary', 'suppliers', 'hasReceivableOrders'
+        ));
     }
 
     // =========================================================
@@ -84,34 +92,25 @@ class SupplierInvoiceController extends Controller
                 'lines',
             ])->find((int) $poId);
 
-            if ($order) {
-                // Total GRN posted (kecuali replacement, karena tagihan supplier tidak mencakup GRN pengganti)
-                $grnPostedTotal = (float) $order->purchaseReceipts
-                    ->where('status', 'posted')
-                    ->where('is_replacement', false)
-                    ->sum('grand_total');
-
-                // Total return posted dari GRN milik PO ini
-                $returnTotal = (float) DB::table('purchase_returns as pr')
-                    ->join('purchase_receipts as rec', 'rec.id', '=', 'pr.purchase_receipt_id')
-                    ->where('rec.purchase_order_id', $order->id)
-                    ->where('pr.status', 'posted')
-                    ->whereNull('pr.voided_at')
-                    ->where(function ($q) {
-                        $q->whereNull('pr.resolution_type')
-                            ->orWhere('pr.resolution_type', '!=', 'replacement');
-                    })
-                    ->sum('pr.total');
+            if ($order && $this->hasPostedGrn($order)) {
+                $basis = $this->invoiceBasis($order);
+                $grnPostedTotal = $basis['grn_posted_total'];
+                $returnTotal = $basis['return_total'];
+            } elseif ($order) {
+                return redirect()
+                    ->route('purchasing.supplier_invoices.index')
+                    ->with('error', 'Invoice Supplier baru hanya dapat dibuat dari PO yang memiliki GRN Posted.');
             }
         }
 
         $suppliers = \App\Models\Supplier::orderBy('name')->get(['id', 'name', 'code']);
         $receivableOrders = PurchaseOrder::where(function ($query) {
-                $query->where('status', 'approved');
-                if (!config('purchasing.po_approval_enabled', false)) {
-                    $query->orWhere('status', 'draft');
-                }
-            })
+            $query->where('status', 'approved');
+            if (! config('purchasing.po_approval_enabled', false)) {
+                $query->orWhere('status', 'draft');
+            }
+        })
+            ->whereHas('purchaseReceipts', fn ($query) => $this->scopeNonReplacementPostedGrn($query))
             ->with('supplier')
             ->orderByDesc('date')
             ->limit(100)
@@ -131,60 +130,69 @@ class SupplierInvoiceController extends Controller
         $this->ensureCanAccess($request);
 
         $data = $request->validate([
-            'purchase_order_id'      => ['nullable', 'integer', 'exists:purchase_orders,id'],
-            'supplier_id'            => ['required', 'integer', 'exists:suppliers,id'],
-            'supplier_invoice_ref'   => ['nullable', 'string', 'max:100'],
-            'invoice_date'           => ['required', 'date'],
-            'due_date'               => ['nullable', 'date'],
-            'subtotal'               => ['nullable', 'string'],
-            'discount_amount'        => ['nullable', 'string'],
-            'return_deduction_amount'=> ['nullable', 'string'],
-            'notes'                  => ['nullable', 'string'],
+            'purchase_order_id' => ['required', 'integer', 'exists:purchase_orders,id'],
+            'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'supplier_invoice_ref' => ['nullable', 'string', 'max:100'],
+            'invoice_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string'],
         ]);
 
-        $subtotal         = $this->num($data['subtotal'] ?? 0);
-        $discountAmount   = $this->num($data['discount_amount'] ?? 0);
-        $returnDeduction  = $this->num($data['return_deduction_amount'] ?? 0);
-        $totalAmount      = max(0, round($subtotal - $discountAmount - $returnDeduction, 2));
+        $order = PurchaseOrder::query()->find((int) $data['purchase_order_id']);
 
-        if (!empty($data['purchase_order_id'])) {
-            $order = PurchaseOrder::query()->find((int) $data['purchase_order_id']);
+        if (! $order || (int) $order->supplier_id !== (int) $data['supplier_id']) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'Supplier invoice harus memakai PO dan supplier yang sama.',
+            ]);
+        }
 
-            if (!$order || (int) $order->supplier_id !== (int) $data['supplier_id']) {
-                throw ValidationException::withMessages([
-                    'purchase_order_id' => 'Supplier invoice harus memakai PO dan supplier yang sama.',
-                ]);
-            }
+        if ($order->status === 'cancelled') {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'PO yang sudah dibatalkan tidak dapat dibuatkan supplier invoice.',
+            ]);
+        }
 
-            if ($order->status === 'cancelled') {
-                throw ValidationException::withMessages([
-                    'purchase_order_id' => 'PO yang sudah dibatalkan tidak dapat dibuatkan supplier invoice.',
-                ]);
-            }
+        $basis = $this->invoiceBasis($order);
+        if ($basis['grn_posted_total'] <= PurchaseOrder::paymentRoundingTolerance()) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'Invoice Supplier hanya dapat dibuat setelah ada GRN Posted.',
+            ]);
+        }
+
+        // Nilai invoice selalu bersumber dari GRN posted, bukan angka dari form.
+        $subtotal = round($basis['grn_posted_total'], 2);
+        $discountAmount = 0.0;
+        $returnDeduction = round(min($basis['return_total'], $subtotal), 2);
+        $totalAmount = max(0, round($subtotal - $returnDeduction, 2));
+
+        if ($totalAmount <= PurchaseOrder::paymentRoundingTolerance()) {
+            throw ValidationException::withMessages([
+                'purchase_order_id' => 'Nilai GRN Posted sudah tertutup retur; invoice tidak dapat dibuat dengan total nol.',
+            ]);
         }
 
         // Generate invoice_no
         $suppCode = DB::table('suppliers')
             ->where('id', (int) $data['supplier_id'])
             ->value('code');
-        $prefix = $suppCode ? 'INV-' . strtoupper($suppCode) : 'INV';
+        $prefix = $suppCode ? 'INV-'.strtoupper($suppCode) : 'INV';
         $invoiceNo = CodeGenerator::make($prefix);
 
         $invoice = SupplierInvoice::create([
-            'invoice_no'              => $invoiceNo,
-            'supplier_invoice_ref'    => $data['supplier_invoice_ref'] ?? null,
-            'supplier_id'             => (int) $data['supplier_id'],
-            'purchase_order_id'       => !empty($data['purchase_order_id']) ? (int) $data['purchase_order_id'] : null,
-            'invoice_date'            => $data['invoice_date'],
-            'due_date'                => $data['due_date'] ?? null,
-            'subtotal'                => $subtotal,
-            'discount_amount'         => $discountAmount,
+            'invoice_no' => $invoiceNo,
+            'supplier_invoice_ref' => $data['supplier_invoice_ref'] ?? null,
+            'supplier_id' => (int) $data['supplier_id'],
+            'purchase_order_id' => (int) $data['purchase_order_id'],
+            'invoice_date' => $data['invoice_date'],
+            'due_date' => $data['due_date'] ?? null,
+            'subtotal' => $subtotal,
+            'discount_amount' => $discountAmount,
             'return_deduction_amount' => $returnDeduction,
-            'total_amount'            => $totalAmount,
-            'paid_amount'             => 0,
-            'status'                  => 'draft',
-            'notes'                   => $data['notes'] ?? null,
-            'created_by'              => $request->user()?->id,
+            'total_amount' => $totalAmount,
+            'paid_amount' => 0,
+            'status' => 'draft',
+            'notes' => $data['notes'] ?? null,
+            'created_by' => $request->user()?->id,
         ]);
 
         return redirect()
@@ -209,10 +217,32 @@ class SupplierInvoiceController extends Controller
             'voidedBy',
         ]);
 
-        $order          = $supplierInvoice->purchaseOrder;
+        $paymentRows = PurchasePayment::query()
+            ->with(['paymentMethod', 'cashAccount', 'createdBy', 'voidedBy'])
+            ->where('supplier_invoice_id', $supplierInvoice->id)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get();
+
+        $paymentMethods = PaymentMethod::query()
+            ->where('is_active', true)
+            ->whereIn('mode', ['cash', 'transfer'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $cashAccounts = Account::query()
+            ->where('is_active', true)
+            ->where('is_cash', true)
+            ->whereIn('code', ['1101', '1111', '1112', '1113', '1114'])
+            ->orderBy('code')
+            ->get();
+
+        $order = $supplierInvoice->purchaseOrder;
         $grnPostedTotal = 0.0;
-        $returnTotal    = 0.0;
-        $grnCount       = 0;
+        $returnTotal = 0.0;
+        $grnCount = 0;
+        $poApOutstanding = 0.0;
 
         if ($order) {
             $grnPostedTotal = (float) $order->purchaseReceipts
@@ -235,10 +265,27 @@ class SupplierInvoiceController extends Controller
                         ->orWhere('pr.resolution_type', '!=', 'replacement');
                 })
                 ->sum('pr.total');
+
+            $poPaidTotal = (float) PurchasePayment::query()
+                ->where('purchase_order_id', $order->id)
+                ->whereNull('voided_at')
+                ->where('type', 'payment')
+                ->sum('amount');
+            $poDpAppliedTotal = (float) PurchasePayment::query()
+                ->where('purchase_order_id', $order->id)
+                ->whereNull('voided_at')
+                ->where('type', 'dp_apply')
+                ->sum('amount');
+            $poApOutstanding = PurchaseOrder::normalizePaymentRemainder(
+                $grnPostedTotal - $returnTotal - $poPaidTotal - $poDpAppliedTotal
+            );
         }
 
+        $paymentAvailable = min($supplierInvoice->outstanding(), $poApOutstanding);
+
         return view('purchasing.supplier_invoices.show', compact(
-            'supplierInvoice', 'order', 'grnPostedTotal', 'returnTotal', 'grnCount'
+            'supplierInvoice', 'order', 'grnPostedTotal', 'returnTotal', 'grnCount',
+            'paymentRows', 'paymentMethods', 'cashAccounts', 'poApOutstanding', 'paymentAvailable'
         ));
     }
 
@@ -250,7 +297,7 @@ class SupplierInvoiceController extends Controller
     {
         $this->ensureCanAccess($request);
 
-        if (!$supplierInvoice->isDraft()) {
+        if (! $supplierInvoice->isDraft()) {
             return back()->with('error', 'Hanya faktur draft yang bisa di-post.');
         }
 
@@ -258,8 +305,38 @@ class SupplierInvoiceController extends Controller
             return back()->with('error', 'Total faktur harus > 0 sebelum di-post.');
         }
 
+        // 3-way control: PO -> GRN -> Supplier Invoice.
+        // Invoice tidak membuat jurnal AP baru; AP sudah berasal dari GRN
+        // posted. Karena itu invoice hanya boleh dipost sebagai dokumen
+        // verifikasi setelah ada penerimaan yang menjadi sumber hutang.
+        if (! $supplierInvoice->purchase_order_id) {
+            return back()->with('error', 'Invoice Supplier wajib memiliki PO dengan GRN Posted.');
+        }
+
+        $order = PurchaseOrder::query()
+            ->with('supplier')
+            ->find((int) $supplierInvoice->purchase_order_id);
+
+        if (! $order || (int) $order->supplier_id !== (int) $supplierInvoice->supplier_id) {
+            return back()->with('error', 'Supplier invoice tidak cocok dengan supplier pada PO.');
+        }
+
+        $basis = $this->invoiceBasis($order);
+        if ($basis['grn_posted_total'] <= PurchaseOrder::paymentRoundingTolerance()) {
+            return back()->with('error', 'Faktur supplier belum dapat di-post karena belum ada GRN Posted.');
+        }
+
+        $invoiceTotal = round((float) $supplierInvoice->total_amount, 2);
+        $maxInvoiceTotal = max(0, round($basis['grn_posted_total'] - $basis['return_total'], 2));
+        if ($invoiceTotal > $maxInvoiceTotal + PurchaseOrder::paymentRoundingTolerance()) {
+            return back()->with(
+                'error',
+                'Total faktur melebihi nilai GRN Posted setelah retur ('.rupiah($maxInvoiceTotal).').'
+            );
+        }
+
         $supplierInvoice->update([
-            'status'    => 'posted',
+            'status' => 'posted',
             'posted_at' => now(),
             'posted_by' => $request->user()?->id,
         ]);
@@ -284,7 +361,7 @@ class SupplierInvoiceController extends Controller
         }
 
         $supplierInvoice->update([
-            'status'    => 'void',
+            'status' => 'void',
             'voided_at' => now(),
             'voided_by' => $request->user()?->id,
         ]);
@@ -317,32 +394,9 @@ class SupplierInvoiceController extends Controller
         abort_unless($request->user()?->isOwner(), 403, 'Hanya owner yang boleh melakukan aksi ini.');
     }
 
-    protected function num($value): float
-    {
-        if ($value === null || $value === '') {
-            return 0.0;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (float) $value;
-        }
-        $v = trim((string) $value);
-        $v = str_replace(' ', '', $v);
-        if (strpos($v, ',') !== false) {
-            $v = str_replace('.', '', $v);
-            $v = str_replace(',', '.', $v);
-            return (float) $v;
-        }
-        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $v)) {
-            $v = str_replace('.', '', $v);
-            return (float) $v;
-        }
-        return (float) $v;
-    }
-
     // =========================================================
-    // SET DEDUCTION — Tahap 9
-    // Update return_deduction_amount secara manual.
-    // Tidak otomatis ambil nilai dari return; tampilkan warning di view.
+    // SET DEDUCTION — legacy route retained for compatibility.
+    // Nilai retur sekarang selalu dihitung dari retur Posted.
     // Route: POST /purchasing/supplier-invoices/{id}/set-deduction
     //        name: purchasing.supplier_invoices.set_deduction
     // Middleware: role:owner,admin (accounting dijaga di view via canSetDeduction)
@@ -360,25 +414,45 @@ class SupplierInvoiceController extends Controller
             return back()->with('error', 'Invoice sudah lunas, tidak bisa mengubah potongan.');
         }
 
-        $data = $request->validate([
-            'return_deduction_amount' => ['required', 'numeric', 'min:0'],
-        ]);
+        return back()->with('error', 'Potongan retur invoice dihitung otomatis dari retur yang sudah Posted.');
+    }
 
-        $deduction = round((float) $data['return_deduction_amount'], 2);
+    protected function scopeNonReplacementPostedGrn($query): void
+    {
+        $query->where('status', 'posted')
+            ->where(function ($query) {
+                $query->whereNull('is_replacement')
+                    ->orWhere('is_replacement', false);
+            });
+    }
 
-        // Guard: deduction tidak boleh melebihi subtotal
-        $subtotal = (float) ($supplierInvoice->subtotal ?? 0);
-        if ($subtotal > 0 && $deduction > $subtotal) {
-            return back()->withErrors([
-                'return_deduction_amount' => 'Potongan tidak boleh melebihi subtotal faktur.',
-            ]);
-        }
+    protected function hasPostedGrn(PurchaseOrder $order): bool
+    {
+        return $order->purchaseReceipts()
+            ->where(fn ($query) => $this->scopeNonReplacementPostedGrn($query))
+            ->exists();
+    }
 
-        $supplierInvoice->return_deduction_amount = $deduction;
-        $supplierInvoice->recalcTotal();
-        $supplierInvoice->syncPaymentStatus();
-        $supplierInvoice->save();
+    protected function invoiceBasis(PurchaseOrder $order): array
+    {
+        $grnPostedTotal = (float) $order->purchaseReceipts()
+            ->where(fn ($query) => $this->scopeNonReplacementPostedGrn($query))
+            ->sum('grand_total');
 
-        return back()->with('success', 'Potongan retur/klaim berhasil disimpan. Total faktur telah diperbarui.');
+        $returnTotal = (float) DB::table('purchase_returns as pr')
+            ->join('purchase_receipts as rec', 'rec.id', '=', 'pr.purchase_receipt_id')
+            ->where('rec.purchase_order_id', $order->id)
+            ->where('pr.status', 'posted')
+            ->whereNull('pr.voided_at')
+            ->where(function ($query) {
+                $query->whereNull('pr.resolution_type')
+                    ->orWhere('pr.resolution_type', '!=', 'replacement');
+            })
+            ->sum('pr.total');
+
+        return [
+            'grn_posted_total' => round($grnPostedTotal, 2),
+            'return_total' => round($returnTotal, 2),
+        ];
     }
 }

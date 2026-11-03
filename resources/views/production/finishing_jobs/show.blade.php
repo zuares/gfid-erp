@@ -82,7 +82,7 @@
   use Illuminate\Support\Carbon;
 
   $user = auth()->user();
-  $isOwner = strtolower((string)($user?->role ?? '')) === 'owner';
+  $isOwner = $user?->isOwner() ?? false;
   $status = $job->status ?? 'draft';
   $isPosted = $status === 'posted';
 
@@ -225,6 +225,24 @@
               @csrf
               <button type="submit" class="btn btn-warning btn-sm btn-pill">
                 <i class="bi bi-arrow-repeat"></i><span>Apply BOM Ulang</span>
+              </button>
+            </form>
+          @endif
+
+          @if($isPosted && $isOwner)
+            <form method="POST" action="{{ route('production.finishing_jobs.unpost', $job->id) }}"
+              onsubmit="return confirm('UNPOST finishing ini? Inventory dan jurnal akan dibuat reversal audit, lalu status kembali DRAFT. Reservation jahit dipertahankan. Lanjutkan?');">
+              @csrf
+              <button type="submit" class="btn btn-outline-warning btn-sm btn-pill">
+                <i class="bi bi-arrow-counterclockwise"></i><span>Unpost</span>
+              </button>
+            </form>
+
+            <form method="POST" action="{{ route('production.finishing_jobs.void', $job->id) }}"
+              onsubmit="return confirm('VOID PERMANEN finishing ini? Stok dan reservation akan dikembalikan, jurnal legacy dan akuntansi baru dibuat reversal audit. Tindakan ini tidak dapat dibatalkan. Lanjutkan?');">
+              @csrf
+              <button type="submit" class="btn btn-outline-danger btn-sm btn-pill">
+                <i class="bi bi-x-circle"></i><span>Void</span>
               </button>
             </form>
           @endif

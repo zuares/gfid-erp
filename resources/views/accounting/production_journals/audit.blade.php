@@ -43,6 +43,7 @@
             </div>
             <div class="d-flex gap-2 flex-wrap">
                 <a class="pja-btn" href="{{ route('accounting.journals.index') }}">Jurnal</a>
+                <a class="pja-btn" href="{{ route('accounting.production-accounting-audit.index') }}">Audit stok + mirror</a>
                 <a class="pja-btn" href="{{ route('accounting.production-journal-audit.index') }}">Refresh</a>
             </div>
         </div>

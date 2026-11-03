@@ -11,6 +11,8 @@ class StandaloneAccountingJournal extends Model
     protected $fillable = [
         'date',
         'reference',
+        'source_type',
+        'source_id',
         'description',
         'posted_at',
         'voided_at',

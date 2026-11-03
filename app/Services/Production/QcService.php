@@ -2,21 +2,27 @@
 
 namespace App\Services\Production;
 
+use App\Models\CuttingBundleCorrection;
 use App\Models\CuttingJob;
 use App\Models\CuttingJobBundle;
 use App\Models\CuttingQcCancellation;
 use App\Models\FinishingJob;
 use App\Models\InventoryMutation;
+use App\Models\Item;
+use App\Models\ItemBom;
+use App\Models\ItemBomLine;
+use App\Models\ItemCategory;
 use App\Models\ProductionLog;
 use App\Models\QcResult;
 use App\Models\SewingPickupLine;
 use App\Models\SewingReturn;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
+use App\Services\Accounting\StandaloneProductionPostingService;
 use App\Services\Costing\FinishingRmHppService;
 use App\Services\Inventory\InventoryService;
-use App\Models\Item;
-use App\Models\ItemCategory;
+use App\Services\Inventory\LotAllocationService;
+use App\Services\Payroll\PieceRateService;
 use Illuminate\Support\Facades\DB;
 
 class QcService
@@ -25,24 +31,27 @@ class QcService
         protected InventoryService $inventory,
         protected FinishingRmHppService $finishingRmHpp,
         protected JournalService $journal,
+        protected StandaloneProductionPostingService $standaloneProductionPosting,
+        protected PieceRateService $pieceRate,
+        protected LotAllocationService $lotAllocation,
     ) {}
 
     private function resolveRejectItem(int $originalItemId): Item
     {
         $original = Item::with('category')->find($originalItemId);
-        if (!$original) {
+        if (! $original) {
             throw new \RuntimeException("Item ID {$originalItemId} tidak ditemukan.");
         }
 
         $category = $original->category;
-        if (!$category) {
+        if (! $category) {
             $category = ItemCategory::firstOrCreate(['code' => 'UNCAT'], ['name' => 'Uncategorized']);
         }
 
         return Item::firstOrCreate([
-            'code' => 'REJ-' . $category->code,
+            'code' => 'REJ-'.$category->code,
         ], [
-            'name' => 'Reject ' . $category->name,
+            'name' => 'Reject '.$category->name,
             'item_category_id' => $category->id,
             'unit_id' => $original->unit_id ?? null,
             'is_stockable' => true,
@@ -81,8 +90,18 @@ class QcService
 
                 /** @var CuttingJobBundle|null $bundle */
                 $bundle = $bundleMap->get($bundleId);
-                if (!$bundle) {
+                if (! $bundle) {
                     continue;
+                }
+
+                if (CuttingBundleCorrection::query()
+                    ->where('cutting_job_bundle_id', $bundle->id)
+                    ->where('status', 'returned')
+                    ->exists()) {
+                    throw new \RuntimeException(
+                        "Bundle {$bundle->bundle_code} sudah dikoreksi dan bahan sudah dikembalikan. "
+                        .'Buat Cutting Job baru untuk item pengganti; jangan simpan QC bundle lama.'
+                    );
                 }
 
                 $bundleQty = (float) $bundle->qty_pcs;
@@ -149,7 +168,7 @@ class QcService
             //   setelah QC selesai, dipanggil dari controller.
             // Jadi di sini TIDAK ADA lagi mutasi stok.
 
-            if (!$hasAnyOk) {
+            if (! $hasAnyOk) {
                 // Tidak ada qty OK → tidak akan dibuat WIP nantinya, tapi tidak error.
                 return;
             }
@@ -174,14 +193,14 @@ class QcService
             // ===========================
             $wipSewWarehouseId = Warehouse::where('code', 'WIP-SEW')->value('id');
             $destinationWarehouse = Warehouse::query()
-                ->whereIn('code', ['WH-RTS', 'WH-PRD'])
+                ->whereIn('code', ['WIP-FIN', 'WH-RTS', 'WH-PRD'])
                 ->whereKey((int) ($payload['destination_warehouse_id'] ?? $sewingReturn->destination_warehouse_id))
                 ->first();
-            $whPrdWarehouseId  = Warehouse::where('code', 'WH-PRD')->value('id');
+            $whPrdWarehouseId = Warehouse::where('code', 'WH-PRD')->value('id');
             $rejSewWarehouseId = Warehouse::where('code', 'REJ-SEW')->value('id');
 
-            if (!$wipSewWarehouseId || !$destinationWarehouse || !$whPrdWarehouseId || !$rejSewWarehouseId) {
-                throw new \RuntimeException('Warehouse WIP-SEW / WH-PRD / WH-RTS / REJ-SEW belum dikonfigurasi.');
+            if (! $wipSewWarehouseId || ! $destinationWarehouse || ! $whPrdWarehouseId || ! $rejSewWarehouseId) {
+                throw new \RuntimeException('Warehouse WIP-SEW / WIP-FIN / WH-PRD / WH-RTS / REJ-SEW belum dikonfigurasi.');
             }
 
             // Simpan tujuan yang dipilih saat QC agar detail return dan proses
@@ -231,7 +250,7 @@ class QcService
 
                 /** @var CuttingJobBundle|null $bundle */
                 $bundle = $bundleMap->get($bundleId);
-                if (!$bundle) {
+                if (! $bundle) {
                     continue;
                 }
 
@@ -244,9 +263,15 @@ class QcService
                 $qtyRejectBahan = (float) ($row['qty_reject_bahan'] ?? 0);
                 $qtyReject = $qtyRejectJahit + $qtyRejectBahan;
 
-                if ($qtyOk < 0) { $qtyOk = 0; }
-                if ($qtyRejectJahit < 0) { $qtyRejectJahit = 0; }
-                if ($qtyRejectBahan < 0) { $qtyRejectBahan = 0; }
+                if ($qtyOk < 0) {
+                    $qtyOk = 0;
+                }
+                if ($qtyRejectJahit < 0) {
+                    $qtyRejectJahit = 0;
+                }
+                if ($qtyRejectBahan < 0) {
+                    $qtyRejectBahan = 0;
+                }
                 $qtyReject = $qtyRejectJahit + $qtyRejectBahan;
 
                 if ($qtyOk + $qtyReject > $bundleQtyBase) {
@@ -267,7 +292,7 @@ class QcService
                 }
 
                 $status = $this->resolveBundleStatus($qtyOk, $qtyReject, $bundleQtyBase);
-                
+
                 $rejectReason = null;
                 if ($qtyRejectJahit > 0 && $qtyRejectBahan > 0) {
                     $rejectReason = 'Reject Jahit & Bahan';
@@ -359,7 +384,7 @@ class QcService
                 }
             }
 
-            if (!$hasAnyMovement) {
+            if (! $hasAnyMovement) {
                 return;
             }
 
@@ -367,7 +392,7 @@ class QcService
             // 2) INVENTORY MOVEMENT + COST
             // ===========================
             // - OUT: WIP-SEW (OK + Reject) pakai cost avg WIP-SEW
-            // - IN : tujuan QC (WH-PRD / WH-RTS) (OK) pakai cost yang sama
+            // - IN : tujuan QC (WIP-FIN / WH-PRD / WH-RTS) (OK) pakai cost yang sama
             // - IN : REJ-SEW (Reject) pakai cost yang sama
 
             // siapkan map unit_cost di WIP-SEW (atau REJ-SEW) per item
@@ -479,7 +504,7 @@ class QcService
                 }
 
                 $bundle = $bundleMap->get((int) $bundleId);
-                if (!$bundle) {
+                if (! $bundle) {
                     continue;
                 }
 
@@ -488,7 +513,7 @@ class QcService
                 $bundle->save();
             }
 
-            if (!empty($touchedPickupIds)) {
+            if (! empty($touchedPickupIds)) {
                 foreach (array_keys($touchedPickupIds) as $pickupId) {
                     $pickup = \App\Models\SewingPickup::with('lines')
                         ->lockForUpdate()
@@ -526,7 +551,7 @@ class QcService
             $fgWarehouseId = Warehouse::where('code', 'FG')->value('id'); // gudang FG
             $rejFinWarehouseId = Warehouse::where('code', 'REJ-FIN')->value('id'); // gudang reject finishing
 
-            if (!$wipFinWarehouseId || !$fgWarehouseId || !$rejFinWarehouseId) {
+            if (! $wipFinWarehouseId || ! $fgWarehouseId || ! $rejFinWarehouseId) {
                 throw new \RuntimeException(
                     'Warehouse WIP-FIN / FG / REJ-FIN belum dikonfigurasi di master gudang.'
                 );
@@ -551,7 +576,7 @@ class QcService
 
                 /** @var CuttingJobBundle|null $bundle */
                 $bundle = $bundleMap->get($bundleId);
-                if (!$bundle) {
+                if (! $bundle) {
                     continue;
                 }
 
@@ -634,9 +659,10 @@ class QcService
                 }
             }
 
-            if (!$hasAnyMovement) {
+            if (! $hasAnyMovement) {
                 // tidak ada qty yang bergerak → langsung create HPP RM-only dan selesai
                 $this->finishingRmHpp->createRmOnlySnapshotsFromFinishing($job, $totalOkByItem);
+
                 return;
             }
 
@@ -793,7 +819,7 @@ class QcService
         return 'qc_reject';
     }
 
-    protected function num(float | int | string | null $value): float
+    protected function num(float|int|string|null $value): float
     {
         if ($value === null || $value === '') {
             return 0.0;
@@ -819,13 +845,23 @@ class QcService
     {
         DB::transaction(function () use ($job) {
 
+            if (CuttingBundleCorrection::query()
+                ->where('cutting_job_id', $job->id)
+                ->where('status', 'returned')
+                ->exists()) {
+                throw new \RuntimeException(
+                    'Cutting Job memiliki koreksi bundle yang sudah mengembalikan bahan baku. '
+                    .'Batalkan koreksi melalui reversal audit khusus sebelum Cancel QC penuh.'
+                );
+            }
+
             // pastikan memang ada QC cutting
             $hasQc = QcResult::query()
                 ->where('stage', QcResult::STAGE_CUTTING)
                 ->where('cutting_job_id', $job->id)
                 ->exists();
 
-            if (!$hasQc) {
+            if (! $hasQc) {
                 // tidak ada QC → tidak ada yang dibatalkan
                 return;
             }
@@ -858,6 +894,7 @@ class QcService
                     (int) $partial->id,
                     "VOID re-QC partial {$job->code} / {$partial->id}",
                 );
+                $this->standaloneProductionPosting->voidCuttingQcBundleCancellation((int) $partial->id);
 
                 $partial->update([
                     'metadata' => array_merge($partial->metadata ?? [], [
@@ -900,6 +937,26 @@ class QcService
             //     voidBySource idempotent → aman diulang; postCuttingWip akan bikin
             //     jurnal baru saat QC ulang.
             $this->journal->voidBySource(JournalService::SRC_CUTTING_WIP, (int) $job->id, "VOID QC Cutting {$job->code}");
+            $this->standaloneProductionPosting->voidCuttingWip((int) $job->id);
+
+            // Auto BOM sewing_supply dikonsumsi di QC Cutting. Saat QC penuh
+            // dibatalkan, RM harus dikembalikan dan jurnal mirror direversal.
+            if (config('accounting.standalone_production_cutting_qc_auto_bom_enabled', false)) {
+                $this->inventory->reverseBySource(
+                    originalSourceTypes: [JournalService::SRC_CUTTING_QC_SEWING_SUPPLY],
+                    originalSourceId: (int) $job->id,
+                    voidSourceType: JournalService::SRC_CUTTING_QC_SEWING_SUPPLY.'_void',
+                    voidSourceId: (int) $job->id,
+                    notesPrefix: "VOID auto BOM QC Cutting {$job->code}",
+                    date: now(),
+                );
+                $this->journal->voidBySource(
+                    JournalService::SRC_CUTTING_QC_SEWING_SUPPLY,
+                    (int) $job->id,
+                    "VOID auto BOM QC Cutting {$job->code}",
+                );
+                $this->standaloneProductionPosting->voidCuttingQcSewingSupply((int) $job->id);
+            }
 
             // 2) Reset bundle QC fields supaya bisa QC ulang
             $job->loadMissing(['bundles']);
@@ -976,6 +1033,18 @@ class QcService
                 );
             }
 
+            if (config('accounting.standalone_production_cutting_qc_auto_bom_enabled', false)
+                && DB::table('inventory_mutations')
+                    ->where('source_type', JournalService::SRC_CUTTING_QC_SEWING_SUPPLY)
+                    ->where('source_id', $job->id)
+                    ->where('qty_change', '<', 0)
+                    ->exists()) {
+                throw new \RuntimeException(
+                    "Bundle {$bundle->bundle_code} sudah ikut konsumsi BOM saat QC Cutting. "
+                    .'Gunakan Cancel QC penuh agar reversal BOM dan jurnal tetap balance.'
+                );
+            }
+
             $qc = QcResult::query()
                 ->where('stage', QcResult::STAGE_CUTTING)
                 ->where('cutting_job_id', $job->id)
@@ -983,7 +1052,7 @@ class QcService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$qc) {
+            if (! $qc) {
                 throw new \RuntimeException("Bundle {$bundle->bundle_code} belum memiliki QC Cutting aktif.");
             }
 
@@ -996,6 +1065,7 @@ class QcService
                     'cutting_reject',
                     'cutting_qc_adjust_in',
                     'cutting_qc_adjust_out',
+                    'cutting_qc_bundle_void',
                 ])
                 ->where('source_id', $job->id)
                 ->where('cutting_job_bundle_id', $bundle->id)
@@ -1008,7 +1078,7 @@ class QcService
             ))) {
                 throw new \RuntimeException(
                     "Bundle {$bundle->bundle_code} sudah pernah di-Adjust QC. "
-                    . 'Batalkan adjustment tersebut terlebih dahulu atau gunakan Cancel QC penuh.'
+                    .'Batalkan adjustment tersebut terlebih dahulu atau gunakan Cancel QC penuh.'
                 );
             }
 
@@ -1088,7 +1158,7 @@ class QcService
             }
 
             $audit->update([
-                'reversal_cutoff_mutation_id' => !empty($reversalMutationIds)
+                'reversal_cutoff_mutation_id' => ! empty($reversalMutationIds)
                     ? max($reversalMutationIds)
                     : (int) InventoryMutation::max('id'),
                 'metadata' => [
@@ -1117,6 +1187,7 @@ class QcService
                     ],
                 );
                 $audit->update(['reversal_journal_id' => $journal->id]);
+                $this->standaloneProductionPosting->mirrorCuttingQcBundleCancellation((int) $audit->id);
             }
 
             $bundle->qty_qc_ok = 0;
@@ -1163,6 +1234,501 @@ class QcService
     }
 
     /**
+     * Kembalikan material satu bundle ke gudang/LOT asal agar dapat dipakai
+     * untuk Cutting baru dengan item berbeda. Dokumen lama tidak dihapus:
+     * reversal stok, jurnal, dan correction record menjadi jejak audit.
+     *
+     * Koreksi sengaja full-bundle. Partial return dapat membuat material lama
+     * tetap melekat pada bundle yang itemnya sudah salah dan menghasilkan HPP
+     * ambigu saat QC ulang.
+     */
+    public function correctCuttingBundle(
+        CuttingJobBundle $bundle,
+        float $returnFabricQty,
+        string $replacementItemCode,
+        string $reason,
+        ?int $actorId = null,
+    ): CuttingBundleCorrection {
+        $reason = trim($reason);
+        $replacementItemCode = strtoupper(trim($replacementItemCode));
+
+        if ($reason === '') {
+            throw new \RuntimeException('Alasan koreksi bundle wajib diisi.');
+        }
+        if ($replacementItemCode === '') {
+            throw new \RuntimeException('Kode item pengganti wajib diisi.');
+        }
+
+        return DB::transaction(function () use ($bundle, $returnFabricQty, $replacementItemCode, $reason, $actorId): CuttingBundleCorrection {
+            $bundle = CuttingJobBundle::query()
+                ->whereKey($bundle->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $job = CuttingJob::query()
+                ->whereKey($bundle->cutting_job_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $activePickedQty = (float) SewingPickupLine::query()
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->where('status', '!=', 'void')
+                ->sum('qty_bundle');
+            if ($activePickedQty > 0.000001 || (float) ($bundle->sewing_picked_qty ?? 0) > 0.000001) {
+                throw new \RuntimeException(
+                    "Bundle {$bundle->bundle_code} tidak bisa dikoreksi: sudah ada qty yang diambil jahit."
+                );
+            }
+
+            $alreadyCorrected = CuttingBundleCorrection::query()
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->where('status', 'returned')
+                ->lockForUpdate()
+                ->exists();
+            if ($alreadyCorrected) {
+                throw new \RuntimeException("Bundle {$bundle->bundle_code} sudah pernah dikoreksi dan materialnya sudah dikembalikan.");
+            }
+
+            $originalFabricQty = round((float) ($bundle->qty_used_fabric ?? 0), 4);
+            $returnFabricQty = round($returnFabricQty, 4);
+            if ($originalFabricQty <= 0.0001) {
+                throw new \RuntimeException("Bundle {$bundle->bundle_code} tidak memiliki pemakaian bahan yang dapat dikembalikan.");
+            }
+            if ($returnFabricQty <= 0.0001 || abs($returnFabricQty - $originalFabricQty) > 0.0001) {
+                throw new \RuntimeException(
+                    "Qty bahan koreksi harus sama dengan pemakaian bundle ({$originalFabricQty}). Partial return belum diizinkan agar HPP tidak ambigu."
+                );
+            }
+
+            $replacementItem = Item::query()
+                ->whereRaw('UPPER(code) = ?', [$replacementItemCode])
+                ->where('type', 'finished_good')
+                ->where('active', true)
+                ->canBeMade()
+                ->first();
+            if (! $replacementItem) {
+                throw new \RuntimeException(
+                    "Item {$replacementItemCode} tidak ditemukan, tidak aktif, atau belum dikonfigurasi sebagai item produksi."
+                );
+            }
+            if (! DB::table('item_boms')->where('item_id', $replacementItem->id)->where('active', true)->exists()) {
+                throw new \RuntimeException("Item {$replacementItemCode} belum memiliki BOM aktif.");
+            }
+
+            $hasQc = QcResult::query()
+                ->where('stage', QcResult::STAGE_CUTTING)
+                ->where('cutting_job_id', $job->id)
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->exists();
+            if ($hasQc) {
+                // Nested transaction tetap berada di transaction boundary ini;
+                // jika material return gagal, reversal QC ikut rollback.
+                $this->cancelCuttingBundleQc(
+                    bundle: $bundle,
+                    reason: 'Koreksi bundle: '.$reason,
+                    actorId: $actorId,
+                );
+                $bundle->refresh();
+            } elseif (! empty($bundle->wip_posted_at)) {
+                throw new \RuntimeException('Bundle memiliki WIP posted tetapi QC result tidak ditemukan; koreksi dihentikan untuk audit manual.');
+            }
+
+            // Koreksi tidak boleh meninggalkan output lama di WIP-CUT.
+            // cancelCuttingBundleQc() membalik mutasi per bundle; cek net di
+            // sini menjaga agar data lama/inconsistent tidak ikut diposting
+            // kembali ke bahan baku secara parsial.
+            $activeOutputNet = (float) InventoryMutation::query()
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->where(function ($query) use ($job): void {
+                    $query
+                        ->where(function ($original) use ($job): void {
+                            $original
+                                ->whereIn('source_type', [
+                                    'cutting_wip',
+                                    'cutting_reject',
+                                    'cutting_qc_adjust_in',
+                                    'cutting_qc_adjust_out',
+                                ])
+                                ->where('source_id', $job->id);
+                        })
+                        ->orWhere('source_type', 'cutting_qc_bundle_void');
+                })
+                ->sum('qty_change');
+            if (abs($activeOutputNet) > 0.0001) {
+                throw new \RuntimeException(
+                    "Bundle {$bundle->bundle_code} masih memiliki saldo output WIP-CUT {$activeOutputNet}. "
+                    .'Koreksi dihentikan agar tidak terjadi stok ganda; lakukan audit/cancel QC terlebih dahulu.'
+                );
+            }
+
+            $lotId = (int) ($bundle->lot_id ?: $job->lot_id);
+            if ($lotId <= 0) {
+                throw new \RuntimeException('LOT bahan bundle tidak ditemukan; material tidak boleh dikembalikan tanpa LOT sumber.');
+            }
+
+            $lot = \App\Models\Lot::query()->whereKey($lotId)->lockForUpdate()->first();
+            if (! $lot) {
+                throw new \RuntimeException("LOT #{$lotId} tidak ditemukan.");
+            }
+            $warehouseId = (int) ($job->warehouse_id ?? 0);
+            $materialItemId = (int) ($lot->item_id ?: $job->fabric_item_id);
+            if ($warehouseId <= 0 || $materialItemId <= 0) {
+                throw new \RuntimeException('Gudang atau item bahan sumber bundle tidak lengkap.');
+            }
+
+            $rawMutations = InventoryMutation::query()
+                ->where('source_type', 'cutting_job')
+                ->where('source_id', $job->id)
+                ->where('lot_id', $lotId)
+                ->where('direction', 'out')
+                ->where('qty_change', '<', 0)
+                ->whereNotNull('unit_cost')
+                ->lockForUpdate()
+                ->get();
+            $rawQty = abs((float) $rawMutations->sum('qty_change'));
+            $rawCost = abs((float) $rawMutations->sum('total_cost'));
+            $unitCost = $rawQty > 0.000001 ? round($rawCost / $rawQty, 6) : (float) ($lot->avg_cost ?? 0);
+            if ($unitCost <= 0.000001) {
+                throw new \RuntimeException('Nilai bahan sumber tidak ditemukan; koreksi dihentikan agar tidak mengembalikan stok tanpa nilai.');
+            }
+
+            $qcCancellation = CuttingQcCancellation::query()
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->latest('id')
+                ->first();
+            $correction = CuttingBundleCorrection::create([
+                'cutting_job_id' => $job->id,
+                'cutting_job_bundle_id' => $bundle->id,
+                'original_item_id' => $bundle->finished_item_id,
+                'replacement_item_id' => $replacementItem->id,
+                'lot_id' => $lotId,
+                'warehouse_id' => $warehouseId,
+                'return_fabric_qty' => $returnFabricQty,
+                'unit_cost' => $unitCost,
+                'return_cost' => round($returnFabricQty * $unitCost, 2),
+                'status' => 'returned',
+                'reason' => $reason,
+                'corrected_by' => $actorId ?: auth()->id(),
+                'corrected_at' => now(),
+                'qc_cancellation_id' => $qcCancellation?->id,
+                'metadata' => [
+                    'original_bundle_item_code' => $bundle->finishedItem?->code,
+                    'replacement_item_code' => $replacementItem->code,
+                    'original_fabric_qty' => $originalFabricQty,
+                    'active_picked_qty_at_correction' => $activePickedQty,
+                ],
+            ]);
+
+            $materialReturn = $this->inventory->stockIn(
+                warehouseId: $warehouseId,
+                itemId: $materialItemId,
+                qty: $returnFabricQty,
+                date: now(),
+                sourceType: 'cutting_bundle_material_return',
+                sourceId: (int) $correction->id,
+                notes: "Koreksi bundle {$bundle->bundle_code} — kembali ke bahan baku LOT {$lot->code}",
+                lotId: $lotId,
+                unitCost: $unitCost,
+                affectLotCost: true,
+                cuttingJobBundleId: $bundle->id,
+            );
+            if (! $materialReturn) {
+                throw new \RuntimeException('Mutasi pengembalian bahan tidak terbentuk.');
+            }
+
+            $journal = $this->journal->post(
+                date: now()->toDateString(),
+                sourceType: JournalService::SRC_CUTTING_BUNDLE_MATERIAL_RETURN,
+                sourceId: (int) $correction->id,
+                description: "Koreksi bundle {$bundle->bundle_code} — material kembali ke bahan baku",
+                lines: [
+                    ['account_id' => $this->journalAccountId(JournalService::CODE_INV_RAW), 'debit' => $correction->return_cost, 'credit' => 0],
+                    ['account_id' => $this->journalAccountId(JournalService::CODE_INV_WIP), 'debit' => 0, 'credit' => $correction->return_cost],
+                ],
+                meta: [
+                    'reference_no' => $bundle->bundle_code,
+                    'notes' => $reason,
+                    'replacement_item_code' => $replacementItem->code,
+                    'created_by' => $actorId ?: auth()->id(),
+                ],
+            );
+            $this->standaloneProductionPosting->mirrorCuttingBundleMaterialReturn((int) $correction->id);
+
+            $jobLot = DB::table('cutting_job_lots')
+                ->where('cutting_job_id', $job->id)
+                ->where('lot_id', $lotId)
+                ->lockForUpdate()
+                ->first();
+            if ($jobLot) {
+                DB::table('cutting_job_lots')
+                    ->where('id', $jobLot->id)
+                    ->update([
+                        'used_fabric_qty' => max(0, (float) $jobLot->used_fabric_qty - $returnFabricQty),
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            $bundle->qty_used_fabric = 0;
+            $bundle->status = 'corrected';
+            $bundle->wip_qty = 0;
+            $bundle->wip_warehouse_id = null;
+            $bundle->wip_posted_at = null;
+            $bundle->cut_wip_qty = 0;
+            $bundle->cut_wip_warehouse_id = null;
+            $bundle->notes = trim(implode("\n", array_filter([
+                $bundle->notes,
+                "Koreksi bundle #{$correction->id}: item pengganti {$replacementItem->code}; bahan dikembalikan {$returnFabricQty}.",
+            ])));
+            $bundle->save();
+
+            $correction->update([
+                'material_return_mutation_id' => $materialReturn->id,
+                'material_return_journal_id' => $journal->id,
+            ]);
+
+            $this->postCuttingBundleCorrectionWageVoid($correction, $job, $bundle, $actorId);
+
+            ProductionLog::record(
+                event: 'cutting_bundle_corrected_to_raw',
+                summary: "Koreksi bundle {$bundle->bundle_code}: bahan kembali ke LOT {$lot->code}",
+                meta: [
+                    'cutting_job_id' => (int) $job->id,
+                    'bundle_id' => (int) $bundle->id,
+                    'correction_id' => (int) $correction->id,
+                    'original_item_code' => $bundle->finishedItem?->code,
+                    'replacement_item_code' => $replacementItem->code,
+                    'return_fabric_qty' => $returnFabricQty,
+                    'return_cost' => (float) $correction->return_cost,
+                    'material_return_mutation_id' => (int) $materialReturn->id,
+                    'material_return_journal_id' => (int) $journal->id,
+                ],
+                sourceType: CuttingBundleCorrection::class,
+                sourceId: (int) $correction->id,
+                reference: $bundle->bundle_code,
+            );
+
+            return $correction->fresh();
+        });
+    }
+
+    private function postCuttingBundleCorrectionWageVoid(
+        CuttingBundleCorrection $correction,
+        CuttingJob $job,
+        CuttingJobBundle $bundle,
+        ?int $actorId = null,
+    ): void {
+        $metadata = $correction->metadata ?? [];
+        if (array_key_exists('wage_reversal_status', $metadata)) {
+            return;
+        }
+
+        $wageJournal = \App\Models\Journal::query()
+            ->where('source_type', JournalService::SRC_CUTTING_JOB_WAGE)
+            ->where('source_id', $job->id)
+            ->whereNull('voided_at')
+            ->with(['lines.account'])
+            ->first();
+        $totalJobWage = (float) ($wageJournal?->lines
+            ->filter(fn ($line) => $line->account?->code === JournalService::CODE_INV_WIP)
+            ->sum('debit') ?? 0);
+
+        if ($totalJobWage <= 0.01) {
+            $metadata['wage_reversal_status'] = 'not_required';
+            $correction->update(['metadata' => $metadata]);
+
+            return;
+        }
+
+        $employeeId = (int) ($bundle->operator_id ?: $job->operator_id ?: 0);
+        $itemId = (int) ($bundle->finished_item_id ?? 0);
+        $rate = $this->pieceRate->getRatePerPcs(
+            module: 'cutting',
+            employeeId: $employeeId,
+            itemId: $itemId,
+            date: $job->date,
+        );
+        $bundleWage = $rate > 0
+            ? round((float) $bundle->qty_pcs * $rate, 2)
+            : round($totalJobWage * ((float) $bundle->qty_pcs / max((float) $job->bundles()->sum('qty_pcs'), 1)), 2);
+        $wageAmount = min($totalJobWage, max($bundleWage, 0));
+        if ($wageAmount <= 0.01) {
+            $metadata['wage_reversal_status'] = 'not_required';
+            $correction->update(['metadata' => $metadata]);
+
+            return;
+        }
+
+        $lossAccountId = $this->journalAccountId(JournalService::CODE_PRODUCTION_LOSS);
+        $wipAccountId = $this->journalAccountId(JournalService::CODE_INV_WIP);
+        if ($lossAccountId <= 0 || $wipAccountId <= 0) {
+            throw new \RuntimeException('Akun 6120 atau 1202 belum tersedia untuk reversal upah koreksi bundle.');
+        }
+
+        $journal = $this->journal->post(
+            date: now()->toDateString(),
+            sourceType: JournalService::SRC_CUTTING_BUNDLE_CORRECTION_WAGE_VOID,
+            sourceId: (int) $correction->id,
+            description: "Koreksi bundle {$bundle->bundle_code} — reversal upah cutting",
+            lines: [
+                ['account_id' => $lossAccountId, 'debit' => $wageAmount, 'credit' => 0],
+                ['account_id' => $wipAccountId, 'debit' => 0, 'credit' => $wageAmount],
+            ],
+            meta: [
+                'reference_no' => $bundle->bundle_code,
+                'reason' => 'Upah cutting bundle salah item dipindahkan ke beban koreksi produksi.',
+                'created_by' => $actorId ?: auth()->id(),
+                'wage_amount' => $wageAmount,
+                'source_wage_journal_id' => $wageJournal?->id,
+            ],
+        );
+        $this->standaloneProductionPosting->mirrorCuttingBundleCorrectionWageVoid((int) $correction->id);
+
+        $metadata['wage_reversal_status'] = 'posted';
+        $metadata['wage_reversal_journal_id'] = (int) $journal->id;
+        $metadata['wage_reversal_amount'] = $wageAmount;
+        $correction->update(['metadata' => $metadata]);
+    }
+
+    /**
+     * Repair one correction created by an older implementation that returned
+     * raw material but left the bundle output in WIP-CUT. The repair is
+     * transactional and idempotent by correction id.
+     */
+    public function repairCuttingBundleCorrectionWip(
+        CuttingBundleCorrection $correction,
+        ?int $actorId = null,
+    ): CuttingBundleCorrection {
+        return DB::transaction(function () use ($correction, $actorId): CuttingBundleCorrection {
+            $correction = CuttingBundleCorrection::query()
+                ->whereKey($correction->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($correction->status !== 'returned') {
+                throw new \RuntimeException('Hanya correction berstatus returned yang dapat diperbaiki.');
+            }
+
+            $metadata = $correction->metadata ?? [];
+            $wipAlreadyRepaired = ! empty($metadata['wip_reversal_mutation_ids']);
+            $wageAlreadyRepaired = array_key_exists('wage_reversal_status', $metadata);
+            if ($wipAlreadyRepaired && $wageAlreadyRepaired) {
+                return $correction->fresh();
+            }
+
+            $bundle = CuttingJobBundle::query()
+                ->whereKey($correction->cutting_job_bundle_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $residuals = InventoryMutation::query()
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->where(function ($query) use ($correction): void {
+                    $query
+                        ->where(function ($original) use ($correction): void {
+                            $original
+                                ->whereIn('source_type', [
+                                    'cutting_wip',
+                                    'cutting_reject',
+                                    'cutting_qc_adjust_in',
+                                    'cutting_qc_adjust_out',
+                                ])
+                                ->where('source_id', $correction->cutting_job_id);
+                        })
+                        ->orWhere('source_type', 'cutting_qc_bundle_void');
+                })
+                ->selectRaw('warehouse_id, item_id, lot_id, SUM(qty_change) as net_qty, SUM(COALESCE(total_cost, 0)) as net_cost')
+                ->groupBy('warehouse_id', 'item_id', 'lot_id')
+                ->lockForUpdate()
+                ->get();
+
+            $reversalMutationIds = $metadata['wip_reversal_mutation_ids'] ?? [];
+            $totalValue = (float) ($metadata['wip_reversal_value'] ?? 0);
+            foreach (($wipAlreadyRepaired ? collect() : $residuals) as $residual) {
+                $netQty = round((float) $residual->net_qty, 4);
+                if ($netQty <= 0.0001) {
+                    continue;
+                }
+
+                $netCost = round((float) $residual->net_cost, 2);
+                $unitCost = $netQty > 0.0001 && $netCost > 0.01
+                    ? round($netCost / $netQty, 6)
+                    : null;
+                $reversal = $this->inventory->adjustByDifference(
+                    warehouseId: (int) $residual->warehouse_id,
+                    itemId: (int) $residual->item_id,
+                    qtyChange: -$netQty,
+                    date: now(),
+                    sourceType: 'cutting_bundle_correction_wip_void',
+                    sourceId: (int) $correction->id,
+                    notes: "Reversal audit WIP-CUT correction #{$correction->id} — {$bundle->bundle_code}",
+                    lotId: $residual->lot_id ? (int) $residual->lot_id : null,
+                    allowNegative: false,
+                    unitCostOverride: $unitCost,
+                    affectLotCost: false,
+                    cuttingJobBundleId: $bundle->id,
+                );
+                if ($reversal?->id) {
+                    $reversalMutationIds[] = (int) $reversal->id;
+                }
+                $totalValue += max($netCost, 0);
+            }
+
+            if ($reversalMutationIds && $totalValue > 0.01) {
+                $journal = $this->journal->post(
+                    date: now()->toDateString(),
+                    sourceType: JournalService::SRC_CUTTING_BUNDLE_CORRECTION_WIP_VOID,
+                    sourceId: (int) $correction->id,
+                    description: "Reversal audit WIP-CUT correction #{$correction->id} — {$bundle->bundle_code}",
+                    lines: [
+                        ['account_id' => $this->journalAccountId(JournalService::CODE_INV_WIP), 'debit' => $totalValue, 'credit' => 0],
+                        ['account_id' => $this->journalAccountId(JournalService::CODE_INV_WIP), 'debit' => 0, 'credit' => $totalValue],
+                    ],
+                    meta: [
+                        'reference_no' => $bundle->bundle_code,
+                        'reason' => 'Membersihkan saldo output WIP-CUT yang tertinggal dari koreksi bundle.',
+                        'created_by' => $actorId ?: auth()->id(),
+                        'reversal_mutation_ids' => $reversalMutationIds,
+                    ],
+                );
+                $this->standaloneProductionPosting->mirrorCuttingBundleCorrectionWipVoid((int) $correction->id);
+                $metadata['wip_reversal_journal_id'] = (int) $journal->id;
+            }
+
+            $bundle->forceFill([
+                'wip_qty' => 0,
+                'wip_warehouse_id' => null,
+                'wip_posted_at' => null,
+                'cut_wip_qty' => 0,
+                'cut_wip_warehouse_id' => null,
+            ])->save();
+
+            if (! $wipAlreadyRepaired) {
+                $metadata['wip_reversal_mutation_ids'] = $reversalMutationIds;
+                $metadata['wip_reversal_value'] = round($totalValue, 2);
+                $metadata['wip_repaired_at'] = now()->toISOString();
+            }
+            $correction->update(['metadata' => $metadata]);
+
+            $this->postCuttingBundleCorrectionWageVoid($correction, $correction->cuttingJob, $bundle, $actorId);
+
+            ProductionLog::record(
+                event: 'cutting_bundle_correction_wip_repaired',
+                summary: "Reversal audit WIP-CUT correction #{$correction->id} — {$bundle->bundle_code}",
+                meta: [
+                    'correction_id' => (int) $correction->id,
+                    'bundle_id' => (int) $bundle->id,
+                    'reversal_mutation_ids' => $reversalMutationIds,
+                    'reversal_value' => round($totalValue, 2),
+                ],
+                sourceType: CuttingBundleCorrection::class,
+                sourceId: (int) $correction->id,
+                reference: $bundle->bundle_code,
+            );
+
+            return $correction->fresh();
+        });
+    }
+
+    /**
      * Post jurnal tambahan ketika bundle yang pernah partial-cancel di-QC ulang.
      * Journal QC job lama tetap aktif karena bundle lain masih dipakai sewing.
      */
@@ -1186,7 +1752,7 @@ class QcService
                 ->latest('id')
                 ->first();
 
-            if (!$qc) {
+            if (! $qc) {
                 continue;
             }
 
@@ -1239,6 +1805,7 @@ class QcService
                 'reprocessed_qc_result_id' => $qc->id,
                 'reprocessed_at' => now(),
             ]);
+            $this->standaloneProductionPosting->mirrorCuttingQcBundleCancellation((int) $audit->id);
         }
     }
 
@@ -1286,7 +1853,7 @@ class QcService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$cancellation) {
+            if (! $cancellation) {
                 throw new \RuntimeException(
                     "Bundle {$bundle->bundle_code} harus di-Partial Cancel QC terlebih dahulu."
                 );
@@ -1310,13 +1877,13 @@ class QcService
                 ->canBeMade()
                 ->first();
 
-            if (!$item) {
+            if (! $item) {
                 throw new \RuntimeException(
                     "Item {$itemCode} tidak ditemukan atau belum dikonfigurasi sebagai item produksi."
                 );
             }
 
-            if (!DB::table('item_boms')
+            if (! DB::table('item_boms')
                 ->where('item_id', $item->id)
                 ->where('active', true)
                 ->exists()) {
@@ -1357,7 +1924,7 @@ class QcService
 
             ProductionLog::record(
                 event: 'qc_bundle_item_changed',
-                summary: "Item bundle {$bundle->bundle_code}: " . ($oldItem?->code ?? '-') . " → {$item->code}",
+                summary: "Item bundle {$bundle->bundle_code}: ".($oldItem?->code ?? '-')." → {$item->code}",
                 meta: [
                     'cutting_job_id' => (int) $job->id,
                     'bundle_id' => (int) $bundle->id,
@@ -1478,11 +2045,39 @@ class QcService
             $deltaOk = $newOk - $oldOk; // (+) tambah WIP, (-) kurangi WIP
             $deltaReject = $newReject - $oldReject; // (+) tambah REJ, (-) kurangi REJ
 
+            // Adjustment hanya untuk reklasifikasi OK <-> Reject. Perubahan
+            // total qty berarti membuat/menghapus nilai produksi dan wajib
+            // lewat Partial Cancel + QC ulang agar raw/labor cost dapat
+            // dihitung ulang secara lengkap.
+            if (abs(($deltaOk + $deltaReject)) > 0.000001) {
+                throw new \RuntimeException(
+                    'Adjust QC hanya boleh memindahkan klasifikasi OK/Reject dengan total qty tetap. '
+                    .'Untuk mengubah total qty, gunakan Partial Cancel lalu QC ulang.'
+                );
+            }
+
+            $originalOutput = InventoryMutation::query()
+                ->whereIn('source_type', ['cutting_wip', 'cutting_reject'])
+                ->where('source_id', $job->id)
+                ->where('cutting_job_bundle_id', $bundle->id)
+                ->where('qty_change', '>', 0)
+                ->lockForUpdate()
+                ->get();
+            $originalQty = (float) $originalOutput->sum('qty_change');
+            $originalCost = (float) $originalOutput->sum('total_cost');
+            $unitCost = $originalQty > 0.000001 ? round($originalCost / $originalQty, 6) : 0.0;
+
+            if (($deltaOk != 0.0 || $deltaReject != 0.0) && $unitCost <= 0.000001) {
+                throw new \RuntimeException(
+                    'Nilai biaya bundle tidak ditemukan. Adjustment dihentikan agar stok tidak bergerak tanpa nilai.'
+                );
+            }
+
             // warehouses
             $wipCutWarehouseId = Warehouse::where('code', 'WIP-CUT')->value('id');
             $rejCutWarehouseId = Warehouse::where('code', 'REJ-CUT')->value('id');
 
-            if (!$wipCutWarehouseId || !$rejCutWarehouseId) {
+            if (! $wipCutWarehouseId || ! $rejCutWarehouseId) {
                 throw new \RuntimeException('Warehouse WIP-CUT / REJ-CUT belum dikonfigurasi.');
             }
 
@@ -1507,7 +2102,7 @@ class QcService
                     sourceId: $job->id,
                     notes: "QC Adjust +OK {$deltaOk} pcs (bundle {$bundle->bundle_code}, job {$job->code})",
                     lotId: null,
-                    unitCost: null,
+                    unitCost: $unitCost,
                     affectLotCost: false,
                     cuttingJobBundleId: $bundle->id,
                 );
@@ -1520,10 +2115,10 @@ class QcService
                     date: $qcDate,
                     sourceType: 'cutting_qc_adjust_out',
                     sourceId: $job->id,
-                    notes: "QC Adjust -OK " . abs($deltaOk) . " pcs (bundle {$bundle->bundle_code}, job {$job->code})",
+                    notes: 'QC Adjust -OK '.abs($deltaOk)." pcs (bundle {$bundle->bundle_code}, job {$job->code})",
                     allowNegative: false,
                     lotId: null,
-                    unitCostOverride: null,
+                    unitCostOverride: $unitCost,
                     affectLotCost: false,
                     cuttingJobBundleId: $bundle->id,
                 );
@@ -1542,7 +2137,7 @@ class QcService
                     sourceId: $job->id,
                     notes: "QC Adjust +REJ {$deltaReject} pcs (bundle {$bundle->bundle_code}, job {$job->code})",
                     lotId: null,
-                    unitCost: null,
+                    unitCost: $unitCost,
                     affectLotCost: false,
                     cuttingJobBundleId: $bundle->id,
                 );
@@ -1554,13 +2149,29 @@ class QcService
                     date: $qcDate,
                     sourceType: 'cutting_qc_adjust_out',
                     sourceId: $job->id,
-                    notes: "QC Adjust -REJ " . abs($deltaReject) . " pcs (bundle {$bundle->bundle_code}, job {$job->code})",
+                    notes: 'QC Adjust -REJ '.abs($deltaReject)." pcs (bundle {$bundle->bundle_code}, job {$job->code})",
                     allowNegative: false,
                     lotId: null,
-                    unitCostOverride: null,
+                    unitCostOverride: $unitCost,
                     affectLotCost: false,
                     cuttingJobBundleId: $bundle->id,
                 );
+            }
+
+            if (abs($deltaOk) > 0.000001 || abs($deltaReject) > 0.000001) {
+                $this->journal->post(
+                    date: $qcDate,
+                    sourceType: JournalService::SRC_CUTTING_QC_ADJUST,
+                    sourceId: (int) $bundle->id,
+                    description: "QC Adjust {$job->code} — {$bundle->bundle_code}",
+                    lines: $this->buildQcAdjustmentJournalLines($deltaOk, $deltaReject, $unitCost),
+                    meta: [
+                        'reference_no' => $bundle->bundle_code,
+                        'notes' => $notes ?: 'Reklasifikasi OK/Reject dengan total qty tetap',
+                        'created_by' => $qcByUserId ?: auth()->id(),
+                    ],
+                );
+                $this->standaloneProductionPosting->mirrorCuttingQcAdjustment((int) $bundle->id);
             }
 
             // =========================
@@ -1614,4 +2225,198 @@ class QcService
         });
     }
 
+    /**
+     * Konsumsi BOM kelengkapan jahit pada saat QC Cutting.
+     *
+     * Hanya baris BOM dengan usage_stage=sewing_supply yang diproses. Qty
+     * dihitung dari Qty OK, bukan Qty reject. Mutasi, jurnal legacy, dan
+     * mirror baru berada dalam transaction yang sama dari controller.
+     */
+    public function consumeCuttingQcSewingSupplies(CuttingJob $job, ?string $qcDate = null): void
+    {
+        if (! config('accounting.standalone_production_cutting_qc_auto_bom_enabled', false)) {
+            return;
+        }
+
+        if (! config('accounting.standalone_dual_posting_production_cutting_enabled', false)) {
+            throw new \RuntimeException(
+                'Auto BOM QC Cutting membutuhkan feature flag mirror akuntansi baru Cutting aktif.'
+            );
+        }
+
+        $job->loadMissing(['bundles']);
+
+        // Idempotency: journal aktif menjadi penanda bahwa kebutuhan BOM job
+        // ini sudah diproses. Setelah Cancel QC penuh, jurnal di-VOID sehingga
+        // QC ulang boleh membuat konsumsi baru.
+        $alreadyPosted = DB::table('journals')
+            ->where('source_type', JournalService::SRC_CUTTING_QC_SEWING_SUPPLY)
+            ->where('source_id', $job->id)
+            ->whereNull('voided_at')
+            ->exists();
+        if ($alreadyPosted) {
+            return;
+        }
+
+        $qtyByFinishedItem = $job->bundles
+            ->groupBy('finished_item_id')
+            ->map(fn ($bundles): float => (float) $bundles->sum('qty_qc_ok'))
+            ->filter(fn (float $qty): bool => $qty > 0.000001)
+            ->all();
+        if ($qtyByFinishedItem === []) {
+            return;
+        }
+
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+        if (! $rmWarehouseId) {
+            throw new \RuntimeException('Gudang RM belum dikonfigurasi untuk auto BOM QC Cutting.');
+        }
+
+        $boms = ItemBom::query()
+            ->whereIn('item_id', array_keys($qtyByFinishedItem))
+            ->where('active', true)
+            ->with(['lines.material'])
+            ->get();
+
+        $requirements = [];
+        foreach ($boms as $bom) {
+            $qtyOk = (float) ($qtyByFinishedItem[(int) $bom->item_id] ?? 0);
+            foreach ($bom->lines as $line) {
+                if (! $this->isCuttingQcSewingSupplyLine($line)) {
+                    continue;
+                }
+
+                $materialId = (int) $line->material_item_id;
+                $requirements[$materialId] ??= [
+                    'material' => $line->material,
+                    'required_qty' => 0.0,
+                    'uom' => (string) ($line->uom ?: $line->material?->unit ?: 'pcs'),
+                ];
+                $requirements[$materialId]['required_qty'] += $qtyOk * (float) $line->qty;
+            }
+        }
+
+        if ($requirements === []) {
+            return;
+        }
+
+        $date = $qcDate ?: ($job->date?->format('Y-m-d') ?? now()->toDateString());
+        $totalSupplyCost = 0.0;
+        foreach ($requirements as $materialId => $requirement) {
+            $requiredQty = round((float) $requirement['required_qty'], 8);
+            if ($requiredQty <= 0.000001) {
+                continue;
+            }
+
+            $allocations = $this->lotAllocation->allocateFifo(
+                warehouseId: (int) $rmWarehouseId,
+                itemId: (int) $materialId,
+                requiredQty: $requiredQty,
+            );
+
+            foreach ($allocations as $allocation) {
+                $code = $requirement['material']?->code ?: "item #{$materialId}";
+                $notes = "Auto BOM QC Cutting {$job->code} — {$code} — LOT {$allocation['lot_code']}";
+
+                $this->inventory->stockOut(
+                    warehouseId: (int) $rmWarehouseId,
+                    itemId: (int) $materialId,
+                    qty: (float) $allocation['qty'],
+                    date: $date,
+                    sourceType: JournalService::SRC_CUTTING_QC_SEWING_SUPPLY,
+                    sourceId: (int) $job->id,
+                    notes: $notes,
+                    allowNegative: false,
+                    lotId: (int) $allocation['lot_id'],
+                    unitCostOverride: (float) $allocation['unit_cost'],
+                    affectLotCost: true,
+                );
+
+                $totalSupplyCost += (float) $allocation['qty'] * (float) $allocation['unit_cost'];
+            }
+        }
+
+        if ($totalSupplyCost <= 0.000001) {
+            return;
+        }
+
+        $this->allocateCuttingQcSupplyCostToWip($job, $totalSupplyCost);
+        $journal = $this->journal->postCuttingQcSewingSupply($job, $date);
+        if (! $journal) {
+            throw new \RuntimeException('Jurnal auto BOM QC Cutting tidak terbentuk. QC dibatalkan.');
+        }
+
+        $this->standaloneProductionPosting->mirrorCuttingQcSewingSupply((int) $job->id);
+    }
+
+    private function allocateCuttingQcSupplyCostToWip(CuttingJob $job, float $supplyCost): void
+    {
+        $outputs = InventoryMutation::query()
+            ->where('source_type', JournalService::SRC_CUTTING_WIP)
+            ->where('source_id', $job->id)
+            ->where('qty_change', '>', 0)
+            ->lockForUpdate()
+            ->get();
+        $totalQty = (float) $outputs->sum('qty_change');
+        if ($totalQty <= 0.000001) {
+            throw new \RuntimeException('Output WIP-CUT belum tersedia untuk alokasi cost BOM QC Cutting.');
+        }
+
+        foreach ($outputs as $output) {
+            $qty = (float) $output->qty_change;
+            $allocation = $supplyCost * ($qty / $totalQty);
+            $oldTotal = (float) ($output->total_cost ?? ($qty * (float) ($output->unit_cost ?? 0)));
+            $newTotal = $oldTotal + $allocation;
+            $output->unit_cost = $qty > 0 ? $newTotal / $qty : $output->unit_cost;
+            $output->total_cost = $newTotal;
+            $output->save();
+        }
+    }
+
+    private function isCuttingQcSewingSupplyLine(ItemBomLine $line): bool
+    {
+        if (! $line->material || (bool) ($line->is_optional ?? false)) {
+            return false;
+        }
+
+        $stage = (string) ($line->usage_stage ?? '');
+        if ($stage !== '') {
+            return $stage === ItemBomLine::STAGE_SEWING_SUPPLY;
+        }
+
+        $roleCode = $line->material->role_code;
+        $legacyRole = (string) ($line->material->item_role ?? '');
+        $code = strtoupper((string) ($line->material->code ?? ''));
+
+        return $roleCode === \App\Models\ItemRole::SUP
+            || $legacyRole === 'production_supply'
+            || str_starts_with($code, 'RIB')
+            || str_starts_with($code, 'KRT')
+            || str_starts_with($code, 'TLK');
+    }
+
+    /** @return array<int, array{account_id:int,debit:float,credit:float}> */
+    private function buildQcAdjustmentJournalLines(float $deltaOk, float $deltaReject, float $unitCost): array
+    {
+        $lines = [];
+        $okValue = round(abs($deltaOk) * $unitCost, 2);
+        $rejectValue = round(abs($deltaReject) * $unitCost, 2);
+
+        if ($okValue > 0.01) {
+            $lines[] = [
+                'account_id' => $this->journalAccountId(JournalService::CODE_INV_WIP),
+                'debit' => $deltaOk > 0 ? $okValue : 0,
+                'credit' => $deltaOk < 0 ? $okValue : 0,
+            ];
+        }
+        if ($rejectValue > 0.01) {
+            $lines[] = [
+                'account_id' => $this->journalAccountId(JournalService::CODE_INV_DEFECT),
+                'debit' => $deltaReject > 0 ? $rejectValue : 0,
+                'credit' => $deltaReject < 0 ? $rejectValue : 0,
+            ];
+        }
+
+        return $lines;
+    }
 }

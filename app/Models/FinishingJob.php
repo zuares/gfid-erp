@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\User;
-use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,6 +13,8 @@ class FinishingJob extends Model
         'date',
         'status',
         'notes',
+        'posted_at',
+        'unposted_at',
         'destination_warehouse_id',
         'created_by',
         'updated_by',
@@ -23,6 +23,7 @@ class FinishingJob extends Model
     protected $casts = [
         'date' => 'date',
         'posted_at' => 'datetime',
+        'unposted_at' => 'datetime',
     ];
 
     // ====== RELATIONSHIPS ======
@@ -69,5 +70,4 @@ class FinishingJob extends Model
         // FK-nya pakai operator_id
         return $this->belongsTo(Employee::class, 'operator_id');
     }
-
 }

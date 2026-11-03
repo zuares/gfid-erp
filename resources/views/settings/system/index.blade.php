@@ -65,9 +65,11 @@
     .ss-stat { position: relative; min-width: 0; padding: .75rem .85rem; border: 1px solid var(--ss-line); border-radius: 11px; background: var(--ss-surface-soft); overflow: hidden; }
     .ss-stat::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--ss-brand); }
     .ss-stat-legacy::before { background: #f59e0b; }
+    .ss-stat-warning::before { background: #d97706; }
     .ss-stat-label { color: var(--ss-muted); font-size: .64rem; font-weight: 900; letter-spacing: .045em; line-height: 1.35; text-transform: uppercase; }
     .ss-stat-value { margin-top: .25rem; color: var(--ss-text); font-size: 1.12rem; font-weight: 950; line-height: 1.1; font-variant-numeric: tabular-nums; }
     .ss-stat-sub { margin-top: .2rem; color: var(--ss-muted); font-size: .69rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ss-meta { color: var(--ss-muted); font-size: .69rem; line-height: 1.45; }
 
     .ss-form-grid { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr); gap: .8rem; align-items: start; }
     .ss-field { display: grid; gap: .32rem; }
@@ -135,7 +137,7 @@
     class="ss-page"
     eyebrow="Owner · System"
     title="Pengaturan Sistem"
-    description="Kelola tanggal cut-off untuk memisahkan data legacy dan transaksi produksi baru.">
+        description="Tentukan kapan pencatatan sistem baru mulai dipakai.">
 
     @if(session('success'))
         <div class="ss-alert ss-alert-success" role="status">
@@ -149,8 +151,8 @@
             <section class="ss-card" aria-labelledby="cutoff-status-title">
                 <div class="ss-card-head">
                     <div class="ss-card-head-copy">
-                        <div class="ss-card-title" id="cutoff-status-title"><i class="bi bi-calendar3" aria-hidden="true"></i>Status cut-off date</div>
-                        <p class="ss-card-sub">Tanggal pemisah antara data lama (legacy) dan data baru. Data sebelum cut-off tetap tersimpan dan dapat dilihat dengan filter manual.</p>
+                        <div class="ss-card-title" id="cutoff-status-title"><i class="bi bi-calendar3" aria-hidden="true"></i>Status periode</div>
+                        <p class="ss-card-sub">Data sebelum tanggal ini tetap tersimpan sebagai data lama.</p>
                     </div>
                     @if($cutoffDate)
                         <span class="ss-status ss-status-on">Aktif · {{ \Carbon\Carbon::parse($cutoffDate)->format('d M Y') }}</span>
@@ -160,28 +162,47 @@
                 </div>
                 <div class="ss-card-body">
                     @if(! $cutoffDate)
-                        <div class="ss-alert ss-alert-warning" role="alert"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i><span>Semua laporan masih menampilkan seluruh data historis. Set cut-off date untuk memulai periode produksi baru.</span></div>
+                        <div class="ss-alert ss-alert-warning" role="alert"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i><span>Tentukan tanggal mulai agar laporan baru memiliki awal periode yang jelas.</span></div>
                     @else
                         <div class="ss-cutoff-hero">
                             <div>
                                 <div class="ss-kicker">Periode sistem baru dimulai</div>
                                 <div class="ss-date">{{ \Carbon\Carbon::parse($cutoffDate)->translatedFormat('d F Y') }}</div>
-                                <div class="ss-date-note">Laporan baru akan default mulai dari tanggal ini.</div>
+                                <div class="ss-date-note">Laporan baru dimulai dari tanggal ini.</div>
                             </div>
                             <i class="bi bi-calendar2-check ss-cutoff-icon" aria-hidden="true"></i>
                         </div>
 
                         @if($stats)
                             <div class="ss-stat-grid" aria-label="Ringkasan data berdasarkan cut-off">
-                                <div class="ss-stat ss-stat-legacy"><div class="ss-stat-label">Mutasi stok · legacy</div><div class="ss-stat-value">{{ number_format($stats->legacy_count) }}</div><div class="ss-stat-sub">Rp {{ number_format($stats->legacy_value, 0, ',', '.') }} sebelum cut-off</div></div>
-                                <div class="ss-stat"><div class="ss-stat-label">Mutasi stok · baru</div><div class="ss-stat-value">{{ number_format($stats->new_count) }}</div><div class="ss-stat-sub">Rp {{ number_format($stats->new_value, 0, ',', '.') }} setelah cut-off</div></div>
-                                <div class="ss-stat ss-stat-legacy"><div class="ss-stat-label">Jurnal · legacy</div><div class="ss-stat-value">{{ number_format($stats->journal_legacy) }}</div><div class="ss-stat-sub">Jurnal accounting lama</div></div>
-                                <div class="ss-stat"><div class="ss-stat-label">Jurnal · baru</div><div class="ss-stat-value">{{ number_format($stats->journal_new) }}</div><div class="ss-stat-sub">Jurnal accounting baru</div></div>
+                                <div class="ss-stat ss-stat-legacy"><div class="ss-stat-label">Mutasi lama</div><div class="ss-stat-value">{{ number_format($stats->legacy_count) }}</div><div class="ss-stat-sub">Rp {{ number_format($stats->legacy_value, 0, ',', '.') }}</div></div>
+                                <div class="ss-stat"><div class="ss-stat-label">Mutasi baru</div><div class="ss-stat-value">{{ number_format($stats->new_count) }}</div><div class="ss-stat-sub">Rp {{ number_format($stats->new_value, 0, ',', '.') }}</div></div>
+                                <div class="ss-stat ss-stat-legacy"><div class="ss-stat-label">Jurnal lama</div><div class="ss-stat-value">{{ number_format($stats->journal_legacy) }}</div><div class="ss-stat-sub">Sebelum tanggal mulai</div></div>
+                                <div class="ss-stat"><div class="ss-stat-label">Jurnal sistem baru</div><div class="ss-stat-value">{{ number_format($stats->journal_new) }}</div><div class="ss-stat-sub">Setelah tanggal mulai</div></div>
+                                <div class="ss-stat ss-stat-warning"><div class="ss-stat-label">Opening balance</div><div class="ss-stat-value">{{ ($stats->dummy_opening_count ?? 0) > 0 ? 'DUMMY' : '—' }}</div><div class="ss-stat-sub">{{ ($stats->dummy_opening_count ?? 0) > 0 ? 'Belum siap untuk laporan resmi' : 'Tidak ada dummy aktif' }}</div></div>
                             </div>
+
+                            @if(($stats->dummy_opening_count ?? 0) > 0)
+                                <div class="ss-alert ss-alert-warning mt-3" role="alert">
+                                    <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                                    <span>Saldo awal masih dummy. Ganti dengan saldo riil sebelum memakai laporan baru.</span>
+                                </div>
+                            @endif
                         @endif
 
                         @if($cutoffNotes)
                             <div class="ss-note mt-3" style="background:var(--ss-surface-soft);border-color:var(--ss-line);color:var(--ss-muted);"><strong style="color:var(--ss-text);">Catatan cut-off:</strong> {{ $cutoffNotes }}</div>
+                        @endif
+
+                        @if($cutoffSetting?->updated_at)
+                            <div class="ss-meta mt-3">
+                                Terakhir diubah {{ $cutoffSetting->updated_at->translatedFormat('d F Y, H:i') }}
+                                @if($cutoffSetting->updater?->name)
+                                    oleh {{ $cutoffSetting->updater->name }}
+                                @elseif($cutoffSetting->updated_by)
+                                    oleh user #{{ $cutoffSetting->updated_by }}
+                                @endif
+                            </div>
                         @endif
                     @endif
                 </div>
@@ -190,8 +211,8 @@
             <section class="ss-card" aria-labelledby="cutoff-form-title">
                 <div class="ss-card-head">
                     <div class="ss-card-head-copy">
-                        <div class="ss-card-title" id="cutoff-form-title"><i class="bi bi-sliders2" aria-hidden="true"></i>{{ $cutoffDate ? 'Ubah cut-off date' : 'Set cut-off date' }}</div>
-                        <p class="ss-card-sub">Pilih tanggal awal periode baru. Tanggal tidak boleh berada di masa depan.</p>
+                        <div class="ss-card-title" id="cutoff-form-title"><i class="bi bi-sliders2" aria-hidden="true"></i>Tanggal mulai sistem baru</div>
+                        <p class="ss-card-sub">Pilih tanggal pertama pencatatan baru.</p>
                     </div>
                 </div>
                 <div class="ss-card-body">
@@ -199,64 +220,50 @@
                         @csrf
                         <div class="ss-form-grid">
                             <div class="ss-field">
-                                <label class="ss-label" for="cutoff_date">Tanggal cut-off <span aria-hidden="true">*</span></label>
+                                <label class="ss-label" for="cutoff_date">Mulai pada <span aria-hidden="true">*</span></label>
                                 <input type="date" id="cutoff_date" name="cutoff_date" class="form-control @error('cutoff_date') is-invalid @enderror" value="{{ old('cutoff_date', $cutoffDate) }}" max="{{ now()->toDateString() }}" required>
                                 @error('cutoff_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                <div class="ss-help">Laporan akan memakai tanggal ini sebagai awal periode default.</div>
                             </div>
                             <div class="ss-field">
                                 <label class="ss-label" for="cutoff_notes">Catatan <span style="font-weight:500;color:var(--ss-muted);">(opsional)</span></label>
-                                <textarea id="cutoff_notes" name="cutoff_notes" class="form-control" rows="2" maxlength="500" placeholder="Contoh: Reset produksi Juli 2026.">{{ old('cutoff_notes', $cutoffNotes) }}</textarea>
-                                <div class="ss-help">Simpan konteks perubahan agar mudah ditelusuri oleh owner atau tim accounting.</div>
+                                <textarea id="cutoff_notes" name="cutoff_notes" class="form-control" rows="2" maxlength="500" placeholder="Contoh: Mulai accounting baru.">{{ old('cutoff_notes', $cutoffNotes) }}</textarea>
                             </div>
                         </div>
-                        <div class="ss-actions"><button type="submit" class="ss-btn ss-btn-primary"><i class="bi bi-check2" aria-hidden="true"></i>Simpan cut-off date</button></div>
+                        <div class="ss-actions"><button type="submit" class="ss-btn ss-btn-primary"><i class="bi bi-check2" aria-hidden="true"></i>Simpan tanggal</button></div>
                     </form>
                 </div>
             </section>
 
             @if($cutoffDate)
                 <section class="ss-card ss-danger-card" aria-labelledby="clear-cutoff-title">
-                    <div class="ss-card-head"><div class="ss-card-head-copy"><div class="ss-card-title" id="clear-cutoff-title"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset cut-off date</div><p class="ss-card-sub">Gunakan hanya jika laporan perlu kembali menampilkan seluruh data historis.</p></div></div>
+                    <div class="ss-card-head"><div class="ss-card-head-copy"><div class="ss-card-title" id="clear-cutoff-title"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Kembalikan tampilan semua data</div><p class="ss-card-sub">Hanya menghapus filter tanggal default.</p></div></div>
                     <div class="ss-card-body ss-danger-body">
-                        <div class="ss-danger-copy"><strong>Data tidak akan dihapus.</strong><br>Yang diubah hanya default filter laporan.</div>
-                        <form action="{{ route('settings.system.cutoff.clear') }}" method="POST" onsubmit="return confirm('Yakin hapus cut-off date? Laporan akan kembali menampilkan semua data lama.')">
+                        <div class="ss-danger-copy"><strong>Data tetap aman.</strong><br>Yang berubah hanya tampilan laporan.</div>
+                        <form action="{{ route('settings.system.cutoff.clear') }}" method="POST" onsubmit="return confirm('Kembalikan tampilan semua data? Tidak ada data yang akan dihapus.')">
                             @csrf
-                            <button type="submit" class="ss-btn ss-btn-danger"><i class="bi bi-trash3" aria-hidden="true"></i>Hapus cut-off</button>
+                            <button type="submit" class="ss-btn ss-btn-danger"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Kembalikan semua data</button>
                         </form>
                     </div>
                 </section>
             @endif
         </div>
 
-        <aside class="ss-aside" aria-label="Panduan opening balance">
+        <aside class="ss-aside" aria-label="Langkah berikutnya">
             <section class="ss-card">
-                <div class="ss-card-head"><div class="ss-card-head-copy"><div class="ss-card-title"><i class="bi bi-list-check" aria-hidden="true"></i>Alur opening balance</div><p class="ss-card-sub">Ikuti urutan ini setelah cut-off date ditetapkan.</p></div></div>
+                <div class="ss-card-head"><div class="ss-card-head-copy"><div class="ss-card-title"><i class="bi bi-list-check" aria-hidden="true"></i>Langkah berikutnya</div><p class="ss-card-sub">Setelah tanggal disimpan.</p></div></div>
                 <div class="ss-card-body">
-                    <x-search-input
-                        id="opening-guide-search"
-                        class="ss-guide-search"
-                        target="[data-opening-guide-item]"
-                        count-id="opening-guide-count"
-                        empty-id="opening-guide-empty"
-                        item-label="panduan"
-                        label="Cari panduan opening balance"
-                        placeholder="Cari langkah, menu, atau kata kunci…" />
                     <ol class="ss-step-list">
-                        <li class="ss-step" data-opening-guide-item><span class="ss-step-number">1</span><div><div class="ss-step-title">Set cut-off date</div><div class="ss-step-desc">Tentukan tanggal pertama sistem baru di form sebelah kiri.</div></div></li>
-                        <li class="ss-step" data-opening-guide-item><span class="ss-step-number">2</span><div><div class="ss-step-title">Opening stock bahan baku</div><div class="ss-step-desc"><a class="ss-link" href="{{ route('inventory.stock_opnames.create') }}?type=opening" target="_blank" rel="noopener">Stock Opname → Opening</a>, pilih gudang RM, isi qty dan HPP.</div></div></li>
-                        <li class="ss-step" data-opening-guide-item><span class="ss-step-number">3</span><div><div class="ss-step-title">Opening stock barang jadi</div><div class="ss-step-desc"><a class="ss-link" href="{{ route('inventory.stock_opnames.create') }}?type=opening" target="_blank" rel="noopener">Stock Opname → Opening</a> untuk gudang FG/WH-RTS.</div></div></li>
-                        <li class="ss-step" data-opening-guide-item><span class="ss-step-number">4</span><div><div class="ss-step-title">Opening balance accounting</div><div class="ss-step-desc"><a class="ss-link" href="{{ route('accounting.opening-balances-batch.create') }}" target="_blank" rel="noopener">Opening Balance Batch</a> untuk kas, piutang, hutang, dan ekuitas.</div></div></li>
-                        <li class="ss-step" data-opening-guide-item><span class="ss-step-number">5</span><div><div class="ss-step-title">Verifikasi trial balance</div><div class="ss-step-desc"><a class="ss-link" href="{{ route('accounting.trial-balance.index') }}" target="_blank" rel="noopener">Trial Balance</a>; pastikan debit dan kredit balance.</div></div></li>
-                        <li class="ss-step" data-opening-guide-item><span class="ss-step-number">6</span><div><div class="ss-step-title">Mulai transaksi baru</div><div class="ss-step-desc">Lanjutkan Cutting, Sewing, Finishing, Shipment, dan transaksi operasional lain.</div></div></li>
+                        <li class="ss-step"><span class="ss-step-number">1</span><div><div class="ss-step-title">Isi stok awal</div><div class="ss-step-desc"><a class="ss-link" href="{{ route('inventory.stock_opnames.create') }}?type=opening" target="_blank" rel="noopener">Stock Opname → Opening</a></div></div></li>
+                        <li class="ss-step"><span class="ss-step-number">2</span><div><div class="ss-step-title">Isi saldo accounting</div><div class="ss-step-desc"><a class="ss-link" href="{{ route('accounting.opening-balances-batch.create') }}" target="_blank" rel="noopener">Opening Balance Batch</a></div></div></li>
+                        <li class="ss-step"><span class="ss-step-number">3</span><div><div class="ss-step-title">Cek keseimbangan</div><div class="ss-step-desc"><a class="ss-link" href="{{ route('accounting.trial-balance.index') }}" target="_blank" rel="noopener">Trial Balance</a></div></div></li>
+                        <li class="ss-step"><span class="ss-step-number">4</span><div><div class="ss-step-title">Mulai transaksi baru</div><div class="ss-step-desc">Lanjutkan transaksi operasional.</div></div></li>
                     </ol>
-                    <div class="ss-guide-empty" id="opening-guide-empty" role="status"><i class="bi bi-search" aria-hidden="true"></i>Tidak ada langkah yang cocok. Coba kata kunci lain.</div>
                 </div>
             </section>
 
             <div class="ss-note">
-                <div class="ss-note-title"><i class="bi bi-info-circle-fill" aria-hidden="true"></i>Catatan penting</div>
-                <ul><li>Data lama tidak dihapus dan tetap dapat difilter manual.</li><li>Opening stock membuat mutation baru, bukan menghapus stok lama.</li><li>Cek konfigurasi via <code>php artisan settings:show</code>.</li></ul>
+                <div class="ss-note-title"><i class="bi bi-info-circle-fill" aria-hidden="true"></i>Catatan</div>
+                <div>Data lama tidak dihapus. Tanggal ini hanya mengatur awal laporan baru.</div>
             </div>
         </aside>
     </div>

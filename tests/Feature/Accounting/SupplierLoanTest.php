@@ -127,7 +127,7 @@ class SupplierLoanTest extends TestCase
     private function accounts(): array
     {
         return [
-            Account::create(['code' => '1111', 'name' => 'Bank Uji', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]),
+            Account::firstOrCreate(['code' => '1111'], ['name' => 'Bank Uji', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]),
             Account::firstOrCreate(
                 ['code' => '1306'],
                 ['name' => 'Piutang Pinjaman Supplier', 'type' => 'asset', 'is_cash' => false, 'is_active' => true],

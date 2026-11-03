@@ -3,24 +3,28 @@
 namespace App\Http\Controllers\Production;
 
 use App\Http\Controllers\Controller;
+use App\Models\CuttingBundleCorrection;
 use App\Models\CuttingJob;
+use App\Models\CuttingJobLot;
 use App\Models\Employee;
 use App\Models\Item;
 use App\Models\ItemRole;
 use App\Models\Lot;
 use App\Models\PieceRate;
 use App\Models\QcResult;
+use App\Models\StandaloneAccountingJournal;
+use App\Models\StandaloneProductionAccountMapping;
 use App\Models\Warehouse;
-use App\Models\CuttingJobLot;
 use App\Models\WipOpnamePeriod;
 use App\Services\Accounting\JournalService;
+use App\Services\Accounting\StandaloneProductionPostingService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Inventory\LotCostService;
 use App\Services\Production\CuttingService;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 // <-- sesuaikan nama model saldo stok kamu
 
@@ -30,6 +34,7 @@ class CuttingJobController extends Controller
         protected InventoryService $inventory,
         protected CuttingService $cutting,
         protected JournalService $journal,
+        protected StandaloneProductionPostingService $standaloneProductionPosting,
         protected LotCostService $lotCost,
     ) {}
 
@@ -52,7 +57,7 @@ class CuttingJobController extends Controller
      */
     public function devCleanProductionData(Request $request)
     {
-        if (!$request->user() || $request->user()->role !== 'owner') {
+        if (! $request->user() || $request->user()->role !== 'owner') {
             abort(403, 'Hanya owner yang bisa membersihkan data produksi.');
         }
 
@@ -60,13 +65,13 @@ class CuttingJobController extends Controller
         $typed = strtoupper(trim((string) $request->input('confirm_text')));
         if ($typed !== self::CLEAN_PROD_PHRASE) {
             return back()->with('error',
-                'Konfirmasi salah. Ketik persis "' . self::CLEAN_PROD_PHRASE . '" untuk membersihkan data produksi.'
+                'Konfirmasi salah. Ketik persis "'.self::CLEAN_PROD_PHRASE.'" untuk membersihkan data produksi.'
             );
         }
 
         // 🔐 Verifikasi password owner (re-auth) — lapis terakhir sebelum hapus.
         $password = (string) $request->input('confirm_password');
-        if ($password === '' || !\Illuminate\Support\Facades\Hash::check($password, (string) $request->user()->password)) {
+        if ($password === '' || ! \Illuminate\Support\Facades\Hash::check($password, (string) $request->user()->password)) {
             return back()->with('error', 'Password owner salah. Pembersihan dibatalkan.');
         }
 
@@ -84,9 +89,18 @@ class CuttingJobController extends Controller
             'cutting_qc_adjust_in', 'cutting_qc_adjust_out', 'cutting_reject', 'cutting_wip',
             // ✅ Reversal/void QC cutting — WAJIB ikut dihapus. Kalau tertinggal (originalnya
             // 'cutting_wip' terhapus di atas), mutasi ini jadi yatim & bikin saldo WIP-CUT negatif.
-            'cutting_qc_void',
+            'cutting_qc_void', 'cutting_qc_bundle_void', 'cutting_qc_bundle_repost',
+            // Koreksi bundle: return bahan, reversal WIP-CUT, dan reversal upah.
+            // Ketiganya harus ikut dihapus bersama record koreksinya saat reset lokal.
+            'cutting_bundle_material_return', 'cutting_bundle_correction_wip_void',
+            'cutting_bundle_correction_wage_void',
             'sewing_qc_in', 'sewing_qc_out', 'sewing_qc_reject',
             'sewing_reject_rework_ok', 'sewing_return_ok', 'sewing_return_reject',
+            // Reject sebelum jahit (baru) dan source lama agar DEV clean tidak
+            // meninggalkan saldo reject yatim di REJ-CUT/REJ-SEW.
+            'sewing_pickup_pre_sewing_reject', 'sewing_pickup_pre_sewing_reject_void',
+            'sewing_pickup_reject', 'sewing_pickup_reject_void',
+            'sewing_pickup_reject_location_correction',
             'sewing_pickup_wage',
             'sewing_pickup_supply', 'sewing_pickup_supply_followup',
             'sewing_pickup_supply_void', 'sewing_pickup_supply_void_line',
@@ -110,6 +124,7 @@ class CuttingJobController extends Controller
             'sewing_return_lines', 'sewing_returns',
             'sewing_pickup_line_supply_lines', 'sewing_pickup_supply_lines',
             'sewing_pickup_lines', 'sewing_pickups',
+            'cutting_bundle_corrections',
             'cutting_job_lots', 'cutting_job_bundles', 'cutting_jobs',
             'finishing_repair_lines', 'finishing_repairs',
             'finishing_job_lines', 'finishing_jobs',
@@ -162,7 +177,7 @@ class CuttingJobController extends Controller
 
             // 4) Tabel transaksi produksi
             foreach ($prodTables as $table) {
-                if (!\Illuminate\Support\Facades\Schema::hasTable($table)) {
+                if (! \Illuminate\Support\Facades\Schema::hasTable($table)) {
                     continue;
                 }
                 $count = DB::table($table)->delete();
@@ -183,45 +198,45 @@ class CuttingJobController extends Controller
                 ->delete();
 
             // 5) Recompute stok gudang dari mutasi tersisa
-            DB::statement("
+            DB::statement('
                 UPDATE inventory_stocks SET qty = COALESCE(
                     (SELECT SUM(m.qty_change) FROM inventory_mutations m
                      WHERE m.warehouse_id = inventory_stocks.warehouse_id
                        AND m.item_id = inventory_stocks.item_id), 0)
-            ");
+            ');
 
             // 6) Recompute saldo & cost lot dari mutasi tersisa
-            DB::statement("
+            DB::statement('
                 UPDATE lots SET
                     qty_onhand = COALESCE((SELECT SUM(m.qty_change) FROM inventory_mutations m WHERE m.lot_id = lots.id), 0),
                     total_cost = COALESCE((SELECT SUM(COALESCE(m.total_cost,0)) FROM inventory_mutations m WHERE m.lot_id = lots.id), 0)
-            ");
-            DB::statement("
+            ');
+            DB::statement('
                 UPDATE lots SET avg_cost = CASE WHEN qty_onhand > 0.000001 THEN total_cost / qty_onhand ELSE 0 END
-            ");
+            ');
         });
 
         $summary = collect($deleted)
-            ->filter(fn($v) => $v > 0)
-            ->map(fn($v, $k) => "{$k}: {$v}")
+            ->filter(fn ($v) => $v > 0)
+            ->map(fn ($v, $k) => "{$k}: {$v}")
             ->implode(', ');
 
-        Log::warning('Data produksi dibersihkan oleh ' . $request->user()->name . ' (backup: ' . $backupRel . ')', $deleted);
+        Log::warning('Data produksi dibersihkan oleh '.$request->user()->name.' (backup: '.$backupRel.')', $deleted);
 
         // Audit trail (tabel production_logs) — aman walau tabel belum di-migrate.
         \App\Models\ProductionLog::record(
             event: 'clean_production',
-            summary: 'Bersihkan data produksi oleh ' . $request->user()->name . '. '
-                . ($summary !== '' ? "Terhapus — {$summary}." : 'Tidak ada data yang dihapus.')
-                . ' Backup: ' . $backupRel,
+            summary: 'Bersihkan data produksi oleh '.$request->user()->name.'. '
+                .($summary !== '' ? "Terhapus — {$summary}." : 'Tidak ada data yang dihapus.')
+                .' Backup: '.$backupRel,
             meta: ['deleted' => $deleted, 'backup' => $backupRel],
         );
 
         return redirect()
             ->route('production.cutting_jobs.index')
             ->with('success', 'Data produksi berhasil dibersihkan & stok dihitung ulang. '
-                . ($summary !== '' ? "Terhapus — {$summary}. " : 'Tidak ada data yang perlu dihapus. ')
-                . '📦 Backup tersimpan: ' . $backupRel);
+                .($summary !== '' ? "Terhapus — {$summary}. " : 'Tidak ada data yang perlu dihapus. ')
+                .'📦 Backup tersimpan: '.$backupRel);
     }
 
     /**
@@ -237,32 +252,33 @@ class CuttingJobController extends Controller
                 return null;
             }
             $dbPath = config('database.connections.sqlite.database');
-            if (!$dbPath || !is_file($dbPath)) {
+            if (! $dbPath || ! is_file($dbPath)) {
                 return null;
             }
 
             $backupDir = storage_path('backups');
-            if (!is_dir($backupDir)) {
+            if (! is_dir($backupDir)) {
                 @mkdir($backupDir, 0755, true);
             }
 
-            $name = 'backup_before_clean_prod_' . now()->format('Ymd_His') . '.sqlite';
-            $target = $backupDir . DIRECTORY_SEPARATOR . $name;
+            $name = 'backup_before_clean_prod_'.now()->format('Ymd_His').'.sqlite';
+            $target = $backupDir.DIRECTORY_SEPARATOR.$name;
 
-            if (!@copy($dbPath, $target) || !is_file($target)) {
+            if (! @copy($dbPath, $target) || ! is_file($target)) {
                 return null;
             }
 
             // Batasi jumlah backup (maks 30 terbaru).
-            $files = glob($backupDir . DIRECTORY_SEPARATOR . 'backup_*.sqlite') ?: [];
+            $files = glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.sqlite') ?: [];
             usort($files, fn ($a, $b) => filemtime($b) <=> filemtime($a));
             foreach (array_slice($files, 30) as $old) {
                 @unlink($old);
             }
 
-            return 'storage/backups/' . $name;
+            return 'storage/backups/'.$name;
         } catch (\Throwable $e) {
-            \Log::error('Backup sebelum bersihkan produksi gagal: ' . $e->getMessage());
+            \Log::error('Backup sebelum bersihkan produksi gagal: '.$e->getMessage());
+
             return null;
         }
     }
@@ -297,6 +313,21 @@ class CuttingJobController extends Controller
         $jobs = $q->paginate(20)->withQueryString();
         $warehouses = Warehouse::orderBy('code')->get();
 
+        $correctionSummaries = CuttingBundleCorrection::query()
+            ->with('replacementItem:id,code')
+            ->where('status', 'returned')
+            ->whereIn('cutting_job_id', $jobs->getCollection()->pluck('id')->all())
+            ->get()
+            ->groupBy('cutting_job_id')
+            ->map(fn ($rows) => [
+                'count' => $rows->count(),
+                'replacement_codes' => $rows->map(fn ($row) => $row->replacementItem?->code)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all(),
+            ]);
+
         // KPI counts — selalu dari seluruh data, tanpa filter
         $kpis = CuttingJob::query()
             ->selectRaw('status, count(*) as cnt')
@@ -304,10 +335,11 @@ class CuttingJobController extends Controller
             ->pluck('cnt', 'status');
 
         return view('production.cutting_jobs.index', [
-            'jobs'       => $jobs,
+            'jobs' => $jobs,
             'warehouses' => $warehouses,
-            'filters'    => $request->only(['status', 'warehouse_id']),
-            'kpis'       => $kpis,
+            'filters' => $request->only(['status', 'warehouse_id']),
+            'kpis' => $kpis,
+            'correctionSummaries' => $correctionSummaries,
         ]);
     }
 
@@ -328,7 +360,7 @@ class CuttingJobController extends Controller
         // 1️⃣ Cari gudang RM (wajib ada, konfigurasi awal di warehouses)
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
 
-        if (!$rmWarehouseId) {
+        if (! $rmWarehouseId) {
             throw new \RuntimeException('Warehouse RM belum dikonfigurasi di tabel warehouses (code = RM).');
         }
 
@@ -356,6 +388,42 @@ class CuttingJobController extends Controller
             ->orderBy('code')
             ->get();
 
+        // Tarif cutting untuk preview HPP di form. Posting final tetap
+        // menghitung ulang berdasarkan operator, item, dan tanggal job.
+        // Ambil seluruh tarif aktif sekali agar form tidak membuat query
+        // per operator × item.
+        $rateDate = now()->toDateString();
+        $activeCuttingRates = PieceRate::query()
+            ->where('module', 'cutting')
+            ->whereIn('employee_id', $operators->pluck('id'))
+            ->whereDate('effective_from', '<=', $rateDate)
+            ->where(function ($query) use ($rateDate): void {
+                $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $rateDate);
+            })
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id')
+            ->get(['employee_id', 'item_id', 'item_category_id', 'rate_per_pcs'])
+            ->groupBy('employee_id');
+
+        $cuttingRates = [];
+        foreach ($operators as $operator) {
+            $operatorRates = $activeCuttingRates->get($operator->id, collect());
+            foreach ($items as $item) {
+                $rate = $operatorRates->first(fn ($row): bool => (int) $row->item_id === (int) $item->id)?->rate_per_pcs;
+                if ((float) $rate <= 0) {
+                    $rate = $operatorRates
+                        ->first(fn ($row): bool => $row->item_id === null
+                            && (int) $row->item_category_id === (int) $item->item_category_id)?->rate_per_pcs;
+                }
+                if ((float) $rate <= 0) {
+                    $rate = $operatorRates
+                        ->first(fn ($row): bool => $row->item_id === null && $row->item_category_id === null)?->rate_per_pcs;
+                }
+
+                $cuttingRates[(int) $operator->id][(int) $item->id] = round((float) ($rate ?? 0), 2);
+            }
+        }
+
         // 5️⃣ Warehouse untuk header cutting job
         $warehouses = Warehouse::orderBy('code')->get();
 
@@ -364,27 +432,27 @@ class CuttingJobController extends Controller
         //    Format: { finished_item_id => { fabric_item_id => { qty, scrap_pct } } }
         $bomLines = \App\Models\ItemBomLine::query()
             ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
-            ->whereHas('bom', fn($q) => $q->where('active', true))
+            ->whereHas('bom', fn ($q) => $q->where('active', true))
             ->with('bom:id,item_id')
             ->get();
 
         $bomData = $bomLines
-            ->groupBy(fn($line) => (int) $line->bom->item_id)
-            ->map(fn($lines) => $lines->keyBy(fn($l) => (int) $l->material_item_id)
-                ->map(fn($l) => ['qty' => (float) $l->qty, 'scrap_pct' => (float) $l->scrap_pct])
+            ->groupBy(fn ($line) => (int) $line->bom->item_id)
+            ->map(fn ($lines) => $lines->keyBy(fn ($l) => (int) $l->material_item_id)
+                ->map(fn ($l) => ['qty' => (float) $l->qty, 'scrap_pct' => (float) $l->scrap_pct])
             );
 
         // URL edit BOM per finished item: { finishedItemId => editUrl }
         // URL quick-update line BOM: { finishedItemId => quickUrl }
         $bomEditUrls = $bomLines
-            ->unique(fn($l) => (int) $l->bom->item_id)
-            ->mapWithKeys(fn($l) => [
+            ->unique(fn ($l) => (int) $l->bom->item_id)
+            ->mapWithKeys(fn ($l) => [
                 (int) $l->bom->item_id => route('master.item_boms.edit', $l->bom->id),
             ]);
 
         $bomQuickUrls = $bomLines
-            ->unique(fn($l) => (int) $l->bom->item_id)
-            ->mapWithKeys(fn($l) => [
+            ->unique(fn ($l) => (int) $l->bom->item_id)
+            ->mapWithKeys(fn ($l) => [
                 (int) $l->bom->item_id => route('master.item_boms.quick_line', $l->bom->id),
             ]);
 
@@ -417,40 +485,74 @@ class CuttingJobController extends Controller
             $qtyPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
             $dateStr = \Illuminate\Support\Carbon::parse($row->date)->format('d/m/y');
 
-            if (!isset($lastUsage[$fid][$mid])) {
+            if (! isset($lastUsage[$fid][$mid])) {
                 $lastUsage[$fid][$mid] = [
                     'qty_per_pcs' => $qtyPerPcs,
-                    'job_code'   => $row->job_code,
-                    'date'       => $dateStr,
-                    'history'    => [],
+                    'job_code' => $row->job_code,
+                    'date' => $dateStr,
+                    'history' => [],
                 ];
             }
 
             $hist = &$lastUsage[$fid][$mid]['history'];
             $lastJob = end($hist);
-            if (count($hist) < 3 && (!$lastJob || $lastJob['job_code'] !== $row->job_code)) {
+            if (count($hist) < 3 && (! $lastJob || $lastJob['job_code'] !== $row->job_code)) {
                 $hist[] = ['qty_per_pcs' => $qtyPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
             }
             unset($hist);
         }
 
+        // Preview mapping yang akan dipakai saat Cutting Job diposting.
+        // Data ini hanya untuk transparansi form; posting tetap dilakukan oleh
+        // StandaloneProductionPostingService dan akan memblokir jika mapping
+        // tidak lengkap.
+        $cuttingAccountingMappings = StandaloneProductionAccountMapping::query()
+            ->leftJoin(
+                'standalone_accounting_accounts as saa',
+                'saa.code',
+                '=',
+                'standalone_production_account_mappings.standalone_account_code',
+            )
+            ->where('standalone_production_account_mappings.stage', 'cutting')
+            ->whereIn('standalone_production_account_mappings.source_type', [
+                StandaloneProductionPostingService::SOURCE_CUTTING_JOB,
+                StandaloneProductionPostingService::SOURCE_CUTTING_WAGE,
+            ])
+            ->where('standalone_production_account_mappings.is_active', true)
+            ->orderBy('standalone_production_account_mappings.source_type')
+            ->orderByRaw("CASE WHEN standalone_production_account_mappings.line_side = 'debit' THEN 0 ELSE 1 END")
+            ->get([
+                'standalone_production_account_mappings.source_type',
+                'standalone_production_account_mappings.line_side',
+                'standalone_production_account_mappings.legacy_account_code',
+                'standalone_production_account_mappings.standalone_account_code',
+                'standalone_production_account_mappings.purpose',
+                'saa.name as standalone_account_name',
+            ]);
+
         return view('production.cutting_jobs.create', [
-            'lotStocks'      => $lotStocks,
+            'lotStocks' => $lotStocks,
             'lotSupplierMap' => $lotSupplierMap,
-            'items'          => $items,
-            'operators'      => $operators,
-            'warehouses'     => $warehouses,
-            'bomData'        => $bomData,
-            'bomEditUrls'    => $bomEditUrls,
-            'bomQuickUrls'   => $bomQuickUrls,
-            'lastUsage'      => $lastUsage,
+            'items' => $items,
+            'operators' => $operators,
+            'warehouses' => $warehouses,
+            'bomData' => $bomData,
+            'bomEditUrls' => $bomEditUrls,
+            'bomQuickUrls' => $bomQuickUrls,
+            'lastUsage' => $lastUsage,
+            'cuttingRates' => $cuttingRates,
+            'cuttingAccountingMappings' => $cuttingAccountingMappings,
+            'cuttingAccountingEnabled' => (bool) config(
+                'accounting.standalone_dual_posting_production_cutting_enabled',
+                false,
+            ),
         ]);
     }
 
     public function liveLots(Request $request)
     {
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
-        if (!$rmWarehouseId) {
+        if (! $rmWarehouseId) {
             return response()->json([
                 'ok' => false,
                 'message' => 'Warehouse RM belum dikonfigurasi.',
@@ -461,7 +563,7 @@ class CuttingJobController extends Controller
         $supplierMap = $this->lotSupplierMap($lotStocks->pluck('lot_id')->filter()->unique()->values()->all());
 
         $groups = $lotStocks
-            ->groupBy(fn($row) => (int) $row->lot->item_id)
+            ->groupBy(fn ($row) => (int) $row->lot->item_id)
             ->map(function ($rows, $itemId) use ($supplierMap) {
                 $first = $rows->first();
                 $item = $first->lot->item;
@@ -484,11 +586,12 @@ class CuttingJobController extends Controller
 
                         return [
                             'lot_id' => (int) $row->lot_id,
-                            'lot_code' => (string) ($lot?->code ?? ('LOT#' . $row->lot_id)),
+                            'lot_code' => (string) ($lot?->code ?? ('LOT#'.$row->lot_id)),
                             'item_id' => (int) $item->id,
                             'item_code' => (string) $item->code,
                             'unit' => $item->stockUnit(),
                             'balance' => (float) $row->qty_balance,
+                            'unit_cost' => (float) ($lot?->avg_cost ?: ($item->effective_unit_cost ?? 0)),
                             'warehouse_code' => (string) ($row->warehouse?->code ?? ''),
                             'supplier_name' => $supplierMap[$row->lot_id] ?? null,
                             'purchase_date' => $date ? \Illuminate\Support\Carbon::parse($date)->format('d/m/y') : null,
@@ -510,7 +613,6 @@ class CuttingJobController extends Controller
      * Form Edit Cutting Job:
      * (sementara masih versi lama, tapi sudah kompatibel dengan bundles yang punya lot_id)
      */
-
     public function edit(CuttingJob $cuttingJob)
     {
         $cuttingJob->load([
@@ -522,7 +624,7 @@ class CuttingJobController extends Controller
 
         // 1) Warehouse RM
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
-        if (!$rmWarehouseId) {
+        if (! $rmWarehouseId) {
             throw new \RuntimeException('Warehouse RM belum dikonfigurasi di tabel warehouses (code = RM).');
         }
 
@@ -554,25 +656,25 @@ class CuttingJobController extends Controller
         // 6) BOM data
         $bomLines = \App\Models\ItemBomLine::query()
             ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
-            ->whereHas('bom', fn($q) => $q->where('active', true))
+            ->whereHas('bom', fn ($q) => $q->where('active', true))
             ->with('bom:id,item_id')
             ->get();
 
         $bomData = $bomLines
-            ->groupBy(fn($line) => (int) $line->bom->item_id)
-            ->map(fn($lines) => $lines->keyBy(fn($l) => (int) $l->material_item_id)
-                ->map(fn($l) => ['qty' => (float) $l->qty, 'scrap_pct' => (float) $l->scrap_pct])
+            ->groupBy(fn ($line) => (int) $line->bom->item_id)
+            ->map(fn ($lines) => $lines->keyBy(fn ($l) => (int) $l->material_item_id)
+                ->map(fn ($l) => ['qty' => (float) $l->qty, 'scrap_pct' => (float) $l->scrap_pct])
             );
 
         $bomEditUrls = $bomLines
-            ->unique(fn($l) => (int) $l->bom->item_id)
-            ->mapWithKeys(fn($l) => [
+            ->unique(fn ($l) => (int) $l->bom->item_id)
+            ->mapWithKeys(fn ($l) => [
                 (int) $l->bom->item_id => route('master.item_boms.edit', $l->bom->id),
             ]);
 
         $bomQuickUrls = $bomLines
-            ->unique(fn($l) => (int) $l->bom->item_id)
-            ->mapWithKeys(fn($l) => [
+            ->unique(fn ($l) => (int) $l->bom->item_id)
+            ->mapWithKeys(fn ($l) => [
                 (int) $l->bom->item_id => route('master.item_boms.quick_line', $l->bom->id),
             ]);
 
@@ -602,18 +704,18 @@ class CuttingJobController extends Controller
             $qtyPerPcs = round((float) $row->qty_used_fabric / max((float) $row->qty_pcs, 0.0001), 4);
             $dateStr = \Illuminate\Support\Carbon::parse($row->date)->format('d/m/y');
 
-            if (!isset($lastUsage[$fid][$mid])) {
+            if (! isset($lastUsage[$fid][$mid])) {
                 $lastUsage[$fid][$mid] = [
                     'qty_per_pcs' => $qtyPerPcs,
-                    'job_code'   => $row->job_code,
-                    'date'       => $dateStr,
-                    'history'    => [],
+                    'job_code' => $row->job_code,
+                    'date' => $dateStr,
+                    'history' => [],
                 ];
             }
 
             $hist = &$lastUsage[$fid][$mid]['history'];
             $lastJob = end($hist);
-            if (count($hist) < 3 && (!$lastJob || $lastJob['job_code'] !== $row->job_code)) {
+            if (count($hist) < 3 && (! $lastJob || $lastJob['job_code'] !== $row->job_code)) {
                 $hist[] = ['qty_per_pcs' => $qtyPerPcs, 'job_code' => $row->job_code, 'date' => $dateStr];
             }
             unset($hist);
@@ -623,7 +725,7 @@ class CuttingJobController extends Controller
         $selectedLotsExisting = $cuttingJob->lots
             ->pluck('lot_id')
             ->filter()
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -633,7 +735,7 @@ class CuttingJobController extends Controller
             $selectedLotsExisting = $cuttingJob->bundles
                 ->pluck('lot_id')
                 ->filter()
-                ->map(fn($id) => (int) $id)
+                ->map(fn ($id) => (int) $id)
                 ->unique()
                 ->values()
                 ->all();
@@ -641,11 +743,11 @@ class CuttingJobController extends Controller
 
         // ringkasan LOT terkunci (kalau pivot ada)
         $selectedLotSummaries = $cuttingJob->lots
-            ->filter(fn($cjLot) => !empty($cjLot->lot_id))
+            ->filter(fn ($cjLot) => ! empty($cjLot->lot_id))
             ->map(function ($cjLot) {
                 return [
                     'lot_id' => (int) $cjLot->lot_id,
-                    'code' => $cjLot->lot?->code ?? ('LOT#' . $cjLot->lot_id),
+                    'code' => $cjLot->lot?->code ?? ('LOT#'.$cjLot->lot_id),
                     'item_code' => $cjLot->lot?->item?->code ?? '-',
                     'item_name' => $cjLot->lot?->item?->name ?? '-',
                     'planned' => (float) $cjLot->planned_fabric_qty,
@@ -662,6 +764,7 @@ class CuttingJobController extends Controller
         } else {
             $rows = $cuttingJob->bundles->map(function ($b) {
                 $fi = $b->finishedItem;
+
                 return [
                     'id' => $b->id,
                     'bundle_no' => $b->bundle_no,
@@ -930,11 +1033,13 @@ class CuttingJobController extends Controller
             'bundles.*.lot_id.required' => 'LOT pada setiap baris bundle wajib dipilih.',
         ]);
 
+        $this->standaloneProductionPosting->assertCuttingMappings();
+
         // ================
         // 1) LOT TERPILIH
         // ================
         $selectedLotIds = collect($validated['selected_lots'] ?? [])
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -985,7 +1090,7 @@ class CuttingJobController extends Controller
 
         // LOT utama → preferensi yang punya saldo; fallback ke LOT pertama
         $primaryLotId = collect($selectedLotIds)
-            ->first(fn($id) => ($lotBalances[$id] ?? 0) > 0) ?? $selectedLotIds[0];
+            ->first(fn ($id) => ($lotBalances[$id] ?? 0) > 0) ?? $selectedLotIds[0];
 
         // =========================
         // 3) FILTER BUNDLE VALID
@@ -996,13 +1101,13 @@ class CuttingJobController extends Controller
 
         foreach ($bundles as $row) {
             $qty = (float) ($row['qty_pcs'] ?? 0);
-            $lotId = !empty($row['lot_id']) ? (int) $row['lot_id'] : 0;
+            $lotId = ! empty($row['lot_id']) ? (int) $row['lot_id'] : 0;
 
-            if (empty($row['finished_item_id']) || $qty <= 0 || !$lotId) {
+            if (empty($row['finished_item_id']) || $qty <= 0 || ! $lotId) {
                 continue;
             }
 
-            if (!in_array($lotId, $selectedLotIds, true)) {
+            if (! in_array($lotId, $selectedLotIds, true)) {
                 return back()
                     ->withErrors(['bundles' => 'LOT pada baris bundle harus termasuk LOT yang dipilih di atas.']);
             }
@@ -1039,11 +1144,11 @@ class CuttingJobController extends Controller
         $bomLines = \App\Models\ItemBomLine::query()
             ->whereIn('material_item_id', $lotItems->values()->unique()->all())
             ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
-            ->whereHas('bom', fn($q) => $q->where('active', true))
+            ->whereHas('bom', fn ($q) => $q->where('active', true))
             ->with('bom:id,item_id')
             ->get()
-            ->groupBy(fn($line) => (int) $line->bom->item_id)
-            ->map(fn($lines) => $lines->keyBy(fn($line) => (int) $line->material_item_id));
+            ->groupBy(fn ($line) => (int) $line->bom->item_id)
+            ->map(fn ($lines) => $lines->keyBy(fn ($line) => (int) $line->material_item_id));
 
         foreach ($bundlesIndexByLot as $lotId => $indexes) {
             $saldoLot = $lotBalances[$lotId] ?? 0.0;
@@ -1058,7 +1163,7 @@ class CuttingJobController extends Controller
             $bomUsed = 0.0;
             foreach ($indexes as $idx) {
                 $finishedItemId = (int) ($validBundles[$idx]['finished_item_id'] ?? 0);
-                $qtyPcs         = (float) ($validBundles[$idx]['qty_pcs'] ?? 0);
+                $qtyPcs = (float) ($validBundles[$idx]['qty_pcs'] ?? 0);
                 $bundleMaterialId = (int) ($lotItems[$lotId] ?? $fabricItemId);
 
                 // Prioritas 1: user sudah isi qty_used_fabric manual di form
@@ -1071,11 +1176,11 @@ class CuttingJobController extends Controller
                     if ($guardBomLine && $qtyPcs > 0) {
                         $maxByBom = $qtyPcs * (float) $guardBomLine->qty * (1 + (float) $guardBomLine->scrap_pct / 100);
                         if ($userFabric > $maxByBom + 0.0005) {
-                            $itemCode = Item::whereKey($finishedItemId)->value('code') ?? ('#' . $finishedItemId);
+                            $itemCode = Item::whereKey($finishedItemId)->value('code') ?? ('#'.$finishedItemId);
                             throw ValidationException::withMessages([
                                 'bundles' => sprintf(
                                     'Pemakaian bahan %s = %s %s melebihi standar BOM (maks %s %s untuk %s pcs). '
-                                    . 'Jika realita memang segitu, update BOM dulu lewat tombol "Update BOM" di form, lalu simpan ulang.',
+                                    .'Jika realita memang segitu, update BOM dulu lewat tombol "Update BOM" di form, lalu simpan ulang.',
                                     $itemCode,
                                     rtrim(rtrim(number_format($userFabric, 4, '.', ''), '0'), '.'),
                                     $fabricUnits[$bundleMaterialId] ?? 'pcs',
@@ -1088,13 +1193,14 @@ class CuttingJobController extends Controller
                     }
 
                     $bomUsed += $userFabric;
+
                     continue;       // nilai sudah ada di $validBundles[$idx], tidak perlu overwrite
                 }
 
                 // Prioritas 2: hitung dari BOM main_material
                 $bomLine = $bomLines[$finishedItemId][$bundleMaterialId] ?? null;
                 if ($bomLine && $qtyPcs > 0) {
-                    $bomQty   = (float) $bomLine->qty;
+                    $bomQty = (float) $bomLine->qty;
                     $scrapPct = (float) $bomLine->scrap_pct;
                     $validBundles[$idx]['qty_used_fabric'] = round(
                         $qtyPcs * $bomQty * (1 + $scrapPct / 100),
@@ -1106,7 +1212,7 @@ class CuttingJobController extends Controller
                 }
             }
 
-            if (!empty($fallbackIndexes)) {
+            if (! empty($fallbackIndexes)) {
                 // Fallback hanya untuk bundle yang tidak punya pasangan
                 // material + BOM. Jangan sampai satu bundle yang punya BOM
                 // membuat bundle lain kehilangan qty kain.
@@ -1136,7 +1242,7 @@ class CuttingJobController extends Controller
             $fabricByLot[$lotId] = ($fabricByLot[$lotId] ?? 0.0) + (float) ($b['qty_used_fabric'] ?? 0);
         }
 
-        $devRollback = $request->boolean('dev_rollback') && !app()->isProduction();
+        $devRollback = $request->boolean('dev_rollback') && ! app()->isProduction();
         if ($devRollback) {
             DB::beginTransaction();
         }
@@ -1153,8 +1259,8 @@ class CuttingJobController extends Controller
             // =========================
             foreach ($selectedLotIds as $lotId) {
                 \App\Models\CuttingJobLot::create([
-                    'cutting_job_id'    => $job->id,
-                    'lot_id'            => $lotId,
+                    'cutting_job_id' => $job->id,
+                    'lot_id' => $lotId,
                     // planned_fabric_qty = total BOM/saldo yang direncanakan dari LOT ini
                     'planned_fabric_qty' => $fabricByLot[$lotId] ?? 0.0,
                 ]);
@@ -1194,27 +1300,38 @@ class CuttingJobController extends Controller
             DB::rollBack();
 
             return back()
-                
+
                 ->with('dev_rollback_result', $summary)
                 ->with('success', 'Mode Developer: simulasi cutting berhasil dan sudah di-rollback. Tidak ada data/stok yang berubah.');
         }
 
-        try {
-            $this->journal->postCuttingJob($job);
-        } catch (\Throwable $e) {
-            Log::error('Gagal membuat jurnal cutting_job', [
-                'cutting_job_id' => $job->id,
-                'message' => $e->getMessage(),
-            ]);
-        }
+        if (config('accounting.standalone_dual_posting_production_cutting_enabled', false)) {
+            // Pilot mode: legacy journal + mirror share one transaction. If a
+            // mapping is missing, both journal writes roll back and the error
+            // is allowed to reach the user instead of being logged silently.
+            DB::transaction(function () use ($job): void {
+                $this->journal->postCuttingJob($job);
+                $this->journal->postCuttingJobWage($job);
+                $this->standaloneProductionPosting->mirrorCuttingJob((int) $job->id);
+            });
+        } else {
+            try {
+                $this->journal->postCuttingJob($job);
+            } catch (\Throwable $e) {
+                Log::error('Gagal membuat jurnal cutting_job', [
+                    'cutting_job_id' => $job->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
 
-        try {
-            $this->journal->postCuttingJobWage($job);
-        } catch (\Throwable $e) {
-            Log::error('Gagal membuat jurnal upah cutting_job', [
-                'cutting_job_id' => $job->id,
-                'message' => $e->getMessage(),
-            ]);
+            try {
+                $this->journal->postCuttingJobWage($job);
+            } catch (\Throwable $e) {
+                Log::error('Gagal membuat jurnal upah cutting_job', [
+                    'cutting_job_id' => $job->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         return redirect()
@@ -1256,7 +1373,7 @@ class CuttingJobController extends Controller
         ]);
 
         $selectedLotIds = collect($validated['selected_lots'])
-            ->map(fn($id) => (int) $id)->unique()->values()->all();
+            ->map(fn ($id) => (int) $id)->unique()->values()->all();
 
         if (empty($selectedLotIds)) {
             return back()->withErrors(['selected_lots' => 'Minimal satu LOT harus dipilih.'])->withInput();
@@ -1283,11 +1400,11 @@ class CuttingJobController extends Controller
             $qty = (float) ($row['qty_pcs'] ?? 0);
             $lotId = (int) ($row['lot_id'] ?? 0);
 
-            if (empty($row['finished_item_id']) || $qty <= 0 || !$lotId) {
+            if (empty($row['finished_item_id']) || $qty <= 0 || ! $lotId) {
                 continue;
             }
 
-            if (!in_array($lotId, $selectedLotIds, true)) {
+            if (! in_array($lotId, $selectedLotIds, true)) {
                 return back()->withErrors(['bundles' => 'LOT pada baris bundle harus termasuk LOT yang dipilih di atas.'])->withInput();
             }
 
@@ -1379,8 +1496,8 @@ class CuttingJobController extends Controller
             // 4. Buat pivot LOT baru
             foreach ($selectedLotIds as $lotId) {
                 \App\Models\CuttingJobLot::create([
-                    'cutting_job_id'     => $job->id,
-                    'lot_id'             => $lotId,
+                    'cutting_job_id' => $job->id,
+                    'lot_id' => $lotId,
                     'planned_fabric_qty' => $fabricByLot[$lotId] ?? 0.0,
                 ]);
             }
@@ -1394,8 +1511,9 @@ class CuttingJobController extends Controller
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
+
             // Optionally log error here
-            return back()->withErrors(['error' => 'Gagal menyimpan update: ' . $e->getMessage()])->withInput();
+            return back()->withErrors(['error' => 'Gagal menyimpan update: '.$e->getMessage()])->withInput();
         }
 
         return redirect()
@@ -1406,12 +1524,12 @@ class CuttingJobController extends Controller
     private function resolveTypedFinishedItems(Request $request): void
     {
         $bundles = $request->input('bundles', []);
-        if (!is_array($bundles) || empty($bundles)) {
+        if (! is_array($bundles) || empty($bundles)) {
             return;
         }
 
         foreach ($bundles as $idx => $row) {
-            if (!empty($row['finished_item_id'])) {
+            if (! empty($row['finished_item_id'])) {
                 continue;
             }
 
@@ -1435,7 +1553,7 @@ class CuttingJobController extends Controller
                 ->whereRaw('UPPER(code) = ?', [$code])
                 ->first();
 
-            if (!$item) {
+            if (! $item) {
                 continue;
             }
 
@@ -1470,7 +1588,7 @@ class CuttingJobController extends Controller
                 ->implode(', ');
 
             throw ValidationException::withMessages([
-                'bundles' => 'Item berikut hanya bisa dibeli jadi dan tidak dapat masuk proses cutting: ' . ($blockedCodes ?: 'item tidak valid') . '.',
+                'bundles' => 'Item berikut hanya bisa dibeli jadi dan tidak dapat masuk proses cutting: '.($blockedCodes ?: 'item tidak valid').'.',
             ]);
         }
 
@@ -1488,7 +1606,7 @@ class CuttingJobController extends Controller
                 ->implode(', ');
 
             throw ValidationException::withMessages([
-                'bundles' => 'Item belum memiliki BOM aktif: ' . ($missingBomCodes ?: 'item tidak valid') . '. Buat atau aktifkan BOM terlebih dahulu.',
+                'bundles' => 'Item belum memiliki BOM aktif: '.($missingBomCodes ?: 'item tidak valid').'. Buat atau aktifkan BOM terlebih dahulu.',
             ]);
         }
     }
@@ -1564,6 +1682,7 @@ class CuttingJobController extends Controller
         foreach ($lotBalances as $lotId => $balance) {
             if ($lotId === $lastKey) {
                 $capped[$lotId] = max(round($onHandQty - $used, 4), 0);
+
                 continue;
             }
 
@@ -1581,7 +1700,7 @@ class CuttingJobController extends Controller
             return "Stok kain tidak cukup. Stok tersedia {$m[3]}, tetapi sistem mencoba memakai {$m[4]}. Refresh halaman lalu pilih LOT ulang.";
         }
 
-        return 'Stok kain tidak cukup: ' . $message;
+        return 'Stok kain tidak cukup: '.$message;
     }
 
     /**
@@ -1599,18 +1718,73 @@ class CuttingJobController extends Controller
             'warehouse',
             'lot.item',
             'lots.lot.item',
-            'bundles.finishedItem',
+            'bundles.finishedItem.category',
+            'bundles.lot.item',
             'bundles.operator',
             'bundles.qcResults' => function ($q) {
                 $q->where('stage', QcResult::STAGE_CUTTING);
             },
         ]);
 
+        // Koreksi bundle ditampilkan di detail job supaya status bundle, bahan
+        // yang kembali ke RM, dan reversal upah dapat ditelusuri dari satu layar.
+        $bundleCorrections = CuttingBundleCorrection::query()
+            ->where('cutting_job_id', (int) $cuttingJob->id)
+            ->with([
+                'replacementItem:id,code,name',
+                'bundle.finishedItem:id,code,name',
+                'bundle.lot:id,code,item_id',
+                'bundle.lot.item:id,code,name',
+            ])
+            ->orderBy('id')
+            ->get();
+
         $hasQcCutting = $cuttingJob->bundles()
             ->whereHas('qcResults', function ($q) {
                 $q->where('stage', QcResult::STAGE_CUTTING);
             })
             ->exists();
+
+        // Read-only trace produksi → Akuntansi Baru. Sertakan repost dan
+        // reversal supaya audit tetap utuh saat dokumen pernah dibatalkan.
+        $accountingJournalEntries = StandaloneAccountingJournal::query()
+            ->where('source_id', (int) $cuttingJob->id)
+            ->where(function ($query): void {
+                $query
+                    ->whereIn('source_type', ['cutting_job', 'cutting_job_wage', 'cutting_wip', 'cutting_qc_sewing_supply'])
+                    ->orWhere('source_type', 'like', 'cutting_job_repost_%')
+                    ->orWhere('source_type', 'like', 'cutting_job_wage_repost_%')
+                    ->orWhere('source_type', 'like', 'cutting_wip_repost_%')
+                    ->orWhere('source_type', 'like', 'cutting_qc_sewing_supply_repost_%')
+                    ->orWhere('source_type', 'like', 'cutting_job_reversal_%')
+                    ->orWhere('source_type', 'like', 'cutting_job_wage_reversal_%')
+                    ->orWhere('source_type', 'like', 'cutting_wip_reversal_%')
+                    ->orWhere('source_type', 'like', 'cutting_qc_sewing_supply_reversal_%');
+            })
+            ->with('lines.account')
+            ->orderBy('id')
+            ->get();
+
+        // Jurnal koreksi memakai source_id = correction_id, bukan job_id.
+        // Gabungkan ke jejak job agar material return, WIP cleanup, dan
+        // reversal upah tidak terlihat sebagai transaksi yang terpisah.
+        if ($bundleCorrections->isNotEmpty()) {
+            $correctionAccountingEntries = StandaloneAccountingJournal::query()
+                ->whereIn('source_id', $bundleCorrections->pluck('id')->map(fn ($id) => (int) $id)->all())
+                ->whereIn('source_type', [
+                    StandaloneProductionPostingService::SOURCE_CUTTING_BUNDLE_MATERIAL_RETURN,
+                    StandaloneProductionPostingService::SOURCE_CUTTING_BUNDLE_CORRECTION_WIP_VOID,
+                    StandaloneProductionPostingService::SOURCE_CUTTING_BUNDLE_CORRECTION_WAGE_VOID,
+                ])
+                ->with('lines.account')
+                ->orderBy('id')
+                ->get();
+
+            $accountingJournalEntries = $accountingJournalEntries
+                ->concat($correctionAccountingEntries)
+                ->sortBy(fn ($journal) => [$journal->posted_at?->timestamp ?? 0, (int) $journal->id])
+                ->values();
+        }
 
         // Target update scrap% BOM: item jadi di job ini yang punya BOM aktif
         // dengan line bahan utama = kain job ini.
@@ -1621,24 +1795,93 @@ class CuttingJobController extends Controller
             $lines = \App\Models\ItemBomLine::query()
                 ->where('material_item_id', (int) $cuttingJob->fabric_item_id)
                 ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
-                ->whereHas('bom', fn($q) => $q->where('active', true)->whereIn('item_id', $finishedItemIds))
+                ->whereHas('bom', fn ($q) => $q->where('active', true)->whereIn('item_id', $finishedItemIds))
                 ->with(['bom.item:id,code'])
                 ->get();
 
             foreach ($lines as $line) {
                 $bomScrapTargets[(int) $line->bom->item_id] = [
-                    'item_code' => $line->bom->item?->code ?? ('#' . $line->bom->item_id),
+                    'item_code' => $line->bom->item?->code ?? ('#'.$line->bom->item_id),
                     'scrap_pct' => (float) $line->scrap_pct,
-                    'bom_qty'   => (float) $line->qty,
+                    'bom_qty' => (float) $line->qty,
                     'quick_url' => route('master.item_boms.quick_line', $line->bom->id),
                 ];
             }
         }
 
+        // Estimasi HPP Cutting per bundle. Nilai ini read-only untuk membantu
+        // review: bahan memakai biaya LOT, upah memakai tarif aktif pada tanggal
+        // job, dan tidak membuat jurnal baru.
+        $rateDate = $cuttingJob->date ?? now();
+        $operatorIds = $cuttingJob->bundles->pluck('operator_id')->filter()->unique()->values();
+        $activeCuttingRates = PieceRate::query()
+            ->where('module', 'cutting')
+            ->whereIn('employee_id', $operatorIds)
+            ->activeAt($rateDate)
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id')
+            ->get(['employee_id', 'item_id', 'item_category_id', 'rate_per_pcs'])
+            ->groupBy('employee_id');
+
+        $cuttingHppRows = $cuttingJob->bundles->map(function ($bundle) use ($activeCuttingRates): array {
+            $finishedItem = $bundle->finishedItem;
+            $lot = $bundle->lot;
+            $lotUnitCost = (float) ($lot?->avg_cost ?: ($lot?->item?->effective_unit_cost ?? 0));
+            $operatorRates = $activeCuttingRates->get((int) $bundle->operator_id, collect());
+
+            $wageRate = $operatorRates
+                ->first(fn ($rate): bool => (int) $rate->item_id === (int) $bundle->finished_item_id)
+                ?->rate_per_pcs;
+            if ((float) $wageRate <= 0) {
+                $wageRate = $operatorRates
+                    ->first(fn ($rate): bool => $rate->item_id === null
+                        && (int) $rate->item_category_id === (int) ($finishedItem?->item_category_id ?? $bundle->item_category_id))
+                    ?->rate_per_pcs;
+            }
+            if ((float) $wageRate <= 0) {
+                $wageRate = $operatorRates
+                    ->first(fn ($rate): bool => $rate->item_id === null && $rate->item_category_id === null)
+                    ?->rate_per_pcs;
+            }
+
+            $qtyPcs = (float) ($bundle->qty_pcs ?? 0);
+            $fabricQty = (float) ($bundle->qty_used_fabric ?? 0);
+            $materialCost = round($fabricQty * $lotUnitCost, 2);
+            $wageCost = round($qtyPcs * (float) ($wageRate ?? 0), 2);
+            $totalCost = round($materialCost + $wageCost, 2);
+
+            return [
+                'bundle_id' => (int) $bundle->id,
+                'bundle_code' => (string) ($bundle->bundle_code ?: ('Bundle #'.$bundle->bundle_no)),
+                'item_code' => (string) ($finishedItem?->code ?? '-'),
+                'qty_pcs' => $qtyPcs,
+                'fabric_qty' => $fabricQty,
+                'material_unit_cost' => $lotUnitCost,
+                'material_cost' => $materialCost,
+                'wage_rate' => (float) ($wageRate ?? 0),
+                'wage_cost' => $wageCost,
+                'total_cost' => $totalCost,
+                'unit_cost' => $qtyPcs > 0 ? round($totalCost / $qtyPcs, 2) : 0,
+                'material_cost_missing' => $fabricQty > 0 && $lotUnitCost <= 0,
+                'wage_rate_missing' => $qtyPcs > 0 && (float) ($wageRate ?? 0) <= 0,
+            ];
+        })->values();
+
+        $cuttingHppTotals = [
+            'material' => round((float) $cuttingHppRows->sum('material_cost'), 2),
+            'wage' => round((float) $cuttingHppRows->sum('wage_cost'), 2),
+            'total' => round((float) $cuttingHppRows->sum('total_cost'), 2),
+            'qty_pcs' => round((float) $cuttingHppRows->sum('qty_pcs'), 2),
+        ];
+
         return view('production.cutting_jobs.show', [
             'job' => $cuttingJob,
             'hasQcCutting' => $hasQcCutting,
+            'bundleCorrections' => $bundleCorrections,
             'bomScrapTargets' => $bomScrapTargets,
+            'accountingJournalEntries' => $accountingJournalEntries,
+            'cuttingHppRows' => $cuttingHppRows,
+            'cuttingHppTotals' => $cuttingHppTotals,
         ]);
     }
 
@@ -1661,7 +1904,7 @@ class CuttingJobController extends Controller
         $voidableStatuses = ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc'];
         if (! in_array($cuttingJob->status, $voidableStatuses, true)) {
             return back()->with('error',
-                'Cutting Job tidak bisa di-void. Status saat ini: ' . strtoupper($cuttingJob->status) . '. Void hanya bisa dilakukan sebelum QC diinput.'
+                'Cutting Job tidak bisa di-void. Status saat ini: '.strtoupper($cuttingJob->status).'. Void hanya bisa dilakukan sebelum QC diinput.'
             );
         }
 
@@ -1680,6 +1923,15 @@ class CuttingJobController extends Controller
         if ($hasSewingPickup) {
             return back()->with('error',
                 'Cutting Job tidak bisa di-void karena sebagian bundle sudah diambil untuk jahit (Sewing Pickup).'
+            );
+        }
+
+        if (\App\Models\CuttingBundleCorrection::query()
+            ->where('cutting_job_id', $cuttingJob->id)
+            ->where('status', 'returned')
+            ->exists()) {
+            return back()->with('error',
+                'Cutting Job memiliki koreksi bundle yang sudah mengembalikan bahan baku. Reversal koreksi harus diselesaikan terlebih dahulu.'
             );
         }
 
@@ -1702,11 +1954,11 @@ class CuttingJobController extends Controller
             if ($hasMutasi) {
                 $this->inventory->reverseBySource(
                     originalSourceTypes: ['cutting_job'],
-                    originalSourceId:    $cuttingJob->id,
-                    voidSourceType:      'cutting_job_void',
-                    voidSourceId:        $cuttingJob->id,
-                    notesPrefix:         "VOID {$cuttingJob->code}",
-                    date:                now(),
+                    originalSourceId: $cuttingJob->id,
+                    voidSourceType: 'cutting_job_void',
+                    voidSourceId: $cuttingJob->id,
+                    notesPrefix: "VOID {$cuttingJob->code}",
+                    date: now(),
                 );
             }
 
@@ -1762,6 +2014,8 @@ class CuttingJobController extends Controller
             ]);
         }
 
+        $this->standaloneProductionPosting->voidCuttingJob((int) $cuttingJob->id);
+
         return redirect()
             ->route('production.cutting_jobs.show', $cuttingJob)
             ->with('success', "Cutting Job {$cuttingJob->code} berhasil di-void. Stok kain sudah dikembalikan ke LOT.");
@@ -1805,7 +2059,7 @@ class CuttingJobController extends Controller
             try {
                 app(\App\Services\Production\QcService::class)->cancelCuttingQc($cuttingJob);
             } catch (\Throwable $e) {
-                return back()->with('error', 'Gagal membatalkan QC saat kembalikan ke bahan baku: ' . $e->getMessage());
+                return back()->with('error', 'Gagal membatalkan QC saat kembalikan ke bahan baku: '.$e->getMessage());
             }
         }
 
@@ -1829,7 +2083,7 @@ class CuttingJobController extends Controller
             })
             ->exists();
 
-        if (!$hasQcCutting) {
+        if (! $hasQcCutting) {
             $cuttingJob->update([
                 'status' => 'sent_to_qc',
             ]);
@@ -1839,7 +2093,6 @@ class CuttingJobController extends Controller
             ->back()
             ->with('success', 'Cutting job dikirim ke QC Cutting.');
     }
-
 
     /**
      * Sinkron actual used fabric lot dari total bundle.
@@ -1887,14 +2140,14 @@ class CuttingJobController extends Controller
     public function recordSisaFabric(Request $request, CuttingJob $cuttingJob)
     {
         $validated = $request->validate([
-            'lots'              => ['required', 'array', 'min:1'],
-            'lots.*.lot_id'     => ['required', 'integer', 'exists:lots,id'],
-            'lots.*.qty_sisa'   => ['nullable', 'numeric', 'min:0'],
-            'lots.*.qty_scrap'  => ['nullable', 'numeric', 'min:0'],
+            'lots' => ['required', 'array', 'min:1'],
+            'lots.*.lot_id' => ['required', 'integer', 'exists:lots,id'],
+            'lots.*.qty_sisa' => ['nullable', 'numeric', 'min:0'],
+            'lots.*.qty_scrap' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
-        if (!$rmWarehouseId) {
+        if (! $rmWarehouseId) {
             throw ValidationException::withMessages(['lots' => 'Gudang RM belum dikonfigurasi.']);
         }
 
@@ -1910,12 +2163,12 @@ class CuttingJobController extends Controller
         $bomQtyByItem = \App\Models\ItemBomLine::query()
             ->whereIn('material_item_id', $lotItemIds->values()->unique()->all())
             ->where('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
-            ->whereHas('bom', fn($q) => $q->where('active', true))
+            ->whereHas('bom', fn ($q) => $q->where('active', true))
             ->with('bom:id,item_id')
             ->get()
-            ->groupBy(fn($l) => (int) $l->bom->item_id)
-            ->map(fn($lines) => $lines->keyBy(fn($l) => (int) $l->material_item_id)
-                ->map(fn($l) => (float) $l->qty));
+            ->groupBy(fn ($l) => (int) $l->bom->item_id)
+            ->map(fn ($lines) => $lines->keyBy(fn ($l) => (int) $l->material_item_id)
+                ->map(fn ($l) => (float) $l->qty));
 
         $goodByLot = [];
         foreach ($cuttingJob->bundles as $b) {
@@ -1928,8 +2181,8 @@ class CuttingJobController extends Controller
         DB::transaction(function () use ($validated, $cuttingJob, $rmWarehouseId, $epsilon, $goodByLot, &$processed) {
 
             foreach ($validated['lots'] as $row) {
-                $lotId    = (int) $row['lot_id'];
-                $qtySisa  = (float) ($row['qty_sisa'] ?? 0);
+                $lotId = (int) $row['lot_id'];
+                $qtySisa = (float) ($row['qty_sisa'] ?? 0);
                 $qtyScrap = (float) ($row['qty_scrap'] ?? 0);
 
                 // Baris tanpa sisa layak & tanpa scrap → tidak ada yang dicatat
@@ -1943,7 +2196,7 @@ class CuttingJobController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                if (!$cjLot) {
+                if (! $cjLot) {
                     throw ValidationException::withMessages([
                         'lots' => "LOT #{$lotId} tidak terdaftar di cutting job ini.",
                     ]);
@@ -1955,12 +2208,12 @@ class CuttingJobController extends Controller
                     ]);
                 }
 
-                $lot     = Lot::lockForUpdate()->findOrFail($lotId);
+                $lot = Lot::lockForUpdate()->findOrFail($lotId);
                 $lotMaterialId = (int) ($lot->item_id ?? $cuttingJob->fabric_item_id);
                 $avgCost = (float) ($lot->avg_cost ?? 0);
 
-                $usedQty   = (float) ($cjLot->used_fabric_qty ?? 0);
-                $goodQty   = (float) ($goodByLot[$lotId] ?? 0);
+                $usedQty = (float) ($cjLot->used_fabric_qty ?? 0);
+                $goodQty = (float) ($goodByLot[$lotId] ?? 0);
                 $lotOnhand = (float) ($lot->qty_onhand ?? 0);
 
                 // Batas: sisa layak + scrap ≤ kain terpakai + sisa fisik LOT
@@ -1982,7 +2235,7 @@ class CuttingJobController extends Controller
                 $excess = $goodQty > 0 ? max($usedQty - $goodQty, 0) : $usedQty;
 
                 $sisaFromUsed = min($qtySisa, $excess);
-                $remnantKept  = max($qtySisa - $sisaFromUsed, 0); // sisa LOT yang dipertahankan
+                $remnantKept = max($qtySisa - $sisaFromUsed, 0); // sisa LOT yang dipertahankan
 
                 if ($sisaFromUsed > $epsilon) {
                     // 1. StockIn ke RM (hanya porsi dari pemakaian)
@@ -2000,8 +2253,8 @@ class CuttingJobController extends Controller
                     );
 
                     // 2. Tambah kembali qty_onhand LOT
-                    $lot->qty_onhand  = (float) $lot->qty_onhand + $sisaFromUsed;
-                    $lot->total_cost  = $lot->qty_onhand * $avgCost;
+                    $lot->qty_onhand = (float) $lot->qty_onhand + $sisaFromUsed;
+                    $lot->total_cost = $lot->qty_onhand * $avgCost;
                     if ($lot->status === 'closed' && $lot->qty_onhand > 0) {
                         $lot->status = 'active';
                     }
@@ -2009,9 +2262,9 @@ class CuttingJobController extends Controller
                 }
 
                 if ($qtyScrap > $epsilon) {
-                    $excessLeft    = max($excess - $sisaFromUsed, 0);
+                    $excessLeft = max($excess - $sisaFromUsed, 0);
                     $scrapFromUsed = min($qtyScrap, $excessLeft);
-                    $writeOff      = min(
+                    $writeOff = min(
                         $qtyScrap - $scrapFromUsed,
                         max((float) $lot->qty_onhand - $remnantKept, 0)
                     );
@@ -2038,12 +2291,12 @@ class CuttingJobController extends Controller
                 }
 
                 // 3. Catat di pivot
-                $cjLot->qty_sisa_fabric   = $qtySisa;
+                $cjLot->qty_sisa_fabric = $qtySisa;
                 if (\Illuminate\Support\Facades\Schema::hasColumn('cutting_job_lots', 'qty_scrap')) {
                     $cjLot->qty_scrap = $qtyScrap;
                 }
-                $cjLot->sisa_recorded_at  = now();
-                $cjLot->sisa_recorded_by  = auth()->id();
+                $cjLot->sisa_recorded_at = now();
+                $cjLot->sisa_recorded_by = auth()->id();
                 $cjLot->save();
 
                 $processed++;
@@ -2068,5 +2321,4 @@ class CuttingJobController extends Controller
             ->route('production.cutting_jobs.show', $cuttingJob)
             ->with('success', "Sisa kain berhasil dicatat ({$processed} LOT) — sisa layak kembali ke RM, scrap tercatat untuk evaluasi BOM.");
     }
-
 }

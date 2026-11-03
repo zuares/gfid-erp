@@ -75,6 +75,26 @@
             @endif
         @endif
 
+        @if (auth()->user()?->isDeveloper())
+            <section class="dash-alert dash-alert-danger mb-3" aria-labelledby="developer-reset-title">
+                <div class="dash-alert-content">
+                    <i class="bi bi-database-x" aria-hidden="true"></i>
+                    <div>
+                        <strong id="developer-reset-title">Developer: mulai saldo dari awal</strong>
+                        <span>Hapus jurnal accounting, saldo inventory, stock opname, dokumen produksi/WIP, dan transaksi purchasing.</span>
+                        <small>Master akun, mapping, supplier, item, gudang, BOM, user, serta data sales/marketplace tidak dihapus.</small>
+                    </div>
+                </div>
+                <form method="POST" action="{{ route('developer.reset-ledgers') }}" class="d-flex flex-wrap gap-2 align-items-center"
+                    onsubmit="return confirm('Ini menghapus data saldo accounting, inventory, produksi, dan transaksi purchasing secara permanen. Master data tetap aman. Lanjutkan?');">
+                    @csrf
+                    <input name="confirmation" type="text" class="form-control form-control-sm" style="min-width:150px;"
+                        placeholder="Ketik RESET SALDO" pattern="RESET SALDO" required autocomplete="off">
+                    <button type="submit" class="btn btn-sm btn-danger">Kosongkan saldo</button>
+                </form>
+            </section>
+        @endif
+
         @includeFirst(
             ['dashboard.partials.' . $role, 'dashboard.partials.generic'],
             ['d' => $d]

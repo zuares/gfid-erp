@@ -1124,7 +1124,8 @@
                                         data-balance="{{ $row->qty_balance }}"
                                         data-item-id="{{ $item->id }}"
                                         data-item-code="{{ $item->code }}"
-                                        data-item-unit="{{ $item->stockUnit() }}">
+                                        data-item-unit="{{ $item->stockUnit() }}"
+                                        data-unit-cost="{{ (float) ($lotRow->avg_cost ?: ($item->effective_unit_cost ?? 0)) }}">
 
                                         <input type="checkbox" class="lot-checkbox lot-checkbox-hidden"
                                             name="selected_lots[]" value="{{ $row->lot_id }}"
@@ -1449,7 +1450,8 @@
                                 data-balance="${escapeHtml(lot.balance)}"
                                 data-item-id="${escapeHtml(lot.item_id)}"
                                 data-item-code="${escapeHtml(lot.item_code)}"
-                                data-item-unit="${escapeHtml(lot.unit || group.unit || 'pcs')}">
+                                data-item-unit="${escapeHtml(lot.unit || group.unit || 'pcs')}"
+                                data-unit-cost="${escapeHtml(lot.unit_cost || 0)}">
                                 <input type="checkbox" class="lot-checkbox lot-checkbox-hidden"
                                     name="selected_lots[]" value="${escapeHtml(lot.lot_id)}"
                                     data-item-id="${escapeHtml(lot.item_id)}"

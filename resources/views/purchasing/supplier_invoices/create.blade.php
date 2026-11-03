@@ -6,6 +6,7 @@
     $user = auth()->user();
     $canSeeMoney = $user?->isOwner() || in_array($user?->role ?? '', ['accounting', 'developer']);
     $selectedOrderId = $order?->id ?? old('purchase_order_id', request('purchase_order_id'));
+    $invoiceTotal = max(0, round((float) $grnPostedTotal - (float) $returnTotal, 2));
 @endphp
 
 @push('head')
@@ -56,9 +57,9 @@
                 <div class="section-title">Referensi Purchase Order</div>
                 <div class="row g-3">
                     <div class="col-12">
-                        <label class="form-label">Purchase Order (Opsional)</label>
-                        <select name="purchase_order_id" id="sel-po" class="form-select">
-                            <option value="">— Tanpa PO / Pilih PO —</option>
+                        <label class="form-label">Purchase Order dengan GRN Posted <span class="text-danger">*</span></label>
+                        <select name="purchase_order_id" id="sel-po" class="form-select" required>
+                            <option value="">— Pilih PO —</option>
                             @foreach ($receivableOrders as $po)
                                 <option value="{{ $po->id }}"
                                     @selected((string) $selectedOrderId === (string) $po->id)>
@@ -67,7 +68,7 @@
                                 </option>
                             @endforeach
                         </select>
-                        <div class="form-text">Pilih PO untuk mengisi otomatis data supplier dan nilai.</div>
+                        <div class="form-text">Hanya PO dengan GRN Posted yang tersedia. Pilih PO untuk memuat nilai penerimaan.</div>
                     </div>
                 </div>
 
@@ -103,7 +104,7 @@
 
                     @if ($grnPostedTotal <= 0)
                         <div class="warn-box mt-2">
-                            ⚠️ PO ini belum ada GRN yang di-post. Faktur tetap bisa dibuat, namun total perlu diisi manual.
+                            ⚠️ PO ini belum memiliki GRN Posted dan tidak dapat dibuatkan invoice.
                         </div>
                     @endif
                 @endif
@@ -175,58 +176,36 @@
         @if ($canSeeMoney)
         <div class="card mb-3">
             <div class="card-body">
-                <div class="section-title">Nilai Faktur</div>
+                <div class="section-title">Nilai Faktur dari GRN Posted</div>
                 <div class="row g-3">
                     <div class="col-12 col-md-4">
-                        <label class="form-label">Subtotal (dari GRN)</label>
-                        <input type="text" name="subtotal"
-                            class="form-control mono text-end @error('subtotal') is-invalid @enderror"
-                            value="{{ old('subtotal', number_format($grnPostedTotal, 2, ',', '.')) }}"
-                            placeholder="0,00">
-                        @error('subtotal')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        <label class="form-label">GRN Posted</label>
+                        <div class="po-summary-card mono text-end">{{ rupiah($grnPostedTotal) }}</div>
                     </div>
 
                     <div class="col-12 col-md-4">
-                        <label class="form-label">Diskon</label>
-                        <input type="text" name="discount_amount"
-                            class="form-control mono text-end @error('discount_amount') is-invalid @enderror"
-                            value="{{ old('discount_amount', '0,00') }}"
-                            placeholder="0,00">
-                        @error('discount_amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        <label class="form-label">Potongan Retur Posted</label>
+                        <div class="po-summary-card mono text-end text-danger">- {{ rupiah($returnTotal) }}</div>
                     </div>
 
                     <div class="col-12 col-md-4">
-                        <label class="form-label">Potongan Retur</label>
-                        <input type="text" name="return_deduction_amount"
-                            class="form-control mono text-end @error('return_deduction_amount') is-invalid @enderror"
-                            value="{{ old('return_deduction_amount', number_format($returnTotal, 2, ',', '.')) }}"
-                            placeholder="0,00">
-                        @error('return_deduction_amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        <label class="form-label">Total Invoice</label>
+                        <div class="po-summary-card mono text-end fw-semibold">{{ rupiah($invoiceTotal) }}</div>
                     </div>
 
                     <div class="col-12">
-                        <div class="po-summary-card">
-                            <div class="d-flex justify-content-between">
-                                <span class="text-muted">Estimasi Total Faktur</span>
-                                <span class="mono fw-semibold" id="totalPreview">—</span>
-                            </div>
-                        </div>
+                        <div class="form-text">Nilai dikunci dari GRN Posted dikurangi retur Posted. Nilai PO dan input manual tidak digunakan.</div>
                     </div>
                 </div>
             </div>
         </div>
-        @else
-            {{-- Non-owner: kirim nilai 0, owner/accounting yang edit nanti --}}
-            <input type="hidden" name="subtotal" value="0">
-            <input type="hidden" name="discount_amount" value="0">
-            <input type="hidden" name="return_deduction_amount" value="0">
         @endif
 
         <div class="d-flex justify-content-between">
             <a href="{{ route('purchasing.supplier_invoices.index') }}" class="btn btn-outline-secondary">
                 ← Batal
             </a>
-            <button type="submit" class="btn btn-primary">Simpan Faktur (Draft)</button>
+            <button type="submit" class="btn btn-primary" @disabled(!$order || $invoiceTotal <= 0)>Simpan Faktur (Draft)</button>
         </div>
     </form>
 </div>
@@ -234,41 +213,19 @@
 
 @push('scripts')
 <script>
-// Live preview total
+// Memuat ulang basis invoice setelah PO dipilih.
 (function () {
-    const numInputs = ['subtotal', 'discount_amount', 'return_deduction_amount'];
-    const preview = document.getElementById('totalPreview');
-    if (!preview) return;
-
-    function parseID(val) {
-        if (!val) return 0;
-        val = val.trim().replace(/\s/g, '');
-        if (val.includes(',')) {
-            val = val.replace(/\./g, '').replace(',', '.');
-        } else if (/^\d{1,3}(\.\d{3}){2,}$/.test(val)) {
-            val = val.replace(/\./g, '');
+    const select = document.getElementById('sel-po');
+    if (!select) return;
+    select.addEventListener('change', function () {
+        const url = new URL(window.location.href);
+        if (this.value) {
+            url.searchParams.set('purchase_order_id', this.value);
+        } else {
+            url.searchParams.delete('purchase_order_id');
         }
-        return parseFloat(val) || 0;
-    }
-
-    function formatRp(n) {
-        return 'Rp ' + n.toLocaleString('id-ID', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-    }
-
-    function recalc() {
-        const sub = parseID(document.querySelector('[name=subtotal]')?.value);
-        const disc = parseID(document.querySelector('[name=discount_amount]')?.value);
-        const ret = parseID(document.querySelector('[name=return_deduction_amount]')?.value);
-        const total = Math.max(0, sub - disc - ret);
-        preview.textContent = formatRp(total);
-    }
-
-    numInputs.forEach(function(name) {
-        const el = document.querySelector('[name=' + name + ']');
-        if (el) el.addEventListener('input', recalc);
+        window.location.assign(url.toString());
     });
-
-    recalc();
 })();
 </script>
 @endpush

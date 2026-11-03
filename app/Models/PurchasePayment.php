@@ -20,6 +20,7 @@ class PurchasePayment extends Model
         'ref_no',
         'notes',
         'created_by',
+        'standalone_journal_id',
         'voided_at',
         'voided_by',
     ];
@@ -43,6 +44,11 @@ class PurchasePayment extends Model
     public function journal(): BelongsTo
     {
         return $this->belongsTo(Journal::class, 'journal_id');
+    }
+
+    public function standaloneJournal(): BelongsTo
+    {
+        return $this->belongsTo(StandaloneAccountingJournal::class, 'standalone_journal_id');
     }
 
     public function supplierInvoice(): BelongsTo

@@ -16,6 +16,7 @@ use App\Models\Lot;
 use App\Models\StockOpname;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
+use App\Services\Accounting\StandaloneInventoryAdjustmentPostingService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Production\SewingSupplyFulfillmentService;
 use Carbon\Carbon;
@@ -24,13 +25,13 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class InventoryAdjustmentController extends Controller
 {
     public function __construct(
         protected InventoryService $inventory,
         protected JournalService $journal,
+        protected StandaloneInventoryAdjustmentPostingService $standaloneInventoryAdjustmentPosting,
         protected SewingSupplyFulfillmentService $sewingSupplyFulfillment,
     ) {}
 
@@ -42,7 +43,7 @@ class InventoryAdjustmentController extends Controller
     public function index(Request $request): View
     {
         $query = InventoryAdjustment::query()
-            ->with(['warehouse', 'creator', 'approver'])
+            ->with(['warehouse', 'creator', 'approver', 'standaloneJournal'])
             ->withCount('lines')
             ->orderByDesc('date')
             ->orderByDesc('id');
@@ -86,9 +87,9 @@ class InventoryAdjustmentController extends Controller
         if ($request->filled('q')) {
             $q = $request->string('q')->toString();
             $query->where(function ($sub) use ($q) {
-                $sub->where('code', 'like', '%' . $q . '%')
-                    ->orWhere('reason', 'like', '%' . $q . '%')
-                    ->orWhere('notes', 'like', '%' . $q . '%');
+                $sub->where('code', 'like', '%'.$q.'%')
+                    ->orWhere('reason', 'like', '%'.$q.'%')
+                    ->orWhere('notes', 'like', '%'.$q.'%');
             });
         }
 
@@ -125,7 +126,8 @@ class InventoryAdjustmentController extends Controller
             $n = (float) ($n ?? 0);
             $neg = $n < 0;
             $n = abs($n);
-            return ($neg ? '-Rp ' : 'Rp ') . number_format($n, 0, ',', '.');
+
+            return ($neg ? '-Rp ' : 'Rp ').number_format($n, 0, ',', '.');
         };
 
         $adjustmentSummaries = [];
@@ -189,6 +191,7 @@ class InventoryAdjustmentController extends Controller
             'creator',
             'approver',
             'source',
+            'standaloneJournal',
             'lines' => function ($q) {
                 $q->with('item')->orderBy('id');
             },
@@ -298,6 +301,7 @@ class InventoryAdjustmentController extends Controller
                     'unit_cost_fmt' => '-',
                     'value_fmt' => $this->formatRupiah(0),
                 ];
+
                 continue;
             }
 
@@ -353,14 +357,15 @@ class InventoryAdjustmentController extends Controller
         ]);
     }
 
-    protected function formatRupiah(float | int | null $amount): string
+    protected function formatRupiah(float|int|null $amount): string
     {
         $n = (float) ($amount ?? 0);
         $negative = $n < 0;
         $n = abs($n);
 
         $formatted = number_format($n, 0, ',', '.');
-        return ($negative ? '-Rp ' : 'Rp ') . $formatted;
+
+        return ($negative ? '-Rp ' : 'Rp ').$formatted;
     }
 
     /**
@@ -416,7 +421,27 @@ class InventoryAdjustmentController extends Controller
         }
 
         $avg = (float) $inventory->getItemIncomingUnitCost($warehouseId, $itemId);
+
         return $avg > 0 ? $avg : null;
+    }
+
+    protected function assertStockOpnameSnapshotUnchanged(StockOpname $opname): void
+    {
+        $snapshotAt = $opname->snapshotAt();
+        $itemIds = $opname->lines()->pluck('item_id');
+
+        $hasLaterMutation = InventoryMutation::query()
+            ->where('warehouse_id', $opname->warehouse_id)
+            ->whereIn('item_id', $itemIds)
+            ->where('created_at', '>', $snapshotAt)
+            ->exists();
+
+        if ($hasLaterMutation) {
+            throw new \RuntimeException(
+                'Ada mutasi stok setelah snapshot stock opname. '
+                .'Lakukan recount atau buat stock opname baru sebelum approve.'
+            );
+        }
     }
 
     /**
@@ -477,7 +502,7 @@ class InventoryAdjustmentController extends Controller
 
         $userId = $request->user()?->id;
         $adjustment = DB::transaction(function () use ($validated, $userId) {
-            $adjustment = new InventoryAdjustment();
+            $adjustment = new InventoryAdjustment;
             $adjustment->code = $this->generateCodeForDate($validated['date']);
             $adjustment->warehouse_id = (int) $validated['warehouse_id'];
             $adjustment->date = $validated['date'];
@@ -526,7 +551,7 @@ class InventoryAdjustmentController extends Controller
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             abort(403, 'Harus login untuk approve adjustment.');
         }
 
@@ -535,18 +560,18 @@ class InventoryAdjustmentController extends Controller
         $isAdmin = $role === 'admin';
 
         // Hanya Owner & Admin yang boleh approve
-        if (!$isOwner && !$isAdmin) {
+        if (! $isOwner && ! $isAdmin) {
             abort(403, 'Hanya Owner atau Admin yang boleh approve adjustment.');
         }
 
         $fromStockOpname = $inventoryAdjustment->source_type === StockOpname::class;
 
         // Kalau sumber dari StockOpname (opening / periodic) → WAJIB Owner
-        if ($fromStockOpname && !$isOwner) {
+        if ($fromStockOpname && ! $isOwner) {
             abort(403, 'Adjustment dari Stock Opname hanya boleh di-approve oleh Owner.');
         }
 
-        if (!$inventoryAdjustment->canApprove()) {
+        if (! $inventoryAdjustment->canApprove()) {
             return redirect()
                 ->route('inventory.adjustments.show', ['inventoryAdjustment' => $inventoryAdjustment->getKey()])
                 ->with('status', 'error')
@@ -573,18 +598,9 @@ class InventoryAdjustmentController extends Controller
             $inventoryAdjustment->save();
 
             $this->journal->postInventoryAdjustment($inventoryAdjustment);
+            $this->standaloneInventoryAdjustmentPosting->post($inventoryAdjustment);
             $this->sewingSupplyFulfillment->fulfillApprovedAdjustment($inventoryAdjustment);
         });
-
-        // Post jurnal setelah transaksi inventory committed
-        try {
-            $this->journal->postInventoryAdjustment($inventoryAdjustment);
-        } catch (\Throwable $e) {
-            Log::warning('[InventoryAdjustment] Gagal post jurnal setelah approve.', [
-                'adjustment_id' => $inventoryAdjustment->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
 
         return redirect()
             ->route('inventory.adjustments.show', ['inventoryAdjustment' => $inventoryAdjustment->getKey()])
@@ -598,16 +614,16 @@ class InventoryAdjustmentController extends Controller
     public function void(Request $request, InventoryAdjustment $inventoryAdjustment): RedirectResponse
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             abort(403, 'Harus login untuk membatalkan adjustment.');
         }
 
         $role = $user->role ?? null;
-        if (!in_array($role, ['owner', 'admin'])) {
+        if (! in_array($role, ['owner', 'admin'])) {
             abort(403, 'Hanya Owner atau Admin yang boleh membatalkan adjustment.');
         }
 
-        if (!$inventoryAdjustment->isPending() && !$inventoryAdjustment->isDraft()) {
+        if (! $inventoryAdjustment->isPending() && ! $inventoryAdjustment->isDraft()) {
             return redirect()
                 ->route('inventory.adjustments.show', ['inventoryAdjustment' => $inventoryAdjustment->getKey()])
                 ->with('status', 'error')
@@ -649,19 +665,19 @@ class InventoryAdjustmentController extends Controller
             return null;
         }
 
-        if (!$item || ($item->role_code ?? null) !== ItemRole::RM) {
+        if (! $item || ($item->role_code ?? null) !== ItemRole::RM) {
             return null;
         }
 
         $lot = Lot::create([
-            'code'         => CodeGenerator::generate('LOT'),
-            'item_id'      => (int) $item->id,
-            'initial_qty'  => 0,
+            'code' => CodeGenerator::generate('LOT'),
+            'item_id' => (int) $item->id,
+            'initial_qty' => 0,
             'initial_cost' => 0,
-            'qty_onhand'   => 0,
-            'total_cost'   => 0,
-            'avg_cost'     => 0,
-            'status'       => 'open',
+            'qty_onhand' => 0,
+            'total_cost' => 0,
+            'avg_cost' => 0,
+            'status' => 'open',
         ]);
 
         return (int) $lot->id;
@@ -710,7 +726,7 @@ class InventoryAdjustmentController extends Controller
                 affectLotCost: false,
             );
 
-            if (!$mutation) {
+            if (! $mutation) {
                 continue;
             }
 
@@ -738,8 +754,13 @@ class InventoryAdjustmentController extends Controller
         /** @var StockOpname|null $opname */
         $opname = $adjustment->source_type === StockOpname::class ? $adjustment->source : null;
 
+        if ($opname) {
+            $this->assertStockOpnameSnapshotUnchanged($opname);
+        }
+
         if ($opname && $opname->type === StockOpname::TYPE_OPENING) {
             $this->approveFromStockOpnameOpening($adjustment, $inventory, $warehouseId, $date, $opname);
+
             return;
         }
 
@@ -763,8 +784,15 @@ class InventoryAdjustmentController extends Controller
             $itemId = (int) $line->item_id;
             $physicalQty = (float) $line->qty_after;
 
-            // BEFORE (real onhand sebelum koreksi)
-            $qtyBefore = $inventory->getOnHandQty($warehouseId, $itemId);
+            $expectedQtyBefore = (float) ($line->qty_before ?? 0);
+            $currentQtyBefore = $inventory->getOnHandQty($warehouseId, $itemId);
+            if (abs($currentQtyBefore - $expectedQtyBefore) > 0.000001) {
+                throw new \RuntimeException(
+                    "Saldo item {$itemId} berubah sejak snapshot stock opname. Lakukan recount sebelum approve."
+                );
+            }
+
+            $qtyBefore = $expectedQtyBefore;
 
             // diff signed
             $signedDiff = $physicalQty - $qtyBefore;
@@ -775,12 +803,15 @@ class InventoryAdjustmentController extends Controller
                 $line->qty_change = 0;
                 $line->direction = 'in';
                 $line->save();
+
                 continue;
             }
 
-            // ambil unit_cost dari SO line
+            // Ambil HPP dari snapshot dokumen SO terlebih dahulu.
             $soLine = $opname->lines->firstWhere('item_id', $itemId);
-            $unitCost = ($soLine && (float) $soLine->unit_cost > 0) ? (float) $soLine->unit_cost : null;
+            $unitCost = ($soLine && (float) $soLine->effective_unit_cost > 0)
+                ? (float) $soLine->effective_unit_cost
+                : null;
 
             // ✅ Buat mutasi pakai unitCostOverride → unit_cost & total_cost KEISI
             $inventory->adjustByDifference(
@@ -790,7 +821,7 @@ class InventoryAdjustmentController extends Controller
                 date: $date,
                 sourceType: InventoryAdjustment::class,
                 sourceId: $adjustment->id,
-                notes: $adjustment->reason ?? ('Saldo awal dari SO opening ' . ($opname->code ?? '')),
+                notes: $adjustment->reason ?? ('Saldo awal dari SO opening '.($opname->code ?? '')),
                 lotId: $this->resolveLotIdForAdjustment($line->item, null, $signedDiff),
                 allowNegative: false,
                 unitCostOverride: $unitCost, // ✅ ini kuncinya
@@ -831,17 +862,24 @@ class InventoryAdjustmentController extends Controller
             $itemId = (int) $line->item_id;
             $physicalQty = (float) $line->qty_after;
 
-            // qty_before = stok on hand sebelum penyesuaian
-            $qtyBefore = $inventory->getOnHandQty(
+            $expectedQtyBefore = (float) ($line->qty_before ?? 0);
+            $currentQtyBefore = $inventory->getOnHandQty(
                 warehouseId: $warehouseId,
                 itemId: $itemId
             );
+            if (abs($currentQtyBefore - $expectedQtyBefore) > 0.000001) {
+                throw new \RuntimeException(
+                    "Saldo item {$itemId} berubah sejak snapshot stock opname. Lakukan recount sebelum approve."
+                );
+            }
+
+            $qtyBefore = $expectedQtyBefore;
 
             /**
              * ==== Resolve unit cost periodic ====
              * Urutan:
-             * 1. Kalau SO Periodik punya unit_cost di baris item → pakai itu
-             * 2. Kalau tidak, pakai HPP master item (items.hpp)
+             * 1. HPP snapshot pada baris SO / cost snapshot aktif
+             * 2. HPP master item sebagai fallback dokumen lama
              *
              * (di sini tidak baca ItemCostSnapshot; snapshot dibuat terpisah)
              */
@@ -849,8 +887,8 @@ class InventoryAdjustmentController extends Controller
 
             // 1) Ambil dari baris SO kalau ada
             $soLine = $opnameLinesByItem->get($itemId);
-            if ($soLine && (float) $soLine->unit_cost > 0) {
-                $unitCost = (float) $soLine->unit_cost;
+            if ($soLine && (float) $soLine->effective_unit_cost > 0) {
+                $unitCost = (float) $soLine->effective_unit_cost;
             } elseif ($line->item && (float) $line->item->hpp > 0) {
                 // 2) fallback dari master item HPP
                 $unitCost = (float) $line->item->hpp;
@@ -864,7 +902,7 @@ class InventoryAdjustmentController extends Controller
                 date: $date,
                 sourceType: InventoryAdjustment::class,
                 sourceId: $adjustment->id,
-                notes: $adjustment->reason ?? ('Penyesuaian stok dari stock opname ' . ($opname?->code ?? '')),
+                notes: $adjustment->reason ?? ('Penyesuaian stok dari stock opname '.($opname?->code ?? '')),
                 lotId: $this->resolveLotIdForAdjustment($line->item, null, $physicalQty - (float) $qtyBefore),
                 unitCostOverride: $unitCost, // ← override cost di mutasi periodic
                 affectLotCost: false,
@@ -902,7 +940,7 @@ class InventoryAdjustmentController extends Controller
                     'packaging_unit_cost' => 0,
                     'overhead_unit_cost' => 0,
                     'unit_cost' => $unitCost,
-                    'notes' => 'SO periodic ' . ($opname?->code ?? ''),
+                    'notes' => 'SO periodic '.($opname?->code ?? ''),
                     'is_active' => true,
                     'created_by' => $opname?->created_by ?? $adjustment->created_by,
                 ]);
@@ -924,19 +962,21 @@ class InventoryAdjustmentController extends Controller
             ->groupBy('item_id', 'lot_id')
             ->havingRaw('SUM(qty_change) != 0')
             ->get();
-            
+
         $results = [];
         if ($mutations->isEmpty()) {
             return $results;
         }
-        
+
         $lots = \App\Models\Lot::whereIn('id', $mutations->pluck('lot_id')->unique())->get()->keyBy('id');
         $items = $itemsCollection ? $itemsCollection->keyBy('id') : \App\Models\Item::whereIn('id', $itemIds)->get()->keyBy('id');
 
         foreach ($mutations as $mut) {
             $item = $items[$mut->item_id] ?? null;
             $lot = $lots[$mut->lot_id] ?? null;
-            if (!$item || !$lot) continue;
+            if (! $item || ! $lot) {
+                continue;
+            }
 
             $results[] = [
                 'id' => $item->id,
@@ -955,7 +995,7 @@ class InventoryAdjustmentController extends Controller
     public function itemsForWarehouse(Request $request): JsonResponse
     {
         $warehouseId = $request->integer('warehouse_id');
-        if (!$warehouseId) {
+        if (! $warehouseId) {
             return response()->json([], 400);
         }
 
@@ -964,13 +1004,13 @@ class InventoryAdjustmentController extends Controller
 
         if ($itemId) {
             $item = Item::with('role')->find($itemId);
-            if (!$item) {
+            if (! $item) {
                 return response()->json([], 404);
             }
 
             if ($item->role_code === 'RM') {
                 $lots = $this->getLotStockRowsForItems([$item->id], $warehouseId);
-                if (!empty($lots)) {
+                if (! empty($lots)) {
                     return response()->json($lots);
                 }
             }
@@ -1002,7 +1042,7 @@ class InventoryAdjustmentController extends Controller
 
             $results = [];
             $rmItemIds = [];
-            
+
             foreach ($stocks as $stock) {
                 if (($stock->item?->role_code ?? '') === 'RM') {
                     $rmItemIds[] = $stock->item_id;
@@ -1019,7 +1059,7 @@ class InventoryAdjustmentController extends Controller
                 }
             }
 
-            if (!empty($rmItemIds)) {
+            if (! empty($rmItemIds)) {
                 $rmLots = $this->getLotStockRowsForItems($rmItemIds, $warehouseId);
                 $results = array_merge($results, $rmLots);
             }
@@ -1030,8 +1070,8 @@ class InventoryAdjustmentController extends Controller
         $items = Item::query()
             ->with('role')
             ->where(function ($sub) use ($q) {
-                $sub->where('code', 'like', '%' . $q . '%')
-                    ->orWhere('name', 'like', '%' . $q . '%');
+                $sub->where('code', 'like', '%'.$q.'%')
+                    ->orWhere('name', 'like', '%'.$q.'%');
             })
             ->orderBy('code')
             ->limit(50)
@@ -1061,16 +1101,16 @@ class InventoryAdjustmentController extends Controller
                     'on_hand' => (float) ($stocks[$item->id] ?? 0),
                     'lot_id' => null,
                     'lot_code' => null,
-                    'not_in_warehouse' => !isset($stocks[$item->id]) || abs((float) ($stocks[$item->id] ?? 0)) < 0.000001,
+                    'not_in_warehouse' => ! isset($stocks[$item->id]) || abs((float) ($stocks[$item->id] ?? 0)) < 0.000001,
                 ];
             }
         }
 
-        if (!empty($rmItemIds)) {
+        if (! empty($rmItemIds)) {
             $rmLots = $this->getLotStockRowsForItems($rmItemIds, $warehouseId, $items);
             $foundItemIds = array_column($rmLots, 'id');
             foreach ($rmItemIds as $rmId) {
-                if (!in_array($rmId, $foundItemIds)) {
+                if (! in_array($rmId, $foundItemIds)) {
                     $item = $items->firstWhere('id', $rmId);
                     $rmLots[] = [
                         'id' => $item->id,
@@ -1099,11 +1139,11 @@ class InventoryAdjustmentController extends Controller
             'item_role_id' => ['nullable', 'exists:item_roles,id'],
         ]);
 
-        $role = !empty($validated['item_role_id'])
+        $role = ! empty($validated['item_role_id'])
             ? ItemRole::find((int) $validated['item_role_id'])
             : null;
 
-        $category = !empty($validated['item_category_id'])
+        $category = ! empty($validated['item_category_id'])
             ? ItemCategory::find((int) $validated['item_category_id'])
             : null;
 
@@ -1115,7 +1155,7 @@ class InventoryAdjustmentController extends Controller
             default => 'material',
         };
 
-        if (!$roleCode && $categoryKind === 'product') {
+        if (! $roleCode && $categoryKind === 'product') {
             $type = 'finished_good';
         }
 
@@ -1184,10 +1224,10 @@ class InventoryAdjustmentController extends Controller
                 ->with('message', 'Adjustment tidak valid.');
         }
 
-        if (!$inventoryAdjustment->isDraft()) {
+        if (! $inventoryAdjustment->isDraft()) {
             return redirect("/inventory/adjustments/{$adjustmentId}")
                 ->with('status', 'warning')
-                ->with('message', 'Hanya draft yang bisa dipost. Dokumen ini sudah berstatus ' . ($inventoryAdjustment->status ?? '-'));
+                ->with('message', 'Hanya draft yang bisa dipost. Dokumen ini sudah berstatus '.($inventoryAdjustment->status ?? '-'));
         }
 
         $inventoryAdjustment->loadMissing(['lines.item', 'source']);
@@ -1201,7 +1241,7 @@ class InventoryAdjustmentController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (!$adjustment->isDraft()) {
+            if (! $adjustment->isDraft()) {
                 return;
             }
 
@@ -1246,7 +1286,7 @@ class InventoryAdjustmentController extends Controller
                     affectLotCost: false,
                 );
 
-                if (!$mutation) {
+                if (! $mutation) {
                     continue;
                 }
 
@@ -1274,28 +1314,23 @@ class InventoryAdjustmentController extends Controller
                 'approved_at' => now(),
             ]);
 
+            $this->journal->postInventoryAdjustment($adjustment);
+            $this->standaloneInventoryAdjustmentPosting->post($adjustment);
+
             $posted = true;
         });
 
-        if (!$posted) {
+        if (! $posted) {
             return redirect("/inventory/adjustments/{$adjustmentId}")
                 ->with('status', 'warning')
                 ->with('message', 'Adjustment sudah berubah status sebelum dipost. Tidak ada perubahan stok yang dilakukan.');
-        }
-
-        try {
-            $this->journal->postInventoryAdjustment($inventoryAdjustment->fresh());
-        } catch (\Throwable $e) {
-            Log::warning('[InventoryAdjustment] Gagal post jurnal setelah post().', [
-                'adjustment_id' => $inventoryAdjustment->id,
-                'error' => $e->getMessage(),
-            ]);
         }
 
         return redirect("/inventory/adjustments/{$adjustmentId}")
             ->with('status', 'success')
             ->with('message', 'Draft adjustment berhasil diposting dan stok sudah dikoreksi.');
     }
+
     public function cuttingOverproductionCreate(Request $request): View
     {
         abort_unless(in_array(auth()->user()->role ?? null, ['owner', 'admin']), 403);
@@ -1309,17 +1344,17 @@ class InventoryAdjustmentController extends Controller
 
         // ✅ 1) kalau job sudah punya wip_warehouse_id -> pakai itu
         $warehouse = null;
-        if (!empty($job->wip_warehouse_id)) {
+        if (! empty($job->wip_warehouse_id)) {
             $warehouse = Warehouse::find($job->wip_warehouse_id);
         }
 
         // ✅ 2) fallback aman: cari gudang WIP by code (JANGAN fallback ke warehouse job)
-        if (!$warehouse) {
+        if (! $warehouse) {
             $warehouse = Warehouse::where('code', 'WIP-CUT')->first(); // <- sesuaikan kode
         }
 
         // ✅ 3) kalau tetap tidak ketemu -> hard error biar gak salah masuk RM
-        abort_if(!$warehouse, 422, 'Gudang WIP target belum diset. Set wip_warehouse_id pada cutting job atau buat gudang code WIP-CUT.');
+        abort_if(! $warehouse, 422, 'Gudang WIP target belum diset. Set wip_warehouse_id pada cutting job atau buat gudang code WIP-CUT.');
 
         $warehouseId = (int) $warehouse->id;
 
@@ -1370,7 +1405,7 @@ class InventoryAdjustmentController extends Controller
 
         $adjustment = DB::transaction(function () use ($validated, $userId) {
 
-            $adj = new InventoryAdjustment();
+            $adj = new InventoryAdjustment;
             $adj->code = $this->generateCodeForDate($validated['date']);
             $adj->warehouse_id = (int) $validated['warehouse_id'];
             $adj->date = $validated['date'];
@@ -1420,7 +1455,7 @@ class InventoryAdjustmentController extends Controller
         return $this->post($adjustment);
     }
 
-// kalau route kamu ada void:
+    // kalau route kamu ada void:
     public function cuttingOverproductionVoid(InventoryAdjustment $adjustment): RedirectResponse
     {
         abort_unless(in_array(auth()->user()->role ?? null, ['owner', 'admin']), 403);
@@ -1432,5 +1467,4 @@ class InventoryAdjustmentController extends Controller
 
         return back()->with('success', 'Adjustment di-VOID.');
     }
-
 }

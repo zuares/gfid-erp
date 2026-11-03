@@ -55,8 +55,8 @@
         $system = (float)($line->system_qty ?? 0);
         $physical = $line->physical_qty !== null ? (float)$line->physical_qty : null;
         $unitCost = (float)($line->unit_cost ?? 0);
-        if ($unitCost <= 0) $unitCost = (float)($line->item->hpp ?? 0);
         if ($unitCost <= 0) $unitCost = (float)($line->effective_unit_cost ?? 0);
+        if ($unitCost <= 0) $unitCost = (float)($line->item->hpp ?? 0);
 
         if ($unitCost > 0) {
             $totalSystemValue += $system * $unitCost;
@@ -130,9 +130,10 @@
         !$isCancelled
         && !$adjustment
         && in_array($opname->status, [StockOpname::STATUS_DRAFT, StockOpname::STATUS_COUNTING, StockOpname::STATUS_REVIEWED], true)
-        && in_array($userRole, ['owner', 'admin', 'operating'], true);
+        && in_array($userRole, ['owner', 'admin'], true);
 
     $canSeeAdjustmentLink = !$isOpOrAdmin;
+    $canSeeAccountingLink = in_array($userRole, ['owner', 'admin'], true);
 
     $hasReviewedInfo = $opname->status === StockOpname::STATUS_REVIEWED && $opname->reviewed_by && $opname->reviewed_at;
 
@@ -390,6 +391,9 @@
             @elseif($opname->status === StockOpname::STATUS_FINALIZED)
                 @if($adjustment && $canSeeAdjustmentLink)
                     <a href="{{ route('inventory.adjustments.show', ['inventoryAdjustment' => $adjustment->getKey()]) }}" class="btn btn-sm btn-outline-secondary mt-1">Adjustment →</a>
+                @endif
+                @if($adjustment && $canSeeAccountingLink && $adjustment->standaloneJournal)
+                    <a href="{{ route('standalone-accounting.journals.show', $adjustment->standaloneJournal) }}" class="btn btn-sm btn-outline-primary mt-1">Jurnal Akuntansi Baru →</a>
                 @endif
             @endif
 
@@ -681,8 +685,8 @@
                             }
 
                             $unitCost = (float) ($line->unit_cost ?? 0);
-                            if ($unitCost <= 0) $unitCost = (float) ($line->item->hpp ?? 0);
                             if ($unitCost <= 0) $unitCost = (float) ($line->effective_unit_cost ?? 0);
+                            if ($unitCost <= 0) $unitCost = (float) ($line->item->hpp ?? 0);
                             $costMissing = $unitCost <= 0;
                             $physicalValue = (!$costMissing && $physical !== null) ? $physical * $unitCost : null;
                             $value = null;
@@ -787,8 +791,8 @@
                             }
 
                             $unitCost = (float) ($line->unit_cost ?? 0);
-                            if ($unitCost <= 0) $unitCost = (float) ($line->item->hpp ?? 0);
                             if ($unitCost <= 0) $unitCost = (float) ($line->effective_unit_cost ?? 0);
+                            if ($unitCost <= 0) $unitCost = (float) ($line->item->hpp ?? 0);
                             $costMissing = $unitCost <= 0;
                             $physicalValue = (!$costMissing && $physical !== null) ? $physical * $unitCost : null;
                             $value = null;

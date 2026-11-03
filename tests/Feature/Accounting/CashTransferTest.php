@@ -111,14 +111,14 @@ class CashTransferTest extends TestCase
         $this->actingAs($user)
             ->get(route('accounting.cash-transfers.create'))
             ->assertOk()
-            ->assertSee('value="' . $bank->id . '" selected', false);
+            ->assertSee('value="'.$bank->id.'" selected', false);
     }
 
     private function cashAccounts(): array
     {
         return [
-            Account::create(['code' => '1111', 'name' => 'Bank Utama', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]),
-            Account::create(['code' => '1101', 'name' => 'Kas Tunai', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]),
+            Account::firstOrCreate(['code' => '1111'], ['name' => 'Bank Utama', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]),
+            Account::firstOrCreate(['code' => '1101'], ['name' => 'Kas Tunai', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]),
         ];
     }
 }

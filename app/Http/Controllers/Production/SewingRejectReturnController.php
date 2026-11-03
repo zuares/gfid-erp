@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\ItemRole;
 use App\Models\SewingRejectConversion;
 use App\Models\Warehouse;
+use App\Services\Accounting\StandaloneProductionPostingService;
 use App\Services\Inventory\InventoryService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -21,9 +22,10 @@ use Illuminate\View\View;
 
 class SewingRejectReturnController extends Controller
 {
-    public function __construct(private InventoryService $inventory)
-    {
-    }
+    public function __construct(
+        private InventoryService $inventory,
+        private StandaloneProductionPostingService $standaloneProductionPosting,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -88,22 +90,22 @@ class SewingRejectReturnController extends Controller
 
         return DB::transaction(function () use ($sourceRejectLineId, $sourceFinishingLineId, $qty, $date, $validated): RedirectResponse {
             $rejSew = Warehouse::query()->where('code', 'REJ-SEW')->first();
-            if (!$rejSew) {
+            if (! $rejSew) {
                 throw ValidationException::withMessages(['qty' => 'Gudang REJ-SEW belum tersedia.']);
             }
             $whRts = Warehouse::query()->where('code', 'WH-RTS')->first();
-            if (!$whRts) {
+            if (! $whRts) {
                 throw ValidationException::withMessages(['qty' => 'Gudang WH-RTS belum tersedia.']);
             }
 
             $source = $this->resolveConversionSource($sourceRejectLineId, $sourceFinishingLineId, (int) $rejSew->id, true);
-            if (!$source) {
+            if (! $source) {
                 throw ValidationException::withMessages(['qty' => 'Baris reject jahit tidak ditemukan atau sudah selesai.']);
             }
 
             if ($qty > (float) $source->remaining_qty + 0.000001) {
                 throw ValidationException::withMessages([
-                    'qty' => "Qty {$source->sku} melebihi sisa reject. Sisa: " . number_format((float) $source->remaining_qty, 2, ',', '.') . ' pcs.',
+                    'qty' => "Qty {$source->sku} melebihi sisa reject. Sisa: ".number_format((float) $source->remaining_qty, 2, ',', '.').' pcs.',
                 ]);
             }
 
@@ -154,6 +156,8 @@ class SewingRejectReturnController extends Controller
                 cuttingJobBundleId: (int) $source->bundle_id ?: null,
             );
 
+            $this->standaloneProductionPosting->mirrorSewingRejectConversion((int) $conversion->id);
+
             return redirect()
                 ->route('production.sewing.reject_returns.index')
                 ->with('status', "{$source->sku} {$qty} pcs dikonversi ke {$rejectItem->code} dan masuk WH-RTS.");
@@ -163,7 +167,7 @@ class SewingRejectReturnController extends Controller
     private function rows(array $filters): \Illuminate\Support\Collection
     {
         $rejSew = Warehouse::query()->where('code', 'REJ-SEW')->first();
-        if (!$rejSew) {
+        if (! $rejSew) {
             return collect();
         }
 
@@ -209,7 +213,7 @@ class SewingRejectReturnController extends Controller
             ->leftJoinSub($convertedSub, 'cv_sum', 'cv_sum.source_reject_return_line_id', '=', 'rl.id')
             ->where('rl.qty_reject', '>', 0)
             ->whereNull('r.voided_at')
-            ->when($filters['operator_id'], fn($q, $opId) => $q->where('r.operator_id', $opId))
+            ->when($filters['operator_id'], fn ($q, $opId) => $q->where('r.operator_id', $opId))
             ->selectRaw("
                 rl.id as line_id,
                 'sewing_return' as source_kind,
@@ -240,9 +244,10 @@ class SewingRejectReturnController extends Controller
                 $converted = (float) $r->qty_converted;
                 $stock = max((float) $r->stock_rej_sew, 0.0);
                 $r->remaining_qty = min(max($reject - $reworked - $converted, 0.0), $stock);
+
                 return $this->decorateRow($r);
             })
-            ->filter(fn($r) => (float) $r->remaining_qty > 0.000001)
+            ->filter(fn ($r) => (float) $r->remaining_qty > 0.000001)
             ->values();
 
         $finishingRows = DB::table('finishing_job_lines as fl')
@@ -259,7 +264,7 @@ class SewingRejectReturnController extends Controller
             ->where('fl.qty_reject', '>', 0)
             ->where('fl.reject_cause', 'sewing')
             ->where('f.status', 'posted')
-            ->when($filters['operator_id'], fn($q, $opId) => $q->where('fl.sewing_operator_id', $opId))
+            ->when($filters['operator_id'], fn ($q, $opId) => $q->where('fl.sewing_operator_id', $opId))
             ->selectRaw("
                 fl.id as line_id,
                 'finishing' as source_kind,
@@ -290,9 +295,10 @@ class SewingRejectReturnController extends Controller
                 $converted = (float) $r->qty_converted;
                 $stock = max((float) $r->stock_rej_sew, 0.0);
                 $r->remaining_qty = min(max($reject - $reworked - $converted, 0.0), $stock);
+
                 return $this->decorateRow($r);
             })
-            ->filter(fn($r) => (float) $r->remaining_qty > 0.000001)
+            ->filter(fn ($r) => (float) $r->remaining_qty > 0.000001)
             ->values();
 
         $rows = $rows->concat($finishingRows)->values();
@@ -300,7 +306,8 @@ class SewingRejectReturnController extends Controller
         if ($filters['q']) {
             $needle = mb_strtolower($filters['q']);
             $rows = $rows->filter(function ($r) use ($needle) {
-                $hay = mb_strtolower(trim($r->sku . ' ' . $r->product_name . ' ' . $r->category . ' ' . $r->operator_code . ' ' . $r->operator_name . ' ' . $r->notes));
+                $hay = mb_strtolower(trim($r->sku.' '.$r->product_name.' '.$r->category.' '.$r->operator_code.' '.$r->operator_name.' '.$r->notes));
+
                 return str_contains($hay, $needle);
             })->values();
         }
@@ -318,8 +325,8 @@ class SewingRejectReturnController extends Controller
             ? 'FIN'
             : 'SR';
 
-        $categoryCode = Str::upper(Str::slug((string) ($row->category_code ?: 'REJECT'), '-'));
-        $row->reject_sku = trim($categoryCode, '-') . '-RJCT';
+        $sourceCode = Str::upper(Str::slug((string) ($row->sku ?: 'ITEM-'.($row->item_id ?? '')), '-'));
+        $row->reject_sku = 'REJ-'.trim($sourceCode, '-');
 
         $reworked = (float) ($row->qty_reworked ?? 0);
         $converted = (float) ($row->qty_converted ?? 0);
@@ -439,7 +446,7 @@ class SewingRejectReturnController extends Controller
             $row = $query->first();
         }
 
-        if (!$row) {
+        if (! $row) {
             return null;
         }
 
@@ -457,15 +464,11 @@ class SewingRejectReturnController extends Controller
             ->with('category')
             ->findOrFail($sourceItemId);
 
-        $category = $source->category;
-        $categoryCode = $category?->code
-            ? Str::upper(Str::slug($category->code, '-'))
-            : Str::upper(Str::slug($category?->name ?: 'REJECT', '-'));
-
-        // SKU standar reject: REJ-{KODE_KATEGORI}, misalnya REJ-LJR.
-        // Kode lama *-RJCT tetap dipertahankan sebagai histori.
-        $rejectCode = 'REJ-' . trim($categoryCode, '-');
-        $rejectName = trim(($category?->name ?: $categoryCode) . ' Reject');
+        // Reject yang tidak bisa disetor harus tetap dapat ditelusuri ke SKU
+        // asal. Contoh: K7BLK menjadi REJ-K7BLK, bukan hanya REJ-{kategori}.
+        $sourceCode = Str::upper(Str::slug((string) ($source->code ?: ('ITEM-'.$sourceItemId)), '-'));
+        $rejectCode = 'REJ-'.trim($sourceCode, '-');
+        $rejectName = trim(($source->name ?: $sourceCode).' Reject');
 
         $attributes = [
             'name' => $rejectName,

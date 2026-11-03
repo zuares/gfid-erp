@@ -247,7 +247,7 @@
       @endif
 
       <div class="pipeline-stage">
-        <div class="pipeline-num">{{ $poDraftCount + $poApprovedNotReceivedCount + $poPartialCount }}</div>
+      <div class="pipeline-num">{{ config('purchasing.po_approval_enabled', false) ? $poDraftCount + $poApprovedNotReceivedCount + $poPartialCount : $poApprovedNotReceivedCount + $poPartialCount }}</div>
         <div class="pipeline-label">Purchase Order</div>
         <div class="pipeline-sub">{{ $poDraftCount }} draft · {{ $poApprovedNotReceivedCount + $poPartialCount }} belum terima</div>
         <div class="pipeline-arrow"><i class="bi bi-chevron-right"></i></div>
@@ -349,8 +349,8 @@
   {{-- B: PO belum diterima --}}
   @if ($poBelumTerimaList->isNotEmpty())
   <div class="card-section mb-3">
-    <div class="card-section-header">
-      <span>PO Approved — Belum Diterima Barang</span>
+        <div class="card-section-header">
+      <span>PO — Belum Diterima Barang</span>
       <span class="hcount">{{ $poBelumTerimaList->count() }}</span>
     </div>
     <div class="table-responsive">
@@ -392,11 +392,11 @@
   </div>
   @endif
 
-  {{-- C: Sudah terima penuh, belum ada faktur --}}
+  {{-- C: Sudah ada GRN posted, belum ada faktur --}}
   @if ($hasInvoiceTable && $poFullyNoInvoiceList->isNotEmpty())
   <div class="card-section mb-3">
     <div class="card-section-header">
-      <span>Barang Diterima Penuh — Belum Ada Faktur Supplier</span>
+      <span>GRN Posted — Belum Ada Faktur Supplier</span>
       <span class="hcount">{{ $poFullyNoInvoiceList->count() }}</span>
     </div>
     <div class="table-responsive">

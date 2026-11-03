@@ -35,73 +35,108 @@ class FinishingBomService
         ]);
 
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
-        if (!$rmWarehouseId) {
+        if (! $rmWarehouseId) {
             throw new \RuntimeException('Warehouse RM belum dikonfigurasi (code = RM).');
         }
 
-        // ✅ VALIDASI STOK RM: agregasi kebutuhan semua line yang belum di-apply,
-        // lalu tolak jika stok RM tidak mencukupi sebelum mutasi apapun dilakukan.
+        // Validasi stok dan HPP RM dilakukan sebelum mutasi apapun. Dengan begitu
+        // Finishing tidak pernah menjadi POSTED dengan konsumsi packing yang
+        // parsial atau jurnal HPP yang tidak lengkap.
         $totalNeedByMaterial = []; // material_item_id → ['code' => ..., 'need' => float]
         foreach ($job->lines as $line) {
-            if (!empty($line->bom_applied_at)) continue;
+            if (! empty($line->bom_applied_at)) {
+                continue;
+            }
             $fgItemId = (int) ($line->item_id ?? 0);
-            $qtyOk    = (float) ($line->qty_ok ?? 0);
-            if ($fgItemId <= 0 || $qtyOk <= 0) continue;
+            $qtyOk = (float) ($line->qty_ok ?? 0);
+            if ($fgItemId <= 0 || $qtyOk <= 0) {
+                continue;
+            }
 
             $bom = ItemBom::where('item_id', $fgItemId)->where('active', true)->first();
-            if (!$bom) continue;
+            if (! $bom) {
+                continue;
+            }
 
             $excludeFLCIds = $this->cuttingMaterialIds($line->bundle?->cuttingJob);
-            $bomLines   = ItemBomLine::where('item_bom_id', $bom->id)
+            $bomLines = ItemBomLine::where('item_bom_id', $bom->id)
                 ->where('usage_stage', ItemBomLine::STAGE_PACKING_SUPPLY)
                 ->where('is_optional', false)
                 ->get();
 
             foreach ($bomLines as $bl) {
-                if ($excludeFLCIds->contains((int) $bl->material_item_id)) continue;
+                if ($excludeFLCIds->contains((int) $bl->material_item_id)) {
+                    continue;
+                }
                 $bomQty = (float) ($bl->qty ?? 0);
-                if ($bomQty <= 0) continue;
-                $need   = $qtyOk * $bomQty * (1 + ((float) ($bl->scrap_pct ?? 0) / 100.0));
-                $matId  = (int) $bl->material_item_id;
-                if (!isset($totalNeedByMaterial[$matId])) {
+                if ($bomQty <= 0) {
+                    continue;
+                }
+                $need = $qtyOk * $bomQty * (1 + ((float) ($bl->scrap_pct ?? 0) / 100.0));
+                $matId = (int) $bl->material_item_id;
+                if (! isset($totalNeedByMaterial[$matId])) {
                     $totalNeedByMaterial[$matId] = ['code' => (string) ($bl->material?->code ?? "material #{$matId}"), 'need' => 0.0];
                 }
                 $totalNeedByMaterial[$matId]['need'] += $need;
             }
         }
 
-        if (!empty($totalNeedByMaterial)) {
-            $matIds    = array_keys($totalNeedByMaterial);
-            $rmStocks  = InventoryStock::where('warehouse_id', $rmWarehouseId)
+        if (! empty($totalNeedByMaterial)) {
+            $matIds = array_keys($totalNeedByMaterial);
+            $rmStocks = InventoryStock::where('warehouse_id', $rmWarehouseId)
                 ->whereIn('item_id', $matIds)
                 ->pluck('qty', 'item_id')
-                ->map(fn($v) => (float) $v)
+                ->map(fn ($v) => (float) $v)
                 ->toArray();
 
             $shortages = [];
             foreach ($totalNeedByMaterial as $matId => $row) {
-                $have  = (float) ($rmStocks[$matId] ?? 0);
-                $need  = $row['need'];
+                $have = (float) ($rmStocks[$matId] ?? 0);
+                $need = $row['need'];
                 if ($have + 0.000001 < $need) {
-                    $code  = $row['code'];
-                    $n     = number_format($need, 2, ',', '.');
-                    $h     = number_format($have, 2, ',', '.');
+                    $code = $row['code'];
+                    $n = number_format($need, 2, ',', '.');
+                    $h = number_format($have, 2, ',', '.');
                     $short = number_format($need - $have, 2, ',', '.');
                     $shortages[] = "• {$code}: butuh {$n}, stok RM {$h} (kurang {$short})";
                 }
             }
 
-            if (!empty($shortages)) {
+            if (! empty($shortages)) {
                 throw ValidationException::withMessages([
                     'supplies' => "Stok RM tidak cukup untuk kelengkapan finishing. Posting ditolak.\n\n"
-                        . implode("\n", $shortages),
+                        .implode("\n", $shortages),
+                ]);
+            }
+
+            // HPP wajib tersedia sebelum posting. Sebelumnya material dengan
+            // unit cost 0 dilewati dan line tetap ditandai applied; akibatnya
+            // saldo stok dan jurnal baru tidak lagi merepresentasikan seluruh
+            // BOM packing. GRN/adjustment RM harus mengisi cost lebih dahulu.
+            $missingCosts = [];
+            foreach ($totalNeedByMaterial as $matId => $row) {
+                $unitCost = (float) $this->inventory->getItemIncomingUnitCost($rmWarehouseId, (int) $matId);
+                if ($unitCost <= 0.000001) {
+                    $missingCosts[] = sprintf(
+                        '• %s: HPP/unit RM belum tersedia (butuh %s %s)',
+                        $row['code'],
+                        number_format((float) $row['need'], 4, ',', '.'),
+                        'unit'
+                    );
+                }
+            }
+
+            if (! empty($missingCosts)) {
+                throw ValidationException::withMessages([
+                    'supplies' => "HPP kelengkapan packing belum tersedia. Posting Finishing dihentikan; tidak ada stok/jurnal yang dibuat.\n\n"
+                        .implode("\n", $missingCosts),
                 ]);
             }
         }
 
         foreach ($job->lines as $line) {
             // ✅ idempotent per line
-            if (!empty($line->bom_applied_at)) {
+            if (! empty($line->bom_applied_at)) {
                 continue;
             }
 
@@ -112,6 +147,7 @@ class FinishingBomService
             if ($fgItemId <= 0 || $qtyOk <= 0) {
                 $line->bom_applied_at = now();
                 $line->save();
+
                 continue;
             }
 
@@ -120,7 +156,7 @@ class FinishingBomService
                 ->where('active', true)
                 ->first();
 
-            if (!$bom) {
+            if (! $bom) {
                 // ⛔ sementara: skip BOM SUP kalau belum ada
                 $line->bom_applied_at = now();
                 $line->save();
@@ -143,6 +179,7 @@ class FinishingBomService
             if ($bomLines->isEmpty()) {
                 $line->bom_applied_at = now();
                 $line->save();
+
                 continue;
             }
 
@@ -172,15 +209,6 @@ class FinishingBomService
                     $rmWarehouseId,
                     (int) $bl->material_item_id,
                 );
-                if ($unitCost <= 0) {
-                    // Skip BOM line ini — material belum di-GRN atau cost belum tersedia.
-                    // Produksi tetap jalan; tandai line bom_has_gaps=true agar muncul di dashboard rekonsiliasi.
-                    \Illuminate\Support\Facades\Log::warning(
-                        "FIN {$job->code} line {$line->id}: skip BOM material #{$bl->material_item_id} ({$bl->code}) — unitCost=0, belum ada cost di RM."
-                    );
-                    $line->bom_has_gaps = true;
-                    continue;
-                }
 
                 $this->inventory->stockOut(
                     warehouseId: $rmWarehouseId,
@@ -197,7 +225,8 @@ class FinishingBomService
                 );
             }
 
-            // ✅ mark applied (bom_has_gaps tetap tersimpan jika di-set true di atas)
+            // Semua line packing berhasil dipotong; baru sekarang tandai applied.
+            $line->bom_has_gaps = false;
             $line->bom_applied_at = now();
             $line->save();
         }
@@ -205,7 +234,7 @@ class FinishingBomService
 
     private function cuttingMaterialIds(?\App\Models\CuttingJob $job): \Illuminate\Support\Collection
     {
-        if (!$job) {
+        if (! $job) {
             return collect();
         }
 

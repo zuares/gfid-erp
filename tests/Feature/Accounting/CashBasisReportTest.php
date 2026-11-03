@@ -15,7 +15,9 @@ class CashBasisReportTest extends TestCase
 
     public function test_paid_daily_payroll_is_included_as_operating_cash_out(): void
     {
-        $bank = Account::create([
+        $bank = Account::firstOrCreate([
+            'code' => '1101',
+        ], [
             'code' => '1101',
             'name' => 'Bank Test',
             'type' => 'asset',

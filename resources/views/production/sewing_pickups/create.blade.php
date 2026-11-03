@@ -263,18 +263,49 @@
                     ->sortBy('code')
                     ->values();
                 $autoDefaultOperatorId = (int) old('operator_id') ?: (int) optional($sewingOperators->first())->id;
+                $bomConsumedAtCuttingQc = (bool) ($bomConsumedAtCuttingQc ?? false);
+                // Jika BOM sudah dipindah ke QC Cutting, jangan tampilkan
+                // label/aksi lama yang seolah-olah Sewing Pickup memotong BOM.
+                $autoBomNegativeEnabled = (bool) ($autoBomNegativeEnabled ?? false)
+                    && ! $bomConsumedAtCuttingQc;
             @endphp
 
             <form id="sewing-pickup-form" action="{{ route('production.sewing.pickups.store') }}" method="post"
                 data-mobile-primary-form="1">
                 @csrf
 
-                {{-- Hidden operator_id (di-set lewat modal), dan gudang --}}
-                <input type="hidden" name="operator_id" id="operator_id_hidden" value="{{ $autoDefaultOperatorId ?: '' }}">
+                {{-- Mode pilot auto BOM memilih operator langsung di form; mode lama
+                     tetap memakai modal kelengkapan jahit. --}}
+                @if ($autoBomNegativeEnabled)
+                    <div class="card mb-3 border-primary-subtle">
+                        <div class="card-section py-2">
+                            <label for="operator_id_auto" class="field-label">Operator Jahit</label>
+                            <select class="form-select form-select-sm" name="operator_id" id="operator_id_auto">
+                                <option value="">Pilih operator jahit</option>
+                                @foreach ($sewingOperators as $operator)
+                                    <option value="{{ $operator->id }}" @selected((int) old('operator_id', $autoDefaultOperatorId) === (int) $operator->id)>
+                                        {{ $operator->code }} — {{ $operator->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="small text-muted mt-1">BOM kelengkapan dipotong otomatis. Jika stok RM kurang, sistem mencatat stok minus dan audit shortage.</div>
+                        </div>
+                    </div>
+                @else
+                    <input type="hidden" name="operator_id" id="operator_id_hidden" value="{{ $autoDefaultOperatorId ?: '' }}">
+                @endif
                 <input type="hidden" name="warehouse_id" value="{{ $defaultWarehouseId }}">
                 <input type="hidden" name="supplies_checklist" id="supplies_checklist_payload" value="">
+                <input type="hidden" name="idempotency_key" value="{{ $pickupIdempotencyKey ?? (string) \Illuminate\Support\Str::uuid() }}">
                 <input type="hidden" name="print_after_save" id="print_after_save" value="0">
                 <input type="hidden" name="paper_width" id="paper_width" value="50mm">
+
+                @if ($bomConsumedAtCuttingQc)
+                    <div class="alert alert-info small py-2 mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        BOM kelengkapan jahit sudah dikonsumsi saat QC Cutting. Sewing Pickup hanya memindahkan WIP-CUT ke WIP-SEW dan menambahkan upah jahit.
+                    </div>
+                @endif
 
                 <div class="card mb-3">
                     <div class="card-section">
@@ -301,10 +332,15 @@
                 @include('production.sewing_pickups._bundle_picker', [
                     'bundles' => $bundles,
                     'bomSuppliesByItem' => $bomSuppliesByItem ?? [],
+                    'wipCostByBundle' => $wipCostByBundle ?? [],
+                    'sewingRatePreview' => $sewingRatePreview ?? [],
+                    'sewingRejectQtyByBundle' => $sewingRejectQtyByBundle ?? [],
+                    'autoBomNegativeEnabled' => $autoBomNegativeEnabled,
+                    'bomConsumedAtCuttingQc' => $bomConsumedAtCuttingQc,
                 ])
 
                 {{-- FORCE SHORTAGE (admin/owner saja) --}}
-                @if (in_array(auth()->user()->role ?? null, ['admin', 'owner'], true))
+                @if (!$autoBomNegativeEnabled && in_array(auth()->user()->role ?? null, ['admin', 'owner'], true))
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" name="force_supply_shortage"
                             id="force_supply_shortage" value="1" @checked(old('force_supply_shortage'))>
@@ -336,12 +372,14 @@
                 </div>
             </form>
 
-            {{-- Modal pilih operator --}}
-            @include('production.sewing_pickups._operator_modal', [
-                'operators' => $sewingOperators,
-                'selectedOperator' => $autoDefaultOperatorId ?: null,
-                'wipSewWarehouse' => $wipSewWarehouse,
-            ])
+            @unless ($autoBomNegativeEnabled)
+                {{-- Modal pilih operator dan checklist kelengkapan mode lama --}}
+                @include('production.sewing_pickups._operator_modal', [
+                    'operators' => $sewingOperators,
+                    'selectedOperator' => $autoDefaultOperatorId ?: null,
+                    'wipSewWarehouse' => $wipSewWarehouse,
+                ])
+            @endunless
         </div>
     </div>
 @endsection

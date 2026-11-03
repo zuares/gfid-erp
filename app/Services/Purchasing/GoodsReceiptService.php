@@ -13,8 +13,8 @@ use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
 use App\Models\SupplierPrice;
-use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
+use App\Services\Accounting\StandaloneGoodsReceiptPostingService;
 use App\Services\Costing\ActiveHppService;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +27,7 @@ class GoodsReceiptService
     public function __construct(
         protected InventoryService $inventory,
         protected JournalService $journal,
+        protected StandaloneGoodsReceiptPostingService $standaloneGoodsReceiptPosting,
         protected PurchaseOrderService $purchaseOrders,
         protected ActiveHppService $activeHpp,
     ) {}
@@ -45,8 +46,8 @@ class GoodsReceiptService
 
             // =====================================================
             // VALIDASI RELASI PO (defense-in-depth level Service)
-            // - PO approved selalu boleh; PO draft boleh saat approval
-            //   dinonaktifkan, selama belum cancelled.
+            // - PO approved selalu boleh; PO draft boleh langsung saat approval
+            //   dinonaktifkan.
             // - Supplier GRN wajib = supplier PO.
             // - Kunci baris PO agar tidak balapan dengan edit PO.
             // =====================================================
@@ -653,6 +654,7 @@ class GoodsReceiptService
             // ==========================
             // 5) POST JOURNAL GRN (2 JURNAL TERPISAH)
             // ==========================
+            $standaloneLegacyLines = [];
             $invDebit = round((float) $hppAfterDiscount, 2);
 
             // total expense debit = sum expense_by_acc + tax + shipping
@@ -727,6 +729,7 @@ class GoodsReceiptService
                 }
 
                 $invLines[] = ['account_id' => $apAccountId, 'debit' => 0, 'credit' => $invDebit];
+                $standaloneLegacyLines = array_merge($standaloneLegacyLines, $invLines);
 
                 $invJournal = $this->journal->post(
                     date: is_string($grn->date) ? $grn->date : $grn->date->format('Y-m-d'),
@@ -744,9 +747,8 @@ class GoodsReceiptService
             }
 
             // (B) JURNAL EXPENSE: Dr Expense/Tax/Shipping / Cr AP (sisa)
+            $expLines = [];
             if ($expDebit > 0.0001 || $expCreditAp > 0.0001) {
-                $expLines = [];
-
                 foreach ($expenseAfterDiscountByAcc as $accId => $amt) {
                     $accId = (int) $accId;
                     $amt = (float) $amt;
@@ -787,6 +789,8 @@ class GoodsReceiptService
                 }
 
                 if (count($expLines) >= 2) {
+                    $standaloneLegacyLines = array_merge($standaloneLegacyLines, $expLines);
+
                     $this->journal->post(
                         date: is_string($grn->date) ? $grn->date : $grn->date->format('Y-m-d'),
                         sourceType: 'grn_exp',
@@ -796,6 +800,12 @@ class GoodsReceiptService
                     );
                 }
             }
+
+            $this->standaloneGoodsReceiptPosting->post(
+                $grn,
+                $standaloneLegacyLines,
+                "Mirror GRN {$grn->code} - {$grn->supplier?->name}",
+            );
 
             // DP yang sudah dibayar sebelum barang diterima harus dipindahkan
             // dari uang muka (1151) ke hutang (2101) saat GRN diposting.
@@ -918,7 +928,22 @@ class GoodsReceiptService
                 throw new \RuntimeException('Hanya GRN yang sudah posted yang bisa di-unpost.');
             }
 
-            // ✅ BLOCK kalau ada payment aktif di PO terkait
+            // Offset DP otomatis juga merupakan payment aktif. Beri pesan
+            // khusus agar operator membatalkan offset terlebih dahulu, bukan
+            // hanya menerima error generik dari guard di bawah.
+            $activeDpApply = PurchasePayment::query()
+                ->where('purchase_order_id', (int) $grn->purchase_order_id)
+                ->where('type', 'dp_apply')
+                ->whereNull('voided_at')
+                ->exists();
+
+            if ($activeDpApply) {
+                throw ValidationException::withMessages([
+                    'grn' => 'Tidak bisa UNPOST karena DP sudah di-offset ke hutang. Void Offset DP terlebih dahulu, lalu unpost GRN.',
+                ]);
+            }
+
+            // BLOCK kalau ada payment aktif di PO terkait
             if ($this->hasActivePaymentsForOrder($grn->purchase_order_id)) {
                 throw ValidationException::withMessages([
                     'grn' => 'Tidak bisa UNPOST karena sudah ada Payment/DP aktif pada PO ini. Void payment dulu, baru unpost.',
@@ -955,6 +980,10 @@ class GoodsReceiptService
             // ==========================
             $this->journal->voidBySource('grn_inv', (int) $grn->id);
             $this->journal->voidBySource('grn_exp', (int) $grn->id);
+            $this->standaloneGoodsReceiptPosting->voidForSource(
+                StandaloneGoodsReceiptPostingService::SOURCE_TYPE,
+                (int) $grn->id,
+            );
 
             // (kalau kamu punya jurnal apply dp di GRN, void di sini juga)
             // $this->journal->voidBySource('grn_apply_dp', (int) $grn->id);

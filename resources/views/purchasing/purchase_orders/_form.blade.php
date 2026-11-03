@@ -30,25 +30,18 @@
         : '';
 
     // === PAYMENT METHOD ===
-    // Filter: exclude DP_APPLY (internal only)
-    $visiblePaymentMethods = ($paymentMethods ?? collect())->filter(fn($pm) => $pm->code !== 'DP_APPLY')->values();
-    // PO baru wajib dipilih manual; jangan mengarahkan user ke metode tertentu.
-    $selectedPaymentMethodId = old('payment_method_id', $order?->payment_method_id ?? null);
-    // Label singkat untuk tiap mode
-    $pmModeLabel = ['cash' => 'Tunai', 'transfer' => 'Transfer (TF)', 'credit' => 'Hutang / Tempo'];
+    // Tipe pembayaran tidak lagi dipilih di form PO. PO baru dianggap tempo;
+    // PO lama tetap mempertahankan metode yang sudah tersimpan saat diedit.
+    $defaultCreditMethodId = ($paymentMethods ?? collect())
+        ->first(fn ($pm) => $pm->code !== 'DP_APPLY' && $pm->mode === 'credit')?->id;
+    $selectedPaymentMethodId = old(
+        'payment_method_id',
+        $order?->payment_method_id ?: $defaultCreditMethodId
+    );
 
     // === ONGKIR (display + raw) ===
     $shippingCostDb = (float) ($order?->shipping_cost ?? 0);
-    $shippingCostDisplay = old('shipping_cost_display', angka($shippingCostDb));
     $shippingCostRaw = old('shipping_cost', (string) (int) $shippingCostDb);
-
-    // === STATUS ===
-    $statusOptions = [
-        'draft' => 'Draft',
-        'approved' => 'Approved',
-        'cancelled' => 'Cancelled',
-    ];
-    $statusValue = old('status', $order?->status ?? 'draft');
 
     // Lines
     $oldLines = old('lines');
@@ -65,7 +58,6 @@
     // Nilai awal agar halaman Edit PO langsung menampilkan total tersimpan
     // sebelum kalkulasi JavaScript selesai diinisialisasi.
     $initialSubtotal = (float) ($order?->subtotal ?? 0);
-    $initialShipping = (float) ($order?->shipping_cost ?? 0);
     $initialGrandTotal = (float) ($order?->grand_total ?? 0);
 
     $receivedByLineId = $order && $order->exists ? app(\App\Services\Purchasing\PurchaseOrderService::class)->receivedQtyByLineId($order) : [];
@@ -738,14 +730,6 @@
             width: min(620px, 100%);
         }
 
-        /* 3-col: Status | Tipe Bayar | Ongkir */
-        .po-meta-inputs {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: .75rem 1rem;
-            margin-bottom: 1rem;
-        }
-
         /* Totals selalu full-width */
         .po-meta-totals {
             border-top: 1px solid var(--line);
@@ -808,16 +792,6 @@
             font-weight: 700;
             color: var(--muted);
             font-size: .85rem;
-        }
-
-        /* Mobile meta: 2 kolom (Status | Tipe Bayar), Ongkir span-2 */
-        @media (max-width: 560px) {
-            .po-meta-inputs {
-                grid-template-columns: 1fr 1fr;
-            }
-            .po-meta-inputs .po-meta-ongkir {
-                grid-column: span 2;
-            }
         }
 
         @media (max-width: 992px) {
@@ -1019,38 +993,13 @@
                 padding: .28rem .85rem;
                 min-height: 32px;
             }
-            /* Meta section: 1 baris — [Tipe Bayar] [Ongkir] [= Total] */
+            /* Meta section: ringkasan total */
             .po-meta-wrap { padding: .05rem .5rem .5rem; }
             .po-meta-card {
-                display: flex;
-                align-items: center;
-                gap: .4rem;
                 border-radius: 10px;
                 padding: .45rem .55rem;
             }
-            /* inputs jadi flex row */
-            .po-meta-inputs {
-                flex: 1;
-                display: flex !important;
-                gap: .4rem;
-                margin-bottom: 0 !important;
-                min-width: 0;
-            }
-            .po-meta-inputs > div:first-child { display: none !important; } /* status */
-            .po-meta-inputs > div:nth-child(2) { flex: 1.4; min-width: 0; } /* tipe bayar */
-            .po-meta-ongkir { flex: 1; min-width: 0; grid-column: unset !important; }
-            /* sembunyikan label di dalam meta card */
-            .po-meta-card .po-label { display: none; }
-            /* total: hanya grand total, di kanan */
-            .po-meta-totals {
-                flex: 0 0 auto;
-                border-top: 0 !important;
-                padding-top: 0 !important;
-                text-align: right;
-            }
-            .po-total-line:not(:last-child) { display: flex !important; }
-            .po-total-line:nth-child(2) { display: none !important; }
-            .po-total-line:last-child { border-top: 0; padding: 0; flex-direction: column; align-items: flex-end; }
+            .po-meta-totals { text-align: right; }
             .po-total-key { font-size: .6rem; color: var(--muted); }
             .po-total-val { font-size: .95rem; font-weight: 900; }
             .po-table-wrapper {
@@ -1127,10 +1076,6 @@
             .po-meta-card {
                 border-radius: 12px;
                 padding: .75rem;
-            }
-            .po-meta-inputs {
-                gap: .55rem;
-                margin-bottom: .7rem;
             }
             .po-total-line {
                 padding: .32rem 0;
@@ -1212,29 +1157,6 @@
 
             .po-meta-card {
                 display: block !important;
-            }
-
-            .po-meta-inputs {
-                display: grid !important;
-                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-                gap: .55rem;
-                margin-bottom: .7rem !important;
-            }
-
-            .po-meta-inputs > div:first-child {
-                display: none !important;
-            }
-
-            .po-meta-inputs > div:nth-child(2),
-            .po-meta-inputs .po-meta-ongkir {
-                min-width: 0;
-                width: auto;
-            }
-
-            .po-meta-card .po-label {
-                display: block !important;
-                font-size: .62rem;
-                margin-bottom: .2rem;
             }
 
             .po-meta-totals {
@@ -1409,12 +1331,6 @@
                 font-size: .82rem !important;
             }
 
-            .po-meta-inputs select,
-            .po-meta-inputs input {
-                min-height: 40px;
-                font-size: 14px !important;
-            }
-
             .po-editor-actions {
                 padding-bottom: calc(.65rem + env(safe-area-inset-bottom));
             }
@@ -1477,10 +1393,6 @@
                 padding: .65rem;
             }
 
-            .po-meta-inputs {
-                gap: .45rem;
-                margin-bottom: .55rem !important;
-            }
         }
 
         @media (max-width: 380px) {
@@ -1876,49 +1788,10 @@
     <div class="po-meta-wrap">
         <div class="po-meta-card">
 
-            {{-- Baris input: Status | Tipe Pembayaran | Ongkir --}}
-            <div class="po-meta-inputs">
-                <div>
-                    <div class="po-label">Status</div>
-                    <input type="hidden" name="status" value="{{ $statusValue }}">
-                    <select class="form-select po-field" disabled>
-                        @foreach ($statusOptions as $key => $label)
-                            <option value="{{ $key }}" @selected($statusValue === $key)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <div class="po-label">Tipe Pembayaran</div>
-                    <select name="payment_method_id" id="po-payment-method"
-                        class="form-select po-field @error('payment_method_id') is-invalid @enderror" required>
-                        <option value="">— Pilih Pembayaran —</option>
-                        @foreach ($visiblePaymentMethods as $pm)
-                            <option value="{{ $pm->id }}" data-mode="{{ $pm->mode }}"
-                                @selected((string) $selectedPaymentMethodId === (string) $pm->id)>
-                                {{ $pmModeLabel[$pm->mode] ?? $pm->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('payment_method_id')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                    <div class="small text-muted mt-1">Jika memilih Transfer, bank dipilih saat pembayaran.</div>
-                </div>
-
-                @if ($canSeeMoney)
-                    <div class="po-meta-ongkir">
-                        <div class="po-label">Ongkir (Rp)</div>
-                        <input type="text"
-                            class="form-control po-field po-num-display shipping-display @error('shipping_cost') is-invalid @enderror"
-                            inputmode="numeric" placeholder="0" value="{{ $shippingCostDisplay }}" autocomplete="off">
-                        <input type="hidden" name="shipping_cost" class="shipping-raw" value="{{ $shippingCostRaw }}">
-                        @error('shipping_cost')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                @endif
-            </div>
+            {{-- Field internal: tidak ditampilkan, tetapi tetap dikirim agar
+                 struktur data lama dan kalkulasi backend tetap kompatibel. --}}
+            <input type="hidden" name="payment_method_id" value="{{ $selectedPaymentMethodId }}">
+            <input type="hidden" name="shipping_cost" class="shipping-raw" value="{{ $shippingCostRaw }}">
 
             {{-- Ringkasan total --}}
             @if ($canSeeMoney)
@@ -1926,10 +1799,6 @@
                     <div class="po-total-line">
                         <div class="po-total-key">Subtotal Items</div>
                         <div class="po-total-val subtle" id="po-subtotal-meta">{{ number_format($initialSubtotal, 0, ',', '.') }}</div>
-                    </div>
-                    <div class="po-total-line">
-                        <div class="po-total-key">Ongkir</div>
-                        <div class="po-total-val subtle" id="po-shipping-meta">{{ number_format($initialShipping, 0, ',', '.') }}</div>
                     </div>
                     <div class="po-total-line">
                         <div class="po-total-key">Grand Total</div>
@@ -1952,7 +1821,6 @@
 
             const subtotalMeta = document.getElementById('po-subtotal-meta');
             const subtotalCell = document.getElementById('po-subtotal-cell') || subtotalMeta;
-            const shippingMeta = document.getElementById('po-shipping-meta');
             const grandMeta = document.getElementById('po-grand-meta');
             const liveLines = document.getElementById('po-live-lines');
             const liveQty = document.getElementById('po-live-qty');
@@ -1962,7 +1830,6 @@
             const supplierSelect = document.querySelector('#po-supplier');
             const supplierSearch = document.querySelector('#po-supplier-search');
             const supplierDropdown = document.querySelector('#po-supplier-suggest-dropdown');
-            const shippingDisplay = document.querySelector('.shipping-display');
             const shippingRaw = document.querySelector('.shipping-raw');
 
             const supplierSuggestOptions = supplierDropdown
@@ -2202,7 +2069,6 @@
 
                 if (subtotalCell) subtotalCell.textContent = fmtIntId(subtotal);
                 if (subtotalMeta) subtotalMeta.textContent = fmtIntId(subtotal);
-                if (shippingMeta) shippingMeta.textContent = fmtIntId(ship);
                 if (grandMeta) grandMeta.textContent = fmtIntId(grand);
                 if (liveLines) liveLines.textContent = fmtIntId(filledLines);
                 if (liveQty) liveQty.textContent = fmtQtyId(totalQty).replace(/,00$/, '');
@@ -2824,35 +2690,6 @@
                     force: true
                 }));
             });
-
-            // shipping format
-            if (shippingDisplay && shippingRaw) {
-                shippingDisplay.addEventListener('focusin', () => selectAllLater(shippingDisplay));
-                shippingDisplay.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') e.preventDefault();
-                });
-
-                shippingDisplay.addEventListener('focusout', function() {
-                    const txt = shippingDisplay.value.toString().trim();
-                    if (txt === '') {
-                        shippingDisplay.value = '';
-                        shippingRaw.value = '';
-                        recalcAll();
-                        return;
-                    }
-                    const n = parseNumber(txt);
-                    shippingDisplay.value = fmtIntId(n);
-                    shippingRaw.value = String(Math.round(n || 0));
-                    recalcAll();
-                }, true);
-
-                const initTxt = shippingDisplay.value.toString().trim();
-                if (initTxt !== '') {
-                    const n = parseNumber(initTxt);
-                    shippingDisplay.value = fmtIntId(n);
-                    shippingRaw.value = String(Math.round(n || 0));
-                }
-            }
 
             // init item suggest
             if (window.initItemSuggestInputs) window.initItemSuggestInputs();

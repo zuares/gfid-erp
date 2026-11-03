@@ -7,15 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Carbon;
 
 class StockOpname extends Model
 {
     public const TYPE_OPENING = 'opening';
+
     public const TYPE_PERIODIC = 'periodic';
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_COUNTING = 'counting';
+
     public const STATUS_REVIEWED = 'reviewed';
+
     public const STATUS_FINALIZED = 'finalized';
 
     // ✅ TAMBAHKAN INI
@@ -24,6 +29,7 @@ class StockOpname extends Model
     protected $fillable = [
         'code',
         'date',
+        'snapshot_at',
         'warehouse_id',
         'type',
         'status',
@@ -38,6 +44,7 @@ class StockOpname extends Model
 
     protected $casts = [
         'date' => 'date',
+        'snapshot_at' => 'datetime',
         'reviewed_at' => 'datetime',
         'finalized_at' => 'datetime',
 
@@ -187,7 +194,7 @@ class StockOpname extends Model
     public function canReopen(): bool
     {
         $user = auth()->user();
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -203,9 +210,21 @@ class StockOpname extends Model
     {
         return ($this->status ?? null) === self::STATUS_CANCELLED;
     }
+
+    /**
+     * Waktu saldo sistem yang menjadi dasar perhitungan opname.
+     * Dokumen lama belum memiliki snapshot_at, sehingga created_at menjadi
+     * fallback agar tidak diam-diam memakai saldo terkini.
+     */
+    public function snapshotAt(): Carbon
+    {
+        $value = $this->snapshot_at ?? $this->created_at ?? now();
+
+        return $value instanceof Carbon ? $value : Carbon::parse($value);
+    }
+
     public function cancelledBy()
     {
         return $this->belongsTo(\App\Models\User::class, 'cancelled_by');
     }
-
 }

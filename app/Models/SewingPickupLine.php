@@ -1,8 +1,7 @@
 <?php
+
 namespace App\Models;
 
-use App\Models\CuttingJobBundle;
-use App\Models\SewingPickup;
 use Illuminate\Database\Eloquent\Model;
 
 class SewingPickupLine extends Model
@@ -13,11 +12,14 @@ class SewingPickupLine extends Model
         'finished_item_id',
         'operator_id',
         'qty_bundle',
+        'qty_rejected',
         'qty_returned_ok',
         'qty_returned_reject',
         'status',
         'notes',
         'unit_cost',
+        'reject_unit_cost',
+        'reject_reason',
         'wage_per_pcs',
         'void_reason',
         'voided_at',
@@ -31,6 +33,9 @@ class SewingPickupLine extends Model
     ];
 
     protected $casts = [
+        'qty_bundle' => 'float',
+        'qty_rejected' => 'float',
+        'reject_unit_cost' => 'float',
         'closed_at' => 'datetime',
     ];
 
@@ -101,9 +106,9 @@ class SewingPickupLine extends Model
         }
 
         $epsilon = 0.000001;
-        $hasIssued = $lines->contains(fn($line) => (float) ($line->issued_qty ?? 0) > $epsilon);
+        $hasIssued = $lines->contains(fn ($line) => (float) ($line->issued_qty ?? 0) > $epsilon);
         $isComplete = $lines->every(
-            fn($line) => (float) ($line->issued_qty ?? 0) + $epsilon >= (float) ($line->required_qty ?? 0)
+            fn ($line) => (float) ($line->issued_qty ?? 0) + $epsilon >= (float) ($line->required_qty ?? 0)
         );
 
         if ($isComplete) {
@@ -117,5 +122,4 @@ class SewingPickupLine extends Model
     {
         return $this->hasMany(SewingProgressAdjustmentLine::class);
     }
-
 }

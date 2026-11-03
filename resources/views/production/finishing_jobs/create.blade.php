@@ -205,6 +205,75 @@
     }
     body[data-theme="dark"] .acc-pill{ background: rgba(15,23,42,.22); }
     .acc-op-sub{ font-size:.72rem; font-weight:900; color:var(--muted); }
+
+    .finishing-financial-section{
+        border:1px solid rgba(148,163,184,.2);
+        border-radius:14px;
+        overflow:hidden;
+        margin-top:.65rem;
+        background:var(--card);
+    }
+    .finishing-financial-section > summary{
+        list-style:none;
+        cursor:pointer;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:.7rem;
+        padding:.7rem .8rem;
+    }
+    .finishing-financial-section > summary::-webkit-details-marker{ display:none; }
+    .finishing-financial-section > summary::after{
+        content:'⌄';
+        color:var(--muted);
+        font-size:1rem;
+        line-height:1;
+        transition:transform .18s ease;
+    }
+    .finishing-financial-section[open] > summary::after{ transform:rotate(180deg); }
+    .finishing-financial-title{ color:var(--text); font-size:.78rem; font-weight:900; }
+    .finishing-financial-subtitle{ color:var(--muted); font-size:.66rem; line-height:1.35; margin-top:.12rem; }
+    .finishing-financial-body{ padding:.7rem .8rem .8rem; border-top:1px solid rgba(148,163,184,.15); }
+    .finishing-financial-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.35rem; }
+    .finishing-financial-item{
+        min-width:0;
+        border:1px solid rgba(148,163,184,.16);
+        border-radius:10px;
+        padding:.38rem .45rem;
+        background:rgba(148,163,184,.045);
+    }
+    .finishing-financial-item span{ display:block; color:var(--muted); font-size:.59rem; font-weight:800; text-transform:uppercase; }
+    .finishing-financial-item strong{ display:block; color:var(--text); font-size:.76rem; margin-top:.08rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .finishing-financial-item.is-total{ border-color:rgba(37,99,235,.25); background:rgba(219,234,254,.62); }
+    .finishing-financial-item.is-total strong{ color:#1d4ed8; }
+    .finishing-financial-table{ font-size:.68rem; margin-top:.6rem; width:100%; }
+    .finishing-financial-table th{ color:var(--muted); font-size:.59rem; text-transform:uppercase; white-space:nowrap; }
+    .finishing-financial-table td,
+    .finishing-financial-table th{ padding:.3rem .38rem; vertical-align:middle; }
+    .finishing-financial-note{ color:var(--muted); font-size:.64rem; line-height:1.4; }
+    .finishing-financial-unit{ display:block; color:var(--muted); font-size:.59rem; line-height:1.25; white-space:nowrap; }
+    .finishing-financial-section.hpp-section{ border-color:rgba(37,99,235,.2); }
+    .finishing-financial-section.hpp-section > summary{ background:rgba(37,99,235,.045); }
+    .finishing-financial-section.hpp-section .finishing-financial-title{ color:#1d4ed8; }
+    .finishing-financial-section.accounting-section{ border-color:rgba(20,184,166,.2); }
+    .finishing-financial-section.accounting-section > summary{ background:rgba(20,184,166,.045); }
+    .finishing-financial-section.accounting-section .finishing-financial-title{ color:#0f766e; }
+    .finishing-financial-section.accounting-section .finishing-financial-item.is-total{ border-color:rgba(20,184,166,.25); background:rgba(204,251,241,.62); }
+    .finishing-financial-section.accounting-section .finishing-financial-item.is-total strong{ color:#0f766e; }
+    @media(max-width:767.98px){
+        .finishing-financial-grid{ gap:.28rem; }
+        .finishing-financial-item{ padding:.32rem .35rem; }
+        .finishing-financial-item strong{ font-size:.67rem; }
+        .finishing-financial-table{ min-width:620px; }
+    }
+    body[data-theme="dark"] .finishing-financial-section{ border-color:rgba(71,85,105,.82); }
+    body[data-theme="dark"] .finishing-financial-section > summary{ background:rgba(148,163,184,.08); }
+    body[data-theme="dark"] .finishing-financial-section.hpp-section > summary{ background:rgba(37,99,235,.12); }
+    body[data-theme="dark"] .finishing-financial-section.hpp-section .finishing-financial-title{ color:#93c5fd; }
+    body[data-theme="dark"] .finishing-financial-section.accounting-section > summary{ background:rgba(20,184,166,.12); }
+    body[data-theme="dark"] .finishing-financial-section.accounting-section .finishing-financial-title,
+    body[data-theme="dark"] .finishing-financial-section.accounting-section .finishing-financial-item.is-total strong{ color:#5eead4; }
+    body[data-theme="dark"] .finishing-financial-item{ background:rgba(15,23,42,.42); }
 </style>
 @endpush
 
@@ -246,6 +315,9 @@
     $summaryRows = collect($linesAll)->filter(fn($l)=>(int)($l['total_wip'] ?? 0) > 0)->count();
     $summaryQty  = collect($linesAll)->sum(fn($l)=> (int)($l['total_wip'] ?? 0));
     $summaryOps  = collect($linesByOp)->filter(fn($l)=>(int)($l['total_wip'] ?? 0) > 0)->pluck('operator_id')->filter(fn($id)=>(int)$id>0)->unique()->count();
+
+    $wipUnitCostByItemId = $wipUnitCostByItemId ?? [];
+    $finishingSupplyUnitCostByItemId = $finishingSupplyUnitCostByItemId ?? [];
 @endphp
 
     <div class="panel mb-2">
@@ -258,24 +330,29 @@
         </div>
     </div>
 
-    {{-- ── KELENGKAPAN PACKING ── --}}
+    {{-- ── AUTO BOM PACKING ── --}}
     @php
         $ps         = $packingSupplies ?? collect();
         $psShortage = $ps->where('has_shortage', true)->count();
         $psTotal    = $ps->count();
     @endphp
-    @if($psTotal > 0)
+    @if($hasAnyWipAll)
     <div class="panel mb-2">
         <div class="panel-h d-flex align-items-center justify-content-between gap-2 flex-wrap">
             <div class="d-flex align-items-center gap-2">
-                <span class="h-title" style="font-size:.85rem;">📦 Kelengkapan Packing</span>
+                <div>
+                    <div class="h-title" style="font-size:.85rem;">📦 Auto BOM Packing</div>
+                    <div style="color:var(--muted);font-size:.68rem;margin-top:.12rem;">
+                        Preview saja. RM dipotong saat Finishing di-POST untuk Qty OK.
+                    </div>
+                </div>
                 @if($psShortage > 0)
                     <span style="background:rgba(220,38,38,.12);color:#b91c1c;border:1px solid rgba(220,38,38,.3);border-radius:999px;padding:.1rem .55rem;font-size:.68rem;font-weight:900;">
                         {{ $psShortage }} KURANG
                     </span>
                 @else
                     <span style="background:rgba(22,163,74,.1);color:#15803d;border:1px solid rgba(22,163,74,.3);border-radius:999px;padding:.1rem .55rem;font-size:.68rem;font-weight:900;">
-                        ✓ STOK CUKUP
+                        ✓ SIAP SAAT POST
                     </span>
                 @endif
             </div>
@@ -317,6 +394,11 @@
                 </div>
             </div>
             @endforeach
+            @if($psTotal === 0)
+                <div class="text-muted" style="font-size:.72rem;padding:.5rem .1rem;">
+                    Belum ada BOM <span class="mono">packing_supply</span> aktif untuk WIP yang tersedia.
+                </div>
+            @endif
         </div>
     </div>
     @endif
@@ -368,7 +450,6 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <div id="op-mode-hint" style="font-size:.68rem; margin-top:.25rem; line-height:1.3;"></div>
                         </div>
 
                         @if(strtolower(auth()->user()?->role ?? '') !== 'operating')
@@ -416,6 +497,102 @@
                         </div>
                     </div>
                 </div>
+
+                @if (auth()->user()?->isOwner())
+                    <details class="finishing-financial-section hpp-section" id="finishing-hpp-section">
+                        <summary>
+                            <div>
+                                <div class="finishing-financial-title">
+                                    <i class="bi bi-calculator me-1" aria-hidden="true"></i> Estimasi HPP Finishing
+                                </div>
+                                <div class="finishing-financial-subtitle">
+                                    Nilai WIP-FIN yang diproses ditambah Auto BOM Packing untuk Qty OK. Read-only.
+                                </div>
+                            </div>
+                            <span class="badge bg-primary-subtle text-primary border" id="finishing-hpp-badge">Belum pilih</span>
+                        </summary>
+                        <div class="finishing-financial-body">
+                            <div class="finishing-financial-grid">
+                                <div class="finishing-financial-item">
+                                    <span>Nilai WIP-FIN</span>
+                                    <strong class="mono" id="finishing-hpp-wip-total">Rp 0</strong>
+                                </div>
+                                <div class="finishing-financial-item">
+                                    <span>BOM packing</span>
+                                    <strong class="mono" id="finishing-hpp-supply-total">Rp 0</strong>
+                                </div>
+                                <div class="finishing-financial-item is-total">
+                                    <span>Total HPP output</span>
+                                    <strong class="mono" id="finishing-hpp-total">Rp 0</strong>
+                                </div>
+                            </div>
+                            <div class="finishing-financial-note mt-2" id="finishing-hpp-note">
+                                Isi qty setor atau reject untuk melihat estimasi HPP. BOM packing hanya dihitung untuk Qty OK.
+                            </div>
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm align-middle finishing-financial-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th class="text-end">OK</th>
+                                            <th class="text-end">Reject</th>
+                                            <th class="text-end">WIP-FIN / pcs</th>
+                                            <th class="text-end">BOM / pcs</th>
+                                            <th class="text-end">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="finishing-hpp-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="finishing-financial-section accounting-section" id="finishing-accounting-section">
+                        <summary>
+                            <div>
+                                <div class="finishing-financial-title">
+                                    <i class="bi bi-journal-check me-1" aria-hidden="true"></i> Akuntansi Baru
+                                </div>
+                                <div class="finishing-financial-subtitle">
+                                    Preview mirror jurnal Finishing: output barang jadi/reject dan konsumsi Auto BOM Packing. Legacy tidak diubah.
+                                </div>
+                            </div>
+                            <span class="badge bg-success text-white" id="finishing-accounting-badge">Belum pilih</span>
+                        </summary>
+                        <div class="finishing-financial-body">
+                            <div class="finishing-financial-grid">
+                                <div class="finishing-financial-item">
+                                    <span>Total debit</span>
+                                    <strong class="mono" id="finishing-accounting-debit">Rp 0</strong>
+                                </div>
+                                <div class="finishing-financial-item">
+                                    <span>Total kredit</span>
+                                    <strong class="mono" id="finishing-accounting-credit">Rp 0</strong>
+                                </div>
+                                <div class="finishing-financial-item is-total">
+                                    <span>Status</span>
+                                    <strong id="finishing-accounting-status">Belum pilih</strong>
+                                </div>
+                            </div>
+                            <div class="finishing-financial-note mt-2" id="finishing-accounting-note">
+                                Mapping: WIP Finishing <span class="mono">1-151-03</span>, Barang Jadi <span class="mono">1-152</span>, Reject <span class="mono">1-153</span>, Bahan <span class="mono">1-150</span>.
+                            </div>
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm align-middle finishing-financial-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Skenario</th>
+                                            <th>Debit</th>
+                                            <th>Kredit</th>
+                                            <th class="text-end">Nominal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="finishing-accounting-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+                @endif
 
                 {{-- LIST ALL (dashboard only) --}}
                 <div class="list" id="list-all">
@@ -544,7 +721,10 @@
                                  data-operator-id="{{ $opId }}"
                                  data-operator-label="{{ $opLabel }}"
                                  data-code="{{ $code }}"
-                                 data-wip="{{ $wip }}">
+                                 data-wip="{{ $wip }}"
+                                 data-item-name="{{ $line['item_name'] ?? '' }}"
+                                 data-wip-unit-cost="{{ (float) ($wipUnitCostByItemId[$itemId] ?? 0) }}"
+                                 data-supply-unit-cost="{{ (float) ($finishingSupplyUnitCostByItemId[$itemId] ?? 0) }}">
                                 <div class="cardx-h">
                                     <div class="cardx-left">
                                         <input type="checkbox" class="chk row-check">
@@ -715,6 +895,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const opRowCountEl = document.getElementById('op-row-count');
 
+    const finishingHppBadge = document.getElementById('finishing-hpp-badge');
+    const finishingHppWipTotal = document.getElementById('finishing-hpp-wip-total');
+    const finishingHppSupplyTotal = document.getElementById('finishing-hpp-supply-total');
+    const finishingHppTotal = document.getElementById('finishing-hpp-total');
+    const finishingHppNote = document.getElementById('finishing-hpp-note');
+    const finishingHppBody = document.getElementById('finishing-hpp-body');
+    const finishingAccountingBadge = document.getElementById('finishing-accounting-badge');
+    const finishingAccountingDebit = document.getElementById('finishing-accounting-debit');
+    const finishingAccountingCredit = document.getElementById('finishing-accounting-credit');
+    const finishingAccountingStatus = document.getElementById('finishing-accounting-status');
+    const finishingAccountingNote = document.getElementById('finishing-accounting-note');
+    const finishingAccountingBody = document.getElementById('finishing-accounting-body');
+
     const body = document.body;
     const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
@@ -731,6 +924,123 @@ document.addEventListener('DOMContentLoaded', () => {
     function setInputsEnabled(root, enabled){
         if(!root) return;
         root.querySelectorAll('input,select,textarea').forEach(el => { el.disabled = !enabled; });
+    }
+
+    const finishingMoneyNf = new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    });
+    const finishingQtyNf = new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
+    const finishingMoney = (value) => 'Rp ' + finishingMoneyNf.format(Number(value || 0));
+
+    function renderFinishingFinancialPreview(){
+        if(!finishingHppBody && !finishingAccountingBody) return;
+
+        const entries = [];
+        if(getMode() === 'byop'){
+            $$('.fin-item', listByOp).forEach(card => {
+                const { qtyIn, qtyRj } = getEls(card);
+                const qtyInValue = Math.max(0, parseInt(qtyIn?.value || 0, 10) || 0);
+                const qtyReject = Math.max(0, parseInt(qtyRj?.value || 0, 10) || 0);
+                const qtyOk = qtyInValue;
+                const qtyUsed = qtyOk + qtyReject;
+                if(qtyUsed <= 0) return;
+
+                const wipUnitCost = Math.max(0, parseFloat(card.dataset.wipUnitCost || '0') || 0);
+                const supplyUnitCost = Math.max(0, parseFloat(card.dataset.supplyUnitCost || '0') || 0);
+                entries.push({
+                    code: card.dataset.code || '-',
+                    itemName: card.dataset.itemName || '',
+                    operatorLabel: card.dataset.operatorLabel || '',
+                    qtyOk,
+                    qtyReject,
+                    qtyUsed,
+                    wipUnitCost,
+                    supplyUnitCost,
+                    wipValue: qtyUsed * wipUnitCost,
+                    supplyValue: qtyOk * supplyUnitCost,
+                });
+            });
+        }
+
+        const wipTotal = entries.reduce((sum, row) => sum + row.wipValue, 0);
+        const supplyTotal = entries.reduce((sum, row) => sum + row.supplyValue, 0);
+        const outputTotal = wipTotal + supplyTotal;
+        const qtyOkTotal = entries.reduce((sum, row) => sum + row.qtyOk, 0);
+        const qtyRejectTotal = entries.reduce((sum, row) => sum + row.qtyReject, 0);
+        const missingCost = entries.some(row => row.wipUnitCost <= 0);
+
+        if(finishingHppBadge) finishingHppBadge.textContent = entries.length ? entries.length + ' baris' : 'Belum pilih';
+        if(finishingHppWipTotal) finishingHppWipTotal.textContent = finishingMoney(wipTotal);
+        if(finishingHppSupplyTotal) finishingHppSupplyTotal.textContent = finishingMoney(supplyTotal);
+        if(finishingHppTotal) finishingHppTotal.textContent = finishingMoney(outputTotal);
+        if(finishingHppNote){
+            finishingHppNote.textContent = !entries.length
+                ? 'Isi qty setor atau reject untuk melihat estimasi HPP. Auto BOM Packing hanya dihitung untuk Qty OK.'
+                : 'Qty OK ' + finishingQtyNf.format(qtyOkTotal) + ' pcs, reject ' + finishingQtyNf.format(qtyRejectTotal) + ' pcs. Auto BOM Packing hanya dihitung untuk Qty OK.';
+        }
+
+        if(finishingHppBody){
+            finishingHppBody.innerHTML = entries.length
+                ? entries.map(row =>
+                    '<tr>' +
+                        '<td><div class="fw-semibold">' + esc(row.code) + '</div>' +
+                        '<span class="finishing-financial-unit">' + esc(row.operatorLabel || row.itemName || '') + '</span></td>' +
+                        '<td class="text-end mono">' + finishingQtyNf.format(row.qtyOk) + '</td>' +
+                        '<td class="text-end mono">' + finishingQtyNf.format(row.qtyReject) + '</td>' +
+                        '<td class="text-end mono">' + finishingMoney(row.wipUnitCost) + '<span class="finishing-financial-unit">per pcs</span></td>' +
+                        '<td class="text-end mono">' + finishingMoney(row.supplyUnitCost) + '<span class="finishing-financial-unit">per pcs</span></td>' +
+                        '<td class="text-end mono">' + finishingMoney(row.wipValue + row.supplyValue) + '</td>' +
+                    '</tr>'
+                ).join('')
+                : '<tr><td colspan="6" class="text-muted text-center py-2">Pilih operator lalu isi qty untuk melihat estimasi HPP.</td></tr>';
+        }
+
+        const okWipValue = entries.reduce((sum, row) => sum + row.qtyOk * row.wipUnitCost, 0);
+        const rejectWipValue = entries.reduce((sum, row) => sum + row.qtyReject * row.wipUnitCost, 0);
+        // BOM finishing hanya menambah nilai barang OK. Reject tetap memakai
+        // nilai WIP-FIN agar sama dengan mutasi stok dan jurnal backend.
+        const okBomAllocation = okWipValue > 0 ? supplyTotal : 0;
+        const okOutputValue = okWipValue + okBomAllocation;
+        const rejectOutputValue = rejectWipValue;
+        const accountingTotal = okOutputValue + rejectOutputValue + supplyTotal;
+
+        if(finishingAccountingBadge) finishingAccountingBadge.textContent = entries.length ? 'Preview' : 'Belum pilih';
+        if(finishingAccountingDebit) finishingAccountingDebit.textContent = finishingMoney(accountingTotal);
+        if(finishingAccountingCredit) finishingAccountingCredit.textContent = finishingMoney(accountingTotal);
+        if(finishingAccountingStatus){
+            finishingAccountingStatus.textContent = !entries.length ? 'Belum pilih' : (missingCost ? 'Perlu review' : 'Balance');
+            finishingAccountingStatus.classList.toggle('text-danger', missingCost && entries.length > 0);
+            finishingAccountingStatus.classList.toggle('text-success', !missingCost && entries.length > 0);
+        }
+        if(finishingAccountingNote && entries.length){
+            finishingAccountingNote.textContent = missingCost
+                ? 'Unit cost WIP-FIN belum tersedia untuk sebagian item; preview nominal belum lengkap.'
+                : 'Mapping: output memakai 1-152 / 1-153 melawan 1-151-03; Auto BOM Packing memakai Dr 1-151-03 dan Cr 1-150.';
+        }
+        if(finishingAccountingBody){
+            const rows = [];
+            if(okOutputValue > 0.000001){
+                rows.push(['Finishing OK', '1-152 Barang Jadi', '1-151-03 WIP Finishing', okOutputValue]);
+            }
+            if(rejectOutputValue > 0.000001){
+                rows.push(['Reject Finishing/Jahit', '1-153 Persediaan Reject', '1-151-03 WIP Finishing', rejectOutputValue]);
+            }
+            if(supplyTotal > 0.000001){
+                rows.push(['Konsumsi packing', '1-151-03 WIP Finishing', '1-150 Persediaan Bahan', supplyTotal]);
+            }
+            finishingAccountingBody.innerHTML = rows.length
+                ? rows.map(row =>
+                    '<tr><td>' + esc(row[0]) + '</td>' +
+                    '<td><span class="finishing-financial-unit">' + esc(row[1]) + '</span></td>' +
+                    '<td><span class="finishing-financial-unit">' + esc(row[2]) + '</span></td>' +
+                    '<td class="text-end mono">' + finishingMoney(row[3]) + '</td></tr>'
+                ).join('')
+                : '<tr><td colspan="4" class="text-muted text-center py-2">Pilih operator lalu isi qty untuk melihat mapping jurnal.</td></tr>';
+        }
     }
 
     // ===== FILTER OPTIONS =====
@@ -812,22 +1122,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const { qtyIn, qtyRj } = getEls(card);
         const W = getWip(card);
 
-        let masuk = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
+        let setor = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
         let rj = Math.max(0, parseInt(qtyRj?.value || 0,10) || 0);
 
-        if(masuk > W) masuk = W;
-        if(rj > W) rj = W;
+        if(setor > W) setor = W;
 
-        if(changed === 'qty_reject' && masuk <= 0 && rj > 0){
-            masuk = W;
-        }
+        const maxReject = Math.max(0, W - setor);
+        if(rj > maxReject) rj = maxReject;
 
-        if(rj > masuk){
-            if(changed === 'qty_in') rj = masuk;
-            if(changed === 'qty_reject') masuk = Math.min(W, rj);
-        }
-
-        if(qtyIn) qtyIn.value = masuk === 0 ? '' : String(masuk);
+        if(qtyIn) qtyIn.value = setor === 0 ? '' : String(setor);
         if(qtyRj) qtyRj.value = rj === 0 ? '' : String(rj);
     }
 
@@ -839,23 +1142,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if(rj > W) rj = W;
 
         if(qtyIn) qtyIn.value = W === 0 ? '' : String(W);
-        if(qtyRj) qtyRj.value = rj === 0 ? '' : String(rj);
-
-        clampCard(card, 'qty_in');
-        syncNotes(card);
-    }
-
-    function applyRejectAffectsSetor(card){
-        const { qtyIn, qtyRj } = getEls(card);
-        const W = getWip(card);
-
-        let rj = Math.max(0, parseInt(qtyRj?.value || 0,10) || 0);
-        if(rj > W) rj = W;
-
-        let masuk = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
-        if(masuk <= 0 || masuk < rj) masuk = W;
-
-        if(qtyIn) qtyIn.value = masuk === 0 ? '' : String(masuk);
         if(qtyRj) qtyRj.value = rj === 0 ? '' : String(rj);
 
         clampCard(card, 'qty_in');
@@ -999,6 +1285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         applyFilter();
+        renderFinishingFinancialPreview();
     }
 
     // ===== MODAL BUILDERS =====
@@ -1120,9 +1407,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const code = (card.dataset.code || '').toString();
             const masuk = Math.max(0, parseInt(qtyIn?.value || 0,10) || 0);
             const rj = Math.max(0, parseInt(qtyRj?.value || 0,10) || 0);
-            const ok = Math.max(0, masuk - rj);
+            const ok = masuk;
 
-            totalMasuk += masuk;
+            totalMasuk += ok + rj;
             totalOk += ok;
             totalRj += rj;
             rows.push({ code, masuk, ok, rj });
@@ -1201,14 +1488,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         clampCard(card, changed);
 
-        if(isReject){
-            applyRejectAffectsSetor(card);
-        }
-
         syncCheckFromInputs(card);
         syncNotes(card);
         computeSubmitEnabled();
         updateOperatorRowCount();
+        renderFinishingFinancialPreview();
     });
 
     // checkbox handler (BYOP)
@@ -1234,6 +1518,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         computeSubmitEnabled();
         updateOperatorRowCount();
+        renderFinishingFinancialPreview();
     });
 
     // select all on focus + keyboard open class
@@ -1301,6 +1586,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyFilter();
     computeSubmitEnabled();
     updateOperatorRowCount();
+    renderFinishingFinancialPreview();
 });
 </script>
 @endpush

@@ -13,7 +13,7 @@ class HppService
     //  A) HITUNG HPP PROSES (CUTTING/SEWING/FINISHING/PACKAGING)
     // =========================================================
 
-    public function calculateCuttingHpp(float | int | string $rmTotalCost, float | int | string $totalQtyOk): float
+    public function calculateCuttingHpp(float|int|string $rmTotalCost, float|int|string $totalQtyOk): float
     {
         $rmTotalCost = $this->num($rmTotalCost);
         $totalQtyOk = $this->num($totalQtyOk);
@@ -25,17 +25,17 @@ class HppService
         return round($rmTotalCost / $totalQtyOk, 4);
     }
 
-    public function calculateSewingHpp(float | int | string $cuttingUnitCost, float | int | string $sewingLaborPerUnit): float
+    public function calculateSewingHpp(float|int|string $cuttingUnitCost, float|int|string $sewingLaborPerUnit): float
     {
         return round($this->num($cuttingUnitCost) + $this->num($sewingLaborPerUnit), 4);
     }
 
-    public function calculateFinishingHpp(float | int | string $sewingUnitCost, float | int | string $finishingPerUnit): float
+    public function calculateFinishingHpp(float|int|string $sewingUnitCost, float|int|string $finishingPerUnit): float
     {
         return round($this->num($sewingUnitCost) + $this->num($finishingPerUnit), 4);
     }
 
-    public function calculatePackagingHpp(float | int | string $packagingPerUnit): float
+    public function calculatePackagingHpp(float|int|string $packagingPerUnit): float
     {
         return round($this->num($packagingPerUnit), 4);
     }
@@ -46,6 +46,7 @@ class HppService
         foreach ($components as $value) {
             $total += $this->num($value);
         }
+
         return round($total, 4);
     }
 
@@ -66,7 +67,7 @@ class HppService
 
         $totalUnitCost = $this->calculateTotalHpp([$rm, $cutting, $sewing, $finishing, $packaging, $overhead]);
 
-        $snapshot = new ItemCostSnapshot();
+        $snapshot = new ItemCostSnapshot;
         $snapshot->item_id = (int) $data['item_id'];
         $snapshot->warehouse_id = array_key_exists('warehouse_id', $data) ? (is_null($data['warehouse_id']) ? null : (int) $data['warehouse_id']) : null;
         $snapshot->snapshot_date = $snapshotDate;
@@ -96,18 +97,50 @@ class HppService
     {
         return ItemCostSnapshot::query()
             ->where('item_id', $itemId)
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+            ->when($warehouseId, fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->where('is_active', true)
             ->orderByDesc('snapshot_date')
             ->orderByDesc('id')
             ->first();
     }
 
+    public function getRmUnitCostForItem(int $itemId, string $dateTo): float
+    {
+        return (float) (ItemCostSnapshot::query()
+            ->where('item_id', $itemId)
+            ->where('reference_type', 'auto_hpp_rm_only_finishing')
+            ->whereDate('snapshot_date', '<=', $dateTo)
+            ->where('rm_unit_cost', '>', 0)
+            ->orderByDesc('snapshot_date')
+            ->orderByDesc('id')
+            ->value('rm_unit_cost') ?? 0.0);
+    }
+
+    public function setActiveSnapshot(ItemCostSnapshot $snapshot, bool $exclusiveWithinType = false): ItemCostSnapshot
+    {
+        $query = ItemCostSnapshot::query()
+            ->where('item_id', $snapshot->item_id)
+            ->when(
+                $snapshot->warehouse_id === null,
+                fn ($q) => $q->whereNull('warehouse_id'),
+                fn ($q) => $q->where('warehouse_id', $snapshot->warehouse_id),
+            );
+
+        if ($exclusiveWithinType) {
+            $query->where('reference_type', $snapshot->reference_type);
+        }
+
+        $query->where('id', '<>', $snapshot->id)->update(['is_active' => false]);
+        $snapshot->update(['is_active' => true]);
+
+        return $snapshot->refresh();
+    }
+
     public function getSnapshotForSale(int $itemId, ?int $warehouseId, string $saleDate): ?ItemCostSnapshot
     {
         return ItemCostSnapshot::query()
             ->where('item_id', $itemId)
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+            ->when($warehouseId, fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->where('is_active', true)
             ->whereDate('snapshot_date', '<=', $saleDate)
             ->orderByDesc('snapshot_date')
@@ -208,7 +241,7 @@ class HppService
     //  D) UTIL
     // =========================================================
 
-    protected function num(float | int | string | null $value): float
+    protected function num(float|int|string|null $value): float
     {
         if ($value === null || $value === '') {
             return 0.0;
@@ -230,7 +263,7 @@ class HppService
         return (float) $value;
     }
 
-    protected function normalizeDate(string | \DateTimeInterface  | null $date): string
+    protected function normalizeDate(string|\DateTimeInterface|null $date): string
     {
         if ($date instanceof \DateTimeInterface) {
             return Carbon::instance($date)->toDateString();
@@ -238,6 +271,7 @@ class HppService
         if (is_string($date) && trim($date) !== '') {
             return Carbon::parse($date)->toDateString();
         }
+
         return now()->toDateString();
     }
 }

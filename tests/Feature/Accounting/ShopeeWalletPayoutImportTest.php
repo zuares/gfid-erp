@@ -4,7 +4,6 @@ namespace Tests\Feature\Accounting;
 
 use App\Models\Account;
 use App\Models\Channel;
-use App\Models\MarketplacePayout;
 use App\Models\Store;
 use App\Services\Accounting\ShopeeWalletPayoutImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,11 +17,13 @@ class ShopeeWalletPayoutImportTest extends TestCase
     public function test_import_menggunakan_fixture_json_hanya_menyimpan_withdrawal_dan_idempotent(): void
     {
         $store = $this->createShopeeStore();
-        $bank = Account::create([
-            'code'      => '1101',
-            'name'      => 'Bank Test',
-            'type'      => 'asset',
-            'is_cash'   => true,
+        $bank = Account::firstOrCreate([
+            'code' => '1101',
+        ], [
+            'code' => '1101',
+            'name' => 'Bank Test',
+            'type' => 'asset',
+            'is_cash' => true,
             'is_active' => true,
         ]);
 
@@ -48,11 +49,11 @@ class ShopeeWalletPayoutImportTest extends TestCase
             'skippedInvalidReasons' => ['non_withdrawal_type' => 1],
         ], $first);
         $this->assertDatabaseHas('marketplace_payouts', [
-            'store_id'                => $store->id,
+            'store_id' => $store->id,
             'external_transaction_id' => '987654321',
-            'source'                  => 'shopee_wallet',
-            'amount'                  => 125000,
-            'status'                  => 'draft',
+            'source' => 'shopee_wallet',
+            'amount' => 125000,
+            'status' => 'draft',
         ]);
         $this->assertDatabaseCount('marketplace_payouts', 1);
 
@@ -68,11 +69,13 @@ class ShopeeWalletPayoutImportTest extends TestCase
         ], $second);
         $this->assertDatabaseCount('marketplace_payouts', 1);
 
-        $otherBank = Account::create([
-            'code'      => '1102',
-            'name'      => 'Bank Test Lain',
-            'type'      => 'asset',
-            'is_cash'   => true,
+        $otherBank = Account::firstOrCreate([
+            'code' => '1102',
+        ], [
+            'code' => '1102',
+            'name' => 'Bank Test Lain',
+            'type' => 'asset',
+            'is_cash' => true,
             'is_active' => true,
         ]);
 
@@ -113,11 +116,13 @@ class ShopeeWalletPayoutImportTest extends TestCase
     public function test_import_periode_satu_bulan_dipecah_maksimal_lima_belas_hari_per_request(): void
     {
         $store = $this->createShopeeStore();
-        $bank = Account::create([
-            'code'      => '1101',
-            'name'      => 'Bank Test',
-            'type'      => 'asset',
-            'is_cash'   => true,
+        $bank = Account::firstOrCreate([
+            'code' => '1101',
+        ], [
+            'code' => '1101',
+            'name' => 'Bank Test',
+            'type' => 'asset',
+            'is_cash' => true,
             'is_active' => true,
         ]);
         $fixturePath = base_path('tests/Fixtures/shopee/wallet_transaction_list.json');
@@ -161,16 +166,16 @@ class ShopeeWalletPayoutImportTest extends TestCase
         $channel = Channel::firstOrCreate(['code' => 'shopee'], ['name' => 'Shopee']);
 
         return Store::create([
-            'channel_id'       => $channel->id,
-            'code'             => 'SHP-TEST',
-            'name'             => 'Toko Shopee Test',
-            'status'           => 'active',
-            'is_active'        => true,
+            'channel_id' => $channel->id,
+            'code' => 'SHP-TEST',
+            'name' => 'Toko Shopee Test',
+            'status' => 'active',
+            'is_active' => true,
             'external_shop_id' => '12345',
-            'credentials'      => [
-                'partner_id'   => '2000000',
-                'partner_key'  => 'dummy_key',
-                'shop_id'      => '12345',
+            'credentials' => [
+                'partner_id' => '2000000',
+                'partner_key' => 'dummy_key',
+                'shop_id' => '12345',
                 'access_token' => 'dummy_access_token',
             ],
             'token_expires_at' => now()->addHours(2),

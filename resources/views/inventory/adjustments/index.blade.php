@@ -278,6 +278,7 @@
                                 <th class="text-center" style="width:70px;">Item</th>
                                 <th style="width:100px;">Sumber</th>
                                 <th style="width:100px;">Status</th>
+                                <th style="width:125px;">Jurnal Baru</th>
                                 <th style="width:90px;"></th>
                             </tr>
                         </thead>
@@ -323,12 +324,22 @@
                                     <td class="mobile-hide">
                                         <span class="badge-status {{ $statusClass }}">{{ ucfirst($adj->status) }}</span>
                                     </td>
+                                    <td class="mobile-hide">
+                                        @if ($adj->standaloneJournal)
+                                            <a href="{{ route('standalone-accounting.journals.show', $adj->standaloneJournal) }}"
+                                                class="btn btn-sm btn-adj-outline btn-pill">Lihat jurnal</a>
+                                        @elseif ($adj->status === \App\Models\InventoryAdjustment::STATUS_APPROVED)
+                                            <span class="muted">Belum mirror</span>
+                                        @else
+                                            <span class="muted">Belum diposting</span>
+                                        @endif
+                                    </td>
                                     <td class="text-end">
                                         <a href="{{ route('inventory.adjustments.show', ['inventoryAdjustment' => $adj->getKey()]) }}" class="btn btn-sm btn-adj-outline btn-pill">Detail</a>
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="8" class="empty">Belum ada dokumen adjustment.</td></tr>
+                                <tr><td colspan="9" class="empty">Belum ada dokumen adjustment.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

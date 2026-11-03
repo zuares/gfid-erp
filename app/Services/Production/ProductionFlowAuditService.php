@@ -22,9 +22,18 @@ class ProductionFlowAuditService
         'cutting_wip',
         'cutting_reject',
         'App\\Models\\SewingPickup',
+        'sewing_pickup_pre_sewing_reject',
+        'sewing_pickup_pre_sewing_reject_void',
+        'sewing_pickup_reject_supply',
+        'sewing_pickup_reject_supply_void',
+        'sewing_pickup_reject',
+        'sewing_pickup_reject_void',
+        'sewing_pickup_reject_location_correction',
         'sewing_qc_out',
         'sewing_qc_in',
         'sewing_qc_reject',
+        'sewing_return_ok',
+        'sewing_return_reject',
         'sewing_reject_rework_ok',
         'sewing_return_void_ok',
         'sewing_return_void_reject',
@@ -58,7 +67,7 @@ class ProductionFlowAuditService
 
         foreach ($bundles as $bundle) {
             $id = (int) $bundle->id;
-            $code = (string) ($bundle->bundle_code ?: '#' . $id);
+            $code = (string) ($bundle->bundle_code ?: '#'.$id);
             $item = (string) ($bundle->item_code ?: '-');
 
             $cutOk = $this->number($bundle->qty_qc_ok);
@@ -97,32 +106,68 @@ class ProductionFlowAuditService
                 'Periksa inventory:fix-cutwip-reject atau buat adjustment setelah verifikasi fisik.'
             );
 
-            $pickupQty = (float) ($pickupExpected[$id] ?? 0);
+            $pickupGoodQty = (float) ($pickupExpected[$id]['good'] ?? 0);
+            $pickupRejectQty = (float) ($pickupExpected[$id]['reject'] ?? 0);
+            $pickupTotalQty = $pickupGoodQty + $pickupRejectQty;
             $this->compare(
                 $issues, 'PICKUP_WIP_CUT_QTY_MISMATCH', 'HIGH', $id, $code, $item,
-                $pickupQty, abs($this->movementQty($movements, $id, 'App\\Models\\SewingPickup', 'WIP-CUT')),
-                'Qty ambil jahit tidak sama dengan OUT WIP-CUT.',
+                $pickupTotalQty,
+                abs($this->movementQty($movements, $id, 'App\\Models\\SewingPickup', 'WIP-CUT'))
+                    + abs($this->movementQty($movements, $id, 'sewing_pickup_pre_sewing_reject', 'WIP-CUT'))
+                    + abs($this->movementQty($movements, $id, 'sewing_pickup_pre_sewing_reject_void', 'WIP-CUT'))
+                    + abs($this->movementQty($movements, $id, 'sewing_pickup_reject', 'WIP-CUT'))
+                    + abs($this->movementQty($movements, $id, 'sewing_pickup_reject_void', 'WIP-CUT')),
+                'Qty ambil jahit OK + reject tidak sama dengan OUT WIP-CUT.',
                 'Periksa pickup line dan ledger; jangan edit mutation langsung.'
             );
             $this->compare(
                 $issues, 'PICKUP_WIP_SEW_QTY_MISMATCH', 'HIGH', $id, $code, $item,
-                $pickupQty, $this->movementQty($movements, $id, 'App\\Models\\SewingPickup', 'WIP-SEW'),
-                'Qty ambil jahit tidak sama dengan IN WIP-SEW.',
+                $pickupGoodQty, $this->movementQty($movements, $id, 'App\\Models\\SewingPickup', 'WIP-SEW'),
+                'Qty ambil jahit OK tidak sama dengan IN WIP-SEW.',
                 'Periksa pickup line dan ledger; jangan edit mutation langsung.'
+            );
+            $this->compare(
+                $issues, 'PICKUP_REJECT_QTY_MISMATCH', 'HIGH', $id, $code, $item,
+                $pickupRejectQty,
+                $this->movementQty($movements, $id, 'sewing_pickup_pre_sewing_reject', 'REJ-CUT')
+                    + $this->movementQty($movements, $id, 'sewing_pickup_pre_sewing_reject_void', 'REJ-CUT')
+                    + $this->movementQty($movements, $id, 'sewing_pickup_reject', 'REJ-SEW')
+                    + $this->movementQty($movements, $id, 'sewing_pickup_reject_void', 'REJ-SEW')
+                    + $this->movementQty($movements, $id, 'sewing_pickup_reject_location_correction', 'REJ-CUT')
+                    + $this->movementQty($movements, $id, 'sewing_pickup_reject_location_correction', 'REJ-SEW'),
+                'Qty reject sebelum jahit tidak sama dengan IN REJ-CUT (transaksi lama REJ-SEW tetap dihitung).',
+                'Periksa pickup line reject dan ledger akuntansi baru; jangan edit mutation langsung.'
             );
 
             $sewOk = (float) ($sewingQc[$id]['ok'] ?? 0);
             $sewReject = (float) ($sewingQc[$id]['reject'] ?? 0);
+
+            // Pada mode direct-post, Sewing Return yang sudah posted adalah
+            // sumber kebenaran output jahit. QC record boleh tidak ada atau
+            // hanya merupakan jejak dari transaksi sebelum mode ini aktif.
+            $directPost = ! (bool) config('accounting.sewing_return_requires_qc', false);
+            if ($directPost) {
+                $sewOk = (float) ($returnLines[$id]['ok'] ?? 0);
+                $sewReject = (float) ($returnLines[$id]['reject'] ?? 0);
+            }
             $sewProcessed = $sewOk + $sewReject;
             $reworkOk = (float) ($sewingQc[$id]['rework_ok'] ?? 0);
             $reworkReject = (float) ($sewingQc[$id]['rework_reject'] ?? 0);
 
+            // Pada mode direct-post, setor ulang reject tidak membuat record
+            // qc_results baru. sewing_return_lines menjadi sumber kebenaran
+            // untuk qty rework, sama seperti output sewing normal di atas.
+            if ($directPost) {
+                $reworkOk = (float) ($returnLines[$id]['rework_ok'] ?? 0);
+                $reworkReject = (float) ($returnLines[$id]['rework_reject'] ?? 0);
+            }
+
             // Pickup boleh masih outstanding/parsial. Yang invalid hanya bila
             // QC normal memproses lebih banyak daripada qty pickup aktif.
-            if ($sewProcessed > $pickupQty + self::EPS) {
+            if ($sewProcessed > $pickupGoodQty + self::EPS) {
                 $issues[] = $this->issue(
                     'SEWING_QC_TOTAL_MISMATCH', 'HIGH', $id, $code, $item,
-                    $pickupQty, $sewProcessed,
+                    $pickupGoodQty, $sewProcessed,
                     'Qty QC sewing normal melebihi qty pickup aktif.',
                     'production:repair-sewing-qc-rejects hanya memperbaiki counter/line; selisih inventory perlu investigasi.'
                 );
@@ -157,12 +202,14 @@ class ProductionFlowAuditService
 
             $lineOk = (float) ($returnLines[$id]['ok'] ?? 0);
             $lineReject = (float) ($returnLines[$id]['reject'] ?? 0);
-            $this->compare(
-                $issues, 'SEWING_RETURN_LINE_QTY_MISMATCH', 'MEDIUM', $id, $code, $item,
-                $sewOk + $sewReject, $lineOk + $lineReject,
-                'Qty sewing_return_lines berbeda dari qc_results sewing.',
-                'production:repair-sewing-qc-rejects --return=<sewing_return_id>.'
-            );
+            if (! $directPost) {
+                $this->compare(
+                    $issues, 'SEWING_RETURN_LINE_QTY_MISMATCH', 'MEDIUM', $id, $code, $item,
+                    $sewOk + $sewReject, $lineOk + $lineReject,
+                    'Qty sewing_return_lines berbeda dari qc_results sewing.',
+                    'production:repair-sewing-qc-rejects --return=<sewing_return_id>.'
+                );
+            }
 
             $reworkLineQty = (float) ($returnLines[$id]['rework_ok'] ?? 0)
                 + (float) ($returnLines[$id]['rework_reject'] ?? 0);
@@ -230,10 +277,19 @@ class ProductionFlowAuditService
             ->join('sewing_pickups as p', 'p.id', '=', 'pl.sewing_pickup_id')
             ->whereIn('pl.cutting_job_bundle_id', $ids->all())
             ->whereNull('p.voided_at')
-            ->selectRaw('pl.cutting_job_bundle_id as bundle_id, SUM(COALESCE(pl.qty_bundle,0)) as qty')
+            ->where(function ($query) {
+                $query->whereNull('pl.status')
+                    ->orWhere('pl.status', '<>', 'void');
+            })
+            ->selectRaw('pl.cutting_job_bundle_id as bundle_id, SUM(COALESCE(pl.qty_bundle,0)) as good_qty, SUM(COALESCE(pl.qty_rejected,0)) as reject_qty')
             ->groupBy('pl.cutting_job_bundle_id')
-            ->pluck('qty', 'bundle_id')
-            ->map(fn ($value) => (float) $value)
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                (int) $row->bundle_id => [
+                    'good' => (float) $row->good_qty,
+                    'reject' => (float) $row->reject_qty,
+                ],
+            ])
             ->all();
     }
 
@@ -244,7 +300,7 @@ class ProductionFlowAuditService
             ->whereIn('pl.cutting_job_bundle_id', $ids->all())
             ->whereIn('rl.source_type', ['reject_sewing_rework', 'finishing_sewing_rework'])
             ->get(['rl.sewing_return_id', 'pl.cutting_job_bundle_id'])
-            ->mapWithKeys(fn ($row) => [((int) $row->sewing_return_id) . ':' . ((int) $row->cutting_job_bundle_id) => true])
+            ->mapWithKeys(fn ($row) => [((int) $row->sewing_return_id).':'.((int) $row->cutting_job_bundle_id) => true])
             ->all();
     }
 
@@ -263,7 +319,7 @@ class ProductionFlowAuditService
         foreach ($rows as $row) {
             $id = (int) $row->bundle_id;
             $isRework = $stage === 'sewing'
-                && isset($reworkKeys[((int) $row->sewing_job_id) . ':' . $id]);
+                && isset($reworkKeys[((int) $row->sewing_job_id).':'.$id]);
             $okKey = $isRework ? 'rework_ok' : 'ok';
             $rejectKey = $isRework ? 'rework_reject' : 'reject';
             $out[$id] ??= ['ok' => 0.0, 'reject' => 0.0, 'rework_ok' => 0.0, 'rework_reject' => 0.0];
@@ -293,9 +349,10 @@ class ProductionFlowAuditService
                 foreach ($rows as $row) {
                     $prefix = in_array($row->source_type, ['reject_sewing_rework', 'finishing_sewing_rework'], true)
                         ? 'rework_' : '';
-                    $out[$prefix . 'ok'] += (float) $row->qty_ok;
-                    $out[$prefix . 'reject'] += (float) $row->qty_reject;
+                    $out[$prefix.'ok'] += (float) $row->qty_ok;
+                    $out[$prefix.'reject'] += (float) $row->qty_reject;
                 }
+
                 return $out;
             })
             ->all();
@@ -329,19 +386,34 @@ class ProductionFlowAuditService
                 } elseif ($row->source_type === 'sewing_return_void_reject') {
                     $row->source_type = $row->warehouse_code === 'REJ-SEW'
                         ? 'sewing_qc_reject' : 'sewing_qc_out';
+                } elseif ($row->source_type === 'sewing_return_ok') {
+                    $row->source_type = $row->warehouse_code === 'WIP-SEW'
+                        ? 'sewing_qc_out' : 'sewing_qc_in';
+                } elseif ($row->source_type === 'sewing_return_reject') {
+                    $row->source_type = $row->warehouse_code === 'REJ-SEW'
+                        ? 'sewing_qc_reject' : 'sewing_qc_out';
                 } elseif ($row->source_type === 'sewing_reject_rework_void') {
                     $row->source_type = $row->warehouse_code === 'REJ-SEW'
                         ? 'sewing_rework_qc_out' : 'sewing_rework_qc_in';
+                } elseif ($row->source_type === 'sewing_pickup_reject_void') {
+                    // Reversal berada pada source_type terpisah, tetapi
+                    // secara flow harus menetralkan reject susulan asal.
+                    $row->source_type = 'sewing_pickup_reject';
+                } elseif ($row->source_type === 'sewing_pickup_pre_sewing_reject_void') {
+                    // Reversal reject baru tetap dikelompokkan ke jalur
+                    // pre-sewing agar audit WIP-CUT/REJ-CUT tetap terbaca.
+                    $row->source_type = 'sewing_pickup_pre_sewing_reject';
                 }
 
                 if (in_array($row->source_type, ['sewing_qc_out', 'sewing_qc_in', 'sewing_qc_reject'], true)
-                    && isset($reworkKeys[((int) $row->source_id) . ':' . ((int) $row->bundle_id)])) {
+                    && isset($reworkKeys[((int) $row->source_id).':'.((int) $row->bundle_id)])) {
                     $row->source_type = match ($row->source_type) {
                         'sewing_qc_out' => 'sewing_rework_qc_out',
                         'sewing_qc_in' => 'sewing_rework_qc_in',
                         default => 'sewing_rework_qc_reject',
                     };
                 }
+
                 return $row;
             });
     }
@@ -430,7 +502,7 @@ class ProductionFlowAuditService
         string $message,
         string $repair
     ): void {
-        if (!$this->different($expected, $actual)) {
+        if (! $this->different($expected, $actual)) {
             return;
         }
 

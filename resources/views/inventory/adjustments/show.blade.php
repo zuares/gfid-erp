@@ -573,6 +573,17 @@
                                 Dokumen sudah dibatalkan.
                             @endif
                         </div>
+
+                        @if ($adjustment->standaloneJournal)
+                            <a href="{{ route('standalone-accounting.journals.show', $adjustment->standaloneJournal) }}"
+                                class="btn btn-sm btn-outline-primary btn-pill mt-3">
+                                Lihat Jurnal Akuntansi Baru
+                            </a>
+                        @elseif ($adjustment->status === InventoryAdjustment::STATUS_APPROVED)
+                            <div class="text-warning small mt-3">
+                                Jurnal Akuntansi Baru belum tersedia. Periksa mapping akun atau log posting.
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>

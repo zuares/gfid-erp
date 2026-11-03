@@ -6,18 +6,19 @@ use App\Http\Controllers\Accounting\CashBasisReportController;
 use App\Http\Controllers\Accounting\CashExpenseController;
 use App\Http\Controllers\Accounting\CashReceiptController;
 use App\Http\Controllers\Accounting\CashTransferController;
-use App\Http\Controllers\Accounting\JournalController;
-use App\Http\Controllers\Accounting\LoanController;
 use App\Http\Controllers\Accounting\EmployeeLoanController;
 use App\Http\Controllers\Accounting\EmployeeSavingsController;
+use App\Http\Controllers\Accounting\JournalController;
+use App\Http\Controllers\Accounting\LoanController;
 use App\Http\Controllers\Accounting\MarketplacePayoutController;
 use App\Http\Controllers\Accounting\OpeningBalanceBatchController;
 use App\Http\Controllers\Accounting\OpeningBalanceController;
-use App\Http\Controllers\Accounting\SupplierApOpeningBalanceController;
-use App\Http\Controllers\Accounting\SupplierLoanController;
+use App\Http\Controllers\Accounting\ProductionAccountingAuditController;
 use App\Http\Controllers\Accounting\ProductionJournalAuditController;
 use App\Http\Controllers\Accounting\ProductionValueReportController;
 use App\Http\Controllers\Accounting\ProfitLossController;
+use App\Http\Controllers\Accounting\SupplierApOpeningBalanceController;
+use App\Http\Controllers\Accounting\SupplierLoanController;
 use App\Http\Controllers\Accounting\TrialBalanceController;
 use App\Http\Controllers\Api\AccountSuggestController;
 
@@ -26,11 +27,13 @@ Route::middleware(['auth', 'access:accounting'])->prefix('accounting')->name('ac
     Route::get('cash-basis-report', [CashBasisReportController::class, 'index'])->name('cash-basis-report.index');
 
     // ✅ Laporan Keuangan
-    Route::get('ap-report',      [ApReportController::class,      'index'])->name('ap-report.index');
-    Route::get('trial-balance',  [TrialBalanceController::class,  'index'])->name('trial-balance.index');
-    Route::get('profit-loss',    [ProfitLossController::class,    'index'])->name('profit-loss.index');
+    Route::get('ap-report', [ApReportController::class,      'index'])->name('ap-report.index');
+    Route::get('trial-balance', [TrialBalanceController::class,  'index'])->name('trial-balance.index');
+    Route::get('profit-loss', [ProfitLossController::class,    'index'])->name('profit-loss.index');
     Route::get('production-journal-audit', [ProductionJournalAuditController::class, 'index'])
         ->name('production-journal-audit.index');
+    Route::get('production-accounting-audit', [ProductionAccountingAuditController::class, 'index'])
+        ->name('production-accounting-audit.index');
     Route::get('production-value-report', [ProductionValueReportController::class, 'index'])
         ->name('production-value-report.index');
 

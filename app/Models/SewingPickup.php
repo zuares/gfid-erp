@@ -13,6 +13,7 @@ class SewingPickup extends Model
         'operator_id',
         'status',
         'notes',
+        'idempotency_key',
     ];
 
     protected $casts = [
@@ -69,18 +70,19 @@ class SewingPickup extends Model
         $lines = $this->relationLoaded('lines') ? $this->lines : $this->lines()->get();
 
         $totalRemaining = $lines->sum(function ($l) {
-            $qty = (float) ($l->qty_bundle ?? 0);
+            $qty = (float) ($l->qty_bundle ?? 0) + (float) ($l->qty_rejected ?? 0);
             $ok = (float) ($l->qty_returned_ok ?? 0);
             $rj = (float) ($l->qty_returned_reject ?? 0);
+            $pickupReject = (float) ($l->qty_rejected ?? 0);
             $dp = (float) ($l->qty_direct_picked ?? 0);
             $adj = (float) ($l->qty_progress_adjusted ?? 0); // ✅ ikut adjustment
             $closed = (float) ($l->qty_closed ?? 0);         // ✅ ikut cancel/settle/write-off
 
-            return max($qty - ($ok + $rj + $dp + $adj + $closed), 0);
+            return max($qty - ($ok + $rj + $pickupReject + $dp + $adj + $closed), 0);
         });
 
-        $returns = $lines->sum(fn($l) => (float) ($l->qty_returned_ok ?? 0) + (float) ($l->qty_returned_reject ?? 0));
-        $closedTotal = $lines->sum(fn($l) => (float) ($l->qty_closed ?? 0));
+        $returns = $lines->sum(fn ($l) => (float) ($l->qty_returned_ok ?? 0) + (float) ($l->qty_returned_reject ?? 0));
+        $closedTotal = $lines->sum(fn ($l) => (float) ($l->qty_closed ?? 0));
 
         if ($totalRemaining <= 0.000001) {
             // Tuntas tanpa setoran nyata & murni ditutup → 'closed'; selain itu 'completed'.
@@ -91,6 +93,7 @@ class SewingPickup extends Model
             return
             (float) ($l->qty_returned_ok ?? 0) +
             (float) ($l->qty_returned_reject ?? 0) +
+            (float) ($l->qty_rejected ?? 0) +
             (float) ($l->qty_direct_picked ?? 0) +
             (float) ($l->qty_progress_adjusted ?? 0) + // ✅ ikut adjustment
             (float) ($l->qty_closed ?? 0);             // ✅ ikut close

@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Purchasing;
 
 use App\Http\Controllers\Controller;
 use App\Models\PurchaseOrder;
+use App\Models\PurchasePayment;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseRequest;
-use App\Models\PurchasePayment;
 use App\Models\PurchaseReturn;
 use App\Models\SupplierInvoice;
 use App\Services\Purchasing\MaterialShortageService;
@@ -19,8 +19,8 @@ class PurchasingDashboardController extends Controller
 
     public function index(Request $request)
     {
-        $user    = $request->user();
-        $role    = strtolower((string) ($user->role ?? ''));
+        $user = $request->user();
+        $role = strtolower((string) ($user->role ?? ''));
         $isOwner = $user?->isOwner() ?? false;
         $isAdmin = $role === 'admin';
 
@@ -31,17 +31,20 @@ class PurchasingDashboardController extends Controller
 
         $canSeeMoney = $isOwner || in_array($role, ['admin', 'accounting', 'developer'], true);
 
-        $today        = now()->toDateString();
+        $today = now()->toDateString();
         $startOfMonth = now()->startOfMonth()->toDateString();
-        $endOfMonth   = now()->endOfMonth()->toDateString();
+        $endOfMonth = now()->endOfMonth()->toDateString();
 
         $hasInvoiceTable = Schema::hasTable('supplier_invoices');
-        $hasPrTable      = Schema::hasTable('purchase_requests');
-        $hasReturnTable  = Schema::hasTable('purchase_returns');
+        $hasPrTable = Schema::hasTable('purchase_requests');
+        $hasReturnTable = Schema::hasTable('purchase_returns');
+        $poOperationalStatuses = config('purchasing.po_approval_enabled', false)
+            ? ['approved']
+            : ['draft', 'approved'];
 
         // ── Material Shortage ─────────────────────────────────────────
-        $shortageRows      = $this->shortages->rows();
-        $shortageCount     = $shortageRows->where('has_shortage', true)->count();
+        $shortageRows = $this->shortages->rows();
+        $shortageCount = $shortageRows->where('has_shortage', true)->count();
         $shortageItemCount = $shortageRows->count();
 
         // ── Purchase Request ──────────────────────────────────────────
@@ -69,15 +72,15 @@ class PurchasingDashboardController extends Controller
         // ── Purchase Order ────────────────────────────────────────────
         $poDraftCount = PurchaseOrder::where('status', 'draft')->count();
 
-        $poApprovedNotReceivedCount = PurchaseOrder::where('status', 'approved')
+        $poApprovedNotReceivedCount = PurchaseOrder::whereIn('status', $poOperationalStatuses)
             ->where(fn ($q) => $q->whereNull('received_status')->orWhere('received_status', 'not_received'))
             ->count();
 
-        $poPartialCount = PurchaseOrder::where('status', 'approved')
+        $poPartialCount = PurchaseOrder::whereIn('status', $poOperationalStatuses)
             ->where('received_status', 'partial')
             ->count();
 
-        $poBelumTerimaList = PurchaseOrder::where('status', 'approved')
+        $poBelumTerimaList = PurchaseOrder::whereIn('status', $poOperationalStatuses)
             ->where(fn ($q) => $q
                 ->whereNull('received_status')
                 ->orWhereIn('received_status', ['not_received', 'partial'])
@@ -97,15 +100,27 @@ class PurchasingDashboardController extends Controller
 
         // ── Invoice ───────────────────────────────────────────────────
         if ($hasInvoiceTable) {
-            $poFullyNoInvoiceCount = PurchaseOrder::where('status', 'approved')
-                ->where('received_status', 'fully_received')
+            $poFullyNoInvoiceCount = PurchaseOrder::whereIn('status', $poOperationalStatuses)
                 ->whereNull('closed_at')
+                ->whereHas('purchaseReceipts', function ($query) {
+                    $query->where('status', 'posted')
+                        ->where(function ($query) {
+                            $query->whereNull('is_replacement')
+                                ->orWhere('is_replacement', false);
+                        });
+                })
                 ->whereDoesntHave('supplierInvoices', fn ($q) => $q->whereNotIn('status', ['void']))
                 ->count();
 
-            $poFullyNoInvoiceList = PurchaseOrder::where('status', 'approved')
-                ->where('received_status', 'fully_received')
+            $poFullyNoInvoiceList = PurchaseOrder::whereIn('status', $poOperationalStatuses)
                 ->whereNull('closed_at')
+                ->whereHas('purchaseReceipts', function ($query) {
+                    $query->where('status', 'posted')
+                        ->where(function ($query) {
+                            $query->whereNull('is_replacement')
+                                ->orWhere('is_replacement', false);
+                        });
+                })
                 ->whereDoesntHave('supplierInvoices', fn ($q) => $q->whereNotIn('status', ['void']))
                 ->with('supplier')
                 ->orderByDesc('date')
@@ -152,13 +167,13 @@ class PurchasingDashboardController extends Controller
                 ->get();
         } else {
             $poFullyNoInvoiceCount = 0;
-            $poFullyNoInvoiceList  = collect();
-            $invOutstandingCount   = 0;
-            $invOutstandingTotal   = 0.0;
-            $invOverdueCount       = 0;
-            $invOverdueTotal       = 0.0;
-            $invOutstandingList    = collect();
-            $invUpcoming           = collect();
+            $poFullyNoInvoiceList = collect();
+            $invOutstandingCount = 0;
+            $invOutstandingTotal = 0.0;
+            $invOverdueCount = 0;
+            $invOverdueTotal = 0.0;
+            $invOutstandingList = collect();
+            $invUpcoming = collect();
         }
 
         // ── Pembayaran ────────────────────────────────────────────────
@@ -166,7 +181,7 @@ class PurchasingDashboardController extends Controller
 
         $payThisMonthTotal = $hasPaymentTable
             ? (float) PurchasePayment::whereNull('voided_at')
-                ->whereBetween('created_at', [$startOfMonth . ' 00:00:00', $endOfMonth . ' 23:59:59'])
+                ->whereBetween('created_at', [$startOfMonth.' 00:00:00', $endOfMonth.' 23:59:59'])
                 ->sum('amount')
             : 0.0;
 
@@ -179,25 +194,24 @@ class PurchasingDashboardController extends Controller
             : collect();
 
         // ── PO Siap / Belum Bisa Close ────────────────────────────────
-        $poReadyCloseQuery = PurchaseOrder::where('status', 'approved')
+        $poReadyCloseQuery = PurchaseOrder::whereIn('status', $poOperationalStatuses)
             ->where('received_status', 'fully_received')
             ->where('payment_status', 'paid')
             ->whereNull('closed_at');
         if ($hasInvoiceTable) {
-            $poReadyCloseQuery->whereDoesntHave('supplierInvoices', fn ($q) =>
-                $q->whereIn('status', ['draft', 'posted', 'partial_paid'])
+            $poReadyCloseQuery->whereDoesntHave('supplierInvoices', fn ($q) => $q->whereIn('status', ['draft', 'posted', 'partial_paid'])
             );
         }
         $poReadyCloseCount = (clone $poReadyCloseQuery)->count();
-        $poReadyCloseList  = (clone $poReadyCloseQuery)
+        $poReadyCloseList = (clone $poReadyCloseQuery)
             ->with(['supplier', 'supplierInvoices'])
             ->orderByDesc('date')->limit(10)->get();
 
         $poClosedMonthCount = PurchaseOrder::whereNotNull('closed_at')
-            ->whereBetween('closed_at', [$startOfMonth . ' 00:00:00', $endOfMonth . ' 23:59:59'])
+            ->whereBetween('closed_at', [$startOfMonth.' 00:00:00', $endOfMonth.' 23:59:59'])
             ->count();
 
-        $poNotReadyCloseList = PurchaseOrder::where('status', 'approved')
+        $poNotReadyCloseList = PurchaseOrder::whereIn('status', $poOperationalStatuses)
             ->whereNull('closed_at')
             ->where(fn ($q) => $q
                 ->where('received_status', '!=', 'fully_received')
@@ -210,20 +224,23 @@ class PurchasingDashboardController extends Controller
                 if (($po->received_status ?? 'not_received') !== 'fully_received') {
                     $blockers[] = match ($po->received_status ?? 'not_received') {
                         'partial' => 'Terima sebagian',
-                        default   => 'Belum ada GRN',
+                        default => 'Belum ada GRN',
                     };
                 }
                 if (($po->payment_status ?? 'unpaid') !== 'paid') {
                     $blockers[] = match ($po->payment_status ?? 'unpaid') {
                         'partial' => 'Bayar sebagian',
-                        default   => 'Belum bayar',
+                        default => 'Belum bayar',
                     };
                 }
                 if ($hasInvoiceTable) {
                     $open = $po->supplierInvoices->whereIn('status', ['draft', 'posted', 'partial_paid'])->count();
-                    if ($open > 0) $blockers[] = "{$open} invoice belum lunas";
+                    if ($open > 0) {
+                        $blockers[] = "{$open} invoice belum lunas";
+                    }
                 }
                 $po->_blockers = $blockers;
+
                 return $po;
             });
         $poNotReadyCloseCount = $poNotReadyCloseList->count();

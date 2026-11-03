@@ -308,6 +308,9 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ── operator sync ── */
     operatorSelect.addEventListener('change', () => {
         operatorHidden.value = operatorSelect.value;
+        document.dispatchEvent(new CustomEvent('sewing-pickup:operator-changed', {
+            detail: { operatorId: operatorSelect.value },
+        }));
         const atLastStep = phase === 'supply' && currentStep === activeSupplyItems.length - 1;
         confirmBtn.disabled = !operatorSelect.value || (atLastStep && !isOwner);
     });
@@ -316,11 +319,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function getSelectedLines() {
         return [...rows].flatMap(row => {
             const qty = parseFloat(row.querySelector('input.qty-input')?.value || 0);
-            return qty > 0
+            const rejectQty = parseFloat(row.querySelector('input.reject-qty-input')?.value || 0);
+            const rejectReason = row.querySelector('input.reject-reason-input')?.value || '';
+            return qty > 0 || rejectQty > 0
                 ? [{
                     bundleId: row.dataset.bundleId || row.querySelector('input[name*="[bundle_id]"]')?.value || '',
                     code: row.dataset.itemCode || '-',
                     qty,
+                    rejectQty,
+                    rejectReason,
                     finishedItemId: row.dataset.finishedItemId || '',
                 }]
                 : [];
@@ -584,6 +591,22 @@ document.addEventListener('DOMContentLoaded', function () {
         e.preventDefault();
         const list = getSelectedLines();
         if (!list.length) return;
+
+        const hasGoodQty = list.some(line => line.qty > 0.000001);
+        const hasRejectQty = list.some(line => line.rejectQty > 0.000001);
+
+        // Reject susulan tidak perlu memilih penjahit dan tidak perlu melewati
+        // wizard kelengkapan jahit. Ia langsung menjadi dokumen reject-only;
+        // backend akan menyimpan operator_id NULL dan memposting ke REJ-CUT.
+        if (hasRejectQty && !hasGoodQty) {
+            if (!syncAndValidatePickupDate()) return;
+            if (operatorSelect) operatorSelect.value = '';
+            if (operatorHidden) operatorHidden.value = '';
+            form.dataset.directReject = '1';
+            HTMLFormElement.prototype.submit.call(form);
+            return;
+        }
+
         showConfirm(list);
         modal.show();
     });

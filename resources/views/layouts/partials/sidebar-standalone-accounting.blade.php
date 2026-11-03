@@ -21,6 +21,18 @@
                 :active="request()->routeIs('standalone-accounting.journals.*')">
                 Jurnal Baru
             </x-sidebar.sub-link>
+            <x-sidebar.sub-link href="{{ route('standalone-accounting.journals.create', ['mode' => 'opening']) }}" icon="bi bi-wallet2"
+                :active="request()->routeIs('standalone-accounting.journals.create') && request('mode') === 'opening'">
+                Saldo Awal
+            </x-sidebar.sub-link>
+            <x-sidebar.sub-link href="{{ route('standalone-accounting.stock-opname-variance.index') }}" icon="bi bi-clipboard2-data"
+                :active="request()->routeIs('standalone-accounting.stock-opname-variance.*')">
+                Stock Opname &amp; Variance
+            </x-sidebar.sub-link>
+            <x-sidebar.sub-link href="{{ route('standalone-accounting.opening-migration.index') }}" icon="bi bi-box-arrow-in-right"
+                :active="request()->routeIs('standalone-accounting.opening-migration.*')">
+                Opening Migrasi
+            </x-sidebar.sub-link>
             <x-sidebar.sub-link href="{{ route('standalone-accounting.accounts.index') }}" icon="bi bi-folder2-open"
                 :active="request()->routeIs('standalone-accounting.accounts.*')">
                 Daftar Akun

@@ -477,6 +477,314 @@
             font-weight: 800;
         }
 
+        .cutting-accounting-card {
+            border-color: rgba(14, 116, 144, .28);
+            background: linear-gradient(135deg, rgba(240, 249, 255, .92), rgba(236, 253, 245, .7));
+            border-radius: 12px;
+            margin-bottom: .65rem;
+            box-shadow: 0 5px 14px rgba(15, 23, 42, .08);
+        }
+
+        .cutting-accounting-card > summary {
+            list-style: none;
+            cursor: pointer;
+        }
+
+        .cutting-accounting-card > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .cutting-accounting-card > summary::after {
+            content: '⌄';
+            margin-left: auto;
+            color: #0f766e;
+            font-size: .95rem;
+            font-weight: 800;
+            line-height: 1;
+            transition: transform .15s ease;
+        }
+
+        .cutting-accounting-card[open] > summary::after {
+            transform: rotate(180deg);
+        }
+
+        /* Preview tetap terlihat pada langkah pilih LOT; field produksi lain
+           baru dibuka setelah LOT dikonfirmasi. */
+        .cutting-create-page #cutting-main-content.d-none {
+            display: block !important;
+        }
+
+        .cutting-create-page #cutting-main-content.d-none > :not(.cutting-accounting-card):not(.cutting-hpp-panel) {
+            display: none !important;
+        }
+
+        .cutting-accounting-card .cutting-card-header {
+            padding: .48rem .7rem;
+            background: rgba(14, 116, 144, .055);
+            border-bottom-color: rgba(14, 116, 144, .14);
+        }
+
+        .cutting-accounting-card .cutting-card-header h5 {
+            color: #0f766e;
+            font-size: .75rem;
+            letter-spacing: .025em;
+        }
+
+        .cutting-accounting-card .cutting-card-body {
+            padding: .55rem .7rem .65rem;
+        }
+
+        .cutting-accounting-status {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            border-radius: 999px;
+            padding: .14rem .48rem;
+            font-size: .64rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .cutting-accounting-status.is-on {
+            color: #166534;
+            background: #dcfce7;
+            border: 1px solid #86efac;
+        }
+
+        .cutting-accounting-status.is-off {
+            color: #92400e;
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+        }
+
+        .cutting-accounting-note {
+            color: #334155;
+            font-size: .7rem;
+            line-height: 1.35;
+        }
+
+        .cutting-accounting-table {
+            --bs-table-bg: transparent;
+            font-size: .68rem;
+            margin-bottom: 0;
+        }
+
+        .cutting-accounting-table th {
+            color: #64748b;
+            font-size: .6rem;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .cutting-accounting-table td,
+        .cutting-accounting-table th {
+            padding: .28rem .36rem;
+            vertical-align: middle;
+            border-color: rgba(14, 116, 144, .12);
+        }
+
+        .cutting-accounting-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-weight: 800;
+            white-space: nowrap;
+            font-size: .68rem;
+        }
+
+        .cutting-accounting-missing {
+            color: #991b1b;
+            background: rgba(254, 226, 226, .75);
+            border: 1px solid rgba(248, 113, 113, .5);
+            border-radius: 10px;
+            padding: .4rem .55rem;
+            font-size: .68rem;
+            line-height: 1.45;
+        }
+
+        body[data-theme="dark"] .cutting-accounting-card {
+            border-color: rgba(45, 212, 191, .35);
+            background: linear-gradient(135deg, rgba(8, 47, 73, .52), rgba(6, 78, 59, .28));
+        }
+
+        body[data-theme="dark"] .cutting-accounting-card .cutting-card-header {
+            background: rgba(45, 212, 191, .08);
+        }
+
+        body[data-theme="dark"] .cutting-accounting-card .cutting-card-header h5,
+        body[data-theme="dark"] .cutting-accounting-note {
+            color: #ccfbf1;
+        }
+
+        body[data-theme="dark"] .cutting-accounting-table th {
+            color: #94a3b8;
+        }
+
+        body[data-theme="dark"] .cutting-accounting-table td,
+        body[data-theme="dark"] .cutting-accounting-table th {
+            border-color: rgba(45, 212, 191, .18);
+        }
+
+        .cutting-hpp-panel {
+            margin-top: .65rem;
+            border: 1px solid rgba(37, 99, 235, .2);
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(239, 246, 255, .82), rgba(248, 250, 252, .92));
+        }
+
+        .cutting-hpp-panel > summary {
+            list-style: none;
+            cursor: pointer;
+            flex-direction: row;
+            align-items: flex-start;
+            background: rgba(37, 99, 235, .04);
+            border-bottom-color: rgba(37, 99, 235, .14);
+        }
+
+        .cutting-hpp-panel > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .cutting-hpp-panel > summary::after {
+            content: '⌄';
+            margin-left: auto;
+            color: #1d4ed8;
+            font-size: .95rem;
+            font-weight: 800;
+            line-height: 1;
+            transition: transform .15s ease;
+        }
+
+        .cutting-hpp-panel[open] > summary::after {
+            transform: rotate(180deg);
+        }
+
+        .cutting-hpp-head {
+            min-height: 0;
+        }
+
+        .cutting-hpp-panel .cutting-card-body {
+            padding: .62rem .72rem .68rem;
+        }
+
+        .cutting-hpp-title {
+            color: #1d4ed8;
+            font-size: .76rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+        }
+
+        .cutting-hpp-subtitle,
+        .cutting-hpp-status {
+            color: #64748b;
+            font-size: .68rem;
+            line-height: 1.35;
+        }
+
+        .cutting-hpp-badge {
+            flex-shrink: 0;
+            padding: .12rem .42rem;
+            border: 1px solid rgba(37, 99, 235, .22);
+            border-radius: 999px;
+            color: #1d4ed8;
+            background: rgba(219, 234, 254, .75);
+            font-size: .62rem;
+            font-weight: 800;
+        }
+
+        .cutting-hpp-totals {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .42rem;
+            margin-bottom: .42rem;
+        }
+
+        .cutting-hpp-total-item {
+            min-width: 0;
+            padding: .38rem .48rem;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .68);
+            border: 1px solid rgba(148, 163, 184, .18);
+        }
+
+        .cutting-hpp-total-item span {
+            display: block;
+            color: #64748b;
+            font-size: .6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .cutting-hpp-total-item strong {
+            display: block;
+            margin-top: .1rem;
+            color: #334155;
+            font-size: .78rem;
+        }
+
+        .cutting-hpp-total-item.is-total {
+            background: rgba(219, 234, 254, .7);
+            border-color: rgba(59, 130, 246, .25);
+        }
+
+        .cutting-hpp-total-item.is-total strong {
+            color: #1d4ed8;
+        }
+
+        .cutting-hpp-detail-wrap {
+            margin-top: .35rem;
+        }
+
+        .cutting-hpp-detail {
+            --bs-table-bg: transparent;
+            font-size: .68rem;
+        }
+
+        .cutting-hpp-detail th {
+            color: #64748b;
+            font-size: .58rem;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .cutting-hpp-detail td,
+        .cutting-hpp-detail th {
+            padding: .25rem .32rem;
+            border-color: rgba(37, 99, 235, .12);
+            vertical-align: middle;
+        }
+
+        body[data-theme="dark"] .cutting-hpp-panel {
+            border-color: rgba(96, 165, 250, .35);
+            background: linear-gradient(135deg, rgba(23, 37, 84, .48), rgba(15, 23, 42, .68));
+        }
+
+        body[data-theme="dark"] .cutting-hpp-panel > summary {
+            background: rgba(37, 99, 235, .12);
+            border-bottom-color: rgba(96, 165, 250, .25);
+        }
+
+        body[data-theme="dark"] .cutting-hpp-title,
+        body[data-theme="dark"] .cutting-hpp-total-item.is-total strong {
+            color: #93c5fd;
+        }
+
+        body[data-theme="dark"] .cutting-hpp-subtitle,
+        body[data-theme="dark"] .cutting-hpp-status,
+        body[data-theme="dark"] .cutting-hpp-total-item span,
+        body[data-theme="dark"] .cutting-hpp-detail th {
+            color: #94a3b8;
+        }
+
+        body[data-theme="dark"] .cutting-hpp-total-item {
+            background: rgba(15, 23, 42, .42);
+            border-color: rgba(148, 163, 184, .2);
+        }
+
+        body[data-theme="dark"] .cutting-hpp-total-item strong {
+            color: #e2e8f0;
+        }
+
         @media (max-width: 767.98px) {
             .cutting-card {
                 border-radius: 14px;
@@ -546,6 +854,52 @@
                 font-size: .76rem;
                 line-height: 1.35;
                 color: var(--text);
+            }
+
+            .cutting-accounting-card .cutting-card-body {
+                padding: .5rem .6rem .6rem;
+            }
+
+            .cutting-accounting-status {
+                font-size: .6rem;
+            }
+
+            .cutting-accounting-table {
+                min-width: 500px;
+            }
+
+            .cutting-accounting-table th:nth-child(5),
+            .cutting-accounting-table td:nth-child(5) {
+                display: none;
+            }
+
+            .cutting-hpp-panel {
+                margin-top: .55rem;
+            }
+
+            .cutting-hpp-panel > summary {
+                flex-direction: row;
+                padding: .62rem .7rem;
+            }
+
+            .cutting-hpp-panel .cutting-card-body {
+                padding: .55rem .6rem .62rem;
+            }
+
+            .cutting-hpp-totals {
+                gap: .3rem;
+            }
+
+            .cutting-hpp-total-item {
+                padding: .32rem .35rem;
+            }
+
+            .cutting-hpp-total-item strong {
+                font-size: .68rem;
+            }
+
+            .cutting-hpp-detail {
+                min-width: 430px;
             }
 
             .bundles-table-wrap {
@@ -832,6 +1186,10 @@
 
     {{-- STEP 2: KONTEN UTAMA (muncul setelah LOT disimpan) --}}
     <div id="cutting-main-content" class="cutting-main-content d-none">
+        @php
+            $canSeeProductionAccounting = auth()->user()?->isOwner() ?? false;
+        @endphp
+
         {{-- Hidden elements dipakai JS untuk tracking state --}}
         <span id="current-fabric-label" style="display:none;"></span>
         <span id="current-lot-count" style="display:none;"></span>
@@ -854,6 +1212,115 @@
                 Info Cutting Job
             </button>
         </div>
+
+        @if ($canSeeProductionAccounting)
+            {{-- CARD: PREVIEW AKUNTANSI BARU --}}
+            @php
+                $accountingMappings = collect($cuttingAccountingMappings ?? []);
+                $accountingExpected = [
+                    'cutting_job|debit',
+                    'cutting_job|credit',
+                    'cutting_job_wage|debit',
+                    'cutting_job_wage|credit',
+                ];
+                $accountingPresent = $accountingMappings
+                    ->map(fn ($mapping) => $mapping->source_type . '|' . $mapping->line_side)
+                    ->unique()
+                    ->values()
+                    ->all();
+                $accountingMissing = array_values(array_diff($accountingExpected, $accountingPresent));
+                $accountingReady = count($accountingMissing) === 0;
+                $accountingSourceLabels = [
+                    'cutting_job' => 'Pemakaian bahan → WIP Cutting',
+                    'cutting_job_wage' => 'Upah cutting → WIP Cutting',
+                ];
+            @endphp
+
+            <details class="cutting-card cutting-accounting-card" aria-labelledby="cutting-accounting-title">
+            <summary class="cutting-card-header">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h5 id="cutting-accounting-title">
+                        <i class="bi bi-journal-check me-1" aria-hidden="true"></i>
+                        Akuntansi Baru
+                    </h5>
+                    @if ($cuttingAccountingEnabled ?? false)
+                        <span class="cutting-accounting-status is-on">
+                            <i class="bi bi-toggle-on" aria-hidden="true"></i> Mirror aktif
+                        </span>
+                    @else
+                        <span class="cutting-accounting-status is-off">
+                            <i class="bi bi-toggle-off" aria-hidden="true"></i> Read-only · flag OFF
+                        </span>
+                    @endif
+                </div>
+                <span class="badge-soft">Preview posting Cutting</span>
+            </summary>
+            <div class="cutting-card-body">
+                <div class="cutting-accounting-note mb-2">
+                    Saat disimpan, akuntansi legacy tetap mengikuti alur lama. Jika mirror diaktifkan,
+                    jurnal akuntansi baru dibuat transactional dan idempotent; jurnal VOID tidak dihitung
+                    dalam saldo aktif.
+                </div>
+
+                @if (!$accountingReady)
+                    <div class="cutting-accounting-missing mb-2" role="alert">
+                        <strong>Posting akan diblokir:</strong> mapping belum lengkap
+                        ({{ implode(', ', $accountingMissing) }}). Lengkapi mapping sebelum mengaktifkan mirror.
+                    </div>
+                @endif
+
+                <div class="table-responsive">
+                    <table class="table table-sm cutting-accounting-table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Sisi</th>
+                                <th>Akun baru</th>
+                                <th>Akun legacy</th>
+                                <th>Tujuan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($accountingMappings as $mapping)
+                                <tr>
+                                    <td>{{ $accountingSourceLabels[$mapping->source_type] ?? $mapping->source_type }}</td>
+                                    <td>
+                                        <span class="badge {{ $mapping->line_side === 'debit' ? 'text-bg-primary' : 'text-bg-secondary' }}">
+                                            {{ strtoupper($mapping->line_side) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="cutting-accounting-code">{{ $mapping->standalone_account_code }}</span>
+                                        <span class="d-block text-muted small">{{ $mapping->standalone_account_name ?: 'Akun belum ditemukan' }}</span>
+                                    </td>
+                                    <td><span class="cutting-accounting-code">{{ $mapping->legacy_account_code }}</span></td>
+                                    <td>{{ $mapping->purpose }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-danger small">
+                                        Mapping akun Cutting belum tersedia. Posting mirror akan dihentikan.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mt-2">
+                    <small class="cutting-accounting-note">
+                        Tidak ada jurnal dibuat hanya dengan membuka halaman ini.
+                    </small>
+                    @if (Route::has('accounting.production-accounting-audit.index'))
+                        <a href="{{ route('accounting.production-accounting-audit.index', ['stage' => ['cutting_material']]) }}"
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-clipboard2-check me-1" aria-hidden="true"></i> Audit mapping
+                        </a>
+                    @endif
+                </div>
+            </div>
+            </details>
+        @endif
 
         {{-- CARD: BUNDLES --}}
         <div class="cutting-card cutting-card-bundles">
@@ -951,6 +1418,60 @@
             </div>
         </div>
 
+        @if ($canSeeProductionAccounting)
+            {{-- CARD: ESTIMASI HPP CUTTING --}}
+            <details class="cutting-card cutting-hpp-panel" id="cutting-hpp-panel" aria-labelledby="cutting-hpp-title">
+            <summary class="cutting-card-header cutting-hpp-head">
+                <div>
+                    <div class="cutting-hpp-title" id="cutting-hpp-title">
+                        <i class="bi bi-calculator me-1" aria-hidden="true"></i> Estimasi HPP Cutting
+                    </div>
+                    <div class="cutting-hpp-subtitle">
+                        Nilai bahan + upah yang masuk ke WIP Cutting, bukan HPP penjualan.
+                    </div>
+                </div>
+                <span class="cutting-hpp-badge">Live</span>
+            </summary>
+            <div class="cutting-card-body">
+                <div class="cutting-hpp-totals" id="cutting-hpp-totals">
+                    <div class="cutting-hpp-total-item">
+                        <span>Bahan</span>
+                        <strong class="mono" id="hpp-material-total">Rp0</strong>
+                    </div>
+                    <div class="cutting-hpp-total-item">
+                        <span>Upah</span>
+                        <strong class="mono" id="hpp-wage-total">Rp0</strong>
+                    </div>
+                    <div class="cutting-hpp-total-item is-total">
+                        <span>Total HPP</span>
+                        <strong class="mono" id="hpp-grand-total">Rp0</strong>
+                    </div>
+                </div>
+
+                <div class="cutting-hpp-status" id="cutting-hpp-status">
+                    Pilih item dan operator untuk melihat estimasi HPP.
+                </div>
+                <div class="table-responsive cutting-hpp-detail-wrap">
+                    <table class="table table-sm cutting-hpp-detail mb-0" id="cutting-hpp-detail">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="text-end">Qty</th>
+                                <th class="text-end">HPP / pcs</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cutting-hpp-detail-rows">
+                            <tr>
+                                <td colspan="4" class="text-muted">Belum ada item hasil cutting.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            </details>
+        @endif
+
         {{-- CARD: SUMMARY LOT (desktop + mobile) --}}
         <div class="cutting-card">
             <div class="cutting-card-header">
@@ -1037,8 +1558,16 @@
             // Riwayat pemakaian kain aktual terakhir:
             // { finishedItemId: { fabricItemId: { qty_per_pcs, job_code, date, history: [...] } } }
             const lastUsage = @json($lastUsage ?? []);
+            // Tarif upah cutting per operator + item untuk preview HPP.
+            const cuttingRates = @json($cuttingRates ?? []);
             // CSRF token untuk PATCH request
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+            const hppMaterialTotal = document.getElementById('hpp-material-total');
+            const hppWageTotal = document.getElementById('hpp-wage-total');
+            const hppGrandTotal = document.getElementById('hpp-grand-total');
+            const hppStatus = document.getElementById('cutting-hpp-status');
+            const hppDetailRows = document.getElementById('cutting-hpp-detail-rows');
 
             function isMobile() {
                 return window.matchMedia('(max-width: 767.98px)').matches;
@@ -1061,6 +1590,7 @@
                         || String(lotId);
                     const itemCode = (tr.dataset.itemCode || '').trim();
                     const unit = (tr.dataset.itemUnit || '').trim() || 'pcs';
+                    const unitCost = parseFloat(tr.dataset.unitCost ?? '0') || 0;
                     lotInfoMap[lotId] = {
                         lotId,
                         itemId,
@@ -1068,6 +1598,7 @@
                         balance,
                         itemCode,
                         unit,
+                        unitCost,
                     };
                 });
             }
@@ -1361,6 +1892,93 @@
                 return '(belum pilih item)';
             }
 
+            function escapeHppHtml(value) {
+                return String(value ?? '').replace(/[&<>"']/g, char => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;',
+                }[char]));
+            }
+
+            function formatHppMoney(value) {
+                return new Intl.NumberFormat('id-ID', {
+                    style: 'currency',
+                    currency: 'IDR',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                }).format(Math.max(Number(value) || 0, 0));
+            }
+
+            function recalcCuttingHpp() {
+                if (!hppDetailRows) return;
+
+                const operatorId = parseInt(document.getElementById('modal-operator-id')?.value || '0', 10);
+                const rows = Array.from(bundlesTbody?.querySelectorAll('.bundle-row') || []);
+                let materialTotal = 0;
+                let wageTotal = 0;
+                let pcsTotal = 0;
+                let missingMaterial = false;
+                let missingWage = false;
+                const detail = [];
+
+                rows.forEach(tr => {
+                    const qty = parseFloat(tr.querySelector('.bundle-qty-pcs')?.value || '0') || 0;
+                    const fabricQty = parseFloat(tr.querySelector('.bundle-qty-fabric')?.value || '0') || 0;
+                    const itemId = parseInt(tr.querySelector('[name*="finished_item_id"]')?.value || '0', 10);
+                    const lotId = parseInt(tr.querySelector('.bundle-lot-select')?.value || '0', 10);
+                    if (qty <= 0) return;
+
+                    const lotInfo = lotInfoMap[lotId] || {};
+                    const materialUnitCost = Number(lotInfo.unitCost || 0);
+                    const material = fabricQty * materialUnitCost;
+                    const wageRate = Number(cuttingRates?.[operatorId]?.[itemId] || 0);
+                    const wage = qty * wageRate;
+
+                    if (fabricQty > 0 && materialUnitCost <= 0) missingMaterial = true;
+                    if (qty > 0 && (!operatorId || wageRate <= 0)) missingWage = true;
+
+                    const rowTotal = material + wage;
+                    materialTotal += material;
+                    wageTotal += wage;
+                    pcsTotal += qty;
+                    detail.push({
+                        label: getBundleItemLabel(tr),
+                        qty,
+                        unit: qty > 0 ? rowTotal / qty : 0,
+                        total: rowTotal,
+                    });
+                });
+
+                hppMaterialTotal.textContent = formatHppMoney(materialTotal);
+                hppWageTotal.textContent = formatHppMoney(wageTotal);
+                hppGrandTotal.textContent = formatHppMoney(materialTotal + wageTotal);
+
+                if (!detail.length) {
+                    hppDetailRows.innerHTML = '<tr><td colspan="4" class="text-muted">Belum ada item hasil cutting.</td></tr>';
+                } else {
+                    hppDetailRows.innerHTML = detail.map(row =>
+                        `<tr>`
+                        + `<td class="mono">${escapeHppHtml(row.label)}</td>`
+                        + `<td class="text-end mono">${row.qty.toLocaleString('id-ID', { maximumFractionDigits: 2 })}</td>`
+                        + `<td class="text-end mono">${formatHppMoney(row.unit)}</td>`
+                        + `<td class="text-end mono fw-semibold">${formatHppMoney(row.total)}</td>`
+                        + `</tr>`
+                    ).join('');
+                }
+
+                if (!detail.length) {
+                    hppStatus.textContent = 'Pilih item dan operator untuk melihat estimasi HPP.';
+                } else if (missingMaterial) {
+                    hppStatus.textContent = 'HPP bahan belum tersedia pada LOT terpilih; cek cost LOT sebelum posting.';
+                } else if (missingWage) {
+                    hppStatus.textContent = 'Pilih operator dengan Piece Rate cutting agar komponen upah lengkap.';
+                } else {
+                    hppStatus.textContent = `Estimasi ${pcsTotal.toLocaleString('id-ID')} pcs berdasarkan cost LOT dan tarif aktif operator.`;
+                }
+            }
+
             function recalcLotSummary() {
                 const rows = bundlesTbody.querySelectorAll('.bundle-row');
                 let totalPcs = 0;
@@ -1389,6 +2007,7 @@
                     li.classList.add('text-muted');
                     li.textContent = 'Belum ada pemilihan LOT atau qty bundle.';
                     lotSummaryList.appendChild(li);
+                    recalcCuttingHpp();
                     return;
                 }
 
@@ -1485,7 +2104,10 @@
                 }
 
                 checkFabricShortage();
+                recalcCuttingHpp();
             }
+
+            document.getElementById('modal-operator-id')?.addEventListener('change', recalcCuttingHpp);
 
             /* ── INLINE SHORTAGE WARNING ────────────────────────────── */
             function checkFabricShortage() {

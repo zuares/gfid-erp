@@ -16,6 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class JournalService
 {
+    public function __construct(
+        protected StandalonePurchasePaymentPostingService $standalonePurchasePaymentPostingService,
+    ) {}
+
     // ====== COA CODES ======
     public const CODE_AP = '2101'; // Hutang Dagang
 
@@ -53,6 +57,8 @@ class JournalService
 
     public const CODE_STOCK_VARIANCE = '6115'; // Selisih Stock Opname
 
+    public const CODE_OPENING_EQUITY = '3101'; // Modal Pemilik / lawan saldo awal
+
     public const CODE_LEGACY_CORRECTION = '6116'; // Koreksi Persediaan Legacy (close as legacy)
 
     public const CODE_PRODUCTION_LOSS = '6120'; // Kerugian Produksi / Reject (scrap & write-off)
@@ -86,11 +92,23 @@ class JournalService
 
     public const SRC_CUTTING_WIP = 'cutting_wip';
 
+    public const SRC_CUTTING_QC_SEWING_SUPPLY = 'cutting_qc_sewing_supply';
+
+    public const SRC_CUTTING_QC_ADJUST = 'cutting_qc_adjust';
+
+    public const SRC_CUTTING_BUNDLE_MATERIAL_RETURN = 'cutting_bundle_material_return';
+
+    public const SRC_CUTTING_BUNDLE_CORRECTION_WIP_VOID = 'cutting_bundle_correction_wip_void';
+
+    public const SRC_CUTTING_BUNDLE_CORRECTION_WAGE_VOID = 'cutting_bundle_correction_wage_void';
+
     public const SRC_SEWING_PICKUP = 'App\\Models\\SewingPickup';
 
     public const SRC_SEWING_PICKUP_WAGE = 'sewing_pickup_wage';
 
     public const SRC_SEWING_PICKUP_SUPPLY = 'sewing_pickup_supply';
+
+    public const SRC_SEWING_PICKUP_LINE_VOID = 'sewing_pickup_line_void';
 
     public const SRC_SEWING_PICKUP_SUPPLY_FOLLOWUP = 'sewing_pickup_supply_followup';
 
@@ -279,6 +297,13 @@ class JournalService
                 'voided_at' => now(),
             ])->save();
 
+            if ($journal->source_type === self::SRC_PURCHASE_PAYMENT && $journal->source_id) {
+                $this->standalonePurchasePaymentPostingService->voidForSource(
+                    $journal->source_type,
+                    (int) $journal->source_id,
+                );
+            }
+
             // 2) Deskripsi reversal
             $revDesc = trim(
                 'Reversal: '.($journal->description ?? '-').
@@ -328,6 +353,35 @@ class JournalService
             }
 
             return $this->void($j, $reason);
+        });
+    }
+
+    /**
+     * Void semua journal aktif untuk satu source family, termasuk journal
+     * repost yang memakai suffix "_repost_N". Setiap journal menghasilkan
+     * reversal audit sendiri dan tetap tidak dihitung sebagai saldo aktif.
+     */
+    public function voidBySourceFamily(string $sourceType, int $sourceId, ?string $reason = null): int
+    {
+        return DB::transaction(function () use ($sourceType, $sourceId, $reason): int {
+            $journals = Journal::query()
+                ->where('source_id', $sourceId)
+                ->where(function ($query) use ($sourceType): void {
+                    $query
+                        ->where('source_type', $sourceType)
+                        ->orWhere('source_type', 'like', $sourceType.'_repost_%');
+                })
+                ->whereNull('voided_at')
+                ->with('lines')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($journals as $journal) {
+                $this->void($journal, $reason);
+            }
+
+            return $journals->count();
         });
     }
 
@@ -384,6 +438,8 @@ class JournalService
             if (! empty($payment->journal_id)) {
                 $existing = Journal::query()->find((int) $payment->journal_id);
                 if ($existing) {
+                    $this->standalonePurchasePaymentPostingService->post($payment, $existing->description);
+
                     return $existing;
                 }
                 // edge case: journal hilang -> reset agar bisa post ulang
@@ -399,6 +455,8 @@ class JournalService
             if ($locked && ! empty($locked->journal_id)) {
                 $existing = Journal::query()->find((int) $locked->journal_id);
                 if ($existing) {
+                    $this->standalonePurchasePaymentPostingService->post($payment, $existing->description);
+
                     return $existing;
                 }
                 $locked->forceFill(['journal_id' => null])->save();
@@ -433,6 +491,8 @@ class JournalService
                         ['account_id' => $advId, 'debit' => 0, 'credit' => $amount],
                     ]
                 );
+
+                $this->standalonePurchasePaymentPostingService->post($payment, $journal->description);
 
                 $payment->forceFill(['journal_id' => $journal->id])->save();
 
@@ -536,6 +596,8 @@ class JournalService
                     ]
                 );
 
+                $this->standalonePurchasePaymentPostingService->post($payment, $journal->description);
+
                 $payment->forceFill(['journal_id' => $journal->id])->save();
 
                 return $journal;
@@ -552,6 +614,8 @@ class JournalService
                     ['account_id' => $cashAccountId, 'debit' => 0, 'credit' => $amount],
                 ]
             );
+
+            $this->standalonePurchasePaymentPostingService->post($payment, $journal->description);
 
             $payment->forceFill(['journal_id' => $journal->id])->save();
 
@@ -800,11 +864,30 @@ class JournalService
 
         // Ambil total nilai keluar WIP-FIN per item dari inventory_mutations
         // Gunakan SUM(ABS(total_cost)) agar multi-line per item ter-capture semua
+        // Setelah VOID/UNPOST lalu repost, hanya cycle setelah reversal terakhir
+        // yang boleh menjadi dasar jurnal. Tanpa batas ini, cycle lama dan
+        // cycle baru akan terakumulasi menjadi double cost.
+        $lastFinishingReverseId = (int) DB::table('inventory_mutations')
+            ->where('source_type', 'finishing_job_reverse')
+            ->where('source_id', (int) $job->id)
+            ->max('id');
+
+        $finishingLineIds = \App\Models\FinishingJobLine::query()
+            ->where('finishing_job_id', (int) $job->id)
+            ->pluck('id');
+        $lastFinishingBomReverseId = $finishingLineIds->isEmpty()
+            ? 0
+            : (int) DB::table('inventory_mutations')
+                ->where('source_type', 'finishing_bom_reverse')
+                ->whereIn('source_id', $finishingLineIds->all())
+                ->max('id');
+
         $mutCosts = DB::table('inventory_mutations')
             ->where('source_type', \App\Models\FinishingJob::class)
             ->where('source_id', $job->id)
             ->where('warehouse_id', $wipWarehouseId)
             ->where('qty_change', '<', 0)
+            ->when($lastFinishingReverseId > 0, fn ($query) => $query->where('id', '>', $lastFinishingReverseId))
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(ABS(total_cost)) as total_cost, SUM(ABS(qty_change)) as total_qty')
             ->get()
@@ -854,28 +937,32 @@ class JournalService
             return null;
         }
 
-        $bomCost = $this->finishingBomCostForJob((int) $job->id);
+        $bomCost = $this->finishingBomCostForJob((int) $job->id, $lastFinishingBomReverseId);
         if ($bomCost > 0) {
-            $baseWip = round($totalWip, 2);
+            // BOM finishing hanya melekat pada output OK. Barang reject tetap
+            // memakai nilai WIP-FIN yang keluar, sama dengan valuation mutasi
+            // REJ-FIN/REJ-SEW di FinishingJobController.
+            $baseOkWip = 0.0;
             $totalBomAllocated = 0.0;
-            $lastDebitIndex = null;
+            $lastOkDebitIndex = null;
 
             foreach ($journalLines as $index => $line) {
-                if (($line['debit'] ?? 0) > 0) {
-                    $lastDebitIndex = $index;
+                if (($line['account_id'] ?? null) === $fgId && ($line['debit'] ?? 0) > 0) {
+                    $baseOkWip += (float) $line['debit'];
+                    $lastOkDebitIndex = $index;
                 }
             }
 
             foreach ($journalLines as $index => &$line) {
                 $debit = round((float) ($line['debit'] ?? 0), 2);
-                if ($debit <= 0) {
+                if (($line['account_id'] ?? null) !== $fgId || $debit <= 0 || $baseOkWip <= 0) {
                     continue;
                 }
 
-                if ($index === $lastDebitIndex) {
+                if ($index === $lastOkDebitIndex) {
                     $allocation = round($bomCost - $totalBomAllocated, 2);
                 } else {
-                    $allocation = $baseWip > 0 ? round($bomCost * ($debit / $baseWip), 2) : 0.0;
+                    $allocation = round($bomCost * ($debit / $baseOkWip), 2);
                 }
 
                 if ($allocation <= 0) {
@@ -925,11 +1012,23 @@ class JournalService
             return $existing;
         }
 
+        $lineIds = \App\Models\FinishingJobLine::query()
+            ->where('finishing_job_id', (int) $job->id)
+            ->pluck('id');
+
+        $lastFinishingBomReverseId = $lineIds->isEmpty()
+            ? 0
+            : (int) DB::table('inventory_mutations')
+                ->where('source_type', 'finishing_bom_reverse')
+                ->whereIn('source_id', $lineIds->all())
+                ->max('id');
+
         $rows = DB::table('inventory_mutations as im')
             ->join('finishing_job_lines as fjl', 'fjl.id', '=', 'im.source_id')
             ->where('im.source_type', 'finishing_bom')
             ->where('fjl.finishing_job_id', (int) $job->id)
             ->where('im.qty_change', '<', 0)
+            ->when($lastFinishingBomReverseId > 0, fn ($query) => $query->where('im.id', '>', $lastFinishingBomReverseId))
             ->groupBy('im.item_id')
             ->selectRaw('im.item_id, SUM(ABS(im.total_cost)) as total_cost')
             ->get();
@@ -1070,16 +1169,42 @@ class JournalService
         }
 
         $rawCost = $this->mutationAmount(self::SRC_CUTTING_JOB, (int) $job->id, 'out');
-        $okCost = $this->mutationAmount(self::SRC_CUTTING_WIP, (int) $job->id, 'in');
-        $rejectCost = $this->mutationAmount('cutting_reject', (int) $job->id, 'in');
+        // QC dapat dibatalkan lalu diposting ulang. Hitung net output per
+        // bundle agar output lama yang sudah direverse tidak ikut terhitung
+        // kembali pada jurnal repost.
+        $okCost = $this->netProductionOutputAmount(self::SRC_CUTTING_WIP, (int) $job->id);
+        $rejectCost = $this->netProductionOutputAmount('cutting_reject', (int) $job->id);
         $outputCost = round($okCost + $rejectCost, 2);
-        $laborCost = round($outputCost - $rawCost, 2);
+        $availableValueAddedCost = round($outputCost - $rawCost, 2);
 
-        if ($outputCost <= 0 || $rawCost <= 0 || $laborCost < -0.01) {
+        if ($outputCost <= 0 || $rawCost <= 0 || $availableValueAddedCost < -0.01) {
             return null;
         }
-        if (abs($laborCost) <= 0.01) {
+
+        // Upah cutting sudah dicatat saat job dibuat (cutting_job_wage).
+        // Jangan mengakrualkan upah yang sama sekali lagi pada jurnal QC.
+        // Jika output belum penuh, batasi wage yang dianggap sudah melekat
+        // pada output agar jurnal tetap balance dan tidak mengakui nilai
+        // tenaga kerja yang belum masuk WIP.
+        $postedWage = (float) Journal::query()
+            ->where('source_type', self::SRC_CUTTING_JOB_WAGE)
+            ->where('source_id', (int) $job->id)
+            ->whereNull('voided_at')
+            ->whereHas('lines', fn ($query) => $query
+                ->where('account_id', $this->accountIdByCode(self::CODE_INV_WIP))
+                ->where('debit', '>', 0))
+            ->with('lines')
+            ->get()
+            ->flatMap->lines
+            ->where('account_id', $this->accountIdByCode(self::CODE_INV_WIP))
+            ->sum('debit');
+        $postedWageForOutput = min(max($postedWage, 0), max($availableValueAddedCost, 0));
+        $laborCost = round(max($availableValueAddedCost - $postedWageForOutput, 0), 2);
+        $wipCredit = round($rawCost + $postedWageForOutput, 2);
+
+        if (abs($availableValueAddedCost) <= 0.01) {
             $rawCost = $outputCost;
+            $wipCredit = $outputCost;
             $laborCost = 0.0;
         }
 
@@ -1090,7 +1215,7 @@ class JournalService
         if ($rejectCost > 0) {
             $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_INV_DEFECT), 'debit' => $rejectCost, 'credit' => 0];
         }
-        $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_INV_WIP), 'debit' => 0, 'credit' => $rawCost];
+        $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_INV_WIP), 'debit' => 0, 'credit' => $wipCredit];
         if ($laborCost > 0.01) {
             $lines[] = ['account_id' => $this->accountIdByCode(self::CODE_PAYROLL_PAYABLE), 'debit' => 0, 'credit' => $laborCost];
         }
@@ -1122,6 +1247,26 @@ class JournalService
             description: "Ambil Jahit {$pickup->code} — WIP-CUT → WIP-SEW",
             debitAccountCode: self::CODE_INV_WIP,
             creditAccountCode: self::CODE_INV_WIP,
+            direction: 'out'
+        );
+    }
+
+    /**
+     * BOM kelengkapan jahit yang dikonsumsi saat QC Cutting.
+     * Dipisahkan dari jurnal cutting_wip agar reversal dan audit tidak
+     * mencampur output WIP dengan pengeluaran material pendukung.
+     */
+    public function postCuttingQcSewingSupply(\App\Models\CuttingJob $job, ?string $date = null): ?Journal
+    {
+        return $this->postInventoryMovementFromMutations(
+            journalSourceType: self::SRC_CUTTING_QC_SEWING_SUPPLY,
+            journalSourceId: (int) $job->id,
+            mutationSourceType: self::SRC_CUTTING_QC_SEWING_SUPPLY,
+            mutationSourceId: (int) $job->id,
+            date: $this->dateOnly($date ?: $job->date),
+            description: "QC Cutting {$job->code} — Auto BOM kelengkapan jahit",
+            debitAccountCode: self::CODE_INV_WIP,
+            creditAccountCode: self::CODE_INV_RAW,
             direction: 'out'
         );
     }
@@ -1555,15 +1700,14 @@ class JournalService
 
     public function postInventoryAdjustment(\App\Models\InventoryAdjustment $adjustment): ?Journal
     {
-        // Opening SO adalah snapshot saldo awal operasional. Jangan jadikan
-        // selisih antara stok lama dan stok fisik sebagai variance 6115 karena
-        // saldo persediaannya akan dijurnal satu kali lewat Opening Balance.
-        // Adjustment periodic/manual tetap diposting seperti biasa.
-        if (
+        // Opening SO adalah snapshot saldo awal operasional. Nilainya harus
+        // masuk ke inventory dan akun lawan saldo awal, bukan ke variance 6115.
+        $isOpening =
             $adjustment->source_type === StockOpname::class
-            && $adjustment->source?->type === StockOpname::TYPE_OPENING
-        ) {
-            return null;
+            && $adjustment->source?->type === StockOpname::TYPE_OPENING;
+
+        if ($isOpening) {
+            return $this->postOpeningInventoryAdjustment($adjustment);
         }
 
         $existing = Journal::query()
@@ -1626,6 +1770,83 @@ class JournalService
             self::SRC_INVENTORY_ADJUSTMENT,
             (int) $adjustment->id,
             "Penyesuaian Stok {$adjustment->code}",
+            $lines,
+        );
+    }
+
+    /**
+     * Post opening inventory as a balanced opening journal.
+     *
+     * Opening stock is an initial balance, not a stock variance:
+     *   Dr inventory / Cr owner equity for incoming opening stock.
+     * The reverse direction is supported for a non-zero opening snapshot
+     * that reduces an existing operational balance.
+     */
+    protected function postOpeningInventoryAdjustment(\App\Models\InventoryAdjustment $adjustment): ?Journal
+    {
+        $existing = Journal::query()
+            ->where('source_type', self::SRC_INVENTORY_ADJUSTMENT)
+            ->where('source_id', $adjustment->id)
+            ->whereNull('voided_at')
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $rows = DB::table('inventory_mutations as im')
+            ->join('items as i', 'i.id', '=', 'im.item_id')
+            ->where('im.source_id', $adjustment->id)
+            ->where('im.source_type', \App\Models\InventoryAdjustment::class)
+            ->whereNotNull('im.total_cost')
+            ->groupBy('i.item_role', 'im.direction')
+            ->selectRaw('COALESCE(i.item_role, "raw_material") as item_role, im.direction, SUM(ABS(im.total_cost)) as amount')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $lines = [];
+        $equityDebit = 0.0;
+        $equityCredit = 0.0;
+
+        foreach ($rows as $row) {
+            $amount = round((float) $row->amount, 2);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $inventoryId = $this->accountIdByCode(
+                $this->inventoryAccountCodeForRole((string) $row->item_role)
+            );
+
+            if ($row->direction === 'in') {
+                $lines[] = ['account_id' => $inventoryId, 'debit' => $amount, 'credit' => 0];
+                $equityCredit = round($equityCredit + $amount, 2);
+            } else {
+                $lines[] = ['account_id' => $inventoryId, 'debit' => 0, 'credit' => $amount];
+                $equityDebit = round($equityDebit + $amount, 2);
+            }
+        }
+
+        $equityId = $this->accountIdByCode(self::CODE_OPENING_EQUITY);
+        if ($equityDebit > 0) {
+            $lines[] = ['account_id' => $equityId, 'debit' => $equityDebit, 'credit' => 0];
+        }
+        if ($equityCredit > 0) {
+            $lines[] = ['account_id' => $equityId, 'debit' => 0, 'credit' => $equityCredit];
+        }
+
+        if (count($lines) < 2) {
+            return null;
+        }
+
+        return $this->post(
+            $this->dateOnly($adjustment->date),
+            self::SRC_INVENTORY_ADJUSTMENT,
+            (int) $adjustment->id,
+            "Saldo Awal Persediaan {$adjustment->code}",
             $lines,
         );
     }
@@ -1958,13 +2179,50 @@ class JournalService
         return round((float) $query->sum(DB::raw('ABS(total_cost)')), 2);
     }
 
-    protected function finishingBomCostForJob(int $finishingJobId): float
+    /**
+     * Net nilai output QC per bundle, termasuk reversal/adjustment QC.
+     *
+     * Mutasi output asli memakai source type cutting_wip/cutting_reject.
+     * Reversal QC memakai source type cutting_qc_* dan tetap membawa
+     * cutting_job_bundle_id, sehingga seluruh siklus dapat direkonsiliasi
+     * tanpa menghitung output yang sudah VOID dua kali.
+     */
+    protected function netProductionOutputAmount(string $sourceType, int $sourceId): float
+    {
+        $base = DB::table('inventory_mutations')
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->get(['cutting_job_bundle_id', 'warehouse_id', 'total_cost']);
+
+        if ($base->isEmpty()) {
+            return 0.0;
+        }
+
+        $bundleIds = $base->pluck('cutting_job_bundle_id')->filter()->unique()->values();
+        $warehouseIds = $base->pluck('warehouse_id')->filter()->unique()->values();
+
+        if ($bundleIds->isEmpty() || $warehouseIds->isEmpty()) {
+            return round((float) $base->sum(fn ($row): float => (float) ($row->total_cost ?? 0)), 2);
+        }
+
+        return round((float) DB::table('inventory_mutations')
+            ->whereIn('cutting_job_bundle_id', $bundleIds->all())
+            ->whereIn('warehouse_id', $warehouseIds->all())
+            ->where(function ($query) use ($sourceType): void {
+                $query->where('source_type', $sourceType)
+                    ->orWhere('source_type', 'like', 'cutting_qc_%');
+            })
+            ->sum('total_cost'), 2);
+    }
+
+    protected function finishingBomCostForJob(int $finishingJobId, int $afterMutationId = 0): float
     {
         return round((float) DB::table('inventory_mutations as im')
             ->join('finishing_job_lines as fjl', 'fjl.id', '=', 'im.source_id')
             ->where('im.source_type', self::SRC_FINISHING_BOM)
             ->where('fjl.finishing_job_id', $finishingJobId)
             ->where('im.qty_change', '<', 0)
+            ->when($afterMutationId > 0, fn ($query) => $query->where('im.id', '>', $afterMutationId))
             ->sum(DB::raw('ABS(im.total_cost)')), 2);
     }
 

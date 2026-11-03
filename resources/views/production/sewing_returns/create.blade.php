@@ -221,6 +221,83 @@
         .sc-input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15); }
         .sc-input:disabled { background:rgba(148,163,184,.10); color:var(--muted); opacity:.7; }
 
+        /* Financial accordions: selaras dengan Cutting dan Sewing Pickup. */
+        .sewing-return-financial-section {
+            overflow: hidden;
+            margin-top: .6rem;
+            padding: 0;
+            border: 1px solid rgba(148, 163, 184, .24);
+            border-radius: 12px;
+            background: var(--card);
+        }
+        .sewing-return-financial-section > summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .7rem;
+            padding: .75rem .85rem;
+            background: rgba(148, 163, 184, .045);
+            border-bottom: 1px solid rgba(148, 163, 184, .16);
+        }
+        .sewing-return-financial-section > summary::-webkit-details-marker { display: none; }
+        .sewing-return-financial-section > summary::after {
+            content: '⌄';
+            color: var(--muted);
+            font-weight: 800;
+            transition: transform .15s ease;
+        }
+        .sewing-return-financial-section[open] > summary::after { transform: rotate(180deg); }
+        .sewing-return-financial-title { color: var(--text); font-size: .78rem; font-weight: 900; }
+        .sewing-return-financial-subtitle { color: var(--muted); font-size: .68rem; line-height: 1.35; margin-top: .12rem; }
+        .sewing-return-financial-body { padding: .75rem .85rem .85rem; }
+        .sewing-return-financial-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
+        .sewing-return-financial-item {
+            min-width: 0;
+            padding: .4rem .5rem;
+            border: 1px solid rgba(148, 163, 184, .28);
+            border-radius: 9px;
+            background: var(--card);
+        }
+        .sewing-return-financial-item span { display: block; color: var(--muted); font-size: .6rem; font-weight: 800; text-transform: uppercase; }
+        .sewing-return-financial-item strong { display: block; color: var(--text); font-size: .78rem; margin-top: .08rem; }
+        .sewing-return-financial-item.is-subtotal { border-color: rgba(59, 130, 246, .18); background: rgba(239, 246, 255, .5); }
+        .sewing-return-financial-item.is-subtotal strong { color: #1d4ed8; }
+        .sewing-return-financial-item.is-total { border-color: rgba(59, 130, 246, .25); background: rgba(219, 234, 254, .68); }
+        .sewing-return-financial-item.is-total strong { color: #1d4ed8; }
+        .sewing-return-financial-table { font-size: .7rem; margin-top: .65rem; width: 100%; }
+        .sewing-return-financial-table th { color: var(--muted); font-size: .6rem; text-transform: uppercase; white-space: nowrap; }
+        .sewing-return-financial-table td,
+        .sewing-return-financial-table th { padding: .32rem .4rem; vertical-align: middle; }
+        .sewing-return-financial-note { color: var(--muted); font-size: .66rem; line-height: 1.4; }
+        .sewing-return-financial-unit { display: block; color: var(--muted); font-size: .61rem; font-weight: 500; line-height: 1.25; white-space: nowrap; }
+        .sewing-return-financial-section.hpp-section { border-color: rgba(37, 99, 235, .2); }
+        .sewing-return-financial-section.hpp-section > summary { background: rgba(37, 99, 235, .045); border-bottom-color: rgba(37, 99, 235, .14); }
+        .sewing-return-financial-section.hpp-section .sewing-return-financial-title { color: #1d4ed8; }
+        .sewing-return-financial-section.accounting-section { border-color: rgba(20, 184, 166, .2); }
+        .sewing-return-financial-section.accounting-section > summary { background: rgba(20, 184, 166, .045); border-bottom-color: rgba(20, 184, 166, .14); }
+        .sewing-return-financial-section.accounting-section .sewing-return-financial-title { color: #0f766e; }
+        .sewing-return-financial-section.accounting-section .sewing-return-financial-item.is-total { border-color: rgba(20, 184, 166, .25); background: rgba(204, 251, 241, .68); }
+        .sewing-return-financial-section.accounting-section .sewing-return-financial-item.is-total strong { color: #0f766e; }
+        @media (max-width: 575.98px) {
+            .sewing-return-financial-grid { gap: .3rem; }
+            .sewing-return-financial-item { padding: .34rem .4rem; }
+            .sewing-return-financial-item strong { font-size: .68rem; }
+            .sewing-return-financial-table { min-width: 760px; }
+        }
+        body[data-theme="dark"] .sewing-return-financial-section { border-color: rgba(71, 85, 105, .82); }
+        body[data-theme="dark"] .sewing-return-financial-section > summary { background: rgba(148, 163, 184, .08); border-bottom-color: rgba(71, 85, 105, .82); }
+        body[data-theme="dark"] .sewing-return-financial-section.hpp-section { border-color: rgba(96, 165, 250, .35); }
+        body[data-theme="dark"] .sewing-return-financial-section.hpp-section > summary { background: rgba(37, 99, 235, .12); border-bottom-color: rgba(96, 165, 250, .25); }
+        body[data-theme="dark"] .sewing-return-financial-section.hpp-section .sewing-return-financial-title { color: #93c5fd; }
+        body[data-theme="dark"] .sewing-return-financial-section.accounting-section { border-color: rgba(45, 212, 191, .35); }
+        body[data-theme="dark"] .sewing-return-financial-section.accounting-section > summary { background: rgba(20, 184, 166, .12); border-bottom-color: rgba(45, 212, 191, .25); }
+        body[data-theme="dark"] .sewing-return-financial-section.accounting-section .sewing-return-financial-title,
+        body[data-theme="dark"] .sewing-return-financial-section.accounting-section .sewing-return-financial-item.is-total strong { color: #5eead4; }
+        body[data-theme="dark"] .sewing-return-financial-section.accounting-section .sewing-return-financial-item.is-total { background: rgba(19, 78, 74, .42); }
+        body[data-theme="dark"] .sewing-return-financial-item { background: rgba(15, 23, 42, .42); }
+
         /* ── Mobile + Tablet optimized card ── */
         @media(max-width:991.98px) {
             .list { gap: .34rem; margin-top: 10px; }
@@ -573,9 +650,17 @@
     // - $canChooseDestination (bool)
     $destinationWarehouses = $destinationWarehouses ?? collect();
     $defaultDestWarehouseId = (int) ($defaultDestWarehouseId ?? 0);
+    $sourceUnitCostByItemId = $sourceUnitCostByItemId ?? [];
 
     $selectedDestId = (int) old('destination_warehouse_id', $defaultDestWarehouseId);
     $canChooseDestination = (bool) ($canChooseDestination ?? false);
+    $destinationWarehouse = $destinationWarehouses->firstWhere('id', $defaultDestWarehouseId);
+    $destinationWarehouseCode = strtoupper((string) ($destinationWarehouse?->code ?? 'WIP-FIN'));
+    $destinationAccountCode = $destinationWarehouseCode === 'WIP-FIN' ? '1-151-03' : '1-152';
+    $destinationAccountLabel = $destinationWarehouseCode === 'WIP-FIN' ? 'WIP Finishing' : 'Persediaan Barang Jadi';
+    $sourceAccountCode = $isRejectReworkMode ? '1-153' : '1-151-02';
+    $sourceAccountLabel = $isRejectReworkMode ? 'Persediaan Reject' : 'WIP Sewing';
+    $returnHppComponentsByLineId = $returnHppComponentsByLineId ?? [];
 
     // ===== ALL MODE: build accordion per item -> operator breakdown (sum remaining)
     $groupsAll = collect();
@@ -946,6 +1031,117 @@
                     </div>
                 </div>
 
+                @if (auth()->user()?->isOwner())
+                    <details class="sewing-return-financial-section accounting-section" id="sewing-return-accounting-section">
+                        <summary>
+                            <div>
+                                <div class="sewing-return-financial-title">
+                                    <i class="bi bi-journal-check me-1" aria-hidden="true"></i> Akuntansi Baru
+                                </div>
+                                <div class="sewing-return-financial-subtitle">
+                                    Preview jurnal perpindahan nilai dari {{ $sourceAccountLabel }} ke {{ $destinationAccountLabel }}. Legacy tidak diubah.
+                                </div>
+                            </div>
+                            <span class="badge bg-success text-white" id="sewing-return-accounting-badge">Belum pilih</span>
+                        </summary>
+                        <div class="sewing-return-financial-body">
+                            <div class="sewing-return-financial-grid">
+                                <div class="sewing-return-financial-item">
+                                    <span>Debit {{ $destinationAccountCode }}</span>
+                                    <strong class="mono" id="sewing-return-accounting-debit">Rp 0</strong>
+                                </div>
+                                <div class="sewing-return-financial-item">
+                                    <span>Kredit {{ $sourceAccountCode }}</span>
+                                    <strong class="mono" id="sewing-return-accounting-credit">Rp 0</strong>
+                                </div>
+                                <div class="sewing-return-financial-item is-total">
+                                    <span>Status</span>
+                                    <strong id="sewing-return-accounting-status">Belum pilih</strong>
+                                </div>
+                            </div>
+                            <div class="sewing-return-financial-note mt-2" id="sewing-return-accounting-note">
+                                Pilih qty setor untuk melihat mapping akun baru.
+                            </div>
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm align-middle sewing-return-financial-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Skenario</th>
+                                            <th>Debit</th>
+                                            <th>Kredit</th>
+                                            <th class="text-end">Nominal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sewing-return-accounting-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="sewing-return-financial-section hpp-section" id="sewing-return-hpp-section">
+                        <summary>
+                            <div>
+                                <div class="sewing-return-financial-title">
+                                    <i class="bi bi-calculator me-1" aria-hidden="true"></i> Estimasi HPP Sewing Return
+                                </div>
+                                <div class="sewing-return-financial-subtitle">
+                                    HPP return = nilai WIP-SEW yang dipindahkan ke {{ $destinationAccountLabel }}. Upah jahit sudah termasuk saat Ambil Jahit. Read-only.
+                                </div>
+                            </div>
+                            <span class="badge bg-primary-subtle text-primary border" id="sewing-return-hpp-badge">Belum pilih</span>
+                        </summary>
+                        <div class="sewing-return-financial-body">
+                            <div class="sewing-return-financial-grid">
+                                <div class="sewing-return-financial-item">
+                                    <span>Bahan baku</span>
+                                    <strong class="mono" id="sewing-return-hpp-raw-material-total">Rp 0</strong>
+                                </div>
+                                <div class="sewing-return-financial-item">
+                                    <span>Bahan pendukung</span>
+                                    <strong class="mono" id="sewing-return-hpp-support-total">Rp 0</strong>
+                                </div>
+                                <div class="sewing-return-financial-item">
+                                    <span>Upah potong</span>
+                                    <strong class="mono" id="sewing-return-hpp-cutting-wage-total">Rp 0</strong>
+                                </div>
+                                <div class="sewing-return-financial-item is-subtotal">
+                                    <span>Total WIP-CUT</span>
+                                    <strong class="mono" id="sewing-return-hpp-wip-cut-total">Rp 0</strong>
+                                </div>
+                                <div class="sewing-return-financial-item">
+                                    <span>Upah jahit</span>
+                                    <strong class="mono" id="sewing-return-hpp-sewing-wage-total">Rp 0</strong>
+                                </div>
+                                <div class="sewing-return-financial-item is-total">
+                                    <span>Total masuk {{ $destinationWarehouseCode }}</span>
+                                    <strong class="mono" id="sewing-return-hpp-total">Rp 0</strong>
+                                </div>
+                            </div>
+                            <div class="sewing-return-financial-note mt-2" id="sewing-return-hpp-note">
+                                Komponen mengikuti HPP yang sudah terbentuk saat Cutting dan Ambil Jahit; tidak ada biaya baru saat Sewing Return.
+                            </div>
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm align-middle sewing-return-financial-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Bundle / item</th>
+                                            <th class="text-end">Qty</th>
+                                            <th class="text-end" title="Bahan baku per pcs">Bahan</th>
+                                            <th class="text-end" title="Bahan pendukung per pcs">Pendukung</th>
+                                            <th class="text-end" title="Upah potong per pcs">Potong</th>
+                                            <th class="text-end" title="Total WIP-CUT per pcs">WIP-CUT</th>
+                                            <th class="text-end" title="Upah jahit per pcs">Jahit</th>
+                                            <th class="text-end">HPP / pcs</th>
+                                            <th class="text-end">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sewing-return-hpp-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+                @endif
+
                 {{-- ===== ALL MODE (SEMUA) : ACCORDION ===== --}}
                 <div class="list" id="list-all" style="{{ $isAllMode ? '' : 'display:none;' }}">
                     @if ($lines->isEmpty() || $groupsAll->isEmpty())
@@ -1104,6 +1300,8 @@
                                 $supplyStatusColor = $supplyUnmigrated
                                     ? '#64748b'
                                     : ($supplyIncomplete ? '#dc2626' : ($supplyPartial ? '#b45309' : '#16a34a'));
+                                $sourceUnitCost = (float) ($sourceUnitCostByItemId[(int) ($line->finished_item_id ?? 0)] ?? 0);
+                                $hppComponents = $returnHppComponentsByLineId[(int) $line->id] ?? [];
 
                                 // Prepare back URL untuk link "Isi Kelengkapan"
                                 $qs = request()->getQueryString();
@@ -1126,6 +1324,15 @@
                                  data-remaining="{{ $remaining }}"
                                  data-wip="{{ $wip }}"
                                  data-returned="{{ $alreadyReturned }}"
+                                 data-source-unit-cost="{{ $sourceUnitCost }}"
+                                 data-wip-sew-unit-cost="{{ (float) ($hppComponents['wip_sew_unit_cost'] ?? $sourceUnitCost) }}"
+                                 data-raw-material-unit-cost="{{ (float) ($hppComponents['raw_material_unit_cost'] ?? 0) }}"
+                                 data-support-unit-cost="{{ (float) ($hppComponents['support_unit_cost'] ?? 0) }}"
+                                 data-cutting-wage-unit-cost="{{ (float) ($hppComponents['cutting_wage_unit_cost'] ?? 0) }}"
+                                 data-wip-cut-unit-cost="{{ (float) ($hppComponents['wip_cut_unit_cost'] ?? 0) }}"
+                                 data-sewing-wage-unit-cost="{{ (float) ($hppComponents['sewing_wage_unit_cost'] ?? 0) }}"
+                                 data-return-kind="{{ $isRejectReworkMode ? 'reject-rework' : 'normal' }}"
+                                 data-pickup-code="{{ $pickup?->code ?? '-' }}"
                                  data-supply-blocked="{{ $supplyIncomplete ? 1 : 0 }}"
                                  data-supply-partial="{{ $supplyPartial ? 1 : 0 }}"
                                  data-supply-max-setor="{{ $supplyPartial ? $supplyMaxSetor : '' }}">
@@ -1440,6 +1647,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const statTotalOk = document.getElementById('stat-total-ok');
     const statReturned = document.getElementById('stat-returned');
 
+    const returnAccountingBadge = document.getElementById('sewing-return-accounting-badge');
+    const returnAccountingDebit = document.getElementById('sewing-return-accounting-debit');
+    const returnAccountingCredit = document.getElementById('sewing-return-accounting-credit');
+    const returnAccountingStatus = document.getElementById('sewing-return-accounting-status');
+    const returnAccountingNote = document.getElementById('sewing-return-accounting-note');
+    const returnAccountingBody = document.getElementById('sewing-return-accounting-body');
+    const returnHppBadge = document.getElementById('sewing-return-hpp-badge');
+    const returnHppRawMaterialTotal = document.getElementById('sewing-return-hpp-raw-material-total');
+    const returnHppSupportTotal = document.getElementById('sewing-return-hpp-support-total');
+    const returnHppCuttingWageTotal = document.getElementById('sewing-return-hpp-cutting-wage-total');
+    const returnHppWipCutTotal = document.getElementById('sewing-return-hpp-wip-cut-total');
+    const returnHppSewingWageTotal = document.getElementById('sewing-return-hpp-sewing-wage-total');
+    const returnHppTotal = document.getElementById('sewing-return-hpp-total');
+    const returnHppNote = document.getElementById('sewing-return-hpp-note');
+    const returnHppBody = document.getElementById('sewing-return-hpp-body');
+    const returnDestinationAccountCode = @json($destinationAccountCode);
+    const returnDestinationAccountLabel = @json($destinationAccountLabel);
+    const returnSourceAccountCode = @json($sourceAccountCode);
+    const returnSourceAccountLabel = @json($sourceAccountLabel);
+    const returnReworkMode = @json($isRejectReworkMode);
+
     const fallbackNote = document.getElementById('modal-fallback-note');
 
     q?.addEventListener('focus', () => {
@@ -1672,6 +1900,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statPickedRows) statPickedRows.textContent = pickedRows.toLocaleString('id-ID');
         if (statTotalOk) statTotalOk.textContent = totalOk.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         if (statReturned) statReturned.textContent = totalReturned.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        renderReturnFinancialPreview();
     }
 
     function applyFilter() {
@@ -1869,6 +2099,179 @@ document.addEventListener('DOMContentLoaded', () => {
             .replaceAll("'", '&#039;');
     }
 
+    const returnMoneyNf = new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    });
+    const returnQtyNf = new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
+
+    function returnMoney(value) {
+        return `Rp ${returnMoneyNf.format(Number(value || 0))}`;
+    }
+
+    function renderReturnFinancialPreview() {
+        if (!returnAccountingBody && !returnHppBody) return;
+
+        const entries = [];
+        $$('.fin-item', listByOp).forEach(card => {
+            const { ok, rj, notSetor } = getEls(card);
+            const qtyOk = parseFloat(ok?.value || '0') || 0;
+            const qtyReject = parseFloat(rj?.value || '0') || 0;
+            const qtyNotSetor = parseFloat(notSetor?.value || '0') || 0;
+            const postedQty = qtyOk + qtyReject;
+            const unitCost = parseFloat(card.dataset.sourceUnitCost || '0') || 0;
+            const rawMaterialUnitCost = parseFloat(card.dataset.rawMaterialUnitCost || '0') || 0;
+            const supportUnitCost = parseFloat(card.dataset.supportUnitCost || '0') || 0;
+            const cuttingWageUnitCost = parseFloat(card.dataset.cuttingWageUnitCost || '0') || 0;
+            const wipCutUnitCost = parseFloat(card.dataset.wipCutUnitCost || '0') || 0;
+            const sewingWageUnitCost = parseFloat(card.dataset.sewingWageUnitCost || '0') || 0;
+
+            if (postedQty <= 0.000001 && qtyNotSetor <= 0.000001) return;
+
+            entries.push({
+                card,
+                code: card.dataset.code || '-',
+                pickupCode: card.dataset.pickupCode || '-',
+                qtyOk,
+                qtyReject,
+                qtyNotSetor,
+                postedQty,
+                unitCost,
+                rawMaterialUnitCost,
+                supportUnitCost,
+                cuttingWageUnitCost,
+                wipCutUnitCost,
+                sewingWageUnitCost,
+                amount: postedQty * unitCost,
+            });
+        });
+
+        const postedEntries = entries.filter(entry => entry.postedQty > 0.000001);
+        const okQty = postedEntries.reduce((sum, entry) => sum + entry.qtyOk, 0);
+        const rejectQty = postedEntries.reduce((sum, entry) => sum + entry.qtyReject, 0);
+        const notSetorQty = entries.reduce((sum, entry) => sum + entry.qtyNotSetor, 0);
+        const totalQty = postedEntries.reduce((sum, entry) => sum + entry.postedQty, 0);
+        const totalValue = postedEntries.reduce((sum, entry) => sum + entry.amount, 0);
+        const rawMaterialTotal = postedEntries.reduce((sum, entry) => sum + entry.postedQty * entry.rawMaterialUnitCost, 0);
+        const supportTotal = postedEntries.reduce((sum, entry) => sum + entry.postedQty * entry.supportUnitCost, 0);
+        const cuttingWageTotal = postedEntries.reduce((sum, entry) => sum + entry.postedQty * entry.cuttingWageUnitCost, 0);
+        const wipCutTotal = postedEntries.reduce((sum, entry) => sum + entry.postedQty * entry.wipCutUnitCost, 0);
+        const sewingWageTotal = postedEntries.reduce((sum, entry) => sum + entry.postedQty * entry.sewingWageUnitCost, 0);
+        const missingCost = postedEntries.some(entry => entry.unitCost <= 0);
+        const hasPosted = postedEntries.length > 0;
+        const hasReject = rejectQty > 0.000001 || (returnReworkMode && okQty > 0.000001);
+        const badge = !entries.length
+            ? 'Belum pilih'
+            : returnReworkMode
+                ? (hasPosted ? 'Rework OK' : 'Konversi reject')
+                : (okQty > 0.000001 && rejectQty > 0.000001 ? 'OK + Reject' : okQty > 0.000001 ? 'Setor OK' : 'Reject');
+
+        if (returnAccountingBadge) returnAccountingBadge.textContent = badge;
+        if (returnHppBadge) returnHppBadge.textContent = hasPosted ? `${postedEntries.length} baris` : badge;
+        if (returnHppRawMaterialTotal) returnHppRawMaterialTotal.textContent = returnMoney(rawMaterialTotal);
+        if (returnHppSupportTotal) returnHppSupportTotal.textContent = returnMoney(supportTotal);
+        if (returnHppCuttingWageTotal) returnHppCuttingWageTotal.textContent = returnMoney(cuttingWageTotal);
+        if (returnHppWipCutTotal) returnHppWipCutTotal.textContent = returnMoney(wipCutTotal);
+        if (returnHppSewingWageTotal) returnHppSewingWageTotal.textContent = returnMoney(sewingWageTotal);
+        if (returnHppTotal) returnHppTotal.textContent = returnMoney(totalValue);
+
+        if (returnAccountingDebit) returnAccountingDebit.textContent = returnMoney(totalValue);
+        if (returnAccountingCredit) returnAccountingCredit.textContent = returnMoney(totalValue);
+        if (returnAccountingStatus) {
+            returnAccountingStatus.textContent = !hasPosted
+                ? 'Belum pilih'
+                : missingCost
+                    ? 'Perlu review'
+                    : 'Balance';
+            returnAccountingStatus.classList.toggle('text-danger', missingCost && hasPosted);
+            returnAccountingStatus.classList.toggle('text-success', !missingCost && hasPosted);
+        }
+
+        if (returnAccountingBody) {
+            returnAccountingBody.innerHTML = '';
+            const accountingRows = [];
+            postedEntries.forEach(entry => {
+                if (entry.qtyOk > 0.000001) {
+                    accountingRows.push({
+                        scenario: returnReworkMode ? 'Rework OK' : 'Setor OK',
+                        debit: `${returnDestinationAccountCode} ${returnDestinationAccountLabel}`,
+                        credit: returnReworkMode ? '1-153 Persediaan Reject' : `${returnSourceAccountCode} ${returnSourceAccountLabel}`,
+                        amount: entry.qtyOk * entry.unitCost,
+                    });
+                }
+                if (entry.qtyReject > 0.000001) {
+                    accountingRows.push({
+                        scenario: 'Reject Jahit',
+                        debit: '1-153 Persediaan Reject',
+                        credit: `${returnSourceAccountCode} ${returnSourceAccountLabel}`,
+                        amount: entry.qtyReject * entry.unitCost,
+                    });
+                }
+            });
+
+            if (!accountingRows.length) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = '<td colspan="4" class="text-center text-muted py-3">Pilih qty setor untuk melihat jurnal akuntansi baru.</td>';
+                returnAccountingBody.appendChild(emptyRow);
+            } else {
+                accountingRows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${esc(row.scenario)}</td>
+                        <td><span class="sewing-return-financial-unit">${esc(row.debit)}</span></td>
+                        <td><span class="sewing-return-financial-unit">${esc(row.credit)}</span></td>
+                        <td class="text-end mono fw-semibold">${returnMoney(row.amount)}</td>`;
+                    returnAccountingBody.appendChild(tr);
+                });
+            }
+        }
+
+        if (returnAccountingNote) {
+            const notes = [
+                hasPosted
+                    ? `Jurnal ${returnReworkMode ? 'rework reject' : 'setoran jahit'} menggunakan nilai stok sumber.`
+                    : 'Belum ada qty yang akan diposting.',
+                'Posting baru tetap transactional dan idempotent.',
+            ];
+            if (missingCost) notes.push('Unit cost sumber belum tersedia; posting harus dihentikan untuk review.');
+            if (notSetorQty > 0.000001) notes.push(`Qty tidak bisa setor ${returnQtyNf.format(notSetorQty)} pcs masuk jalur konversi reject; belum termasuk jurnal Sewing Return.`);
+            returnAccountingNote.textContent = notes.join(' ');
+        }
+
+        if (returnHppBody) {
+            returnHppBody.innerHTML = '';
+            if (!postedEntries.length) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = `<td colspan="9" class="text-center text-muted py-3">${notSetorQty > 0.000001 ? 'Qty ini hanya untuk konversi reject dan tidak masuk HPP Sewing Return.' : 'Pilih qty setor untuk melihat estimasi HPP.'}</td>`;
+                returnHppBody.appendChild(emptyRow);
+            } else {
+                postedEntries.forEach(entry => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><div class="fw-semibold">${esc(entry.code)}</div><div class="sewing-return-financial-note">${esc(entry.pickupCode)}</div></td>
+                        <td class="text-end mono">${returnQtyNf.format(entry.postedQty)}</td>
+                        <td class="text-end mono">${returnMoney(entry.rawMaterialUnitCost)}<span class="sewing-return-financial-unit">per pcs</span></td>
+                        <td class="text-end mono">${returnMoney(entry.supportUnitCost)}<span class="sewing-return-financial-unit">per pcs</span></td>
+                        <td class="text-end mono">${returnMoney(entry.cuttingWageUnitCost)}<span class="sewing-return-financial-unit">per pcs</span></td>
+                        <td class="text-end mono fw-semibold">${returnMoney(entry.wipCutUnitCost)}<span class="sewing-return-financial-unit">per pcs</span></td>
+                        <td class="text-end mono">${returnMoney(entry.sewingWageUnitCost)}<span class="sewing-return-financial-unit">per pcs</span></td>
+                        <td class="text-end mono"><div>${returnMoney(entry.unitCost)}</div><span class="sewing-return-financial-unit">per pcs</span></td>
+                        <td class="text-end mono fw-semibold">${returnMoney(entry.amount)}</td>`;
+                    returnHppBody.appendChild(tr);
+                });
+            }
+        }
+
+        if (returnHppNote) {
+            returnHppNote.textContent = returnReworkMode
+                ? 'Rework OK memindahkan nilai yang sudah ada di REJ-SEW; tidak menambah upah baru.'
+                : 'HPP mengikuti unit cost WIP-SEW; rincian bahan, pendukung, upah potong, dan upah jahit hanya untuk transparansi. Tidak ada biaya baru saat Sewing Return.';
+        }
+    }
+
     function rebuildModalItems() {
         if (!mItems || !listByOp) return;
         mItems.innerHTML = '';
@@ -1959,6 +2362,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyFilter();
     computeSubmitEnabled();
     computeTopSummary();
+    renderReturnFinancialPreview();
 
     if (q) {
         setTimeout(() => {

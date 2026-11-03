@@ -238,6 +238,9 @@
                                         <td class="text-end">
                                             <div class="d-inline-flex gap-2">
                                                 <a href="{{ route('accounting.journals.show', $journal) }}" class="ob-btn">Detail</a>
+                                                @if (!$isVoided && $journal->standaloneJournal)
+                                                    <a href="{{ route('standalone-accounting.journals.show', $journal->standaloneJournal) }}" class="ob-btn">Akuntansi Baru</a>
+                                                @endif
                                                 @if (!$isVoided)
                                                     <form method="POST"
                                                         action="{{ route('accounting.opening-balances.void', $journal) }}"
@@ -290,6 +293,9 @@
                                 </div>
                                 <div class="ob-mobile-actions">
                                     <a href="{{ route('accounting.journals.show', $journal) }}" class="ob-btn">Detail</a>
+                                    @if (!$isVoided && $journal->standaloneJournal)
+                                        <a href="{{ route('standalone-accounting.journals.show', $journal->standaloneJournal) }}" class="ob-btn">Akuntansi Baru</a>
+                                    @endif
                                     @if (!$isVoided)
                                         <form method="POST"
                                             action="{{ route('accounting.opening-balances.void', $journal) }}"

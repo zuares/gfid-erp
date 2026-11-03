@@ -22,6 +22,9 @@ class SystemSettingController extends Controller
     {
         $cutoffDate  = SystemSetting::cutoffDateString();
         $cutoffNotes = SystemSetting::get(SystemSetting::KEY_CUTOFF_NOTES);
+        $cutoffSetting = SystemSetting::query()
+            ->with('updater')
+            ->find(SystemSetting::KEY_CUTOFF_DATE);
 
         // Statistik cepat: berapa mutasi sebelum vs sesudah cut-off
         $stats = null;
@@ -35,19 +38,33 @@ class SystemSettingController extends Controller
                 ", [$cutoffDate, $cutoffDate, $cutoffDate, $cutoffDate])
                 ->first();
 
-            $statsJournal = DB::table('journals')
+            $statsLegacyJournal = DB::table('journals')
                 ->whereNull('voided_at')
                 ->selectRaw("
-                    COUNT(CASE WHEN date < ? THEN 1 END) as legacy_count,
-                    COUNT(CASE WHEN date >= ? THEN 1 END) as new_count
-                ", [$cutoffDate, $cutoffDate])
+                    COUNT(CASE WHEN date < ? THEN 1 END) as legacy_count
+                ", [$cutoffDate])
                 ->first();
 
-            $stats->journal_legacy = $statsJournal->legacy_count ?? 0;
-            $stats->journal_new    = $statsJournal->new_count ?? 0;
+            $statsNewJournal = DB::table('standalone_accounting_journals')
+                ->whereNull('voided_at')
+                ->whereDate('date', '>=', $cutoffDate)
+                ->selectRaw('COUNT(*) as new_count')
+                ->first();
+
+            $stats->journal_legacy = $statsLegacyJournal->legacy_count ?? 0;
+            $stats->journal_new = $statsNewJournal->new_count ?? 0;
+            $stats->dummy_opening_count = DB::table('standalone_accounting_journals')
+                ->whereNull('voided_at')
+                ->where('reference', 'OB-UMKM-DUMMY-001')
+                ->count();
         }
 
-        return view('settings.system.index', compact('cutoffDate', 'cutoffNotes', 'stats'));
+        return view('settings.system.index', compact(
+            'cutoffDate',
+            'cutoffNotes',
+            'cutoffSetting',
+            'stats',
+        ));
     }
 
     /**
@@ -79,11 +96,13 @@ class SystemSettingController extends Controller
                 'Catatan cut-off',
                 auth()->id()
             );
+        } else {
+            SystemSetting::remove(SystemSetting::KEY_CUTOFF_NOTES);
         }
 
         return redirect()
             ->route('settings.system.index')
-            ->with('success', "Cut-off date berhasil disimpan: {$date}. Laporan baru akan default mulai dari tanggal ini.");
+            ->with('success', "Tanggal mulai sistem baru disimpan: {$date}.");
     }
 
     /**
@@ -96,6 +115,6 @@ class SystemSettingController extends Controller
 
         return redirect()
             ->route('settings.system.index')
-            ->with('success', 'Cut-off date dihapus. Laporan sekarang menampilkan semua data termasuk data lama.');
+            ->with('success', 'Tampilan semua data dikembalikan. Tidak ada data yang dihapus.');
     }
 }

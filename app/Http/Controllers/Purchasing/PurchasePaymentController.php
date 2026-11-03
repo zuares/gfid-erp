@@ -314,6 +314,123 @@ class PurchasePaymentController extends Controller
     }
 
     /**
+     * Store a settlement directly from a posted Supplier Invoice.
+     *
+     * GRN remains the AP recognition event. This endpoint only creates the
+     * cash/bank settlement and links it to the invoice for subledger status.
+     */
+    public function storeForSupplierInvoice(Request $request, SupplierInvoice $supplierInvoice)
+    {
+        $this->ensureOwner($request);
+
+        $data = $request->validate([
+            'date' => ['required', 'date'],
+            'payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
+            'cash_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+            'amount' => ['required', 'string'],
+            'ref_no' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $amount = $this->toNumber($data['amount']);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'Nominal pembayaran harus lebih dari 0.',
+            ]);
+        }
+
+        $paymentMethod = PaymentMethod::query()->findOrFail((int) $data['payment_method_id']);
+        $mode = $this->detectPaymentMode($paymentMethod);
+        if (! in_array($mode, ['cash', 'transfer'], true)) {
+            throw ValidationException::withMessages([
+                'payment_method_id' => 'Pembayaran invoice hanya boleh menggunakan CASH atau TRANSFER.',
+            ]);
+        }
+
+        $cashAccountId = $this->resolveCashAccountId($paymentMethod, $data['cash_account_id'] ?? null);
+        $this->validateCashAccount($cashAccountId, $mode);
+
+        DB::transaction(function () use ($request, $data, $supplierInvoice, $amount, $paymentMethod, $cashAccountId) {
+            $invoice = SupplierInvoice::query()
+                ->whereKey($supplierInvoice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! in_array($invoice->status, ['posted', 'partial_paid'], true)) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Hanya invoice POSTED atau BAYAR SEBAGIAN yang dapat dibayar.',
+                ]);
+            }
+
+            if (! $invoice->purchase_order_id) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Invoice belum terhubung ke Purchase Order.',
+                ]);
+            }
+
+            $order = PurchaseOrder::query()
+                ->whereKey($invoice->purchase_order_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((int) $order->supplier_id !== (int) $invoice->supplier_id || $order->status === 'cancelled') {
+                throw ValidationException::withMessages([
+                    'amount' => 'PO atau supplier invoice tidak valid untuk pembayaran.',
+                ]);
+            }
+
+            $invoicePaid = (float) PurchasePayment::query()
+                ->where('supplier_invoice_id', $invoice->id)
+                ->whereNull('voided_at')
+                ->where('type', 'payment')
+                ->sum('amount');
+            $invoiceOutstanding = max(0, round((float) $invoice->total_amount - $invoicePaid, 2));
+            $poOutstanding = $this->rawApOutstandingByGrn($order);
+            $available = min($invoiceOutstanding, $poOutstanding);
+
+            if ($available <= PurchaseOrder::paymentRoundingTolerance()) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Invoice sudah lunas atau saldo hutang PO sudah habis.',
+                ]);
+            }
+
+            if ($amount > $available + PurchaseOrder::paymentRoundingTolerance()) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Nominal melebihi outstanding invoice.',
+                ]);
+            }
+
+            $payment = PurchasePayment::create([
+                'purchase_order_id' => $order->id,
+                'supplier_invoice_id' => $invoice->id,
+                'date' => $data['date'],
+                'payment_method_id' => $paymentMethod->id,
+                'cash_account_id' => $cashAccountId,
+                'type' => 'payment',
+                'amount' => min(round($amount, 2), $available),
+                'ref_no' => $data['ref_no'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $request->user()->id,
+            ]);
+
+            $journal = $this->journalService->postPurchasePayment(
+                $payment->fresh(['purchaseOrder', 'cashAccount', 'paymentMethod'])
+            );
+
+            if ($journal && empty($payment->journal_id) && ! empty($journal->id)) {
+                $payment->forceFill(['journal_id' => (int) $journal->id])->save();
+            }
+
+            $this->recalcPaymentStatus($order);
+            $this->syncInvoicePaymentStatus($invoice->id);
+        });
+
+        return redirect()
+            ->route('purchasing.supplier_invoices.show', $supplierInvoice->id)
+            ->with('success', "Pembayaran invoice {$supplierInvoice->invoice_no} berhasil dicatat.");
+    }
+
+    /**
      * Store DP / Payment (pelunasan) dari modal show PO.
      *
      * Rules:
@@ -997,9 +1114,11 @@ class PurchasePaymentController extends Controller
             $status = 'partial';
         }
 
-        // Pembayaran adalah konfirmasi bahwa PO sudah diproses. Draft tidak
-        // boleh tetap tampil sebagai dokumen aktif setelah ada pembayaran.
-        if ($order->status === 'draft' && in_array($status, ['partial', 'paid', 'overpaid'], true)) {
+        // Saat approval PO aktif, pembayaran mengonfirmasi PO. Pada workflow
+        // tanpa approval, PO tetap Draft sebagai status operasional historis.
+        if (config('purchasing.po_approval_enabled', false)
+            && $order->status === 'draft'
+            && in_array($status, ['partial', 'paid', 'overpaid'], true)) {
             $order->status = 'approved';
             $order->approved_by = auth()->id();
             $order->approved_at = now();

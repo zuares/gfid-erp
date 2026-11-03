@@ -40,7 +40,7 @@
       <div class="card-section d-flex justify-content-between align-items-start flex-wrap gap-2">
         <div>
           <div class="fw-bold">Input Perbaikan Reject Finishing</div>
-          <div class="small text-muted">Qty OK masuk WH-PRD. Qty Tidak Bisa menjadi SKU kategori-RJCT dan otomatis masuk WH-RTS.</div>
+          <div class="small text-muted">Qty OK masuk WH-PRD. Qty Tidak Bisa menjadi REJ-{kode item} dan otomatis masuk WH-RTS.</div>
         </div>
         <a href="{{ route('production.finishing_repairs.index') }}" class="btn btn-outline-secondary btn-sm btn-pill">Kembali</a>
       </div>
@@ -111,7 +111,7 @@
                       name="results[{{ $idx }}][qty_reject]" class="form-control form-control-sm qty mono"
                       value="{{ old("results.$idx.qty_reject") }}" placeholder="0">
                     <div class="small text-muted mono mt-1">
-                      {{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::slug($line->category_code ?: 'REJECT', '-')) }}-RJCT -> WH-RTS
+                      REJ-{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::slug($line->item_code ?: ('ITEM-' . $line->item_id), '-')) }} -> WH-RTS
                     </div>
                   </td>
                   <td>

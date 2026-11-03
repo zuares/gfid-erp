@@ -16,8 +16,7 @@ class FinishingRmHppService
     /**
      * Buat RM-only snapshot untuk setiap FG dalam satu FinishingJob.
      *
-     * @param  FinishingJob $job
-     * @param  array<int,float> $qtyOkByItem [item_id => total_qty_ok_finishing]
+     * @param  array<int,float>  $qtyOkByItem  [item_id => total_qty_ok_finishing]
      * @return ItemCostSnapshot[]
      */
     public function createRmOnlySnapshotsFromFinishing(
@@ -59,22 +58,22 @@ class FinishingRmHppService
 
             $notes = "Auto HPP RM-only dari Finishing {$job->code}";
 
-            $snapshots[] = $this->hpp->createSnapshot(
-                itemId: $itemId,
-                warehouseId: null, // atau isi kalau kamu punya gudang FG spesifik
-                snapshotDate: $snapshotDate,
-                referenceType: 'auto_hpp_rm_only_finishing',
-                referenceId: $job->id,
-                qtyBasis: $qtyOk,
-                rmUnitCost: $rmUnitCost,
-                cuttingUnitCost: 0.0,
-                sewingUnitCost: 0.0,
-                finishingUnitCost: 0.0,
-                packagingUnitCost: 0.0,
-                overheadUnitCost: 0.0,
-                notes: $notes,
-                setActive: false, // RM-only biasanya basis, bukan HPP final
-            );
+            $snapshots[] = $this->hpp->createSnapshot([
+                'item_id' => $itemId,
+                'warehouse_id' => null,
+                'snapshot_date' => $snapshotDate,
+                'reference_type' => 'auto_hpp_rm_only_finishing',
+                'reference_id' => $job->id,
+                'qty_basis' => $qtyOk,
+                'rm_unit_cost' => $rmUnitCost,
+                'cutting_unit_cost' => 0.0,
+                'sewing_unit_cost' => 0.0,
+                'finishing_unit_cost' => 0.0,
+                'packaging_unit_cost' => 0.0,
+                'overhead_unit_cost' => 0.0,
+                'notes' => $notes,
+                'is_active' => false,
+            ]);
         }
 
         return $snapshots;
@@ -112,7 +111,7 @@ class FinishingRmHppService
             $cuttingJob = $bundle->cuttingJob;
             $lot = $bundle->lot;
 
-            if (!$cuttingJob || !$lot) {
+            if (! $cuttingJob || ! $lot) {
                 continue;
             }
 
@@ -120,7 +119,7 @@ class FinishingRmHppService
             $rmItemId = (int) $lot->item_id;
             $lotId = (int) $bundle->lot_id;
 
-            if (!$rmWarehouseId || !$rmItemId || !$lotId) {
+            if (! $rmWarehouseId || ! $rmItemId || ! $lotId) {
                 continue;
             }
 

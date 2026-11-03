@@ -38,6 +38,17 @@ body[data-theme="dark"] .po-document-date-row strong{color:#bfdbfe}
 .pay-badge.pay-partial{color:#a16207;background:rgba(234,179,8,.1);border-color:rgba(234,179,8,.25)}
 .pay-badge.pay-overpaid{color:#6d28d9;background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.25)}
 .pay-badge.pay-unpaid{color:#64748b;background:rgba(148,163,184,.08)}
+.accounting-sync-group{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.3rem}
+.accounting-sync{display:inline-flex;align-items:center;gap:.22rem;border:1px solid;border-radius:999px;padding:.12rem .42rem;font-size:.62rem;font-weight:800;line-height:1.2;white-space:nowrap}
+.accounting-sync.is-posted{color:#15803d;background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.24)}
+.accounting-sync.is-pending{color:#a16207;background:rgba(234,179,8,.1);border-color:rgba(234,179,8,.28)}
+.accounting-sync.is-neutral{color:#64748b;background:rgba(148,163,184,.08);border-color:rgba(148,163,184,.24)}
+.accounting-sync-link{color:#475569;font-size:.66rem;font-weight:750;text-decoration:none}
+.accounting-sync-link:hover{color:#334155;text-decoration:underline}
+body[data-theme="dark"] .accounting-sync.is-posted{color:#86efac;background:rgba(22,163,74,.16);border-color:rgba(74,222,128,.32)}
+body[data-theme="dark"] .accounting-sync.is-pending{color:#fcd34d;background:rgba(234,179,8,.16);border-color:rgba(250,204,21,.32)}
+body[data-theme="dark"] .accounting-sync.is-neutral{color:#cbd5e1;background:rgba(148,163,184,.12);border-color:rgba(148,163,184,.3)}
+body[data-theme="dark"] .accounting-sync-link{color:#cbd5e1}
 .po-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.55rem;margin-bottom:.65rem}
 .po-card{background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:8px;overflow:hidden;margin-bottom:.65rem}
 .po-kpi{padding:.65rem .75rem}
@@ -72,6 +83,99 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 .po-tabpane{display:none}
 .po-tabpane.active{display:block}
 .po-tabpane .po-card{margin-bottom:0}
+.po-workflow{margin:0 0 .8rem;padding:.85rem 1rem;background:var(--card,#fff);border:1px solid rgba(148,163,184,.18);border-radius:9px;overflow-x:auto}
+.po-workflow-list{display:flex;align-items:flex-start;min-width:650px;margin:0;padding:0;list-style:none}
+.po-workflow-step{position:relative;display:flex;flex:1;min-width:125px;flex-direction:column;align-items:center;gap:.35rem;color:#94a3b8;text-align:center;font-size:.7rem;font-weight:800}
+.po-workflow-step:not(:last-child)::after{content:'';position:absolute;top:11px;left:calc(50% + 12px);right:calc(-50% + 12px);height:2px;background:rgba(148,163,184,.24)}
+.po-workflow-dot{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:2px solid rgba(148,163,184,.35);border-radius:999px;background:var(--card,#fff);font-size:.68rem;line-height:1}
+.po-workflow-step.is-done{color:#15803d}
+.po-workflow-step.is-done .po-workflow-dot{border-color:#22c55e;background:#22c55e;color:#fff}
+.po-workflow-step.is-done:not(:last-child)::after{background:rgba(34,197,94,.55)}
+.po-workflow-step.is-current{color:#1d4ed8}
+.po-workflow-step.is-current .po-workflow-dot{border-color:#2563eb;background:#eff6ff;color:#1d4ed8;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+.po-workflow-step.is-cancelled{color:#b91c1c}
+.po-workflow-step.is-cancelled .po-workflow-dot{border-color:#ef4444;background:#fef2f2;color:#b91c1c}
+.po-workflow-label{white-space:nowrap}
+.po-workflow-help{margin-top:.15rem;color:#64748b;font-size:.72rem;font-weight:500;text-align:center}
+body[data-theme="dark"] .po-workflow-dot{background:var(--card,#0f172a)}
+body[data-theme="dark"] .po-workflow-step.is-current .po-workflow-dot{background:rgba(37,99,235,.18);color:#bfdbfe}
+body[data-theme="dark"] .po-workflow-help{color:#94a3b8}
+
+/* Payment modal contract: quiet hierarchy, shared GFID roles, and a compact form. */
+#modalAddPayment{
+  --payment-brand:var(--gf-color-brand,#5b5ce2);
+  --payment-brand-strong:var(--gf-color-brand-strong,#4142bb);
+  --payment-ink:var(--gf-color-content,#101828);
+  --payment-muted:var(--gf-color-muted,#667085);
+  --payment-line:var(--gf-color-line,#e4e7ec);
+  --payment-surface:var(--gf-color-surface,#fff);
+  --payment-soft:var(--gf-color-surface-muted,#f2f4f7);
+}
+#modalAddPayment .modal-dialog{max-width:660px;margin-block:.75rem}
+#modalAddPayment .payment-modal-content{overflow:hidden;border:1px solid var(--payment-line);border-radius:18px;background:var(--payment-surface);box-shadow:0 24px 60px rgba(48,49,125,.16)}
+#modalAddPayment .payment-modal-header{display:grid;grid-template-columns:38px minmax(0,1fr) 40px;align-items:start;gap:.7rem;padding:1rem 1.2rem;border-bottom:1px solid var(--payment-line);background:color-mix(in srgb,var(--payment-soft) 60%,var(--payment-surface))}
+#modalAddPayment .payment-modal-icon{display:grid;width:38px;height:38px;place-items:center;border-radius:12px;color:var(--payment-brand-strong);background:#eeefff;font-size:.9rem}
+#modalAddPayment .payment-modal-kicker{margin-top:.04rem;color:var(--payment-brand-strong);font-size:.6rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+#modalAddPayment .payment-modal-header .modal-title{margin:.16rem 0 0;color:var(--payment-ink);font-size:1.02rem;font-weight:850;letter-spacing:-.035em}
+#modalAddPayment .payment-modal-subtitle{max-width:520px;margin:.24rem 0 0;color:var(--payment-muted);font-size:.69rem;line-height:1.45}
+#modalAddPayment .payment-modal-header .btn-close{grid-column:3;width:40px;height:40px;margin-top:-.15rem;padding:.75rem;border-radius:9px}
+#modalAddPayment .payment-modal-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.45rem;margin-top:.85rem;padding-top:.8rem;border-top:1px solid rgba(148,163,184,.18)}
+#modalAddPayment .payment-modal-stat{min-width:0;padding:.48rem .58rem;border:1px solid rgba(148,163,184,.18);border-radius:10px;background:rgba(255,255,255,.58)}
+#modalAddPayment .payment-modal-stat-label{display:block;overflow:hidden;color:var(--payment-muted);font-size:.58rem;font-weight:800;letter-spacing:.045em;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}
+#modalAddPayment .payment-modal-stat-value{display:block;margin-top:.18rem;overflow:hidden;color:var(--payment-ink);font-size:.78rem;font-weight:850;text-overflow:ellipsis;white-space:nowrap}
+#modalAddPayment .payment-modal-body{padding:1rem 1.2rem 1.1rem;background:var(--payment-surface)}
+#modalAddPayment .payment-modal-note{display:flex;align-items:flex-start;gap:.55rem;margin-bottom:.9rem;padding:.65rem .72rem;border:1px solid #b2ddff;border-radius:10px;color:#175cd3;background:#eff8ff;font-size:.68rem;line-height:1.45}
+#modalAddPayment .payment-modal-note-icon{display:grid;flex:0 0 auto;width:25px;height:25px;place-items:center;border-radius:8px;background:#dbeafe;color:#1d4ed8}
+#modalAddPayment .payment-modal-note-label{display:block;margin-bottom:.08rem;font-size:.6rem;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
+#modalAddPayment .payment-modal-note-copy{display:block}
+#modalAddPayment .payment-modal-form{display:grid;gap:.85rem}
+#modalAddPayment .payment-modal-field{min-width:0}
+#modalAddPayment .payment-modal .form-label,
+#modalAddPayment .form-label{display:block;margin-bottom:.3rem;color:var(--payment-ink);font-size:.65rem;font-weight:760}
+#modalAddPayment .form-control,#modalAddPayment .form-select{min-height:40px;border-color:#d0d5dd;border-radius:9px;color:var(--payment-ink);background:var(--payment-surface);font-size:.73rem;box-shadow:none}
+#modalAddPayment .form-control:focus,#modalAddPayment .form-select:focus{border-color:var(--payment-brand);box-shadow:0 0 0 3px rgba(91,92,226,.12)}
+#modalAddPayment .form-control:disabled,#modalAddPayment .form-select:disabled{color:var(--payment-muted);background:var(--payment-soft)}
+#modalAddPayment .form-text{margin-top:.25rem;color:var(--payment-muted);font-size:.61rem;line-height:1.4}
+#modalAddPayment .input-group-text{border-color:#d0d5dd;color:var(--payment-muted);background:var(--payment-soft);font-size:.72rem}
+#modalAddPayment #btnFillRemaining{min-width:84px;border-color:#d0d5dd;color:var(--payment-brand-strong);background:var(--payment-surface);font-size:.67rem;font-weight:750}
+#modalAddPayment #btnFillRemaining:hover,#modalAddPayment #btnFillRemaining:focus-visible{border-color:#b9baf4;color:var(--payment-brand-strong);background:#f8f8ff}
+#modalAddPayment .payment-modal-alert{margin:0 0 .75rem;padding:.58rem .7rem;border-radius:9px;font-size:.65rem;line-height:1.45}
+#modalAddPayment .payment-modal-alert-info{border:1px solid #b2ddff;color:#175cd3;background:#eff8ff}
+#modalAddPayment .payment-modal-alert-warning{border:1px solid #fedf89;color:#a15c07;background:#fffaeb}
+#modalAddPayment .payment-modal-error{font-size:.64rem!important}
+#modalAddPayment .payment-modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:.55rem;padding:.78rem 1.2rem;border-top:1px solid var(--payment-line);background:rgba(252,252,253,.96);box-shadow:0 -8px 18px rgba(16,24,40,.04);backdrop-filter:blur(8px)}
+#modalAddPayment .payment-modal-footer .btn{min-height:40px;border-radius:10px;font-size:.7rem;font-weight:780}
+#modalAddPayment .payment-modal-footer .btn-outline-secondary{border-color:#d0d5dd;color:#475467;background:var(--payment-surface)}
+#modalAddPayment .payment-modal-footer .btn-outline-secondary:hover,#modalAddPayment .payment-modal-footer .btn-outline-secondary:focus-visible{border-color:#b9baf4;color:var(--payment-brand-strong);background:#f8f8ff}
+#modalAddPayment .payment-modal-footer .btn-primary{border-color:var(--payment-brand);background:var(--payment-brand);box-shadow:0 7px 14px rgba(91,92,226,.2)}
+#modalAddPayment .payment-modal-footer .btn-primary:hover,#modalAddPayment .payment-modal-footer .btn-primary:focus-visible{border-color:var(--payment-brand-strong);background:var(--payment-brand-strong);box-shadow:0 9px 18px rgba(65,66,187,.24)}
+#modalAddPayment .payment-modal-footer .btn:disabled{cursor:not-allowed;opacity:.55;box-shadow:none}
+body[data-theme="dark"] #modalAddPayment .payment-modal-content,
+body[data-theme="dark"] #modalAddPayment .payment-modal-body{border-color:#334155;background:#0f172a}
+body[data-theme="dark"] #modalAddPayment .payment-modal-header,
+body[data-theme="dark"] #modalAddPayment .payment-modal-footer{border-color:#334155;background:#111827}
+body[data-theme="dark"] #modalAddPayment .payment-modal-icon{color:#c4b5fd;background:rgba(91,92,226,.22)}
+body[data-theme="dark"] #modalAddPayment .payment-modal-stat{border-color:#334155;background:#111827}
+body[data-theme="dark"] #modalAddPayment .payment-modal-note{border-color:#1e40af;color:#bfdbfe;background:#172554}
+body[data-theme="dark"] #modalAddPayment .payment-modal-note-icon{color:#bfdbfe;background:#1e3a8a}
+body[data-theme="dark"] #modalAddPayment .form-control,
+body[data-theme="dark"] #modalAddPayment .form-select{border-color:#475569;color:#f8fafc;background:#0f172a}
+body[data-theme="dark"] #modalAddPayment .form-control::placeholder{color:#94a3b8}
+body[data-theme="dark"] #modalAddPayment .input-group-text{border-color:#475569;color:#cbd5e1;background:#1e293b}
+body[data-theme="dark"] #modalAddPayment #btnFillRemaining,
+body[data-theme="dark"] #modalAddPayment .payment-modal-footer .btn-outline-secondary{border-color:#475569;color:#c7d2fe;background:#0f172a}
+body[data-theme="dark"] #modalAddPayment .payment-modal-alert-info{border-color:#1e40af;color:#bfdbfe;background:#172554}
+body[data-theme="dark"] #modalAddPayment .payment-modal-alert-warning{border-color:#92400e;color:#fcd34d;background:#451a03}
+@media(max-width:767px){
+  #modalAddPayment .modal-dialog{margin:.5rem}
+  #modalAddPayment .payment-modal-header{grid-template-columns:36px minmax(0,1fr) 40px;padding:.9rem}
+  #modalAddPayment .payment-modal-body{padding:.9rem}
+  #modalAddPayment .payment-modal-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #modalAddPayment .payment-modal-stat:last-child{grid-column:1 / -1}
+  #modalAddPayment .payment-modal-footer{align-items:stretch;flex-direction:column-reverse;padding:.75rem .9rem}
+  #modalAddPayment .payment-modal-footer .btn{width:100%;min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){#modalAddPayment *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
 
 @media(max-width:860px){
   .po-wrap{padding:.5rem .5rem 3.5rem}
@@ -97,6 +201,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
   .po-table td.po-r{text-align:left;margin-top:.35rem}
   .po-table td.progress-cell { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed rgba(148,163,184,.3); }
   .po-total{display:none!important}
+  .po-workflow{overflow-x:visible;padding:.75rem .55rem}
+  .po-workflow-list{min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.2rem}
+  .po-workflow-step{min-width:0;font-size:.62rem;line-height:1.2}
+  .po-workflow-step:not(:last-child)::after{top:10px;left:calc(50% + 10px);right:calc(-50% + 10px)}
+  .po-workflow-dot{width:22px;height:22px;font-size:.62rem}
+  .po-workflow-label{white-space:normal;overflow-wrap:anywhere}
+  .po-workflow-help{font-size:.68rem}
 }
 .mono {
     font-variant-numeric: tabular-nums;
@@ -124,6 +235,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
         // Status PO
         $status = (string) ($order->status ?? 'draft');
+        $approvalEnabled = (bool) config('purchasing.po_approval_enabled', false);
         $statusClass = match ($status) {
             'approved' => 'tag tag-status-approved',
             'cancelled' => 'tag tag-status-cancelled',
@@ -227,7 +339,24 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
             && $poGrandTotal > 0.01
             && !in_array($payStatus, ['paid', 'overpaid'], true);
         $canOpenPayment = $canPaySettlement || $canPayDp;
+        // Pertahankan label aksi utama agar konsisten dengan halaman purchasing;
+        // konteks DP/pelunasan dijelaskan di dalam modal.
         $paymentButtonLabel = 'Bayar Sekarang';
+        $paymentModalTitle = $canPaySettlement && $canPayDp
+            ? 'Bayar Hutang / Tambah DP'
+            : ($canPaySettlement ? 'Bayar Hutang Supplier' : 'Tambah DP Supplier');
+        $modalPaymentMethods = collect($paymentMethods ?? [])
+            ->filter(fn ($pmOpt) => ! in_array(strtoupper((string) ($pmOpt->code ?? '')), ['DP_APPLY', 'LOAN_APPLY'], true))
+            ->values();
+        $selectedModalPaymentMethodId = old('payment_method_id', $order->payment_method_id);
+        $selectedModalPaymentMethod = $modalPaymentMethods->firstWhere('id', (int) $selectedModalPaymentMethodId);
+        if (! $selectedModalPaymentMethod || strtolower((string) ($selectedModalPaymentMethod->mode ?? '')) === 'credit') {
+            $selectedModalPaymentMethodId = $modalPaymentMethods
+                ->first(fn ($pmOpt) => strtolower((string) ($pmOpt->mode ?? '')) === 'cash')?->id
+                ?? $modalPaymentMethods
+                    ->first(fn ($pmOpt) => strtolower((string) ($pmOpt->mode ?? '')) === 'transfer')?->id
+                ?? $selectedModalPaymentMethodId;
+        }
 
         // apply DP guard
         $canApplyDp = $canPay && $hasAp && $dpAvailable > 0 && $apOutstanding > 0;
@@ -256,6 +385,38 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
             'dp_recorded' => 'DP TERCATAT',
             default => $payStatusLabel,
         };
+        $receivedStatus = (string) ($order->received_status ?? 'not_received');
+        $workflowCurrent = match (true) {
+            $status === 'cancelled' => 0,
+            $status === 'closed' => $approvalEnabled ? 4 : 3,
+            $receivedStatus === 'fully_received' && $apUiStatus === 'ap_paid' => $approvalEnabled ? 3 : 2,
+            $receivedStatus === 'fully_received' => $approvalEnabled ? 3 : 2,
+            $receivedStatus === 'partial' => $approvalEnabled ? 2 : 1,
+            $approvalEnabled && $status === 'approved' => 1,
+            default => 0,
+        };
+        $workflowSteps = $approvalEnabled
+            ? [
+                ['label' => 'Draft', 'icon' => '1'],
+                ['label' => 'Approved', 'icon' => '2'],
+                ['label' => $receivedStatus === 'partial' ? 'GRN Sebagian' : ($receivedStatus === 'fully_received' ? 'GRN Selesai' : 'GRN'), 'icon' => '3'],
+                ['label' => $apUiStatus === 'ap_paid' ? 'Lunas' : 'Bayar', 'icon' => '4'],
+                ['label' => 'Closed', 'icon' => '5'],
+            ]
+            : [
+                ['label' => 'Draft', 'icon' => '1'],
+                ['label' => $receivedStatus === 'partial' ? 'GRN Sebagian' : ($receivedStatus === 'fully_received' ? 'GRN Selesai' : 'GRN'), 'icon' => '2'],
+                ['label' => $apUiStatus === 'ap_paid' ? 'Lunas' : 'Bayar', 'icon' => '3'],
+                ['label' => 'Closed', 'icon' => '4'],
+            ];
+        $draftGrns = $grnList
+            ->filter(fn ($grn) => ($grn->status ?? 'draft') === 'draft')
+            ->sortBy('created_at')
+            ->values();
+        $staleDraftDays = max(1, (int) config('purchasing.draft_grn_stale_days', 3));
+        $staleDraftGrns = $draftGrns->filter(
+            fn ($grn) => optional($grn->created_at)->lt(now()->subDays($staleDraftDays))
+        )->values();
         $apSettledTotal = round($paidPaymentTotal + $dpAppliedTotal, 2);
         $paymentModalId = '#modalAddPayment';
         $linePurchaseUnits = ($order->lines ?? collect())
@@ -324,7 +485,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                 <span class="d-none d-md-inline">Offset DP</span>
             </button>
         @endif
-        <button type="button" class="po-btn {{ $canApplyDp ? 'po-primary' : 'po-success' }}" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="Bayar sekarang">
+        <button type="button" class="po-btn {{ $canApplyDp ? 'po-primary' : 'po-success' }}" data-payment-type="{{ $canPaySettlement ? 'payment' : 'dp' }}" data-bs-toggle="modal" data-bs-target="#modalAddPayment" title="{{ $canPaySettlement ? 'Bayar hutang supplier' : 'Tambah uang muka supplier' }}">
             <i class="bi bi-cash-coin d-inline-block d-md-none"></i>
             <span class="d-none d-md-inline">{{ $paymentButtonLabel }}</span>
         </button>
@@ -385,7 +546,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     </button>
                 </li>
             @endif
-            @if ($order->isReceivableForGrn() && $user && ($user->isOwner() || in_array($user->role ?? '', ['accounting', 'developer'])))
+            @if ($hasAp && $user && ($user->isOwner() || in_array($user->role ?? '', ['accounting', 'developer'])))
                 @if (\Illuminate\Support\Facades\Route::has('purchasing.supplier_invoices.create'))
                     <li>
                         <a class="dropdown-item py-2" href="{{ route('purchasing.supplier_invoices.create', ['purchase_order_id' => $order->id]) }}">
@@ -418,7 +579,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     </form>
                 </li>
             @endif
-            @if ($status === 'approved' && $user && $user->isOwner() && $grnCount > 0)
+            @if (($status === 'approved' || (!$approvalEnabled && $order->isLocked())) && $user && $user->isOwner() && $grnCount > 0)
                 <li><hr class="dropdown-divider"></li>
                 <li>
                     <form action="{{ route('purchasing.purchase_orders.close', $order->id) }}" method="POST"
@@ -441,6 +602,58 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         <strong>{{ id_day($order->date) }}</strong>
     </div>
 
+    <nav class="po-workflow" aria-label="Tahapan Purchase Order">
+        <ol class="po-workflow-list">
+            @foreach ($workflowSteps as $stepIndex => $step)
+                @php
+                    $isCancelledStep = $status === 'cancelled' && $stepIndex === 0;
+                    $stepClass = $isCancelledStep
+                        ? 'is-cancelled'
+                        : ($stepIndex < $workflowCurrent ? 'is-done' : ($stepIndex === $workflowCurrent ? 'is-current' : ''));
+                @endphp
+                <li class="po-workflow-step {{ $stepClass }}" aria-current="{{ $stepIndex === $workflowCurrent ? 'step' : 'false' }}">
+                    <span class="po-workflow-dot" aria-hidden="true">{{ $isCancelledStep ? '!' : ($stepIndex < $workflowCurrent ? '✓' : $step['icon']) }}</span>
+                    <span class="po-workflow-label">{{ $isCancelledStep ? 'Cancelled' : $step['label'] }}</span>
+                </li>
+            @endforeach
+        </ol>
+        <div class="po-workflow-help">
+            @if ($status === 'cancelled')
+                PO dibatalkan dan tidak dapat dilanjutkan ke penerimaan.
+            @elseif ($status === 'draft' && config('purchasing.po_approval_enabled', false))
+                PO masih Draft. Approve PO terlebih dahulu sebelum membuat GRN.
+            @elseif ($draftGrns->isNotEmpty())
+                GRN Draft belum mengubah stok atau jurnal. Post atau hapus draft setelah penerimaan diverifikasi.
+            @elseif (!$hasAp)
+                Hutang AP baru terbentuk setelah GRN diposting.
+            @elseif ($workflowCurrent === ($approvalEnabled ? 3 : 2) && $apUiStatus !== 'ap_paid')
+                Barang sudah diterima; lanjutkan pembayaran untuk menutup hutang.
+            @else
+                Ikuti tahapan dari kiri ke kanan sampai PO ditutup.
+            @endif
+        </div>
+    </nav>
+
+    @if ($status === 'draft' && config('purchasing.po_approval_enabled', false))
+        <div class="alert alert-warning d-flex align-items-start gap-2 mb-3 mt-2 py-2 px-3" style="font-size:.84rem;">
+            <i class="bi bi-shield-exclamation mt-1" aria-hidden="true"></i>
+            <div>
+                <strong>PO belum aktif untuk penerimaan.</strong>
+                Dokumen ini masih Draft. Periksa supplier, item, qty, harga, dan total; setelah benar gunakan <b>Opsi Lainnya → Approve PO</b>.
+            </div>
+        </div>
+    @endif
+
+    @if ($staleDraftGrns->isNotEmpty())
+        <div class="alert alert-warning d-flex align-items-start gap-2 mb-3 mt-2 py-2 px-3" style="font-size:.84rem;">
+            <i class="bi bi-hourglass-split mt-1" aria-hidden="true"></i>
+            <div>
+                <strong>{{ $staleDraftGrns->count() }} Draft GRN belum selesai.</strong>
+                Draft lebih dari {{ $staleDraftDays }} hari belum mengubah stok/jurnal, tetapi sementara mengunci line PO. Buka detail GRN untuk post atau hapus draft.
+            </div>
+        </div>
+    @endif
+
     @if ($canSeeMoney && $hasAp && $dpAvailable > 0.0001 && $apOutstanding > 0.0001)
         <div class="alert alert-warning d-flex align-items-start gap-2 mb-3 mt-2 py-2 px-3" style="font-size:.84rem;">
             <i class="bi bi-exclamation-triangle-fill mt-1" aria-hidden="true"></i>
@@ -453,7 +666,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         </div>
     @endif
 
-    @if ($status === 'approved' && ($order->received_status ?? 'not_received') === 'partial' && ($order->payment_status ?? 'unpaid') === 'paid')
+    @if (($status === 'approved' || !$approvalEnabled) && ($order->received_status ?? 'not_received') === 'partial' && ($order->payment_status ?? 'unpaid') === 'paid')
         <div class="alert alert-warning d-flex align-items-center mb-3 mt-2" style="font-size: .85rem;">
             <i class="bi bi-info-circle-fill me-2 fs-5"></i>
             <div>
@@ -497,8 +710,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
         </div>
         <div class="po-card po-kpi">
             <div class="po-label">Hutang AP Tersisa</div>
-            <div class="po-value" style="color:{{ $apOutstanding > 0.0001 ? '#b91c1c' : '#15803d' }};">{{ $formatPaymentMoney($payStatus === 'overpaid' ? $supplierReceivable : $apOutstanding) }}</div>
-            <div class="po-muted" style="font-size:.7rem;">GRN − payment − offset</div>
+            @if ($hasAp)
+                <div class="po-value" style="color:{{ $apOutstanding > 0.0001 ? '#b91c1c' : '#15803d' }};">{{ $formatPaymentMoney($payStatus === 'overpaid' ? $supplierReceivable : $apOutstanding) }}</div>
+                <div class="po-muted" style="font-size:.7rem;">GRN − payment − offset</div>
+            @else
+                <div class="po-value" style="color:#64748b;">—</div>
+                <div class="po-muted" style="font-size:.7rem;">Belum terbentuk · post GRN dulu</div>
+            @endif
         </div>
         @else
         <div class="po-card po-kpi">
@@ -781,6 +999,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                         'return_apply' => 'Retur',
                                         default => 'Pelunasan',
                                     };
+                                    $mirror = $p->standaloneJournal;
+                                    $mirrorSupported = in_array($type, config('accounting.standalone_dual_posting_types', []), true);
+                                    $mirrorPosted = $mirror && $mirror->posted_at && ! $mirror->voided_at;
                                 @endphp
                                 <tr>
                                     <td class="po-code-cell" style="font-weight:normal;color:#64748b;">{{ $p->date ? id_date($p->date) : '-' }}</td>
@@ -788,6 +1009,16 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                     <td>
                                         <div style="font-weight:700;">{{ $p->paymentMethod?->code ?? '-' }}</div>
                                         <div class="po-muted" style="font-size:.7rem;">{{ $p->paymentMethod?->name ?? '-' }}</div>
+                                        <div class="accounting-sync-group" aria-label="Status posting akuntansi">
+                                            @if ($mirrorPosted)
+                                                <span class="accounting-sync is-posted"><i class="bi bi-check2-circle" aria-hidden="true"></i> Baru: Posted</span>
+                                                <a class="accounting-sync-link" href="{{ route('standalone-accounting.journals.show', $mirror->id) }}">Lihat jurnal</a>
+                                            @elseif (config('accounting.standalone_dual_posting_enabled', false) && $mirrorSupported)
+                                                <span class="accounting-sync is-pending"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Baru: Tertunda</span>
+                                            @else
+                                                <span class="accounting-sync is-neutral"><i class="bi bi-dash-circle" aria-hidden="true"></i> Baru: Nonaktif</span>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="po-r" style="font-weight:700;">
                                         @if(in_array($type, ['dp_apply','loan_apply','return_apply']))
@@ -835,70 +1066,84 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
     @if ($canManagePayments)
     {{-- =========================================================
-    MODAL: ADD PAYMENT / DP (punya kamu, tetap, cuma sedikit touch)
+    MODAL: ADD PAYMENT / DP
 ========================================================= --}}
-    <div class="modal fade" id="modalAddPayment" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content gf-modal">
-                <div class="modal-header">
+    <div class="modal fade" id="modalAddPayment" tabindex="-1" aria-labelledby="paymentModalTitle" aria-describedby="paymentModalSubtitle paymentAccountingHintText" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content payment-modal-content">
+                <div class="modal-header payment-modal-header">
+                    <span class="payment-modal-icon" aria-hidden="true"><i class="bi bi-wallet2"></i></span>
                     <div>
-                        <h6 class="modal-title fw-semibold mb-0">{{ $paymentButtonLabel }}</h6>
-                        <div class="d-flex gap-1 flex-wrap mt-2">
+                        <div class="payment-modal-kicker">Pembayaran supplier</div>
+                        <h2 class="modal-title" id="paymentModalTitle">{{ $paymentModalTitle }}</h2>
+                        <p class="payment-modal-subtitle mb-0" id="paymentModalSubtitle">
+                            {{ $canPaySettlement && $canPayDp
+                                ? 'Pilih pelunasan hutang atau catat uang muka baru.'
+                                : ($canPaySettlement ? 'Catat pembayaran untuk mengurangi hutang supplier.' : 'Catat uang muka sebelum barang diterima.') }}
+                        </p>
+                        <div class="payment-modal-summary" aria-label="Ringkasan saldo pembayaran">
                             @if ($hasAp)
-                                <span class="modal-kpi">GRN <strong class="mono">{{ rupiah($grnPostedTotal) }}</strong></span>
+                                <div class="payment-modal-stat"><span class="payment-modal-stat-label">GRN posted</span><strong class="payment-modal-stat-value mono">{{ rupiah($grnPostedTotal) }}</strong></div>
                                 @if ($returnPostedTotal > 0.0001)
-                                    <span class="modal-kpi">Retur <strong class="mono">{{ rupiah($returnPostedTotal) }}</strong></span>
+                                    <div class="payment-modal-stat"><span class="payment-modal-stat-label">Retur</span><strong class="payment-modal-stat-value mono">{{ rupiah($returnPostedTotal) }}</strong></div>
                                 @endif
-                                <span class="modal-kpi">Sisa <strong class="mono">{{ $formatPaymentMoney($apOutstanding) }}</strong></span>
+                                <div class="payment-modal-stat"><span class="payment-modal-stat-label">Sisa hutang</span><strong class="payment-modal-stat-value mono">{{ $formatPaymentMoney($apOutstanding) }}</strong></div>
                             @else
-                                <span class="modal-kpi">Total PO <strong class="mono">{{ rupiah($poGrandTotal) }}</strong></span>
-                                <span class="modal-kpi">Uang muka tercatat <strong class="mono">{{ rupiah($advanceTotal) }}</strong></span>
-                                <span class="modal-kpi">Sisa nilai PO <strong class="mono">{{ rupiah($dpRemaining) }}</strong></span>
+                                <div class="payment-modal-stat"><span class="payment-modal-stat-label">Total PO</span><strong class="payment-modal-stat-value mono">{{ rupiah($poGrandTotal) }}</strong></div>
+                                <div class="payment-modal-stat"><span class="payment-modal-stat-label">DP tercatat</span><strong class="payment-modal-stat-value mono">{{ rupiah($advanceTotal) }}</strong></div>
+                                <div class="payment-modal-stat"><span class="payment-modal-stat-label">Sisa nilai PO</span><strong class="payment-modal-stat-value mono">{{ rupiah($dpRemaining) }}</strong></div>
                             @endif
                         </div>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup modal pembayaran"></button>
                 </div>
 
                 <form method="POST" action="{{ route('purchasing.purchase_orders.payments.store', $order->id) }}"
                     id="paymentForm">
                     @csrf
 
-                                <div class="modal-body">
-                                    <div class="alert alert-info py-2 px-3 mb-3 small">
-                                        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-                                        Offset DP hanya memindahkan saldo dari <b>Uang Muka Pembelian</b> ke
-                                        <b>Hutang Dagang</b>; tidak ada uang baru yang keluar.
+                                <div class="modal-body payment-modal-body">
+                                    <div class="payment-modal-note" id="paymentAccountingHint" role="status" aria-live="polite">
+                                        <span class="payment-modal-note-icon" aria-hidden="true"><i class="bi bi-journal-text"></i></span>
+                                        <div>
+                                            <span class="payment-modal-note-label">Posting akuntansi</span>
+                                            <span class="payment-modal-note-copy" id="paymentAccountingHintText">{{ $canPaySettlement
+                                            ? 'Akuntansi lama + baru: Dr Hutang Dagang / Cr Kas atau Bank. Nominal dibatasi oleh sisa hutang dari GRN POSTED.'
+                                            : 'Akuntansi lama + baru: Dr Uang Muka Pembelian / Cr Kas atau Bank. Setelah GRN POSTED, gunakan Offset DP untuk mengurangi hutang.' }}</span>
+                                        </div>
                                     </div>
-                                    <div class="row g-2">
+                                    <div class="payment-modal-form">
                             @if ($advanceTotal > 0.0001 && $dpRemaining <= \App\Models\PurchaseOrder::paymentRoundingTolerance())
-                                <div class="col-12">
-                                    <div class="alert alert-warning py-2 px-3 mb-1 small">
+                                <div class="payment-modal-alert payment-modal-alert-warning">
                                         DP sudah menutup total PO. Tambahan nominal tetap boleh dicatat, tetapi selisihnya akan menjadi piutang supplier.
-                                    </div>
                                 </div>
                             @elseif (!$hasAp)
-                                <div class="col-12">
-                                    <div class="alert alert-info py-2 px-3 mb-1 small">
+                                <div class="payment-modal-alert payment-modal-alert-info">
                                         @if ($advanceTotal > 0.0001)
                                             DP sudah tercatat {{ rupiah($advanceTotal) }} (termasuk alokasi pinjaman). Tambahan nominal akan menambah uang muka; pelunasan baru tersedia setelah GRN diposting.
                                         @else
                                             Belum ada GRN POSTED. Nominal ini akan dicatat sebagai DP; pelunasan baru tersedia setelah barang diterima dan GRN diposting.
                                         @endif
-                                    </div>
                                 </div>
                             @endif
 
-                            <div class="col-6 col-md-3">
-                                <label class="form-label small fw-semibold">Tanggal</label>
-                                <input type="text" name="date" class="form-control form-control-sm gf-date-input"
+                            <div class="row g-2">
+                            <div class="col-6 col-md-4 payment-modal-field">
+                                <label class="form-label" for="paymentDateModal">Tanggal</label>
+                                <input type="text" name="date" id="paymentDateModal" class="form-control form-control-sm gf-date-input"
                                     value="{{ old('date', now()->toDateString()) }}" data-gf-date
                                     autocomplete="off" required>
                             </div>
 
-                            <div class="col-6 col-md-3">
-                                <label class="form-label small fw-semibold">Jenis</label>
-                                @php $defaultPaymentType = $canPaySettlement ? old('type', 'payment') : 'dp'; @endphp
+                            <div class="col-6 col-md-8 payment-modal-field">
+                                <label class="form-label" for="typeSelectModal">Tujuan pembayaran</label>
+                                @php
+                                    $defaultPaymentType = old('type', $canPaySettlement ? 'payment' : 'dp');
+                                    if (! in_array($defaultPaymentType, ['payment', 'dp'], true)
+                                        || ($defaultPaymentType === 'payment' && ! $canPaySettlement)) {
+                                        $defaultPaymentType = $canPaySettlement ? 'payment' : 'dp';
+                                    }
+                                @endphp
                                 <select name="type" class="form-select form-select-sm" required id="typeSelectModal">
                                     @if ($canPaySettlement)
                                         <option value="payment" @selected($defaultPaymentType === 'payment')>Pelunasan</option>
@@ -910,14 +1155,14 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                 </div>
                             </div>
 
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small fw-semibold">Metode <span class="text-danger">*</span></label>
+                            <div class="col-12 col-md-6 payment-modal-field">
+                                <label class="form-label" for="pmSelectModal">Metode <span class="text-danger">*</span></label>
                                 <select name="payment_method_id" class="form-select form-select-sm" required id="pmSelectModal">
-                                    @foreach ($paymentMethods ?? [] as $pmOpt)
+                                    @foreach ($modalPaymentMethods as $pmOpt)
                                         <option value="{{ $pmOpt->id }}"
                                             data-mode="{{ strtolower($pmOpt->mode ?? '') }}"
                                             data-code="{{ strtoupper($pmOpt->code ?? '') }}"
-                                            @selected(old('payment_method_id', $order->payment_method_id) == $pmOpt->id)>
+                                            @selected((string) $selectedModalPaymentMethodId === (string) $pmOpt->id)>
                                             {{ $pmOpt->name }}
                                             @if (!empty($pmOpt->mode))— {{ strtoupper($pmOpt->mode) }}@endif
                                         </option>
@@ -928,11 +1173,11 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                 </div>
                             </div>
 
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small fw-semibold">Kas/Bank <span class="text-danger">*</span></label>
+                            <div class="col-12 col-md-6 payment-modal-field">
+                                <label class="form-label" id="cashAccountLabel">Kas/Bank <span class="text-danger">*</span></label>
 
                                 <div id="cashWrap" class="d-none">
-                                    <select name="cash_account_id" class="form-select form-select-sm" id="cashSelectCash">
+                                    <select name="cash_account_id" class="form-select form-select-sm" id="cashSelectCash" aria-labelledby="cashAccountLabel">
                                         <option value="">— Pilih Kas —</option>
                                         @if ($cash1101)
                                             <option value="{{ $cash1101->id }}" data-code="1101"
@@ -945,7 +1190,7 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                 </div>
 
                                 <div id="bankWrap" class="d-none">
-                                    <select name="cash_account_id" class="form-select form-select-sm" id="cashSelectBank">
+                                    <select name="cash_account_id" class="form-select form-select-sm" id="cashSelectBank" aria-labelledby="cashAccountLabel">
                                         <option value="">— Pilih Bank/E-Wallet —</option>
                                         @foreach ($transferBanks as $acc)
                                             <option value="{{ $acc->id }}" data-code="{{ $acc->code }}"
@@ -963,32 +1208,33 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                 </div>
                             </div>
 
-                            <div class="col-12 col-md-6">
-                                <label class="form-label small fw-semibold">Nominal <span class="text-danger">*</span></label>
+                            <div class="col-12 col-md-6 payment-modal-field">
+                                <label class="form-label" for="amountInput">Nominal <span class="text-danger">*</span></label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text">Rp</span>
                                     <input type="text" name="amount" class="form-control mono" id="amountInput"
                                         placeholder="0" value="{{ old('amount') }}" required>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" id="btnFillRemaining">Isi sisa</button>
                                 </div>
+                                <div class="form-text small" id="paymentAmountHint">Nominal akan dicek kembali terhadap saldo hutang/uang muka.</div>
                             </div>
 
-                            <div class="col-6 col-md-3">
-                                <label class="form-label small fw-semibold">No. Ref</label>
-                                <input type="text" name="ref_no" class="form-control form-control-sm mono" placeholder="Opsional"
+                            <div class="col-6 col-md-3 payment-modal-field">
+                                <label class="form-label" for="paymentRefModal">No. ref</label>
+                                <input type="text" name="ref_no" id="paymentRefModal" class="form-control form-control-sm mono" placeholder="Opsional"
                                     value="{{ old('ref_no') }}">
                             </div>
 
-                            <div class="col-6 col-md-3">
-                                <label class="form-label small fw-semibold">Catatan</label>
-                                <input type="text" name="notes" class="form-control form-control-sm" placeholder="Opsional"
+                            <div class="col-6 col-md-9 payment-modal-field">
+                                <label class="form-label" for="paymentNotesModal">Catatan</label>
+                                <input type="text" name="notes" id="paymentNotesModal" class="form-control form-control-sm" placeholder="Opsional"
                                     value="{{ old('notes') }}">
                             </div>
 
                             @php $unpaidInvList = $unpaidInvoices ?? collect(); @endphp
                             @if ($unpaidInvList->isNotEmpty())
-                            <div class="col-12" id="supplierInvoiceWrapModal">
-                                <label class="form-label small fw-semibold">Faktur Supplier <span class="text-muted fw-normal">(opsional)</span></label>
+                            <div class="col-12 payment-modal-field" id="supplierInvoiceWrapModal">
+                                <label class="form-label" for="supplierInvoiceSelectModal">Faktur supplier <span class="text-muted fw-normal">(opsional)</span></label>
                                 <select name="supplier_invoice_id" id="supplierInvoiceSelectModal" class="form-select form-select-sm">
                                     <option value="">— Tidak dikaitkan ke faktur —</option>
                                     @foreach ($unpaidInvList as $inv)
@@ -1003,10 +1249,10 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                                 </select>
                             </div>
                             @endif
-                        </div>
+                            </div>
 
                         @if ($errors->any())
-                            <div class="alert alert-danger mt-3 mb-0 py-2 small">
+                            <div class="payment-modal-alert alert alert-danger mt-0 mb-0 py-2 small">
                                 <div class="fw-semibold mb-1">Gagal:</div>
                                 <ul class="mb-0">
                                     @foreach ($errors->all() as $e)
@@ -1017,9 +1263,9 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                         @endif
                     </div>
 
-                    <div class="modal-footer">
+                    <div class="modal-footer payment-modal-footer">
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button class="btn btn-sm btn-primary" id="btnSavePayment">Simpan</button>
+                        <button class="btn btn-sm btn-primary" id="btnSavePayment"><i class="bi bi-check2" aria-hidden="true"></i> <span id="btnSavePaymentText">Simpan</span></button>
                     </div>
                 </form>
             </div>
@@ -1230,6 +1476,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
 
                 const amountInput = document.getElementById('amountInput');
                 const btnFill = document.getElementById('btnFillRemaining');
+                const paymentForm = document.getElementById('paymentForm');
+                const paymentModal = document.getElementById('modalAddPayment');
+                const paymentModalTitle = document.getElementById('paymentModalTitle');
+                const paymentModalSubtitle = document.getElementById('paymentModalSubtitle');
+                const paymentAccountingHintText = document.getElementById('paymentAccountingHintText');
+                const paymentAmountHint = document.getElementById('paymentAmountHint');
+                const btnSavePaymentText = document.getElementById('btnSavePaymentText');
 
                 const remaining = {{ (float) $apOutstanding }};
                 const dpRemaining = {{ (float) $dpRemaining }};
@@ -1281,6 +1534,20 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     if (creditPayErr) creditPayErr.classList.toggle('d-none', !show);
                 }
 
+                function syncPaymentMethodOptions() {
+                    const isPayment = (typeSelect?.value || 'payment') === 'payment';
+                    const options = pm ? Array.from(pm.options) : [];
+
+                    options.forEach(option => {
+                        option.disabled = isPayment && option.dataset.mode === 'credit';
+                    });
+
+                    if (isPayment && detectMode() === 'credit') {
+                        const fallback = options.find(option => !option.disabled && option.value);
+                        if (fallback) pm.value = fallback.value;
+                    }
+                }
+
                 function autoPickCash() {
                     if (!cashSelectCash) return;
                     if (!cashSelectCash.value && cashSelectCash.options.length > 1) cashSelectCash.selectedIndex = 1;
@@ -1323,6 +1590,30 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                     if (btnSave) btnSave.disabled = !(okCashBank && okTypeMode);
                 }
 
+                function syncAccountingHint() {
+                    const isPayment = (typeSelect?.value || 'payment') === 'payment';
+                    const mode = detectMode();
+                    const methodLabel = mode === 'transfer' ? 'Bank' : (mode === 'cash' ? 'Kas' : 'Kas/Bank');
+
+                    if (paymentModalTitle) {
+                        paymentModalTitle.textContent = isPayment ? 'Bayar Hutang Supplier' : 'Tambah DP Supplier';
+                    }
+                    if (paymentModalSubtitle) {
+                        paymentModalSubtitle.textContent = isPayment
+                            ? 'Catat pembayaran untuk mengurangi hutang supplier.'
+                            : (mode === 'credit'
+                                ? 'Catat uang muka supplier tanpa kas atau bank keluar.'
+                                : 'Catat uang muka sebelum barang diterima.');
+                    }
+                    if (paymentAccountingHintText) {
+                        paymentAccountingHintText.textContent = isPayment
+                            ? `Akuntansi lama + baru: Dr Hutang Dagang / Cr ${methodLabel}. Nominal dibatasi oleh sisa hutang dari GRN POSTED.`
+                            : (mode === 'credit'
+                                ? 'DP tempo: dicatat sebagai uang muka supplier tanpa kas/bank keluar pada langkah ini.'
+                                : `Akuntansi lama + baru: Dr Uang Muka Pembelian / Cr ${methodLabel}. Setelah GRN POSTED, gunakan Offset DP untuk mengurangi hutang.`);
+                    }
+                }
+
                 function syncModeUI() {
                     const mode = detectMode();
 
@@ -1332,23 +1623,27 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                         if (cashSelectBank) cashSelectBank.value = '';
                         setBankError(false);
                         setCashError(false);
+                        syncAccountingHint();
                         applyAllValidations();
                         return;
                     }
 
                     if (mode === 'transfer') {
                         showOnly('bank');
+                        syncAccountingHint();
                         applyAllValidations();
                         return;
                     }
 
                     showOnly('cash');
                     autoPickCash();
+                    syncAccountingHint();
                     applyAllValidations();
                 }
 
                 function syncTypeRules() {
                     const isPayment = (typeSelect?.value || 'payment') === 'payment';
+                    syncPaymentMethodOptions();
                     supplierInvoiceWrap?.classList.toggle('d-none', !isPayment);
                     if (supplierInvoiceSelect) {
                         supplierInvoiceSelect.disabled = !isPayment;
@@ -1359,6 +1654,13 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                             ? 'Pelunasan memakai hutang dari GRN POSTED dan tidak boleh melebihi sisa tagihan.'
                             : 'DP dicatat sebagai uang muka dan bisa di-offset setelah GRN POSTED.';
                     }
+                    if (paymentAmountHint) {
+                        const maxAmount = isPayment ? remaining : dpRemaining;
+                        paymentAmountHint.textContent = maxAmount > paymentTolerance
+                            ? `Maksimal saat ini: Rp ${fmtMoneyInput(maxAmount)}.`
+                            : (isPayment ? 'Tidak ada sisa hutang yang dapat dibayar.' : 'Sisa nilai PO sudah tidak tersedia untuk DP.');
+                    }
+                    syncAccountingHint();
                     if (btnFill) {
                         const maxAmount = isPayment ? remaining : dpRemaining;
                         const canFill = maxAmount > paymentTolerance;
@@ -1389,6 +1691,60 @@ body[data-theme="dark"] .po-unit-conversion strong{color:#cbd5e1}
                 pm?.addEventListener('change', syncModeUI);
                 cashSelectBank?.addEventListener('change', applyAllValidations);
                 cashSelectCash?.addEventListener('change', applyAllValidations);
+
+                paymentModal?.addEventListener('show.bs.modal', function(event) {
+                    const requestedType = event.relatedTarget?.dataset?.paymentType;
+                    if (requestedType && typeSelect?.querySelector(`option[value="${requestedType}"]`)) {
+                        typeSelect.value = requestedType;
+                    }
+                    if (paymentForm) delete paymentForm.dataset.confirmed;
+                    syncTypeRules();
+                    syncModeUI();
+                });
+
+                paymentForm?.addEventListener('submit', function(event) {
+                    if (paymentForm.dataset.confirmed === '1') return;
+
+                    const type = typeSelect?.value || 'payment';
+                    const rawAmount = (amountInput?.value || '').toString().trim();
+                    const amount = Number(rawAmount.replace(/\./g, '').replace(/,/g, '.'));
+                    const maxAmount = type === 'payment' ? remaining : dpRemaining;
+
+                    if (!Number.isFinite(amount) || amount <= 0 || amount > maxAmount + paymentTolerance) {
+                        event.preventDefault();
+                        window.alert(type === 'payment'
+                            ? 'Nominal melebihi sisa hutang atau belum diisi.'
+                            : 'Nominal melebihi sisa nilai PO atau belum diisi.');
+                        return;
+                    }
+
+                    const mode = detectMode();
+                    const creditLine = type === 'payment'
+                        ? 'Jurnal: Dr Hutang Dagang / Cr Kas atau Bank.'
+                        : (mode === 'credit'
+                            ? 'DP tempo dicatat sebagai uang muka supplier.'
+                            : 'Jurnal: Dr Uang Muka Pembelian / Cr Kas atau Bank.');
+                    const confirmed = window.confirm(
+                        `${type === 'payment' ? 'Catat pelunasan hutang' : 'Catat DP'} sebesar Rp ${fmtMoneyInput(amount)}?\n\n` +
+                        `${creditLine}\n` +
+                        `Tanggal dan referensi akan masuk ke riwayat pembayaran.`
+                    );
+
+                    if (!confirmed) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    paymentForm.dataset.confirmed = '1';
+                    if (btnSave) {
+                        btnSave.disabled = true;
+                        if (btnSavePaymentText) {
+                            btnSavePaymentText.textContent = 'Menyimpan...';
+                        } else {
+                            btnSave.textContent = 'Menyimpan...';
+                        }
+                    }
+                });
 
                 // init
                 syncTypeRules();

@@ -269,7 +269,9 @@ class PieceworkPayrollPostingTest extends TestCase
             'is_active' => true,
         ]);
         $savings = Account::where('code', '2104')->firstOrFail();
-        $bank = Account::create([
+        $bank = Account::firstOrCreate([
+            'code' => '1102',
+        ], [
             'code' => '1102',
             'name' => 'Bank Bonus Test',
             'type' => 'asset',
@@ -369,7 +371,9 @@ class PieceworkPayrollPostingTest extends TestCase
             'type' => 'asset',
             'is_active' => true,
         ]);
-        $bank = Account::create([
+        $bank = Account::firstOrCreate([
+            'code' => '1101',
+        ], [
             'code' => '1101',
             'name' => 'Bank Test',
             'type' => 'asset',

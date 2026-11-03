@@ -126,6 +126,8 @@
     .st-reject::before{ background:rgba(239,68,68,.95); }
     .st-void{ background:rgba(239,68,68,.10); color:#991b1b; border-color:rgba(239,68,68,.30); }
     .st-void::before{ background:rgba(239,68,68,.95); }
+    .st-correction{ background:rgba(220,38,38,.08); color:#b91c1c; border-color:rgba(220,38,38,.28); }
+    .st-correction::before{ background:rgba(220,38,38,.95); }
 
     body[data-theme="dark"] .st-cut{ background:rgba(59,130,246,.20); color:#dbeafe; border-color:rgba(59,130,246,.55); }
     body[data-theme="dark"] .st-sent{ background:rgba(13,148,136,.20); color:#ccfbf1; border-color:rgba(13,148,136,.55); }
@@ -367,6 +369,8 @@
                                     $qtyPcs      = (float) ($job->bundles_sum_qty_pcs ?? $job->bundles->sum('qty_pcs'));
                                     $isQcDone    = in_array($st, ['qc_ok','qc_done','qc_mixed','qc_reject'], true);
                                     $isVoid      = $st === 'voided';
+                                    $correctionSummary = $correctionSummaries[$job->id] ?? null;
+                                    $hasCorrection = is_array($correctionSummary) && ($correctionSummary['count'] ?? 0) > 0;
                                     $detailUrl   = route('production.cutting_jobs.show', $job);
                                     $qcUrl       = Route::has('production.qc.cutting.edit')
                                         ? route('production.qc.cutting.edit', $job) : $detailUrl;
@@ -413,6 +417,12 @@
                                                     <div class="text-muted" style="font-size: 0.75rem;">
                                                         <i class="bi bi-tag me-1"></i>{{ $job->code }}
                                                     </div>
+                                                    @if ($hasCorrection)
+                                                        <div class="text-danger" style="font-size: 0.68rem; font-weight:700; margin-top:.2rem;">
+                                                            <i class="bi bi-arrow-return-left me-1"></i>
+                                                            {{ $correctionSummary['count'] }} bundle dikoreksi · bahan kembali ke RM
+                                                        </div>
+                                                    @endif
                                                 </div>
                                                 
                                                 <!-- Mobile Layout -->
@@ -420,6 +430,9 @@
                                                     <!-- Status -->
                                                     <div style="display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 0.5rem;">
                                                         <span class="badge-status {{ $cfg['class'] }}">{{ $cfg['label'] }}</span>
+                                                        @if ($hasCorrection)
+                                                            <span class="badge-status st-correction" title="Bahan bundle dikembalikan ke bahan baku" style="margin-left:.35rem;">Koreksi bahan</span>
+                                                        @endif
                                                     </div>
 
                                                     <!-- Item Code & Qty (Focal) -->
@@ -449,6 +462,11 @@
                                                         <span class="mono">{{ $job->code }}</span>
                                                         @if ($job->operator)<span>Cut: <span style="color: #64748b; font-weight: 600;">{{ $job->operator->name }}</span></span>@endif
                                                     </div>
+                                                    @if ($hasCorrection)
+                                                        <div style="font-size:.68rem; color:#b91c1c; font-weight:700; margin-top:.25rem;">
+                                                            {{ $correctionSummary['count'] }} bundle dikoreksi · bahan kembali ke RM
+                                                        </div>
+                                                    @endif
                                                 </div>
 
 
@@ -487,6 +505,11 @@
 
                                     <td class="mobile-hide">
                                         <span class="badge-status {{ $cfg['class'] }}" title="{{ $cfg['hint'] }}">{{ $cfg['label'] }}</span>
+                                        @if ($hasCorrection)
+                                            <div style="margin-top:.35rem;">
+                                                <span class="badge-status st-correction" title="Bahan bundle dikembalikan ke bahan baku">Koreksi bahan</span>
+                                            </div>
+                                        @endif
                                     </td>
 
                                     <td class="text-end cj-row-action" style="white-space:nowrap;">

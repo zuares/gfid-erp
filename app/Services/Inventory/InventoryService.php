@@ -7,7 +7,7 @@ use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\ItemCostSnapshot;
 use App\Models\Warehouse;
-use App\Services\Inventory\LotCostService;
+use App\Services\Accounting\JournalService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -61,13 +61,13 @@ class InventoryService
     public function stockIn(
         int $warehouseId,
         int $itemId,
-        float | int | string $qty,
-        string | \DateTimeInterface  | null $date = null,
+        float|int|string $qty,
+        string|\DateTimeInterface|null $date = null,
         ?string $sourceType = null,
         ?int $sourceId = null,
         ?string $notes = null,
         ?int $lotId = null, // optional LOT
-        float | int | string | null $unitCost = null, // harga per unit (untuk moving average / nilai mutasi)
+        float|int|string|null $unitCost = null, // harga per unit (untuk moving average / nilai mutasi)
         bool $affectLotCost = true, // apakah mutasi ini ikut update LotCost (hanya untuk kain mentah)
         ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle) di ledger
         ?int $sourceLineId = null
@@ -86,7 +86,7 @@ class InventoryService
             ->lockForUpdate()
             ->first();
 
-        if (!$stock) {
+        if (! $stock) {
             $stock = InventoryStock::create([
                 'warehouse_id' => $warehouseId,
                 'item_id' => $itemId,
@@ -138,14 +138,14 @@ class InventoryService
     public function stockOut(
         int $warehouseId,
         int $itemId,
-        float | int | string $qty,
-        string | \DateTimeInterface  | null $date = null,
+        float|int|string $qty,
+        string|\DateTimeInterface|null $date = null,
         ?string $sourceType = null,
         ?int $sourceId = null,
         ?string $notes = null,
         bool $allowNegative = false,
         ?int $lotId = null, // optional LOT
-        float | int | string | null $unitCostOverride = null, // untuk WIP, bisa pakai unit_cost custom
+        float|int|string|null $unitCostOverride = null, // untuk WIP, bisa pakai unit_cost custom
         bool $affectLotCost = true, // hanya true untuk pemakaian kain mentah
         ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle) di ledger
         bool $strictNonNegative = false,
@@ -172,21 +172,21 @@ class InventoryService
 
         // Kalau caller tidak eksplisit allow, cek flag allow_negative di master item
         // (bahan baku & bahan pendukung produksi boleh minus)
-        if (!$allowNegative && !$strictNonNegative) {
+        if (! $allowNegative && ! $strictNonNegative) {
             $allowNegative = (bool) \DB::table('items')
                 ->where('id', $itemId)
                 ->value('allow_negative');
         }
 
-        if (!$allowNegative && ($current + $eps) < $qty) {
+        if (! $allowNegative && ($current + $eps) < $qty) {
             throw new \RuntimeException(
                 "Stok tidak mencukupi untuk item {$itemId} di gudang {$warehouseId}. "
-                . "Stok: {$current}, mau keluar: {$qty} "
-                . "(dbg current=" . sprintf('%.10f', $current) . ", qty=" . sprintf('%.10f', $qty) . ")"
+                ."Stok: {$current}, mau keluar: {$qty} "
+                .'(dbg current='.sprintf('%.10f', $current).', qty='.sprintf('%.10f', $qty).')'
             );
         }
 
-        if (!$stock) {
+        if (! $stock) {
             $stock = InventoryStock::create([
                 'warehouse_id' => $warehouseId,
                 'item_id' => $itemId,
@@ -264,14 +264,14 @@ class InventoryService
     public function consumeAllocationAndStockOut(
         int $warehouseId,
         int $itemId,
-        float | int | string $qty,
-        string | \DateTimeInterface  | null $date = null,
+        float|int|string $qty,
+        string|\DateTimeInterface|null $date = null,
         ?string $sourceType = null,
         ?int $sourceId = null,
         ?string $notes = null,
         bool $allowNegative = false,
         ?int $lotId = null,
-        float | int | string | null $unitCostOverride = null,
+        float|int|string|null $unitCostOverride = null,
         bool $affectLotCost = true,
         ?int $cuttingJobBundleId = null,
         bool $strictNonNegative = false,
@@ -319,7 +319,7 @@ class InventoryService
     public function reserveStock(
         int $warehouseId,
         int $itemId,
-        float | int | string $qty,
+        float|int|string $qty,
         ?string $sourceType = null,
         ?int $sourceId = null,
         ?int $sourceLineId = null,
@@ -336,7 +336,7 @@ class InventoryService
             ->lockForUpdate()
             ->first();
 
-        if (!$stock) {
+        if (! $stock) {
             $stock = InventoryStock::create([
                 'warehouse_id' => $warehouseId,
                 'item_id' => $itemId,
@@ -347,12 +347,12 @@ class InventoryService
 
         // $allowNegative = true => izinkan over-reserve (mis. saat edit shipment),
         // pemblokiran stok kurang dilakukan di tahap submit/post (checkStockSufficiency).
-        if (!$allowNegative) {
+        if (! $allowNegative) {
             $available = $stock->qty - $stock->allocated_qty;
             if (($available + 0.0000001) < $qty) {
                 throw new \RuntimeException(
                     "Stok tersedia tidak mencukupi untuk di-reserve. Item {$itemId} Gudang {$warehouseId}. "
-                    . "Tersedia: {$available}, Mau di-reserve: {$qty}"
+                    ."Tersedia: {$available}, Mau di-reserve: {$qty}"
                 );
             }
         }
@@ -367,7 +367,7 @@ class InventoryService
     public function releaseStock(
         int $warehouseId,
         int $itemId,
-        float | int | string $qty,
+        float|int|string $qty,
         ?string $sourceType = null,
         ?int $sourceId = null,
         ?int $sourceLineId = null
@@ -383,7 +383,7 @@ class InventoryService
             ->lockForUpdate()
             ->first();
 
-        if (!$stock) {
+        if (! $stock) {
             return;
         }
 
@@ -399,8 +399,8 @@ class InventoryService
         int $fromWarehouseId,
         int $toWarehouseId,
         int $itemId,
-        float | int | string $qty,
-        string | \DateTimeInterface  | null $date = null,
+        float|int|string $qty,
+        string|\DateTimeInterface|null $date = null,
         ?string $sourceType = null,
         ?int $sourceId = null,
         ?string $notes = null,
@@ -491,13 +491,13 @@ class InventoryService
     public function adjustTo(
         int $warehouseId,
         int $itemId,
-        float | int | string $newQty,
-        string | \DateTimeInterface  | null $date = null,
+        float|int|string $newQty,
+        string|\DateTimeInterface|null $date = null,
         ?string $sourceType = 'adjustment',
         ?int $sourceId = null,
         ?string $notes = null,
         ?int $lotId = null, // bisa juga per LOT
-        float | int | string | null $unitCostOverride = null, // untuk kunci unit_cost mutasi (terutama IN)
+        float|int|string|null $unitCostOverride = null, // untuk kunci unit_cost mutasi (terutama IN)
         bool $affectLotCost = true, // false untuk SO/adjustment biar LotCost aman
     ): ?InventoryMutation {
         $newQty = $this->num($newQty);
@@ -579,7 +579,7 @@ class InventoryService
             ->orderBy('lot_id')
             ->orderBy('warehouse_id');
 
-        if (!$includeZeroBalance) {
+        if (! $includeZeroBalance) {
             $q->having('qty_balance', '>', 0);
         }
 
@@ -604,10 +604,10 @@ class InventoryService
     private function capLotRowsToStock(Collection $rows): Collection
     {
         return $rows
-            ->groupBy(fn($row) => ((int) $row->warehouse_id) . ':' . ((int) $row->item_id))
+            ->groupBy(fn ($row) => ((int) $row->warehouse_id).':'.((int) $row->item_id))
             ->flatMap(function (Collection $group) {
                 $first = $group->first();
-                if (!$first) {
+                if (! $first) {
                     return $group;
                 }
 
@@ -628,6 +628,7 @@ class InventoryService
                 return $group->values()->map(function ($row, int $index) use ($totalLotQty, $stockQty, $count, &$used) {
                     if ($index === $count - 1) {
                         $row->qty_balance = max(round($stockQty - $used, 4), 0);
+
                         return $row;
                     }
 
@@ -638,7 +639,7 @@ class InventoryService
                     return $row;
                 });
             })
-            ->filter(fn($row) => (float) ($row->qty_balance ?? 0) > 0.000001)
+            ->filter(fn ($row) => (float) ($row->qty_balance ?? 0) > 0.000001)
             ->values();
     }
 
@@ -646,7 +647,7 @@ class InventoryService
     // HELPER
     // =====================================================================
 
-    protected function normalizeDate(string | \DateTimeInterface  | null $date): string
+    protected function normalizeDate(string|\DateTimeInterface|null $date): string
     {
         if ($date instanceof \DateTimeInterface) {
             return Carbon::instance($date)->toDateString();
@@ -659,7 +660,7 @@ class InventoryService
         return now()->toDateString();
     }
 
-    protected function num(float | int | string | null $value): float
+    protected function num(float|int|string|null $value): float
     {
         if ($value === null || $value === '') {
             return 0.0;
@@ -676,6 +677,7 @@ class InventoryService
         if (strpos($value, ',') !== false) {
             $value = str_replace('.', '', $value);
             $value = str_replace(',', '.', $value);
+
             return (float) $value;
         }
 
@@ -741,6 +743,34 @@ class InventoryService
         return $totalCost / $totalQty;
     }
 
+    /**
+     * Nilai unit WIP untuk satu bundle produksi.
+     *
+     * Cost WIP tidak boleh diambil dari rata-rata seluruh item di gudang,
+     * karena gudang WIP-CUT dapat berisi banyak job dengan HPP berbeda.
+     * Gunakan hanya mutasi output cutting yang ditag ke bundle tersebut.
+     */
+    public function getBundleWipUnitCost(int $warehouseId, int $itemId, int $bundleId): float
+    {
+        $query = InventoryMutation::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('item_id', $itemId)
+            ->where('cutting_job_bundle_id', $bundleId)
+            ->whereIn('source_type', ['cutting_wip', 'cutting_qc_adjust_in'])
+            ->where('direction', 'in')
+            ->where('qty_change', '>', 0)
+            ->whereNotNull('unit_cost');
+
+        $totalQty = (float) $query->sum('qty_change');
+        $totalCost = (float) $query->sum('total_cost');
+
+        if ($totalQty <= 0.000001 || $totalCost <= 0.000001) {
+            return 0.0;
+        }
+
+        return $totalCost / $totalQty;
+    }
+
     public function getMovingAverageFgCost(int $fgWarehouseId, int $itemId): float
     {
         $row = InventoryMutation::query()
@@ -752,7 +782,7 @@ class InventoryService
             ->where('item_id', $itemId)
             ->first();
 
-        if (!$row || (float) $row->total_in_qty <= 0) {
+        if (! $row || (float) $row->total_in_qty <= 0) {
             return 0.0;
         }
 
@@ -769,7 +799,7 @@ class InventoryService
             ->orderByDesc('id')
             ->first();
 
-        if (!$mutation || $mutation->unit_cost === null) {
+        if (! $mutation || $mutation->unit_cost === null) {
             return null;
         }
 
@@ -884,11 +914,11 @@ class InventoryService
         int $itemId,
         int $fromWarehouseId,
         int $toWarehouseId,
-        float | int | string $qty,
+        float|int|string $qty,
         ?string $referenceType = null,
         ?int $referenceId = null,
         ?string $notes = null,
-        string | \DateTimeInterface  | null $date = null,
+        string|\DateTimeInterface|null $date = null,
         bool $allowNegative = false,
         ?int $lotId = null,
         ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle)
@@ -914,14 +944,14 @@ class InventoryService
     public function adjustByDifference(
         int $warehouseId,
         int $itemId,
-        float | int | string $qtyChange,
-        string | \DateTimeInterface  | null $date = null,
+        float|int|string $qtyChange,
+        string|\DateTimeInterface|null $date = null,
         ?string $sourceType = 'adjustment',
         ?int $sourceId = null,
         ?string $notes = null,
         ?int $lotId = null,
         bool $allowNegative = false,
-        float | int | string | null $unitCostOverride = null,
+        float|int|string|null $unitCostOverride = null,
         bool $affectLotCost = true,
         ?int $cuttingJobBundleId = null, // FASE 1: tag dimensi produksi (per bundle)
     ): ?InventoryMutation {
@@ -967,13 +997,14 @@ class InventoryService
     public function getActiveUnitCost(Item $item, ?int $warehouseId = null): float
     {
         $snapshot = ItemCostSnapshot::getActiveForItem($item->id, $warehouseId);
+
         return (float) ($snapshot?->unit_cost ?? 0.0);
     }
 
     protected function resolveUnitCostFromSnapshot(int $itemId, ?int $warehouseId = null): ?float
     {
         $item = Item::find($itemId);
-        if (!$item) {
+        if (! $item) {
             return null;
         }
 
@@ -1006,11 +1037,12 @@ class InventoryService
             ->orderByDesc('id')
             ->first();
 
-        if (!$row) {
+        if (! $row) {
             return null;
         }
 
         $cost = (float) $row->unit_cost;
+
         return ($cost > 0.000001) ? $cost : null;
     }
 
@@ -1030,7 +1062,7 @@ class InventoryService
         string $voidSourceType,
         int $voidSourceId,
         ?string $notesPrefix = null,
-        string | \DateTimeInterface  | null $date = null,
+        string|\DateTimeInterface|null $date = null,
     ): void {
         $date = $this->normalizeDate($date);
 
@@ -1062,20 +1094,81 @@ class InventoryService
             if ($lastReversalId > 0) {
                 return;
             }
-            throw new \RuntimeException("Mutasi sumber tidak ditemukan untuk reverse.");
+            throw new \RuntimeException('Mutasi sumber tidak ditemukan untuk reverse.');
+        }
+
+        // Auto BOM QC memakai lot asal sebagai dimensi biaya. Saat dibatalkan,
+        // qty dan total cost lot tersebut harus dipulihkan agar saldo lot dan
+        // mutasi tetap konsisten. Alur lama lainnya mempertahankan perilaku
+        // sebelumnya dan tidak mengubah moving average lot.
+        $restoreLotCost = in_array(JournalService::SRC_CUTTING_QC_SEWING_SUPPLY, $originalSourceTypes, true)
+            || in_array(\App\Services\Production\SewingPickupRejectSupplyService::SOURCE, $originalSourceTypes, true);
+
+        // Reject Susulan dapat mengembalikan sebagian sewing_supply ke RM
+        // sebelum QC Cutting dibatalkan. Kurangi bagian tersebut dari
+        // reversal QC agar qty/biaya lot tidak dipulihkan dua kali.
+        $returnedQcSupplyByItemLot = [];
+        if (in_array(JournalService::SRC_CUTTING_QC_SEWING_SUPPLY, $originalSourceTypes, true)) {
+            $bundleIds = DB::table('cutting_job_bundles')
+                ->where('cutting_job_id', $originalSourceId)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+            $lineIds = $bundleIds === []
+                ? []
+                : DB::table('sewing_pickup_lines')
+                    ->whereIn('cutting_job_bundle_id', $bundleIds)
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all();
+
+            if ($lineIds !== []) {
+                $returnedQcSupplyByItemLot = DB::table('inventory_mutations')
+                    ->whereIn('source_type', [
+                        \App\Services\Production\SewingPickupRejectSupplyService::SOURCE,
+                        \App\Services\Production\SewingPickupRejectSupplyService::VOID_SOURCE,
+                    ])
+                    ->whereIn('source_id', $lineIds)
+                    ->when($lastReversalId > 0, fn ($query) => $query->where('id', '>', $lastReversalId))
+                    ->groupBy('item_id', 'lot_id')
+                    ->selectRaw('item_id, lot_id, SUM(qty_change) as qty')
+                    ->get()
+                    ->mapWithKeys(fn ($row): array => [
+                        (int) $row->item_id.':'.($row->lot_id !== null ? (int) $row->lot_id : 'none') => max((float) $row->qty, 0.0),
+                    ])
+                    ->all();
+            }
         }
 
         foreach ($rows as $m) {
             $delta = -$this->num($m->qty_change); // reverse
 
+            if (in_array(JournalService::SRC_CUTTING_QC_SEWING_SUPPLY, $originalSourceTypes, true)) {
+                $lotKey = (int) $m->item_id.':'.($m->lot_id !== null ? (int) $m->lot_id : 'none');
+                $returnedQty = (float) ($returnedQcSupplyByItemLot[$lotKey] ?? 0.0);
+                if ($returnedQty > 0.000001) {
+                    $originalQty = abs((float) $m->qty_change);
+                    $usedReturnQty = min($returnedQty, $originalQty);
+                    $delta = $delta > 0
+                        ? max($delta - $usedReturnQty, 0.0)
+                        : min($delta + $usedReturnQty, 0.0);
+                    $returnedQcSupplyByItemLot[$lotKey] = max($returnedQty - $usedReturnQty, 0.0);
+                }
+            }
+
+            if (abs($delta) <= 0.000001) {
+                continue;
+            }
+
             $note = trim(
-                ($notesPrefix ? $notesPrefix . ' | ' : '')
-                . "reverse mut#{$m->id}"
-                . ($m->notes ? " | {$m->notes}" : '')
+                ($notesPrefix ? $notesPrefix.' | ' : '')
+                ."reverse mut#{$m->id}"
+                .($m->notes ? " | {$m->notes}" : '')
             );
 
-            // ✅ penting: affectLotCost = false supaya void tidak ngacak moving average LOT kain
-            // ✅ unitCostOverride pakai unit_cost lama supaya total_cost balik dengan cost yang sama
+            // ✅ unitCostOverride memakai unit_cost lama supaya total_cost
+            // kembali dengan cost yang sama.
             $this->adjustByDifference(
                 warehouseId: (int) $m->warehouse_id,
                 itemId: (int) $m->item_id,
@@ -1087,10 +1180,9 @@ class InventoryService
                 lotId: $m->lot_id ? (int) $m->lot_id : null,
                 allowNegative: false,
                 unitCostOverride: $m->unit_cost !== null ? (float) $m->unit_cost : null,
-                affectLotCost: false,
+                affectLotCost: $restoreLotCost,
                 cuttingJobBundleId: $m->cutting_job_bundle_id ? (int) $m->cutting_job_bundle_id : null,
             );
         }
     }
-
 }

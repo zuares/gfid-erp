@@ -18,11 +18,11 @@ class FgHppAutoService
     /**
      * Hitung HPP per unit untuk 1 FG + simpan ke item_cost_snapshots.
      *
-     * @param  int         $itemId       ID item finished good
-     * @param  string      $dateFrom     'Y-m-d'
-     * @param  string      $dateTo       'Y-m-d'
-     * @param  int|null    $warehouseId  optional gudang (misal WH-RTS)
-     * @param  string|null $notes        catatan snapshot
+     * @param  int  $itemId  ID item finished good
+     * @param  string  $dateFrom  'Y-m-d'
+     * @param  string  $dateTo  'Y-m-d'
+     * @param  int|null  $warehouseId  optional gudang (misal WH-RTS)
+     * @param  string|null  $notes  catatan snapshot
      */
     public function calculateAndSnapshotForFinishedItem(
         int $itemId,
@@ -68,21 +68,22 @@ class FgHppAutoService
         );
 
         // 6) Simpan snapshot via HppService
-        return $this->hpp->createSnapshot(
-            $itemId, // item_id
-            $warehouseId, // warehouse_id
-            $dateTo, // snapshot_date
-            'auto_hpp_period', // reference_type
-            null, // reference_id
-            $qtyBasis, // qty_basis
-            $rmUnitCost, // rm_unit_cost
-            $cuttingUnitCost, // cutting_unit_cost
-            $sewingUnitCost, // sewing_unit_cost
-            $finishingUnitCost,
-            $packagingUnitCost,
-            $overheadUnitCost,
-            $notes ?: "Auto HPP {$dateFrom} s/d {$dateTo}"
-        );
+        return $this->hpp->createSnapshot([
+            'item_id' => $itemId,
+            'warehouse_id' => $warehouseId,
+            'snapshot_date' => $dateTo,
+            'reference_type' => 'auto_hpp_period',
+            'reference_id' => null,
+            'qty_basis' => $qtyBasis,
+            'rm_unit_cost' => $rmUnitCost,
+            'cutting_unit_cost' => $cuttingUnitCost,
+            'sewing_unit_cost' => $sewingUnitCost,
+            'finishing_unit_cost' => $finishingUnitCost,
+            'packaging_unit_cost' => $packagingUnitCost,
+            'overhead_unit_cost' => $overheadUnitCost,
+            'notes' => $notes ?: "Auto HPP {$dateFrom} s/d {$dateTo}",
+            'is_active' => false,
+        ]);
     }
 
     /**
@@ -163,7 +164,7 @@ class FgHppAutoService
             $job = $bundle->cuttingJob;
             $lot = $bundle->lot;
 
-            if (!$job || !$lot) {
+            if (! $job || ! $lot) {
                 continue;
             }
 
@@ -171,7 +172,7 @@ class FgHppAutoService
             $rmItemId = (int) $lot->item_id;
             $lotId = (int) $bundle->lot_id;
 
-            if (!$rmWarehouseId || !$rmItemId || !$lotId) {
+            if (! $rmWarehouseId || ! $rmItemId || ! $lotId) {
                 continue;
             }
 

@@ -474,13 +474,15 @@
 
         // Summary
         $totalBundles = (int) $lines->count();
-        $totalQtyPickup = (float) $lines->sum(fn($l) => (float) ($l->qty_bundle ?? 0));
+        $totalQtyPickup = (float) $lines->sum(fn($l) => (float) ($l->qty_bundle ?? 0) + (float) ($l->qty_rejected ?? 0));
+        $totalPickupReject = (float) $lines->sum(fn($l) => (float) ($l->qty_rejected ?? 0));
         $totalReturnOk = (float) $lines->sum(fn($l) => (float) ($l->qty_returned_ok ?? 0));
         $totalReturnReject = (float) $lines->sum(fn($l) => (float) ($l->qty_returned_reject ?? 0));
         $totalDirectPick = (float) $lines->sum(fn($l) => (float) ($l->qty_direct_picked ?? 0));
         $totalProgressAdj = (float) $lines->sum(fn($l) => (float) ($l->qty_progress_adjusted ?? 0));
 
-        $totalProcessed = $totalReturnOk + $totalReturnReject + $totalDirectPick + $totalProgressAdj;
+        $totalFlowProcessed = $totalReturnOk + $totalReturnReject + $totalDirectPick + $totalProgressAdj;
+        $totalProcessed = $totalPickupReject + $totalFlowProcessed;
         $totalRemaining = max($totalQtyPickup - $totalProcessed, 0);
         $overallPercent = $totalQtyPickup > 0 ? min(100, max(0, ($totalProcessed / $totalQtyPickup) * 100)) : 0;
 
@@ -496,8 +498,10 @@
                 continue;
             }
 
-            $qtyPickup = (float) ($l->qty_bundle ?? 0);
+            $qtyPickup = (float) ($l->qty_bundle ?? 0) + (float) ($l->qty_rejected ?? 0);
+            $pickupReject = (float) ($l->qty_rejected ?? 0);
             $processed =
+                $pickupReject +
                 (float) ($l->qty_returned_ok ?? 0) +
                 (float) ($l->qty_returned_reject ?? 0) +
                 (float) ($l->qty_direct_picked ?? 0) +
@@ -515,7 +519,7 @@
         }
 
         // Header void only if no process at all
-        $canVoid = $pickup->status !== 'void' && $totalProcessed <= $epsilon;
+        $canVoid = $pickup->status !== 'void' && $totalFlowProcessed <= $epsilon;
 
         // Safe voided_at text (hindari Carbon::parse)
         $voidedAtText = optional($pickup->voided_at)->format('Y-m-d H:i');
@@ -819,6 +823,7 @@
                                 <th class="text-end" style="width:110px;">Qty</th>
                                 <th class="text-end" style="width:90px;">OK</th>
                                 <th class="text-end" style="width:90px;">RJ</th>
+                                <th class="text-end" style="width:95px;">RJ Pickup</th>
                                 <th class="text-end" style="width:90px;">DP</th>
                                 <th class="text-end" style="width:90px;">Adj</th>
                                 <th class="text-end" style="width:120px;">Sisa</th>
@@ -834,13 +839,15 @@
                                     $bundle = $line->bundle;
                                     $lot = $bundle?->cuttingJob?->lot;
 
-                                    $qtyPickup = (float) ($line->qty_bundle ?? 0);
+                                    $qtyGoodPickup = (float) ($line->qty_bundle ?? 0);
+                                    $qtyPickupReject = (float) ($line->qty_rejected ?? 0);
+                                    $qtyPickup = $qtyGoodPickup + $qtyPickupReject;
                                     $returnedOk = (float) ($line->qty_returned_ok ?? 0);
                                     $returnedReject = (float) ($line->qty_returned_reject ?? 0);
                                     $directPick = (float) ($line->qty_direct_picked ?? 0);
                                     $progressAdj = (float) ($line->qty_progress_adjusted ?? 0);
 
-                                    $processed = $returnedOk + $returnedReject + $directPick + $progressAdj;
+                                    $processed = $qtyPickupReject + $returnedOk + $returnedReject + $directPick + $progressAdj;
                                     $remaining = max($qtyPickup - $processed, 0);
                                     $percentLine =
                                         $qtyPickup > 0 ? min(100, max(0, ($processed / $qtyPickup) * 100)) : 0;
@@ -905,6 +912,14 @@
                                     <td class="td-desktop-only text-end">{{ number_format($returnedOk, 2, ',', '.') }}
                                     </td>
                                     <td class="td-desktop-only text-end">{{ number_format($returnedReject, 2, ',', '.') }}
+                                    </td>
+                                    <td class="td-desktop-only text-end">
+                                        @if ($qtyPickupReject > 0)
+                                            <span class="text-danger">{{ number_format($qtyPickupReject, 2, ',', '.') }}</span>
+                                            <div class="small muted">{{ $line->reject_reason ?? 'Reject Susulan' }}</div>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
                                     </td>
                                     <td class="td-desktop-only text-end">{{ number_format($directPick, 2, ',', '.') }}
                                     </td>

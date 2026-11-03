@@ -106,7 +106,7 @@ class AccountRenameTest extends TestCase
 
         $this->actingAs(User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-RENAME']))
             ->put(route('accounting.accounts.update', $account), [
-                'code' => '1113',
+                'code' => '1199',
                 'name' => 'SEABANK Operasional',
                 'type' => 'asset',
                 'is_cash' => true,
@@ -116,7 +116,7 @@ class AccountRenameTest extends TestCase
 
         $this->assertDatabaseHas('accounts', [
             'id' => $account->id,
-            'code' => '1113',
+            'code' => '1199',
             'name' => 'SEABANK Operasional',
             'type' => 'asset',
             'is_cash' => 1,

@@ -68,11 +68,21 @@ class Journal extends Model
     }
 
     /**
+     * Mirror of an opening-balance journal in Akuntansi Baru.
+     */
+    public function standaloneJournal(): HasOne
+    {
+        return $this->hasOne(StandaloneAccountingJournal::class, 'source_id')
+            ->where('source_type', 'opening_balance')
+            ->whereNull('voided_at');
+    }
+
+    /**
      * Helper: is posted?
      */
     public function isPosted(): bool
     {
-        return !is_null($this->posted_at);
+        return ! is_null($this->posted_at);
     }
 
     /**
@@ -80,6 +90,6 @@ class Journal extends Model
      */
     public function isVoided(): bool
     {
-        return !is_null($this->voided_at);
+        return ! is_null($this->voided_at);
     }
 }
