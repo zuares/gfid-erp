@@ -198,11 +198,15 @@
         background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .035);
     }
     .sv-product-toggle {
-        display: grid; grid-template-columns: 42px minmax(0, 1fr) auto auto; align-items: center; gap: .65rem;
+        display: grid; grid-template-columns: 26px 42px minmax(0, 1fr) auto auto; align-items: center; gap: .65rem;
         width: 100%; min-height: 68px; padding: .65rem .75rem; border: 0; background: var(--sv-surface);
         color: var(--sv-content); text-align: left; cursor: pointer;
     }
     .sv-product-toggle:hover { background: color-mix(in srgb, var(--sv-brand) 4%, var(--sv-surface)); }
+    .sv-product-toggle-index {
+        display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--sv-line);
+        border-radius: 7px; background: var(--sv-soft); color: var(--sv-muted); font-size: .64rem; font-weight: 850; font-variant-numeric: tabular-nums;
+    }
     .sv-product-toggle-icon {
         position: relative; z-index: 1; display: grid; width: 42px; height: 42px; place-items: center; overflow: visible;
         border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control);
@@ -214,7 +218,7 @@
         overflow: hidden; color: var(--sv-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: .64rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap;
     }
-    .sv-product-toggle-copy strong { overflow: hidden; color: var(--sv-content); font-size: .8rem; font-weight: 850; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+    .sv-product-toggle-copy strong { overflow: hidden; color: var(--sv-content); font-size: .74rem; font-weight: 750; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
     .sv-product-toggle-copy small { overflow: hidden; color: var(--sv-muted); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
     .sv-product-toggle-count {
         display: inline-flex; align-items: center; min-height: 26px; padding: .2rem .5rem;
@@ -496,7 +500,9 @@
     $selectedStoreChannel = strtolower((string) $selectedStore?->channel?->code);
     $activeStorePlatform = in_array($selectedStoreChannel, ['tiktok', 'ttk', 'tt'], true)
         ? 'tiktok'
-        : (in_array($selectedStoreChannel, ['shopee', 'shp'], true) ? 'shopee' : 'all');
+        : (in_array($selectedStoreChannel, ['shopee', 'shp'], true)
+            ? 'shopee'
+            : (in_array($channel, ['tiktok', 'shopee'], true) ? $channel : 'all'));
 @endphp
 
 <main class="sv-page">
@@ -572,7 +578,10 @@
                         <div class="sv-store-platform-tabs" role="group" aria-label="Filter platform toko">
                             @foreach($storeGroups as $group)
                                 @continue($group['stores']->isEmpty())
-                                <button type="button" class="sv-store-platform-tab {{ $activeStorePlatform === $group['key'] ? 'active' : '' }}" data-store-platform="{{ $group['key'] }}" aria-pressed="{{ $activeStorePlatform === $group['key'] ? 'true' : 'false' }}">
+                                @php
+                                    $platformFilters = array_merge($storeSharedFilters, ['channel' => $group['key']]);
+                                @endphp
+                                <button type="button" class="sv-store-platform-tab {{ $activeStorePlatform === $group['key'] ? 'active' : '' }}" data-store-platform="{{ $group['key'] }}" data-platform-url="{{ route('marketplace.products.empty-variants', $platformFilters) }}" aria-pressed="{{ $activeStorePlatform === $group['key'] ? 'true' : 'false' }}">
                                     <i class="bi {{ $group['icon'] }}"></i><span>{{ $group['label'] }}</span><span class="sv-store-platform-count">{{ $group['stores']->count() }}</span>
                                 </button>
                             @endforeach
@@ -640,6 +649,7 @@
                         @endphp
                         <section class="sv-product-group {{ $groupOpen ? 'is-open' : '' }}" data-product-group data-product-id="{{ $groupProduct?->id }}">
                             <button class="sv-product-toggle" type="button" aria-expanded="{{ $groupOpen ? 'true' : 'false' }}" aria-controls="{{ $groupId }}">
+                                <span class="sv-product-toggle-index" aria-hidden="true">{{ $loop->iteration }}</span>
                                 <span class="sv-product-toggle-icon" aria-hidden="true">
                                     @if($groupProduct?->image_url)
                                         <img src="{{ $groupProduct->image_url }}" alt="" loading="lazy">
@@ -996,7 +1006,13 @@
         };
 
         platformTabs.forEach((tab, index) => {
-            tab.addEventListener('click', () => {
+            tab.addEventListener('click', event => {
+                const platformUrl = tab.dataset.platformUrl;
+                if (platformUrl) {
+                    event.preventDefault();
+                    loadDashboard(platformUrl);
+                    return;
+                }
                 picker.dataset.activePlatform = tab.dataset.storePlatform || 'all';
                 apply();
             });

@@ -63,6 +63,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('Update Stok')
             ->assertSee('Stok tidak sinkron')
             ->assertSee('data-product-group', false)
+            ->assertSee('sv-product-toggle-index', false)
             ->assertSee('sv-product-group-body', false)
             ->assertSee('aria-expanded="true"', false)
             ->assertSee('data-mp-stock-val', false)

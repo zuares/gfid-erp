@@ -47,7 +47,9 @@ class EmptyVariantDashboardController extends Controller
             : null;
         $inventoryAverageSales = $this->variantStockSummary->inventoryAverageSalesExpression();
         $inventoryAvailableStock = $this->variantStockSummary->inventoryAvailableStockExpression();
-        $stores = $this->variantStockSummary->connectedStores($channel);
+        // Keep both platform tabs available while the variant query can still
+        // be scoped to the selected channel below.
+        $stores = $this->variantStockSummary->connectedStores();
         $connectedStoreIds = $stores->pluck('id');
 
         if ($storeId > 0 && ! $connectedStoreIds->contains($storeId)) {
