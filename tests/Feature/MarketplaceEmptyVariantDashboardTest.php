@@ -83,21 +83,22 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('class="sv-record"', false)
             ->assertSee('class="sv-list-head"', false)
             ->assertSee('Filter')
+            ->assertSee('Terlaris saja')
             ->assertSee('title="Jaket Multi Variant"', false)
             ->assertSee('ID product-variants')
             ->assertSee('Stok internal')
             ->assertSee('id="stock-'.$emptyModel->id.'"', false)
             ->assertSee('value="12"', false)
+            ->assertDontSee('Belum Terjual / S')
             ->assertSee('id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value=""', false)
             ->assertDontSee('Pakai stok tersedia')
-            ->assertSee('Belum Terjual / S')
             ->assertDontSee('Internal Kosong / M')
             ->assertDontSee('Hitam / Minus')
             ->assertDontSee('Navy / M')
             ->assertDontSee('Hitam / L');
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 0]))
+            ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 0, 'sales_scope' => 'all']))
             ->assertOk()
             ->assertSee('Semua variant')
             ->assertSee('Belum Terjual / S')
@@ -148,7 +149,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertDontSee('s3rdm-3');
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'all']))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'all', 'sales_scope' => 'all']))
             ->assertOk()
             ->assertSee('Produk Bundle S3RDM')
             ->assertSee('s3rdm-3')

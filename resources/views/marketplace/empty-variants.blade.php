@@ -357,7 +357,7 @@
     }
     @media (min-width: 768px) {
         .sv-page { padding-top: 1.25rem; }
-        .sv-filter { grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)); align-items: end; }
+        .sv-filter { grid-template-columns: minmax(200px, 1.7fr) repeat(4, minmax(125px, 1fr)); align-items: end; }
         .sv-search-field { grid-column: auto; }
         .sv-records { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -450,6 +450,7 @@
         'store_id' => $storeId ?: null,
         'channel' => $channel ?: null,
         'search' => $search ?: null,
+        'sales_scope' => $salesScope !== 'best_sellers' ? $salesScope : null,
         'min_avg_sales' => $minAverageSales,
         'stock_scope' => $stockScope !== 'all' ? $stockScope : null,
     ], fn ($value) => $value !== null && $value !== '');
@@ -457,6 +458,7 @@
         'stock_scope' => $stockScope !== 'all' ? $stockScope : null,
         'stock_status' => $stockStatus ?: null,
         'search' => $search ?: null,
+        'sales_scope' => $salesScope !== 'best_sellers' ? $salesScope : null,
         'min_avg_sales' => $minAverageSales,
     ], fn ($value) => $value !== null && $value !== '');
     $allStoreFilters = array_merge($storeSharedFilters, array_filter(['channel' => $channel ?: null]));
@@ -500,6 +502,13 @@
             <div class="sv-field">
                 <label class="sv-field-label" for="svChannel">Channel</label>
                 <select class="form-select sv-control" id="svChannel" name="channel"><option value="">Semua channel</option><option value="shopee" @selected($channel === 'shopee')>Shopee</option><option value="tiktok" @selected($channel === 'tiktok')>TikTok Shop</option></select>
+            </div>
+            <div class="sv-field">
+                <label class="sv-field-label" for="svSales">Penjualan</label>
+                <select class="form-select sv-control" id="svSales" name="sales_scope">
+                    <option value="best_sellers" @selected($salesScope === 'best_sellers')>Terlaris saja</option>
+                    <option value="all" @selected($salesScope === 'all')>Semua produk</option>
+                </select>
             </div>
             <div class="sv-field">
                 <label class="sv-field-label" for="svStock">Stok MP</label>

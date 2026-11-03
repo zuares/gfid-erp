@@ -38,6 +38,7 @@ class EmptyVariantDashboardController extends Controller
             : '';
         $search = mb_substr(trim((string) $request->query('search')), 0, 100);
         $storeId = max(0, $request->integer('store_id'));
+        $salesScope = $request->query('sales_scope') === 'all' ? 'all' : 'best_sellers';
         $averageSalesInput = $request->query('min_avg_sales');
         $minAverageSales = $request->filled('min_avg_sales')
             && is_numeric($averageSalesInput)
@@ -58,6 +59,7 @@ class EmptyVariantDashboardController extends Controller
             ->when($storeId > 0, fn (Builder $query) => $query->where('mp_stock.store_id', $storeId))
             ->when($channel === 'tiktok', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['tiktok', 'ttk', 'tt']))
             ->when($channel === 'shopee', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['shopee', 'shp']))
+            ->when($salesScope === 'best_sellers', fn (Builder $query) => $query->whereRaw($inventoryAverageSales.' > 0'))
             ->when($minAverageSales !== null, fn (Builder $query) => $query->whereRaw($inventoryAverageSales.' > CAST(? AS DECIMAL(18,4))', [$minAverageSales]))
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $like = '%'.$search.'%';
@@ -139,6 +141,7 @@ class EmptyVariantDashboardController extends Controller
                 'product.store:id,name,code,channel_id',
                 'product.store.channel:id,code,name',
             ])
+            ->when($salesScope === 'best_sellers', fn (Builder $query) => $query->orderByDesc('average_daily_sales'))
             ->orderBy('marketplace_product_models.stock')
             ->orderBy('mp_stock.item_name')
             ->simplePaginate(25)
@@ -155,6 +158,7 @@ class EmptyVariantDashboardController extends Controller
             'channel',
             'search',
             'storeId',
+            'salesScope',
             'minAverageSales',
         ));
     }
