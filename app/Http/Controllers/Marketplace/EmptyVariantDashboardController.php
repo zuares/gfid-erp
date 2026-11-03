@@ -69,36 +69,34 @@ class EmptyVariantDashboardController extends Controller
                 });
             });
 
-        $emptyAggregate = (clone $baseScopedQuery)
-            ->where('marketplace_product_models.stock', '<=', 0)
-            ->whereRaw($inventoryAvailableStock.' > 0')
-            ->selectRaw('COUNT(*) as empty_total')
-            ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock = 0 THEN 1 ELSE 0 END) as zero_count')
-            ->selectRaw('SUM(CASE WHEN marketplace_product_models.stock < 0 THEN 1 ELSE 0 END) as negative_count')
-            ->selectRaw('COUNT(DISTINCT marketplace_product_models.marketplace_product_id) as empty_product_count')
-            ->toBase()
-            ->first();
+        // Evaluate the expensive mapping + inventory expression once, then
+        // derive all badges from the same subquery instead of scanning it three
+        // times for every page request.
+        $variantStockQuery = (clone $baseScopedQuery)
+            ->select([
+                'marketplace_product_models.stock',
+                'marketplace_product_models.marketplace_product_id',
+            ])
+            ->selectRaw($inventoryAvailableStock.' as internal_available_stock');
 
-        $internalEmptyAggregate = (clone $baseScopedQuery)
-            ->where('marketplace_product_models.stock', '>', 0)
-            ->whereRaw($inventoryAvailableStock.' <= 0')
-            ->selectRaw('COUNT(*) as internal_empty_mp_stock_count')
-            ->selectRaw('COUNT(DISTINCT marketplace_product_models.marketplace_product_id) as internal_empty_product_count')
-            ->toBase()
-            ->first();
-
-        $allAggregate = (clone $baseScopedQuery)
+        $stockAggregate = DB::query()
+            ->fromSub($variantStockQuery, 'variant_stock')
             ->selectRaw('COUNT(*) as mapped_total')
-            ->selectRaw('COUNT(DISTINCT marketplace_product_models.marketplace_product_id) as mapped_product_count')
-            ->toBase()
+            ->selectRaw('COUNT(DISTINCT marketplace_product_id) as mapped_product_count')
+            ->selectRaw('SUM(CASE WHEN stock <= 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as empty_total')
+            ->selectRaw('SUM(CASE WHEN stock = 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as zero_count')
+            ->selectRaw('SUM(CASE WHEN stock < 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as negative_count')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN stock <= 0 AND internal_available_stock > 0 THEN marketplace_product_id END) as empty_product_count')
+            ->selectRaw('SUM(CASE WHEN stock > 0 AND internal_available_stock <= 0 THEN 1 ELSE 0 END) as internal_empty_mp_stock_count')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN stock > 0 AND internal_available_stock <= 0 THEN marketplace_product_id END) as internal_empty_product_count')
             ->first();
 
-        $emptyTotal = (int) ($emptyAggregate->empty_total ?? 0);
-        $zeroCount = (int) ($emptyAggregate->zero_count ?? 0);
-        $negativeCount = (int) ($emptyAggregate->negative_count ?? 0);
-        $internalEmptyCount = (int) ($internalEmptyAggregate->internal_empty_mp_stock_count ?? 0);
-        $mappedTotal = (int) ($allAggregate->mapped_total ?? 0);
-        $mappedProductCount = (int) ($allAggregate->mapped_product_count ?? 0);
+        $emptyTotal = (int) ($stockAggregate->empty_total ?? 0);
+        $zeroCount = (int) ($stockAggregate->zero_count ?? 0);
+        $negativeCount = (int) ($stockAggregate->negative_count ?? 0);
+        $internalEmptyCount = (int) ($stockAggregate->internal_empty_mp_stock_count ?? 0);
+        $mappedTotal = (int) ($stockAggregate->mapped_total ?? 0);
+        $mappedProductCount = (int) ($stockAggregate->mapped_product_count ?? 0);
 
         $summary = [
             'total' => match ($stockScope) {
@@ -113,8 +111,8 @@ class EmptyVariantDashboardController extends Controller
             'marketplace_available' => $internalEmptyCount,
             'internal_empty_mp_stock' => $internalEmptyCount,
             'products' => match ($stockScope) {
-                'internal_empty_marketplace_stock' => (int) ($internalEmptyAggregate->internal_empty_product_count ?? 0),
-                'marketplace_empty' => (int) ($emptyAggregate->empty_product_count ?? 0),
+                'internal_empty_marketplace_stock' => (int) ($stockAggregate->internal_empty_product_count ?? 0),
+                'marketplace_empty' => (int) ($stockAggregate->empty_product_count ?? 0),
                 default => $mappedProductCount,
             },
         ];
