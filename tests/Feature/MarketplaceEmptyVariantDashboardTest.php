@@ -78,6 +78,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('data-store-picker', false)
             ->assertSee('data-store-search', false)
             ->assertSee('data-store-platform="tiktok"', false)
+            ->assertDontSee('data-store-all', false)
             ->assertSee('TikTok Stock Audit')
             ->assertSee('data-realtime-filter', false)
             ->assertDontSee('id="svStore"', false)

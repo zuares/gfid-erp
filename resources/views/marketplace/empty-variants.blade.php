@@ -121,7 +121,7 @@
     }
     .sv-control {
         width: 100%; min-height: 44px; border-color: var(--sv-line); border-radius: var(--sv-radius-control);
-        background-color: var(--sv-surface); color: var(--sv-content); font-size: max(16px, .78rem);
+        background-color: var(--sv-surface); color: var(--sv-content); font-size: .78rem;
     }
     .sv-search { padding-left: 2.25rem; }
     .sv-control:focus {
@@ -150,7 +150,7 @@
     .sv-store-search > i { position: absolute; top: 50%; left: .7rem; color: var(--sv-muted); pointer-events: none; transform: translateY(-50%); }
     .sv-store-search input {
         width: 100%; min-height: 36px; padding: .4rem .65rem .4rem 2rem; border: 1px solid var(--sv-line);
-        border-radius: 9px; background: var(--sv-surface); color: var(--sv-content); font-size: max(16px, .72rem); outline: none;
+        border-radius: 9px; background: var(--sv-surface); color: var(--sv-content); font-size: .72rem; outline: none;
     }
     .sv-store-search input:focus { border-color: var(--sv-brand); box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--sv-brand) 13%, transparent); }
     .sv-store-filter-result { flex: 0 0 auto; color: var(--sv-muted); font-size: .66rem; white-space: nowrap; }
@@ -158,7 +158,7 @@
     .sv-store-platform-tabs::-webkit-scrollbar { display: none; }
     .sv-store-platform-tab {
         display: inline-flex; flex: 0 0 auto; align-items: center; gap: .35rem; min-height: 32px; padding: .35rem .6rem;
-        border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--sv-muted); font-size: .7rem; font-weight: 800; white-space: nowrap;
+        border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--sv-muted); cursor: pointer; font-size: .7rem; font-weight: 800; text-decoration: none; white-space: nowrap;
     }
     .sv-store-platform-tab:hover { color: var(--sv-brand-strong); }
     .sv-store-platform-tab.active { border-color: color-mix(in srgb, var(--sv-brand) 18%, var(--sv-line)); background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .06); color: var(--sv-brand-strong); }
@@ -175,6 +175,7 @@
     .sv-store-tab-list { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 0; }
     .sv-store-empty { padding: .35rem .1rem 0; color: var(--sv-muted); font-size: .7rem; }
     @media (max-width: 767.98px) {
+        .sv-control, .sv-store-search input { font-size: 16px; }
         .sv-store-group { width: 100%; padding-left: 0; border-left: 0; }
         .sv-store-tab-list { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; padding-bottom: .15rem; scrollbar-width: none; }
         .sv-store-tab-list::-webkit-scrollbar { display: none; }
@@ -597,9 +598,9 @@
                         </div>
 
                         <div class="sv-store-platform-tabs" role="tablist" aria-label="Pilih platform marketplace">
-                            <button type="button" class="sv-store-platform-tab {{ $activeStorePlatform === 'all' ? 'active' : '' }}" data-store-platform="all" role="tab" aria-selected="{{ $activeStorePlatform === 'all' ? 'true' : 'false' }}">
+                            <a class="sv-store-platform-tab {{ $activeStorePlatform === 'all' ? 'active' : '' }}" data-dashboard-link data-store-platform="all" href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}" role="tab" aria-selected="{{ $activeStorePlatform === 'all' ? 'true' : 'false' }}">
                                 <i class="bi bi-grid"></i><span>Semua toko</span><span class="sv-store-platform-count">{{ $stores->count() }}</span>
-                            </button>
+                            </a>
                             @foreach($storeGroups as $group)
                                 @continue($group['stores']->isEmpty())
                                 <button type="button" class="sv-store-platform-tab {{ $activeStorePlatform === $group['key'] ? 'active' : '' }}" data-store-platform="{{ $group['key'] }}" role="tab" aria-selected="{{ $activeStorePlatform === $group['key'] ? 'true' : 'false' }}">
@@ -609,7 +610,6 @@
                         </div>
 
                         <div class="sv-store-groups" role="group" aria-label="Pilih toko marketplace">
-                            <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link data-store-link data-store-all href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua toko</a>
                             @foreach($storeGroups as $group)
                                 @continue($group['stores']->isEmpty())
                                 <section class="sv-store-group" data-store-group data-store-channel="{{ $group['key'] }}" aria-labelledby="svStoreGroup{{ ucfirst($group['key']) }}">
@@ -1004,8 +1004,7 @@
         const empty = picker.querySelector('[data-store-empty]');
         const platformTabs = [...picker.querySelectorAll('[data-store-platform]')];
         const storeGroups = [...picker.querySelectorAll('[data-store-group]')];
-        const storeLinks = [...picker.querySelectorAll('[data-store-link]:not([data-store-all])')];
-        const allStoreLink = picker.querySelector('[data-store-all]');
+        const storeLinks = [...picker.querySelectorAll('[data-store-link]')];
 
         const apply = () => {
             const platform = picker.dataset.activePlatform || 'all';
@@ -1025,7 +1024,6 @@
                 group.hidden = !groupVisible;
             });
 
-            if (allStoreLink) allStoreLink.hidden = Boolean(query && visibleCount === 0);
             if (empty) empty.hidden = visibleCount > 0;
             if (result) {
                 result.textContent = query || platform !== 'all'
