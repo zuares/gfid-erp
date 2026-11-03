@@ -81,6 +81,8 @@ class MarketplaceVariantStockSummaryService
 
     public function mappedEmptyStockQuery(): Builder
     {
+        $baseSkuExpression = $this->normalizedMarketplaceSkuExpression('marketplace_product_models.model_sku');
+
         return MarketplaceProductModel::query()
             ->join('marketplace_products as mp_stock', 'mp_stock.id', '=', 'marketplace_product_models.marketplace_product_id')
             ->join('stores as st_stock', 'st_stock.id', '=', 'mp_stock.store_id')
@@ -89,10 +91,13 @@ class MarketplaceVariantStockSummaryService
             ->where('marketplace_product_models.model_id', '!=', '0')
             ->whereNotNull('marketplace_product_models.model_sku')
             ->whereRaw("TRIM(marketplace_product_models.model_sku) != ''")
-            ->whereExists(function ($mapping): void {
+            ->whereExists(function ($mapping) use ($baseSkuExpression): void {
                 $mapping->selectRaw('1')
                     ->from('sku_mappings as sm_stock')
-                    ->whereColumn('sm_stock.marketplace_sku', 'marketplace_product_models.model_sku')
+                    ->where(function ($sku) use ($baseSkuExpression): void {
+                        $sku->whereRaw('LOWER(TRIM(sm_stock.marketplace_sku)) = LOWER(TRIM(marketplace_product_models.model_sku))')
+                            ->orWhereRaw('LOWER(TRIM(sm_stock.marketplace_sku)) = LOWER(TRIM('.$baseSkuExpression.'))');
+                    })
                     ->where(function ($channelMapping): void {
                         $channelMapping->whereNull('sm_stock.channel_code')
                             ->orWhereRaw("(LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(sm_stock.channel_code) IN ('shopee', 'shp'))")
@@ -103,12 +108,26 @@ class MarketplaceVariantStockSummaryService
 
     public function inventoryAverageSalesExpression(): string
     {
-        return <<<'SQL'
+        $baseSkuExpression = $this->normalizedMarketplaceSkuExpression('marketplace_product_models.model_sku');
+
+        return <<<SQL
 COALESCE((
     SELECT mapped_ads.avg_daily_sales
     FROM sku_mappings AS ads_mapping
     INNER JOIN items AS mapped_ads ON mapped_ads.id = ads_mapping.item_id
-    WHERE ads_mapping.marketplace_sku = marketplace_product_models.model_sku
+    WHERE LOWER(TRIM(ads_mapping.marketplace_sku)) = LOWER(TRIM(marketplace_product_models.model_sku))
+      AND (
+        ads_mapping.channel_code IS NULL
+        OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(ads_mapping.channel_code) IN ('shopee', 'shp'))
+        OR (LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(ads_mapping.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))
+      )
+    ORDER BY CASE WHEN ads_mapping.channel_code IS NULL THEN 1 ELSE 0 END
+    LIMIT 1
+), (
+    SELECT mapped_ads.avg_daily_sales
+    FROM sku_mappings AS ads_mapping
+    INNER JOIN items AS mapped_ads ON mapped_ads.id = ads_mapping.item_id
+    WHERE LOWER(TRIM(ads_mapping.marketplace_sku)) = LOWER(TRIM({$baseSkuExpression}))
       AND (
         ads_mapping.channel_code IS NULL
         OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(ads_mapping.channel_code) IN ('shopee', 'shp'))
@@ -122,24 +141,60 @@ SQL;
 
     public function inventoryAvailableStockExpression(): string
     {
-        return <<<'SQL'
+        $baseSkuExpression = $this->normalizedMarketplaceSkuExpression('marketplace_product_models.model_sku');
+
+        return <<<SQL
 COALESCE((
     SELECT COALESCE(SUM(internal_stock.qty), 0) - COALESCE(SUM(internal_stock.allocated_qty), 0)
     FROM inventory_stocks AS internal_stock
-    WHERE internal_stock.item_id = (
-        SELECT availability_mapping.item_id
-        FROM sku_mappings AS availability_mapping
-        WHERE availability_mapping.marketplace_sku = marketplace_product_models.model_sku
-          AND (
-            availability_mapping.channel_code IS NULL
-            OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(availability_mapping.channel_code) IN ('shopee', 'shp'))
-            OR (LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(availability_mapping.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))
-          )
-        ORDER BY CASE WHEN availability_mapping.channel_code IS NULL THEN 1 ELSE 0 END
-        LIMIT 1
+        WHERE internal_stock.item_id = COALESCE(
+        (
+            SELECT availability_mapping.item_id
+            FROM sku_mappings AS availability_mapping
+            WHERE LOWER(TRIM(availability_mapping.marketplace_sku)) = LOWER(TRIM(marketplace_product_models.model_sku))
+              AND (
+                availability_mapping.channel_code IS NULL
+                OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(availability_mapping.channel_code) IN ('shopee', 'shp'))
+                OR (LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(availability_mapping.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))
+              )
+            ORDER BY CASE WHEN availability_mapping.channel_code IS NULL THEN 1 ELSE 0 END
+            LIMIT 1
+        ),
+        (
+            SELECT base_mapping.item_id
+            FROM sku_mappings AS base_mapping
+            WHERE LOWER(TRIM(base_mapping.marketplace_sku)) = LOWER(TRIM({$baseSkuExpression}))
+              AND (
+                base_mapping.channel_code IS NULL
+                OR (LOWER(ch_stock.code) IN ('shopee', 'shp') AND LOWER(base_mapping.channel_code) IN ('shopee', 'shp'))
+                OR (LOWER(ch_stock.code) IN ('tiktok', 'ttk', 'tt') AND LOWER(base_mapping.channel_code) IN ('tiktok', 'tiktok shop', 'ttk', 'tt'))
+              )
+            ORDER BY CASE WHEN base_mapping.channel_code IS NULL THEN 1 ELSE 0 END
+            LIMIT 1
+        )
     )
 ), 0)
 SQL;
+    }
+
+    /**
+     * SKU bundle marketplace seperti S3RDM-3 memakai item master S3RDM.
+     * Suffix yang didukung mengikuti aturan bundle yang sudah dipakai dashboard.
+     */
+    public function normalizedMarketplaceSku(?string $sku): string
+    {
+        $normalized = strtoupper(trim((string) $sku));
+
+        return preg_replace('/-(1|3|6)$/', '', $normalized) ?: $normalized;
+    }
+
+    private function normalizedMarketplaceSkuExpression(string $column): string
+    {
+        return "CASE\n"
+            ."    WHEN {$column} LIKE '%-1' OR {$column} LIKE '%-3' OR {$column} LIKE '%-6'\n"
+            ."    THEN SUBSTR({$column}, 1, LENGTH({$column}) - 2)\n"
+            ."    ELSE {$column}\n"
+            .'END';
     }
 
     public function connectedStores(?string $channel = null): Collection

@@ -56,11 +56,11 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'marketplace_empty']))
             ->assertOk()
             ->assertSee('Stok Variant Kosong')
-            ->assertSee('Variant perlu diperbarui')
-            ->assertSee('Pilih Toko:')
+            ->assertSee('Stok marketplace kosong')
+            ->assertSee('Toko')
             ->assertSee('Stok MP')
             ->assertSee('Update Stok')
-            ->assertSee('Stok Kosong tapi di Marketplace Ada Stok')
+            ->assertSee('Internal 0 · MP ada')
             ->assertSee('data-product-group', false)
             ->assertSee('sv-product-group-body', false)
             ->assertSee('aria-expanded="true"', false)
@@ -82,7 +82,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('class="sv-item-id"', false)
             ->assertSee('class="sv-record"', false)
             ->assertSee('class="sv-list-head"', false)
-            ->assertSee('Filter diterapkan otomatis saat nilai berubah.')
+            ->assertSee('Filter')
             ->assertSee('title="Jaket Multi Variant"', false)
             ->assertSee('ID product-variants')
             ->assertSee('Stok internal')
@@ -99,7 +99,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $this->actingAs($owner)
             ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 0]))
             ->assertOk()
-            ->assertSee('Semua variant termapping')
+            ->assertSee('Semua variant')
             ->assertSee('Belum Terjual / S')
             ->assertSee('Internal Kosong / M')
             ->assertSee('Hitam / Minus')
@@ -127,6 +127,33 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('aria-label="Toko Shopee"', false)
             ->assertSee('Navy / XL')
             ->assertDontSee('Navy / L');
+    }
+
+    public function test_bundle_variant_uses_master_sku_stock_for_internal_empty_audit(): void
+    {
+        $owner = User::factory()->create(['role' => 'owner', 'employee_code' => 'OWNER-BUNDLE-MASTER-STOCK']);
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create(['channel_id' => $channel->id, 'code' => 'TTK-BUNDLE-MASTER', 'name' => 'TikTok Bundle Master', 'status' => 'active', 'is_active' => true, 'credentials' => ['access_token' => 'bundle-master-token']]);
+        $product = MarketplaceProduct::create(['store_id' => $store->id, 'item_id' => 'bundle-product', 'item_name' => 'Produk Bundle S3RDM', 'item_status' => 'NORMAL', 'has_model' => true]);
+        $masterItem = Item::create(['code' => 's3rdm', 'name' => 'S3RDM Master', 'unit' => 'pcs', 'type' => 'finished']);
+        SkuMapping::create(['marketplace_sku' => 'S3RDM', 'channel_code' => 'tiktok', 'item_id' => $masterItem->id]);
+        MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => 's3rdm-bundle-model', 'model_name' => 'Bundle 3 pcs', 'model_sku' => 's3rdm-3', 'stock' => 8]);
+        $warehouse = Warehouse::create(['code' => 'WH-BUNDLE-MASTER', 'name' => 'Warehouse Bundle Master']);
+        InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $masterItem->id, 'qty' => 12, 'allocated_qty' => 2]);
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'internal_empty_marketplace_stock']))
+            ->assertOk()
+            ->assertDontSee('Produk Bundle S3RDM')
+            ->assertDontSee('s3rdm-3');
+
+        $this->actingAs($owner)
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'all']))
+            ->assertOk()
+            ->assertSee('Produk Bundle S3RDM')
+            ->assertSee('s3rdm-3')
+            ->assertSee('S3RDM Master')
+            ->assertSee('Stok internal');
     }
 
     public function test_dashboard_filters_variants_by_inventory_average_daily_sales(): void
@@ -210,7 +237,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertDontSee('Toko Nonaktif')
             ->assertDontSee('Toko Status Inactive')
             ->assertSee('Variant Audit Terhubung')
-            ->assertSee('Audit mismatch: stok internal kosong, tetapi marketplace masih menjual variant ini.')
+            ->assertSee('Perlu dicek')
             ->assertSee('data-stock-scope="internal_empty_marketplace_stock"', false)
             ->assertDontSee('Variant Tidak Terhubung')
             ->assertDontSee('Variant Nonaktif');

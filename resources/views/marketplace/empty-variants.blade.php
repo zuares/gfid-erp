@@ -30,13 +30,9 @@
         outline-offset: 2px;
     }
     .sv-head {
-        position: relative; display: flex; flex-direction: column; gap: .8rem; overflow: hidden;
-        margin-bottom: .85rem; padding: 1rem; border: 1px solid color-mix(in srgb, var(--sv-brand) 20%, var(--sv-line));
-        border-radius: var(--sv-radius-card); background: linear-gradient(135deg, color-mix(in srgb, var(--sv-brand) 9%, var(--sv-surface)), var(--sv-surface) 60%, color-mix(in srgb, var(--gf-color-accent, #13b8c4) 7%, var(--sv-surface)));
-        box-shadow: var(--sv-shadow);
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+        margin-bottom: .9rem; padding: .15rem .1rem;
     }
-    .sv-head::after { content: ''; position: absolute; right: -3rem; bottom: -4.5rem; width: 11rem; height: 11rem; border-radius: 50%; background: color-mix(in srgb, var(--sv-brand) 8%, transparent); pointer-events: none; }
-    .sv-head > * { position: relative; z-index: 1; }
     .sv-eyebrow {
         display: inline-flex; align-items: center; gap: .35rem; margin-bottom: .35rem;
         color: var(--sv-brand-strong); font-size: .68rem; font-weight: 800;
@@ -46,7 +42,7 @@
         margin: 0; color: var(--sv-content); font-size: clamp(1.25rem, 4vw, 1.7rem);
         font-weight: 850; letter-spacing: -.04em; line-height: 1.15;
     }
-    .sv-copy { max-width: 720px; margin: .4rem 0 0; color: var(--sv-muted); font-size: .8rem; line-height: 1.55; }
+    .sv-copy { display: none; }
     .sv-back {
         display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
         min-height: 40px; padding: .5rem .75rem; border: 1px solid var(--sv-line);
@@ -109,14 +105,12 @@
     .sv-scope-btn.active .sv-badge { background: var(--sv-brand); color: #fff; }
     .sv-scope-btn--warning.active .sv-badge { background: var(--sv-warning); color: #fff; }
     .sv-filter {
-        display: grid; grid-template-columns: minmax(0, 1fr); gap: .7rem;
-        margin-bottom: .75rem; padding: .85rem;
+        display: grid; grid-template-columns: minmax(0, 1fr); gap: .65rem;
+        margin-bottom: .75rem; padding: .75rem;
     }
-    .sv-filter-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; grid-column: 1 / -1; }
-    .sv-filter-title { display: flex; align-items: center; gap: .4rem; margin: 0; color: var(--sv-content); font-size: .8rem; font-weight: 800; }
-    .sv-filter-title i { display: inline-grid; width: 1.65rem; height: 1.65rem; place-items: center; border-radius: .5rem; background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface)); color: var(--sv-brand); font-size: .75rem; }
-    .sv-filter-copy { margin: .18rem 0 0; color: var(--sv-muted); font-size: .67rem; line-height: 1.4; }
-    .sv-filter-state { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .3rem; min-height: 26px; padding: .2rem .45rem; border-radius: 999px; background: color-mix(in srgb, var(--sv-success) 10%, var(--sv-surface)); color: var(--sv-success); font-size: .62rem; font-weight: 800; white-space: nowrap; }
+    .sv-filter-head { display: flex; align-items: center; gap: .4rem; grid-column: 1 / -1; }
+    .sv-filter-title { display: flex; align-items: center; gap: .4rem; margin: 0; color: var(--sv-content); font-size: .78rem; font-weight: 800; }
+    .sv-filter-title i { display: inline-grid; width: 1.5rem; height: 1.5rem; place-items: center; border-radius: .45rem; background: color-mix(in srgb, var(--sv-brand) 10%, var(--sv-surface)); color: var(--sv-brand); font-size: .7rem; }
     .sv-field { min-width: 0; }
     .sv-field-label { display: block; margin-bottom: .32rem; }
     .sv-search-wrap { position: relative; }
@@ -141,21 +135,18 @@
     }
     .sv-feedback.is-visible { display: block; }
     .sv-panel { overflow: hidden; }
-    .sv-panel-head {
-        display: grid; gap: .7rem;
-        padding: .9rem; border-bottom: 1px solid var(--sv-line); background: linear-gradient(90deg, color-mix(in srgb, var(--sv-brand) 5%, var(--sv-surface)), var(--sv-surface) 55%);
-    }
+    .sv-panel-head { display: grid; gap: .65rem; padding: .8rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
     .sv-panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
-    .sv-store-picker-row { display: grid; gap: .5rem; padding-top: .7rem; border-top: 1px solid var(--sv-line); }
+    .sv-store-picker-row { display: grid; gap: .45rem; padding-top: .65rem; border-top: 1px solid var(--sv-line); }
     @media (min-width: 768px) { .sv-store-picker-row { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .75rem; } }
     .sv-store-picker-label {
-        display: inline-flex; align-items: center; gap: .35rem; min-height: 34px; font-size: .7rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap;
+        display: inline-flex; align-items: center; gap: .35rem; min-height: 28px; font-size: .65rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
     }
-    .sv-store-groups { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .75rem; min-width: 0; }
-    .sv-store-group { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; min-width: 0; padding-left: .75rem; border-left: 1px solid var(--sv-line); }
+    .sv-store-groups { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; min-width: 0; }
+    .sv-store-group { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; min-width: 0; }
     .sv-store-group-label {
         display: inline-flex; align-items: center; gap: .3rem; color: var(--sv-muted);
-        font-size: .63rem; font-weight: 800; letter-spacing: .025em; text-transform: uppercase; white-space: nowrap;
+        font-size: .6rem; font-weight: 800; letter-spacing: .025em; text-transform: uppercase; white-space: nowrap;
     }
     .sv-store-group-label i { color: var(--sv-brand); }
     .sv-store-tab-list { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 0; }
@@ -355,7 +346,6 @@
     .sv-pages { padding: .75rem; border-top: 1px solid var(--sv-line); }
     @keyframes sv-loading { from { background-position: -80% 0; } to { background-position: 180% 0; } }
     @media (min-width: 576px) {
-        .sv-head { flex-direction: row; align-items: flex-start; justify-content: space-between; }
         .sv-back { min-height: 38px; }
         .sv-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .sv-search-field { grid-column: 1 / -1; }
@@ -414,6 +404,19 @@
         .sv-save { min-height: 38px; padding-inline: .7rem; }
     }
     @media (max-width: 575.98px) {
+        .sv-page { padding-inline: .65rem; }
+        .sv-head { align-items: center; gap: .65rem; }
+        .sv-eyebrow { margin-bottom: .2rem; font-size: .6rem; }
+        .sv-title { font-size: 1.22rem; }
+        .sv-back { min-width: 40px; width: 40px; padding-inline: 0; }
+        .sv-back-label { display: none; }
+        .sv-filter { padding: .65rem; }
+        .sv-scope-nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+        .sv-scope-nav::-webkit-scrollbar { display: none; }
+        .sv-scope-btn { flex: 0 0 auto; }
+        .sv-panel-head { padding: .7rem; }
+        .sv-panel-title { font-size: .86rem; }
+        .sv-panel-summary { gap: .15rem .45rem; }
         .sv-confirm-dialog { width: calc(100% - 1rem); max-height: calc(100dvh - 1rem); border-radius: 18px; }
         .sv-confirm-head { padding: 1rem 1rem .75rem; }
         .sv-confirm-body { padding-inline: 1rem; }
@@ -466,7 +469,7 @@
             <h1 class="sv-title">Stok Variant Kosong</h1>
             <p class="sv-copy">Tinjau seluruh variant ter-mapping, lalu gunakan filter untuk memprioritaskan pembaruan stok.</p>
         </div>
-        <a class="sv-back" href="{{ route('marketplace.products') }}"><i class="bi bi-arrow-left"></i><span>Kembali ke Produk</span></a>
+        <a class="sv-back" href="{{ route('marketplace.products') }}" aria-label="Kembali ke produk"><i class="bi bi-arrow-left"></i><span class="sv-back-label">Kembali</span></a>
     </header>
 
     <div class="sv-feedback" id="svFilterFeedback" role="alert" aria-live="assertive"></div>
@@ -476,13 +479,11 @@
             @if($storeId > 0)<input type="hidden" name="store_id" value="{{ $storeId }}">@endif
             <div class="sv-filter-head">
                 <div>
-                    <h2 class="sv-filter-title"><i class="bi bi-sliders2"></i>Filter variant</h2>
-                    <p class="sv-filter-copy">Filter diterapkan otomatis saat nilai berubah.</p>
+                    <h2 class="sv-filter-title"><i class="bi bi-sliders2"></i>Filter</h2>
                 </div>
-                <span class="sv-filter-state"><i class="bi bi-lightning-charge-fill"></i>Realtime</span>
             </div>
             <div class="sv-field sv-search-field">
-                <label class="sv-field-label" for="svSearch">Cari variant atau SKU</label>
+                <label class="sv-field-label" for="svSearch">Cari variant / SKU</label>
                 <div class="sv-search-wrap"><i class="bi bi-search"></i><input class="form-control sv-control sv-search" id="svSearch" name="search" value="{{ $search }}" maxlength="100" autocomplete="off" placeholder="Nama variant, SKU, atau ID produk"></div>
             </div>
             <div class="sv-field">
@@ -490,11 +491,11 @@
                 <select class="form-select sv-control" id="svChannel" name="channel"><option value="">Semua channel</option><option value="shopee" @selected($channel === 'shopee')>Shopee</option><option value="tiktok" @selected($channel === 'tiktok')>TikTok Shop</option></select>
             </div>
             <div class="sv-field">
-                <label class="sv-field-label" for="svStock">Status stok marketplace</label>
+                <label class="sv-field-label" for="svStock">Stok MP</label>
                 <select class="form-select sv-control" id="svStock" name="stock_status" @disabled($stockScope !== 'marketplace_empty')><option value="zero" @selected($stockStatus === 'zero')>Stok tepat 0</option><option value="negative" @selected($stockStatus === 'negative')>Stok minus</option></select>
             </div>
             <div class="sv-field">
-                <label class="sv-field-label" for="svAverage">Rata² terjual/hari lebih dari <span class="text-muted fw-normal">(opsional)</span></label>
+                <label class="sv-field-label" for="svAverage">Rata-rata / hari &gt;</label>
                 <input class="form-control sv-control" id="svAverage" name="min_avg_sales" type="number" min="0" max="1000000" step="0.1" value="{{ $minAverageSales }}" inputmode="decimal" placeholder="Semua penjualan">
             </div>
         </form>
@@ -503,14 +504,7 @@
             <div class="sv-panel-head">
                 <div class="sv-panel-title-row">
                     <div>
-                        <h2 class="sv-panel-title">{{ $stockScope === 'all' ? 'Semua variant termapping' : 'Variant perlu diperbarui' }}</h2>
-                        @if($stockScope === 'internal_empty_marketplace_stock')
-                            <span class="sv-scope-note"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>Audit mismatch: stok internal kosong, tetapi marketplace masih menjual variant ini.</span>
-                        @elseif($stockScope === 'all')
-                            <span class="sv-scope-note">Belum ada filter stok aktif. Pilih mode audit untuk memprioritaskan tindakan.</span>
-                        @else
-                            <span class="sv-scope-note">Menampilkan stok marketplace 0 dengan stok internal tersedia untuk pembaruan.</span>
-                        @endif
+                        <h2 class="sv-panel-title">{{ $stockScope === 'all' ? 'Semua variant' : ($stockScope === 'internal_empty_marketplace_stock' ? 'Perlu dicek' : 'Stok marketplace kosong') }}</h2>
                     </div>
                     <span class="sv-panel-count">{{ number_format($variants->count()) }} di halaman ini</span>
                 </div>
@@ -521,7 +515,7 @@
                        data-dashboard-link
                        href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => null, 'stock_status' => null])) }}">
                         <i class="bi bi-grid-3x3-gap"></i>
-                        <span>Semua variant</span>
+                        <span>Semua</span>
                         <span class="sv-badge" data-summary="scope_all">{{ number_format($mappedTotal) }}</span>
                     </a>
                     <a class="sv-scope-btn {{ $stockScope === 'marketplace_empty' ? 'active' : '' }}"
@@ -529,7 +523,7 @@
                        data-dashboard-link
                        href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => 'marketplace_empty', 'stock_status' => 'zero'])) }}">
                         <i class="bi bi-box-seam"></i>
-                        <span>Stok MP 0 · Internal Ada</span>
+                        <span>MP 0 · Internal ada</span>
                         <span class="sv-badge" data-summary="scope_empty">{{ number_format($emptyScopeTotal) }}</span>
                     </a>
                     <a class="sv-scope-btn sv-scope-btn--warning {{ $stockScope === 'internal_empty_marketplace_stock' ? 'active' : '' }}"
@@ -537,13 +531,13 @@
                        data-dashboard-link
                        href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_scope' => 'internal_empty_marketplace_stock', 'stock_status' => null])) }}">
                         <i class="bi bi-exclamation-triangle"></i>
-                        <span>Stok Kosong tapi di Marketplace Ada Stok</span>
+                        <span>Internal 0 · MP ada</span>
                         <span class="sv-badge sv-badge--warning" data-summary="scope_internal_empty">{{ number_format($internalEmptyTotal) }}</span>
                     </a>
                 </nav>
 
                 <div class="sv-store-picker-row">
-                    <span class="sv-store-picker-label"><i class="bi bi-shop"></i> Pilih Toko:</span>
+                    <span class="sv-store-picker-label"><i class="bi bi-shop"></i> Toko</span>
                     <div class="sv-store-groups" role="group" aria-label="Pilih toko marketplace">
                         <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua Toko</a>
                         @foreach($storeGroups as $group)
@@ -571,7 +565,7 @@
                         <a class="sv-summary-item {{ $stockStatus === 'zero' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'zero'])) }}">Stok 0: <strong data-summary="zero">{{ number_format($summary['zero']) }}</strong></a>
                         <a class="sv-summary-item {{ $stockStatus === 'negative' ? 'active' : '' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($baseFilters, ['stock_status' => 'negative'])) }}">Minus: <strong data-summary="negative">{{ number_format($summary['negative']) }}</strong></a>
                     @else
-                        <span class="sv-summary-item"><strong data-summary="total">{{ number_format($mappedTotal) }}</strong> variant termapping</span>
+                        <span class="sv-summary-item"><strong data-summary="total">{{ number_format($mappedTotal) }}</strong> variant</span>
                         <span class="sv-summary-item"><strong>{{ number_format($summary['products']) }}</strong> produk</span>
                         <span class="sv-summary-item">Pilih mode stok untuk menyaring</span>
                     @endif

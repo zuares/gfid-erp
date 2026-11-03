@@ -173,22 +173,45 @@ class EmptyVariantDashboardController extends Controller
             ->unique()
             ->values();
 
+        $lookupSkus = $skus
+            ->flatMap(fn (string $sku): array => [$sku, $this->variantStockSummary->normalizedMarketplaceSku($sku)])
+            ->filter()
+            ->unique()
+            ->values();
+
         $mappings = SkuMapping::query()
-            ->whereIn('marketplace_sku', $skus)
+            ->where(function (Builder $query) use ($lookupSkus): void {
+                foreach ($lookupSkus as $index => $lookupSku) {
+                    $method = $index === 0 ? 'whereRaw' : 'orWhereRaw';
+                    $query->{$method}('LOWER(TRIM(marketplace_sku)) = ?', [mb_strtolower(trim($lookupSku))]);
+                }
+            })
             ->with('item:id,code,name,avg_daily_sales,avg_daily_sales_window,avg_daily_sales_updated_at')
             ->get();
 
         $mappingFor = function (MarketplaceProductModel $variant) use ($mappings): ?SkuMapping {
             $sku = mb_strtolower(trim((string) $variant->model_sku));
+            $baseSku = mb_strtolower(trim($this->variantStockSummary->normalizedMarketplaceSku($variant->model_sku)));
             $channel = strtolower((string) $variant->product?->store?->channel?->code);
             $aliases = in_array($channel, ['tiktok', 'ttk', 'tt'], true)
                 ? ['tiktok', 'tiktok shop', 'ttk', 'tt']
                 : ['shopee', 'shp'];
 
-            $candidates = $mappings->filter(fn (SkuMapping $mapping): bool => mb_strtolower(trim((string) $mapping->marketplace_sku)) === $sku);
+            $candidates = $mappings->filter(function (SkuMapping $mapping) use ($sku, $baseSku): bool {
+                $mappingSku = mb_strtolower(trim((string) $mapping->marketplace_sku));
 
-            return $candidates->first(fn (SkuMapping $mapping): bool => in_array(strtolower(trim((string) $mapping->channel_code)), $aliases, true))
-                ?? $candidates->first(fn (SkuMapping $mapping): bool => blank($mapping->channel_code));
+                return $mappingSku === $sku || ($baseSku !== $sku && $mappingSku === $baseSku);
+            });
+            $sortBySpecificSku = fn (SkuMapping $mapping): int => mb_strtolower(trim((string) $mapping->marketplace_sku)) === $sku ? 0 : 1;
+
+            return $candidates
+                ->filter(fn (SkuMapping $mapping): bool => in_array(strtolower(trim((string) $mapping->channel_code)), $aliases, true))
+                ->sortBy($sortBySpecificSku)
+                ->first()
+                ?? $candidates
+                    ->filter(fn (SkuMapping $mapping): bool => blank($mapping->channel_code))
+                    ->sortBy($sortBySpecificSku)
+                    ->first();
         };
 
         $resolvedMappings = $variants->mapWithKeys(fn (MarketplaceProductModel $variant): array => [
