@@ -701,7 +701,6 @@
             @if($variants->hasPages())<div class="sv-pages">{{ $variants->links() }}</div>@endif
         </section>
     </div>
-</main>
 <dialog class="sv-confirm-dialog" id="svStockConfirm" aria-labelledby="svStockConfirmTitle" aria-describedby="svStockConfirmCopy">
     <form method="dialog">
         <div class="sv-confirm-head">
@@ -726,6 +725,7 @@
     </form>
 </dialog>
 <div class="sv-save-feedback" id="svSaveFeedback" role="status" aria-live="polite" aria-atomic="true"></div>
+</main>
 @endsection
 
 @push('scripts')
