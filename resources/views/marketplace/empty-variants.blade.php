@@ -198,8 +198,8 @@
         background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .035);
     }
     .sv-product-toggle {
-        display: grid; grid-template-columns: 26px 42px minmax(0, 1fr) auto auto; align-items: center; gap: .65rem;
-        width: 100%; min-height: 68px; padding: .65rem .75rem; border: 0; background: var(--sv-surface);
+        display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; align-items: center; gap: .65rem;
+        width: 100%; min-height: 68px; padding: .65rem 1rem .65rem 1.2rem; border: 0; background: var(--sv-surface);
         color: var(--sv-content); text-align: left; cursor: pointer;
     }
     .sv-product-toggle:hover { background: color-mix(in srgb, var(--sv-brand) 4%, var(--sv-surface)); }
@@ -207,12 +207,6 @@
         display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--sv-line);
         border-radius: 7px; background: var(--sv-soft); color: var(--sv-muted); font-size: .64rem; font-weight: 850; font-variant-numeric: tabular-nums;
     }
-    .sv-product-toggle-icon {
-        position: relative; z-index: 1; display: grid; width: 42px; height: 42px; place-items: center; overflow: visible;
-        border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control);
-        background: var(--sv-soft); color: var(--sv-muted); font-size: .9rem;
-    }
-    .sv-product-toggle-icon img { position: relative; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; transition: transform .18s ease, box-shadow .18s ease; }
     .sv-product-toggle-copy { display: grid; gap: .12rem; min-width: 0; }
     .sv-product-toggle-id {
         overflow: hidden; color: var(--sv-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -250,8 +244,7 @@
     .sv-product-photo { position: relative; z-index: 1; cursor: zoom-in; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; transform-origin: center; }
     @media (hover: hover) and (pointer: fine) {
         .sv-product-photo:hover,
-        .sv-product-photo:focus-visible,
-        .sv-product-toggle-icon:hover img {
+        .sv-product-photo:focus-visible {
             z-index: 20; border-color: color-mix(in srgb, var(--sv-brand) 42%, var(--sv-line));
             box-shadow: 0 10px 24px rgba(16, 24, 40, .2); transform: scale(2.15);
         }
@@ -409,7 +402,7 @@
         .sv-records { display: block; padding: 0; }
         .sv-product-group { border-inline: 0; border-radius: 0; box-shadow: none; }
         .sv-product-group + .sv-product-group { border-top: 1px solid var(--sv-line); }
-        .sv-product-toggle { padding-inline: .75rem; }
+        .sv-product-toggle { padding-inline: 1rem; padding-left: 1.2rem; }
         .sv-product-group-body { display: block; padding: 0; }
         .sv-record {
             grid-template-areas: none; align-items: center; border: 0; border-bottom: 1px solid var(--sv-line);
@@ -462,7 +455,7 @@
         .sv-confirm-button--primary { order: -1; }
     }
     @media (prefers-reduced-motion: reduce) {
-        .sv-dashboard-content, .sv-record, .sv-save-feedback, .sv-product-photo, .sv-product-toggle-icon img { transition: none; }
+        .sv-dashboard-content, .sv-record, .sv-save-feedback, .sv-product-photo { transition: none; }
         .sv-dashboard-content.is-loading::before { animation: none; }
     }
 </style>
@@ -650,13 +643,6 @@
                         <section class="sv-product-group {{ $groupOpen ? 'is-open' : '' }}" data-product-group data-product-id="{{ $groupProduct?->id }}">
                             <button class="sv-product-toggle" type="button" aria-expanded="{{ $groupOpen ? 'true' : 'false' }}" aria-controls="{{ $groupId }}">
                                 <span class="sv-product-toggle-index" aria-hidden="true">{{ $loop->iteration }}</span>
-                                <span class="sv-product-toggle-icon" aria-hidden="true">
-                                    @if($groupProduct?->image_url)
-                                        <img src="{{ $groupProduct->image_url }}" alt="" loading="lazy">
-                                    @else
-                                        <i class="bi bi-image"></i>
-                                    @endif
-                                </span>
                                 <span class="sv-product-toggle-copy">
                                     <span class="sv-product-toggle-id">ID {{ $groupProduct?->item_id ?: '—' }}</span>
                                     <strong>{{ $groupProduct?->item_name ?: 'Produk tanpa nama' }}</strong>
