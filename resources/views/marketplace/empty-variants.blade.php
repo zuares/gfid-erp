@@ -144,18 +144,42 @@
     .sv-store-picker-label {
         display: inline-flex; align-items: center; gap: .35rem; min-height: 28px; font-size: .65rem; font-weight: 800; color: var(--sv-muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
     }
-    .sv-store-groups { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem; min-width: 0; }
-    .sv-store-group { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; min-width: 0; }
+    .sv-store-picker { display: grid; gap: .55rem; min-width: 0; }
+    .sv-store-filter-bar { display: flex; align-items: center; gap: .45rem; min-width: 0; }
+    .sv-store-search { position: relative; flex: 1 1 220px; min-width: 0; }
+    .sv-store-search > i { position: absolute; top: 50%; left: .7rem; color: var(--sv-muted); pointer-events: none; transform: translateY(-50%); }
+    .sv-store-search input {
+        width: 100%; min-height: 36px; padding: .4rem .65rem .4rem 2rem; border: 1px solid var(--sv-line);
+        border-radius: 9px; background: var(--sv-surface); color: var(--sv-content); font-size: max(16px, .72rem); outline: none;
+    }
+    .sv-store-search input:focus { border-color: var(--sv-brand); box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--sv-brand) 13%, transparent); }
+    .sv-store-filter-result { flex: 0 0 auto; color: var(--sv-muted); font-size: .66rem; white-space: nowrap; }
+    .sv-store-platform-tabs { display: flex; gap: .25rem; max-width: 100%; padding: .2rem; overflow-x: auto; border: 1px solid var(--sv-line); border-radius: 10px; background: var(--sv-soft); scrollbar-width: none; }
+    .sv-store-platform-tabs::-webkit-scrollbar { display: none; }
+    .sv-store-platform-tab {
+        display: inline-flex; flex: 0 0 auto; align-items: center; gap: .35rem; min-height: 32px; padding: .35rem .6rem;
+        border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--sv-muted); font-size: .7rem; font-weight: 800; white-space: nowrap;
+    }
+    .sv-store-platform-tab:hover { color: var(--sv-brand-strong); }
+    .sv-store-platform-tab.active { border-color: color-mix(in srgb, var(--sv-brand) 18%, var(--sv-line)); background: var(--sv-surface); box-shadow: 0 1px 2px rgba(16, 24, 40, .06); color: var(--sv-brand-strong); }
+    .sv-store-platform-tab:focus-visible { outline: 3px solid color-mix(in srgb, var(--sv-brand) 25%, transparent); outline-offset: 1px; }
+    .sv-store-platform-count { min-width: 19px; padding: .12rem .32rem; border-radius: 999px; background: var(--sv-soft); color: var(--sv-muted); font-size: .62rem; text-align: center; }
+    .sv-store-platform-tab.active .sv-store-platform-count { background: var(--sv-brand); color: #fff; }
+    .sv-store-groups { display: grid; gap: .45rem; min-width: 0; }
+    .sv-store-group { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .45rem; min-width: 0; }
     .sv-store-group-label {
         display: inline-flex; align-items: center; gap: .3rem; color: var(--sv-muted);
         font-size: .6rem; font-weight: 800; letter-spacing: .025em; text-transform: uppercase; white-space: nowrap;
     }
     .sv-store-group-label i { color: var(--sv-brand); }
     .sv-store-tab-list { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 0; }
+    .sv-store-empty { padding: .35rem .1rem 0; color: var(--sv-muted); font-size: .7rem; }
     @media (max-width: 767.98px) {
         .sv-store-group { width: 100%; padding-left: 0; border-left: 0; }
         .sv-store-tab-list { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; padding-bottom: .15rem; scrollbar-width: none; }
         .sv-store-tab-list::-webkit-scrollbar { display: none; }
+        .sv-store-filter-bar { align-items: stretch; flex-direction: column; }
+        .sv-store-filter-result { padding-left: .1rem; }
     }
     .sv-panel-summary {
         display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .55rem; padding: .45rem .6rem;
@@ -473,6 +497,11 @@
         ['key' => 'tiktok', 'label' => 'TikTok Shop', 'icon' => 'bi-music-note-beamed', 'stores' => $storesByChannel->get('tiktok', collect())],
         ['key' => 'shopee', 'label' => 'Shopee', 'icon' => 'bi-bag', 'stores' => $storesByChannel->get('shopee', collect())],
     ];
+    $selectedStore = $storeId > 0 ? $stores->firstWhere('id', $storeId) : null;
+    $selectedStoreChannel = strtolower((string) $selectedStore?->channel?->code);
+    $activeStorePlatform = in_array($selectedStoreChannel, ['tiktok', 'ttk', 'tt'], true)
+        ? 'tiktok'
+        : (in_array($selectedStoreChannel, ['shopee', 'shp'], true) ? 'shopee' : 'all');
 @endphp
 
 <main class="sv-page">
@@ -558,19 +587,42 @@
 
                 <div class="sv-store-picker-row">
                     <span class="sv-store-picker-label"><i class="bi bi-shop"></i> Toko</span>
-                    <div class="sv-store-groups" role="group" aria-label="Pilih toko marketplace">
-                        <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua</a>
-                        @foreach($storeGroups as $group)
-                            @continue($group['stores']->isEmpty())
-                            <section class="sv-store-group" aria-labelledby="svStoreGroup{{ ucfirst($group['key']) }}">
-                                <span class="sv-store-group-label" id="svStoreGroup{{ ucfirst($group['key']) }}"><i class="bi {{ $group['icon'] }}"></i>{{ $group['label'] }}</span>
-                                <nav class="sv-store-tab-list" aria-label="Toko {{ $group['label'] }}">
-                                    @foreach($group['stores'] as $store)
-                                        <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" aria-current="{{ $storeId === $store->id ? 'page' : 'false' }}" data-dashboard-link href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
-                                    @endforeach
-                                </nav>
-                            </section>
-                        @endforeach
+                    <div class="sv-store-picker" data-store-picker data-active-platform="{{ $activeStorePlatform }}">
+                        <div class="sv-store-filter-bar" role="search" aria-label="Cari toko marketplace">
+                            <div class="sv-store-search">
+                                <i class="bi bi-search" aria-hidden="true"></i>
+                                <input type="search" data-store-search placeholder="Cari nama atau ID toko..." autocomplete="off" aria-label="Cari nama atau ID toko">
+                            </div>
+                            <span class="sv-store-filter-result" data-store-result aria-live="polite"></span>
+                        </div>
+
+                        <div class="sv-store-platform-tabs" role="tablist" aria-label="Pilih platform marketplace">
+                            <button type="button" class="sv-store-platform-tab {{ $activeStorePlatform === 'all' ? 'active' : '' }}" data-store-platform="all" role="tab" aria-selected="{{ $activeStorePlatform === 'all' ? 'true' : 'false' }}">
+                                <i class="bi bi-grid"></i><span>Semua toko</span><span class="sv-store-platform-count">{{ $stores->count() }}</span>
+                            </button>
+                            @foreach($storeGroups as $group)
+                                @continue($group['stores']->isEmpty())
+                                <button type="button" class="sv-store-platform-tab {{ $activeStorePlatform === $group['key'] ? 'active' : '' }}" data-store-platform="{{ $group['key'] }}" role="tab" aria-selected="{{ $activeStorePlatform === $group['key'] ? 'true' : 'false' }}">
+                                    <i class="bi {{ $group['icon'] }}"></i><span>{{ $group['label'] }}</span><span class="sv-store-platform-count">{{ $group['stores']->count() }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+
+                        <div class="sv-store-groups" role="group" aria-label="Pilih toko marketplace">
+                            <a class="sv-store-tab {{ $storeId === 0 ? 'active' : '' }}" aria-current="{{ $storeId === 0 ? 'page' : 'false' }}" data-dashboard-link data-store-link data-store-all href="{{ route('marketplace.products.empty-variants', $allStoreFilters) }}"><i class="bi bi-grid"></i>Semua toko</a>
+                            @foreach($storeGroups as $group)
+                                @continue($group['stores']->isEmpty())
+                                <section class="sv-store-group" data-store-group data-store-channel="{{ $group['key'] }}" aria-labelledby="svStoreGroup{{ ucfirst($group['key']) }}">
+                                    <span class="sv-store-group-label" id="svStoreGroup{{ ucfirst($group['key']) }}"><i class="bi {{ $group['icon'] }}"></i>{{ $group['label'] }}</span>
+                                    <nav class="sv-store-tab-list" aria-label="Toko {{ $group['label'] }}">
+                                        @foreach($group['stores'] as $store)
+                                            <a class="sv-store-tab {{ $storeId === $store->id ? 'active' : '' }}" aria-current="{{ $storeId === $store->id ? 'page' : 'false' }}" data-dashboard-link data-store-link data-store-name="{{ $store->name }}" data-store-id="{{ $store->id }} {{ $store->code }}" href="{{ route('marketplace.products.empty-variants', array_merge($storeSharedFilters, ['store_id' => $store->id])) }}"><i class="bi bi-shop"></i>{{ $store->name }}</a>
+                                        @endforeach
+                                    </nav>
+                                </section>
+                            @endforeach
+                        </div>
+                        <span class="sv-store-empty" data-store-empty hidden>Toko tidak ditemukan.</span>
                     </div>
                 </div>
 
@@ -943,6 +995,70 @@
             loadDashboard(link.href);
         }));
     };
+    const bindStorePicker = () => {
+        const picker = document.querySelector('[data-store-picker]');
+        if (!picker) return;
+
+        const search = picker.querySelector('[data-store-search]');
+        const result = picker.querySelector('[data-store-result]');
+        const empty = picker.querySelector('[data-store-empty]');
+        const platformTabs = [...picker.querySelectorAll('[data-store-platform]')];
+        const storeGroups = [...picker.querySelectorAll('[data-store-group]')];
+        const storeLinks = [...picker.querySelectorAll('[data-store-link]:not([data-store-all])')];
+        const allStoreLink = picker.querySelector('[data-store-all]');
+
+        const apply = () => {
+            const platform = picker.dataset.activePlatform || 'all';
+            const query = String(search?.value || '').trim().toLowerCase();
+            let visibleCount = 0;
+
+            storeGroups.forEach(group => {
+                const platformMatches = platform === 'all' || group.dataset.storeChannel === platform;
+                let groupVisible = false;
+                group.querySelectorAll('[data-store-link]').forEach(link => {
+                    const haystack = `${link.dataset.storeName || ''} ${link.dataset.storeId || ''}`.toLowerCase();
+                    const matches = platformMatches && (!query || haystack.includes(query));
+                    link.hidden = !matches;
+                    groupVisible = groupVisible || matches;
+                    if (matches) visibleCount += 1;
+                });
+                group.hidden = !groupVisible;
+            });
+
+            if (allStoreLink) allStoreLink.hidden = Boolean(query && visibleCount === 0);
+            if (empty) empty.hidden = visibleCount > 0;
+            if (result) {
+                result.textContent = query || platform !== 'all'
+                    ? `${visibleCount} dari ${storeLinks.length} toko`
+                    : `${storeLinks.length} toko terhubung`;
+            }
+            platformTabs.forEach(tab => {
+                const active = tab.dataset.storePlatform === platform;
+                tab.classList.toggle('active', active);
+                tab.setAttribute('aria-selected', String(active));
+            });
+        };
+
+        search?.addEventListener('input', apply);
+        platformTabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => {
+                picker.dataset.activePlatform = tab.dataset.storePlatform || 'all';
+                apply();
+            });
+            tab.addEventListener('keydown', event => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const nextIndex = event.key === 'Home'
+                    ? 0
+                    : event.key === 'End'
+                        ? platformTabs.length - 1
+                        : (index + (event.key === 'ArrowRight' ? 1 : -1) + platformTabs.length) % platformTabs.length;
+                platformTabs[nextIndex]?.focus();
+                platformTabs[nextIndex]?.click();
+            });
+        });
+        apply();
+    };
     const bindStoreTabs = () => {
         const tabs = [...document.querySelectorAll('.sv-store-tab')];
         tabs.forEach((tab, index) => tab.addEventListener('keydown', event => {
@@ -957,7 +1073,7 @@
             tabs[nextIndex]?.click();
         }));
     };
-    const bindAll = () => { bindProductAccordions(); bindStockActions(); bindRealtimeFilter(); bindDashboardLinks(); bindStoreTabs(); };
+    const bindAll = () => { bindProductAccordions(); bindStockActions(); bindRealtimeFilter(); bindDashboardLinks(); bindStorePicker(); bindStoreTabs(); };
     window.addEventListener('popstate', () => loadDashboard(window.location.href, false));
     bindAll();
 })();
