@@ -259,6 +259,19 @@ class TikTokFinancialTransactionService
         $moneyIn = 0.0;
         $unknown = 0;
         $latestSync = null;
+        $gmvReferences = [];
+
+        foreach ($rows as $candidate) {
+            if (! $this->isGmvAdType($candidate->transaction_type)) {
+                continue;
+            }
+
+            $gmvReferences[(string) $candidate->external_transaction_id] = true;
+            $adjustmentId = data_get($candidate->source_payload ?? [], 'adjustment_id');
+            if (filled($adjustmentId)) {
+                $gmvReferences[(string) $adjustmentId] = true;
+            }
+        }
 
         foreach ($rows as $row) {
             $flow = strtoupper((string) ($row->money_flow ?? 'UNKNOWN'));
@@ -272,26 +285,19 @@ class TikTokFinancialTransactionService
 
                 continue;
             }
-            if ($flow !== 'MONEY_OUT') {
+            $isGmvPay = $this->isGmvAdType($row->transaction_type);
+            $isBilling = ! $isGmvPay && $this->isBillingType($row->transaction_type, $row->source_payload);
+            if ($isBilling && isset($gmvReferences[(string) $row->external_transaction_id])) {
+                continue;
+            }
+
+            if ($flow !== 'MONEY_OUT' && ! $isGmvPay && ! $isBilling) {
                 $unknown++;
 
                 continue;
             }
 
             $moneyOut += $amount;
-            $payloadText = strtoupper(json_encode($row->source_payload ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
-            $type = strtoupper((string) $row->transaction_type);
-            $isGmvPay = in_array($type, ['GMV_PAYMENT_FOR_ADS', 'GMV_PAY', 'GMV_PAYMENT'], true)
-                || str_contains($type, 'GMV_PAYMENT_FOR_ADS')
-                || (str_contains($payloadText, 'GMV') && str_contains($payloadText, 'AD'));
-            $isBilling = ! $isGmvPay && (
-                in_array($type, ['PAYMENT', 'BILLING', 'AD_BILLING', 'AD_PAYMENT', 'AD_CHARGE', 'TOP_UP'], true)
-                || str_contains($type, 'BILL')
-                || str_contains($type, 'AD_PAYMENT')
-                || str_contains($payloadText, 'BILLING')
-                || str_contains($payloadText, 'ADVERTIS')
-                || str_contains($payloadText, 'IKLAN')
-            );
             $bucket = $isGmvPay ? 'gmv_pay' : ($isBilling ? 'billing' : 'other_out');
             $buckets[$bucket]['count']++;
             $buckets[$bucket]['amount'] += $amount;
@@ -905,12 +911,33 @@ class TikTokFinancialTransactionService
                 'label' => 'Kompensasi Platform',
                 'badge' => 'info',
             ],
-            'GMV_PAYMENT_FOR_ADS' => ['label' => 'Pembayaran Iklan dari GMV', 'badge' => 'danger'],
+            'GMV_PAYMENT_FOR_ADS', 'GMV_PAYMENT_FOR_TIKTOK_ADS' => ['label' => 'Pembayaran Iklan dari GMV', 'badge' => 'danger'],
             default => [
                 'label' => ucwords(strtolower(str_replace('_', ' ', $type))),
                 'badge' => 'secondary',
             ],
         };
+    }
+
+    private function isGmvAdType(mixed $type): bool
+    {
+        $type = strtoupper(trim((string) $type));
+
+        return in_array($type, ['GMV_PAYMENT_FOR_ADS', 'GMV_PAY', 'GMV_PAYMENT'], true)
+            || str_contains($type, 'GMV_PAYMENT_FOR_');
+    }
+
+    private function isBillingType(mixed $type, mixed $payload): bool
+    {
+        $type = strtoupper(trim((string) $type));
+        $payloadText = strtoupper(json_encode(is_array($payload) ? $payload : [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
+
+        return in_array($type, ['PAYMENT', 'BILLING', 'AD_BILLING', 'AD_PAYMENT', 'AD_CHARGE', 'TOP_UP'], true)
+            || str_contains($type, 'BILL')
+            || str_contains($type, 'AD_PAYMENT')
+            || str_contains($payloadText, 'BILLING')
+            || str_contains($payloadText, 'ADVERTIS')
+            || str_contains($payloadText, 'IKLAN');
     }
 
     private function numericAmount(mixed $value): ?float

@@ -1835,6 +1835,8 @@ class MarketplaceAnalyticsSummaryService
      * Ads API facts take precedence. Imported income reports (including
      * TikTok advertising deductions) fill the gap when a store/day has no
      * positive API spend, matching AdsDashboardService's source policy.
+     * TikTok finance cash-out facts are the final temporary fallback while
+     * the delivery-cost API/import is not available yet.
      *
      * @return array<int, array{store_id: int, date: string, spend: float}>
      */
@@ -1857,16 +1859,22 @@ class MarketplaceAnalyticsSummaryService
                 ->get();
         }
 
+        $cashOutRows = $this->tiktokCashOutAdSpends($filters);
+
         $apiByKey = $apiRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
         $importedByKey = $importedRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
+        $cashOutByKey = collect($cashOutRows)->keyBy(fn (array $row): string => ((int) $row['store_id']).'|'.substr((string) $row['date'], 0, 10));
         $facts = [];
 
-        foreach ($apiByKey->keys()->merge($importedByKey->keys())->unique() as $key) {
+        foreach ($apiByKey->keys()->merge($importedByKey->keys())->merge($cashOutByKey->keys())->unique() as $key) {
             $api = $apiByKey->get($key);
             $imported = $importedByKey->get($key);
+            $cashOut = $cashOutByKey->get($key);
             $spend = $api && (float) ($api->spend ?? 0) > 0
                 ? (float) $api->spend
-                : (float) ($imported->spend ?? 0);
+                : ((float) ($imported->spend ?? 0) > 0
+                    ? (float) $imported->spend
+                    : (float) ($cashOut['spend'] ?? 0));
 
             if ($spend <= 0) {
                 continue;
@@ -1881,6 +1889,139 @@ class MarketplaceAnalyticsSummaryService
         }
 
         return $facts;
+    }
+
+    /**
+     * Temporary TikTok fallback based on money leaving GMV Pay / Ads billing.
+     * Statement GMV rows are authoritative; matching account PAYMENT rows are
+     * skipped to avoid counting the same charge twice.
+     *
+     * @return array<int, array{store_id:int, date:string, spend:float}>
+     */
+    private function tiktokCashOutAdSpends(array $filters): array
+    {
+        if (! Schema::hasTable('marketplace_tiktok_financial_transactions')) {
+            return [];
+        }
+
+        $rows = DB::table('marketplace_tiktok_financial_transactions as t')
+            ->join('stores as st', 'st.id', '=', 't.store_id')
+            ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->whereBetween('t.transaction_created_at', [
+                $filters['date_from'].' 00:00:00',
+                $filters['date_to'].' 23:59:59',
+            ])
+            ->whereRaw("LOWER(ch.code) IN ('tiktok', 'ttk', 'tkt', 'tt')")
+            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('t.store_id', $storeId))
+            ->where(function ($query): void {
+                $query
+                    ->whereRaw("UPPER(t.transaction_type) LIKE 'GMV_PAYMENT%'")
+                    ->orWhereIn('t.transaction_type', [
+                        'GMV_PAY',
+                        'GMV_PAYMENT',
+                        'PAYMENT',
+                        'BILLING',
+                        'AD_BILLING',
+                        'AD_PAYMENT',
+                        'AD_CHARGE',
+                        'TOP_UP',
+                    ]);
+            })
+            ->select([
+                't.store_id',
+                't.external_transaction_id',
+                't.transaction_type',
+                't.amount',
+                't.money_flow',
+                't.transaction_created_at',
+                't.source_payload',
+            ])
+            ->orderBy('t.id')
+            ->get();
+
+        $gmvReferences = [];
+        foreach ($rows as $row) {
+            if (! $this->isTikTokGmvAdType($row->transaction_type)) {
+                continue;
+            }
+
+            $gmvReferences[(string) $row->external_transaction_id] = true;
+            $payload = $this->decodeJsonPayload($row->source_payload);
+            if (filled($payload['adjustment_id'] ?? null)) {
+                $gmvReferences[(string) $payload['adjustment_id']] = true;
+            }
+        }
+
+        $totals = [];
+        foreach ($rows as $row) {
+            $type = strtoupper(trim((string) $row->transaction_type));
+            $isGmv = $this->isTikTokGmvAdType($type);
+            $isBilling = ! $isGmv && $this->isTikTokBillingType($type, $row->source_payload);
+            if (! $isGmv && ! $isBilling) {
+                continue;
+            }
+
+            if ($isBilling && isset($gmvReferences[(string) $row->external_transaction_id])) {
+                continue;
+            }
+
+            $amount = abs((float) $row->amount);
+            if ($amount <= 0 || strtoupper((string) ($row->money_flow ?? '')) === 'MONEY_IN') {
+                continue;
+            }
+
+            $date = Carbon::parse($row->transaction_created_at)->toDateString();
+            $key = ((int) $row->store_id).'|'.$date;
+            $totals[$key] = ($totals[$key] ?? 0) + $amount;
+        }
+
+        return collect($totals)
+            ->map(function (float $spend, string $key): array {
+                [$storeId, $date] = explode('|', $key, 2);
+
+                return [
+                    'store_id' => (int) $storeId,
+                    'date' => $date,
+                    'spend' => round($spend, 2),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function isTikTokGmvAdType(mixed $type): bool
+    {
+        $type = strtoupper(trim((string) $type));
+
+        return in_array($type, ['GMV_PAYMENT_FOR_ADS', 'GMV_PAY', 'GMV_PAYMENT'], true)
+            || str_contains($type, 'GMV_PAYMENT_FOR_');
+    }
+
+    private function isTikTokBillingType(string $type, mixed $payload): bool
+    {
+        $payloadText = strtoupper(json_encode($this->decodeJsonPayload($payload), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
+
+        return in_array($type, ['PAYMENT', 'BILLING', 'AD_BILLING', 'AD_PAYMENT', 'AD_CHARGE', 'TOP_UP'], true)
+            || str_contains($type, 'BILL')
+            || str_contains($type, 'AD_PAYMENT')
+            || str_contains($payloadText, 'BILLING')
+            || str_contains($payloadText, 'ADVERTIS')
+            || str_contains($payloadText, 'IKLAN');
+    }
+
+    private function decodeJsonPayload(mixed $payload): array
+    {
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        if (! is_string($payload) || trim($payload) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     private function operationalBase(array $filters)
