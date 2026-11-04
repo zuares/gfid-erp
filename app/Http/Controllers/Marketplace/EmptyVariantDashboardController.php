@@ -8,6 +8,7 @@ use App\Models\SkuMapping;
 use App\Services\Marketplace\MarketplaceVariantStockSummaryService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -56,100 +57,118 @@ class EmptyVariantDashboardController extends Controller
             $storeId = 0;
         }
 
-        $baseScopedQuery = $this->variantStockSummary->mappedEmptyStockQuery()
-            ->whereIn('mp_stock.store_id', $connectedStoreIds)
-            ->when($storeId > 0, fn (Builder $query) => $query->where('mp_stock.store_id', $storeId))
-            ->when($channel === 'tiktok', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['tiktok', 'ttk', 'tt']))
-            ->when($channel === 'shopee', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['shopee', 'shp']))
-            ->when($salesScope === 'best_sellers', fn (Builder $query) => $query->whereRaw($inventoryAverageSales.' > 0'))
-            ->when($minAverageSales !== null, fn (Builder $query) => $query->whereRaw($inventoryAverageSales.' > CAST(? AS DECIMAL(18,4))', [$minAverageSales]))
-            ->when($search !== '', function (Builder $query) use ($search): void {
-                $like = '%'.$search.'%';
-                $query->where(function (Builder $searchQuery) use ($like): void {
-                    $searchQuery->where('mp_stock.item_name', 'like', $like)
-                        ->orWhere('marketplace_product_models.model_name', 'like', $like)
-                        ->orWhere('marketplace_product_models.model_sku', 'like', $like)
-                        ->orWhere('marketplace_product_models.model_id', 'like', $like);
+        $showProductList = $storeId > 0;
+        if ($showProductList) {
+            $baseScopedQuery = $this->variantStockSummary->mappedEmptyStockQuery()
+                ->whereIn('mp_stock.store_id', $connectedStoreIds)
+                ->where('mp_stock.store_id', $storeId)
+                ->when($channel === 'tiktok', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['tiktok', 'ttk', 'tt']))
+                ->when($channel === 'shopee', fn (Builder $query) => $query->whereIn(DB::raw('LOWER(ch_stock.code)'), ['shopee', 'shp']))
+                ->when($salesScope === 'best_sellers', fn (Builder $query) => $query->whereRaw($inventoryAverageSales.' > 0'))
+                ->when($minAverageSales !== null, fn (Builder $query) => $query->whereRaw($inventoryAverageSales.' > CAST(? AS DECIMAL(18,4))', [$minAverageSales]))
+                ->when($search !== '', function (Builder $query) use ($search): void {
+                    $like = '%'.$search.'%';
+                    $query->where(function (Builder $searchQuery) use ($like): void {
+                        $searchQuery->where('mp_stock.item_name', 'like', $like)
+                            ->orWhere('marketplace_product_models.model_name', 'like', $like)
+                            ->orWhere('marketplace_product_models.model_sku', 'like', $like)
+                            ->orWhere('marketplace_product_models.model_id', 'like', $like);
+                    });
                 });
-            });
 
-        // Evaluate the expensive mapping + inventory expression once, then
-        // derive all badges from the same subquery instead of scanning it three
-        // times for every page request.
-        $variantStockQuery = (clone $baseScopedQuery)
-            ->select([
-                'marketplace_product_models.stock',
-                'marketplace_product_models.marketplace_product_id',
-            ])
-            ->selectRaw($inventoryAvailableStock.' as internal_available_stock');
+            // Evaluate the expensive mapping + inventory expression once, then
+            // derive all badges from the same subquery instead of scanning it three
+            // times for every page request.
+            $variantStockQuery = (clone $baseScopedQuery)
+                ->select([
+                    'marketplace_product_models.stock',
+                    'marketplace_product_models.marketplace_product_id',
+                ])
+                ->selectRaw($inventoryAvailableStock.' as internal_available_stock');
 
-        $stockAggregate = DB::query()
-            ->fromSub($variantStockQuery, 'variant_stock')
-            ->selectRaw('COUNT(*) as mapped_total')
-            ->selectRaw('COUNT(DISTINCT marketplace_product_id) as mapped_product_count')
-            ->selectRaw('SUM(CASE WHEN stock <= 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as empty_total')
-            ->selectRaw('SUM(CASE WHEN stock = 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as zero_count')
-            ->selectRaw('SUM(CASE WHEN stock < 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as negative_count')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN stock <= 0 AND internal_available_stock > 0 THEN marketplace_product_id END) as empty_product_count')
-            ->selectRaw('SUM(CASE WHEN stock > 0 AND internal_available_stock <= 0 THEN 1 ELSE 0 END) as internal_empty_mp_stock_count')
-            ->selectRaw('COUNT(DISTINCT CASE WHEN stock > 0 AND internal_available_stock <= 0 THEN marketplace_product_id END) as internal_empty_product_count')
-            ->first();
+            $stockAggregate = DB::query()
+                ->fromSub($variantStockQuery, 'variant_stock')
+                ->selectRaw('COUNT(*) as mapped_total')
+                ->selectRaw('COUNT(DISTINCT marketplace_product_id) as mapped_product_count')
+                ->selectRaw('SUM(CASE WHEN stock <= 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as empty_total')
+                ->selectRaw('SUM(CASE WHEN stock = 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as zero_count')
+                ->selectRaw('SUM(CASE WHEN stock < 0 AND internal_available_stock > 0 THEN 1 ELSE 0 END) as negative_count')
+                ->selectRaw('COUNT(DISTINCT CASE WHEN stock <= 0 AND internal_available_stock > 0 THEN marketplace_product_id END) as empty_product_count')
+                ->selectRaw('SUM(CASE WHEN stock > 0 AND internal_available_stock <= 0 THEN 1 ELSE 0 END) as internal_empty_mp_stock_count')
+                ->selectRaw('COUNT(DISTINCT CASE WHEN stock > 0 AND internal_available_stock <= 0 THEN marketplace_product_id END) as internal_empty_product_count')
+                ->first();
 
-        $emptyTotal = (int) ($stockAggregate->empty_total ?? 0);
-        $zeroCount = (int) ($stockAggregate->zero_count ?? 0);
-        $negativeCount = (int) ($stockAggregate->negative_count ?? 0);
-        $internalEmptyCount = (int) ($stockAggregate->internal_empty_mp_stock_count ?? 0);
-        $mappedTotal = (int) ($stockAggregate->mapped_total ?? 0);
-        $mappedProductCount = (int) ($stockAggregate->mapped_product_count ?? 0);
+            $emptyTotal = (int) ($stockAggregate->empty_total ?? 0);
+            $zeroCount = (int) ($stockAggregate->zero_count ?? 0);
+            $negativeCount = (int) ($stockAggregate->negative_count ?? 0);
+            $internalEmptyCount = (int) ($stockAggregate->internal_empty_mp_stock_count ?? 0);
+            $mappedTotal = (int) ($stockAggregate->mapped_total ?? 0);
+            $mappedProductCount = (int) ($stockAggregate->mapped_product_count ?? 0);
 
-        $summary = [
-            'total' => match ($stockScope) {
-                'internal_empty_marketplace_stock' => $internalEmptyCount,
-                'marketplace_empty' => $emptyTotal,
-                default => $mappedTotal,
-            },
-            'mapped_total' => $mappedTotal,
-            'empty_total' => $emptyTotal,
-            'zero' => $zeroCount,
-            'negative' => $negativeCount,
-            'marketplace_available' => $internalEmptyCount,
-            'internal_empty_mp_stock' => $internalEmptyCount,
-            'products' => match ($stockScope) {
-                'internal_empty_marketplace_stock' => (int) ($stockAggregate->internal_empty_product_count ?? 0),
-                'marketplace_empty' => (int) ($stockAggregate->empty_product_count ?? 0),
-                default => $mappedProductCount,
-            },
-        ];
+            $summary = [
+                'total' => match ($stockScope) {
+                    'internal_empty_marketplace_stock' => $internalEmptyCount,
+                    'marketplace_empty' => $emptyTotal,
+                    default => $mappedTotal,
+                },
+                'mapped_total' => $mappedTotal,
+                'empty_total' => $emptyTotal,
+                'zero' => $zeroCount,
+                'negative' => $negativeCount,
+                'marketplace_available' => $internalEmptyCount,
+                'internal_empty_mp_stock' => $internalEmptyCount,
+                'products' => match ($stockScope) {
+                    'internal_empty_marketplace_stock' => (int) ($stockAggregate->internal_empty_product_count ?? 0),
+                    'marketplace_empty' => (int) ($stockAggregate->empty_product_count ?? 0),
+                    default => $mappedProductCount,
+                },
+            ];
 
-        $variantsQuery = clone $baseScopedQuery;
-        if ($stockScope === 'internal_empty_marketplace_stock') {
-            $variantsQuery
-                ->where('marketplace_product_models.stock', '>', 0)
-                ->whereRaw($inventoryAvailableStock.' <= 0');
-        } elseif ($stockScope === 'marketplace_empty') {
-            $variantsQuery->whereRaw($inventoryAvailableStock.' > 0');
-            if ($stockStatus === 'zero') {
-                $variantsQuery->where('marketplace_product_models.stock', 0);
-            } elseif ($stockStatus === 'negative') {
-                $variantsQuery->where('marketplace_product_models.stock', '<', 0);
+            $variantsQuery = clone $baseScopedQuery;
+            if ($stockScope === 'internal_empty_marketplace_stock') {
+                $variantsQuery
+                    ->where('marketplace_product_models.stock', '>', 0)
+                    ->whereRaw($inventoryAvailableStock.' <= 0');
+            } elseif ($stockScope === 'marketplace_empty') {
+                $variantsQuery->whereRaw($inventoryAvailableStock.' > 0');
+                if ($stockStatus === 'zero') {
+                    $variantsQuery->where('marketplace_product_models.stock', 0);
+                } elseif ($stockStatus === 'negative') {
+                    $variantsQuery->where('marketplace_product_models.stock', '<', 0);
+                }
             }
+
+            $variants = $variantsQuery
+                ->select('marketplace_product_models.*')
+                ->selectRaw($inventoryAverageSales.' as average_daily_sales')
+                ->with([
+                    'product:id,store_id,item_id,item_name,item_sku,item_status,image_url,synced_at',
+                    'product.store:id,name,code,channel_id',
+                    'product.store.channel:id,code,name',
+                ])
+                ->when($salesScope === 'best_sellers', fn (Builder $query) => $query->orderByDesc('average_daily_sales'))
+                ->orderBy('marketplace_product_models.stock')
+                ->orderBy('mp_stock.item_name')
+                ->simplePaginate(25)
+                ->withQueryString();
+
+            $this->attachMappingsAndInternalStocks($variants->getCollection());
+        } else {
+            $summary = [
+                'total' => 0,
+                'mapped_total' => 0,
+                'empty_total' => 0,
+                'zero' => 0,
+                'negative' => 0,
+                'marketplace_available' => 0,
+                'internal_empty_mp_stock' => 0,
+                'products' => 0,
+            ];
+            $variants = new Paginator(collect(), 25, 1, [
+                'path' => $request->url(),
+            ]);
+            $variants->withQueryString();
         }
-
-        $variants = $variantsQuery
-            ->select('marketplace_product_models.*')
-            ->selectRaw($inventoryAverageSales.' as average_daily_sales')
-            ->with([
-                'product:id,store_id,item_id,item_name,item_sku,item_status,image_url,synced_at',
-                'product.store:id,name,code,channel_id',
-                'product.store.channel:id,code,name',
-            ])
-            ->when($salesScope === 'best_sellers', fn (Builder $query) => $query->orderByDesc('average_daily_sales'))
-            ->orderBy('marketplace_product_models.stock')
-            ->orderBy('mp_stock.item_name')
-            ->simplePaginate(25)
-            ->withQueryString();
-
-        $this->attachMappingsAndInternalStocks($variants->getCollection());
 
         return view('marketplace.empty-variants', compact(
             'variants',
@@ -162,6 +181,7 @@ class EmptyVariantDashboardController extends Controller
             'storeId',
             'salesScope',
             'minAverageSales',
+            'showProductList',
         ));
     }
 
