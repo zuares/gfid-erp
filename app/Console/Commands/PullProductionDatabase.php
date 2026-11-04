@@ -65,8 +65,8 @@ class PullProductionDatabase extends Command
 
         $backupDir = storage_path('backups');
         File::ensureDirectoryExists($backupDir);
-        $staged = storage_path('app/private/.db-pull-' . Str::uuid() . '.sqlite');
-        $remoteSnapshot = '/tmp/gfid-db-pull-' . Str::uuid() . '.sqlite';
+        $staged = storage_path('app/private/.db-pull-'.Str::uuid().'.sqlite');
+        $remoteSnapshot = '/tmp/gfid-db-pull-'.Str::uuid().'.sqlite';
         $remoteWasCreated = false;
 
         try {
@@ -77,7 +77,15 @@ class PullProductionDatabase extends Command
                 }
                 $remoteWasCreated = true;
 
-                if (! $this->runProcess(['scp', "{$ssh}:{$remoteSnapshot}", $staged])) {
+                if (! $this->runProcess([
+                    'scp',
+                    '-o',
+                    'RequestTTY=no',
+                    '-o',
+                    'RemoteCommand=none',
+                    "{$ssh}:{$remoteSnapshot}",
+                    $staged,
+                ])) {
                     return self::FAILURE;
                 }
             } else {
@@ -100,6 +108,10 @@ class PullProductionDatabase extends Command
                 return self::FAILURE;
             }
 
+            if (! $this->assertHealthySqlite($staged)) {
+                return self::FAILURE;
+            }
+
             $this->line("Target dev: {$target}");
             $this->warn('Data production dapat berisi kredensial, token, dan data pelanggan.');
 
@@ -110,17 +122,17 @@ class PullProductionDatabase extends Command
             }
 
             if (! $this->option('no-backup') && File::exists($target)) {
-                $safetyBackup = $backupDir . '/before_pull_prod_' . now()->format('Ymd_His') . '.sqlite';
+                $safetyBackup = $backupDir.'/before_pull_prod_'.now()->format('Ymd_His').'.sqlite';
                 if (! File::copy($target, $safetyBackup)) {
                     $this->error('Backup database dev gagal dibuat; proses dibatalkan.');
 
                     return self::FAILURE;
                 }
-                $this->info('Backup dev: ' . $safetyBackup);
+                $this->info('Backup dev: '.$safetyBackup);
             }
 
             File::ensureDirectoryExists(dirname($target));
-            $replacement = $target . '.pulling-' . Str::uuid();
+            $replacement = $target.'.pulling-'.Str::uuid();
             if (! File::copy($staged, $replacement)) {
                 $this->error('Gagal menyiapkan database pengganti.');
 
@@ -142,7 +154,10 @@ class PullProductionDatabase extends Command
             File::delete($staged);
 
             if ($remoteWasCreated) {
-                $this->runProcess(['ssh', $ssh, 'rm', '-f', '--', $remoteSnapshot], true);
+                $this->runProcess(
+                    $this->sshCommand($ssh, 'rm -f -- '.escapeshellarg($remoteSnapshot)),
+                    true,
+                );
             }
         }
     }
@@ -195,10 +210,56 @@ class PullProductionDatabase extends Command
         $backupCommand = sprintf(
             'sqlite3 --bail %s %s',
             escapeshellarg($remotePath),
-            escapeshellarg('.backup ' . $remoteSnapshot),
+            escapeshellarg('.backup '.$remoteSnapshot),
         );
 
-        return $this->runProcess(['ssh', $ssh, $backupCommand]);
+        return $this->runProcess($this->sshCommand($ssh, $backupCommand));
+    }
+
+    /** @return array<int, string> */
+    private function sshCommand(string $ssh, string $remoteCommand): array
+    {
+        return [
+            'ssh',
+            '-n',
+            '-T',
+            '-o',
+            'RequestTTY=no',
+            '-o',
+            'RemoteCommand=none',
+            $ssh,
+            $remoteCommand,
+        ];
+    }
+
+    private function assertHealthySqlite(string $path): bool
+    {
+        $this->info('Memvalidasi integrity snapshot SQLite.');
+
+        $process = new Process(
+            ['sqlite3', '--bail', $path, 'PRAGMA quick_check;'],
+            base_path(),
+        );
+        $process->setTimeout(null);
+        $process->run();
+
+        if (! $process->isSuccessful() || trim($process->getOutput()) !== 'ok') {
+            $this->error('Snapshot ditolak: PRAGMA quick_check tidak menghasilkan ok.');
+
+            if (trim($process->getErrorOutput()) !== '') {
+                $this->error(trim($process->getErrorOutput()));
+            }
+
+            if (trim($process->getOutput()) !== '') {
+                $this->line(trim($process->getOutput()));
+            }
+
+            return false;
+        }
+
+        $this->info('Integrity snapshot: OK.');
+
+        return true;
     }
 
     private function runProcess(array $command, bool $quiet = false): bool
@@ -215,7 +276,7 @@ class PullProductionDatabase extends Command
             if (! $quiet && trim($process->getErrorOutput()) !== '') {
                 $this->error(trim($process->getErrorOutput()));
             }
-            $this->error('Perintah eksternal gagal: ' . $process->getCommandLine());
+            $this->error('Perintah eksternal gagal: '.$process->getCommandLine());
         }
 
         return $process->isSuccessful();

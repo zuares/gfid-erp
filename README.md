@@ -87,9 +87,10 @@ php artisan db:pull-prod \
   --source=/path/ke/production.sqlite \
   --target=database/database_dev.sqlite
 
-Perintah ini membuat backup database dev di storage/backups/ sebelum overwrite,
-lalu membersihkan cache Laravel. Untuk snapshot via SSH, server harus memiliki
-sqlite3 dan user SSH harus dapat membaca file database production.
+Perintah ini memvalidasi `PRAGMA quick_check`, membuat backup database dev di
+storage/backups/ sebelum overwrite, dan membersihkan cache Laravel. Untuk
+snapshot via SSH, server harus memiliki sqlite3 dan user SSH harus dapat
+membaca file database production.
 
 Gunakan --force untuk melewati konfirmasi. Gunakan --no-backup hanya jika
 database dev sudah dibackup dengan cara lain.
