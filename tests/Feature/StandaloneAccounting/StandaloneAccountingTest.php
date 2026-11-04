@@ -86,8 +86,8 @@ it('keeps the standalone chart of accounts isolated from legacy accounting', fun
         ->assertSee('Kas')
         ->assertSee('Bank');
 
-    // Includes the three WIP detail accounts added by the production migrations.
-    expect(StandaloneAccountingAccount::count())->toBe(51)
+    // Includes three WIP detail accounts and dedicated employee loan/savings accounts.
+    expect(StandaloneAccountingAccount::count())->toBe(54)
         ->and(StandaloneAccountingAccount::whereIn('code', ['1101', '1111', '1112', '1113', '1114'])->count())->toBe(0);
 });
 

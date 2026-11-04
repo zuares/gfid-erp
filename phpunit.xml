@@ -31,5 +31,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Standalone posting is enabled only inside tests; runtime .env stays OFF. -->
+        <env name="ACCOUNTING_STANDALONE_DUAL_POSTING_PAYROLL_ENABLED" value="true"/>
+        <env name="ACCOUNTING_STANDALONE_DUAL_POSTING_EMPLOYEE_BALANCES_ENABLED" value="true"/>
     </php>
 </phpunit>
