@@ -1352,7 +1352,8 @@ class ItemController extends Controller
     public function meta(Request $request)
     {
         $id = (int) $request->get('item_id');
-        $item = \App\Models\Item::select('id', 'default_allocation', 'default_expense_account_id', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor')
+        $item = \App\Models\Item::with('role:id,code')
+            ->select('id', 'default_allocation', 'default_expense_account_id', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor', 'item_role', 'item_role_id')
             ->where('id', $id)
             ->first();
 
@@ -1367,6 +1368,7 @@ class ItemController extends Controller
             'stock_unit' => $item->stockUnit(),
             'purchase_unit' => $item->purchaseUnit(),
             'purchase_conversion_factor' => $item->purchaseConversionFactor(),
+            'force_purchase_unit' => $item->isPackaging() && $item->purchaseConversionFactor() > 1,
         ]);
     }
 }

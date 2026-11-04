@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Item;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptLine;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderLine;
 use App\Models\Supplier;
 use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -116,6 +118,90 @@ class PurchaseUnitConversionTest extends TestCase
         $this->assertSame('pcs', $line->stock_unit);
         $this->assertEqualsWithDelta(1, (float) $line->conversion_factor, 0.000001);
         $this->assertEqualsWithDelta(3000, (float) $po->subtotal, 0.01);
+    }
+
+    public function test_packaging_po_cannot_override_master_pack_with_stock_pcs(): void
+    {
+        $supplier = Supplier::create(['code' => 'PACK-SUP', 'name' => 'Packing supplier']);
+        $item = Item::create([
+            'code' => 'OPP-PACK-GUARD',
+            'name' => 'Plastik OPP guard',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'Pack',
+            'purchase_conversion_factor' => 500,
+            'item_role' => 'shipping_supply',
+            'type' => 'material',
+        ]);
+
+        /** @var PurchaseOrderService $service */
+        $service = app(PurchaseOrderService::class);
+        $po = $service->create([
+            'date' => now()->toDateString(),
+            'supplier_id' => $supplier->id,
+            'lines' => [[
+                'item_id' => $item->id,
+                'qty' => 1,
+                'purchase_unit' => 'pcs',
+                'stock_unit' => 'pcs',
+                'conversion_factor' => 1,
+                'unit_price' => 80000,
+            ]],
+        ]);
+
+        $line = $po->lines()->firstOrFail();
+
+        $this->assertSame('Pack', $line->purchase_unit);
+        $this->assertSame('pcs', $line->stock_unit);
+        $this->assertEqualsWithDelta(500, (float) $line->conversion_factor, 0.000001);
+        $this->assertEqualsWithDelta(500, $line->stockQty(), 0.000001);
+    }
+
+    public function test_backfill_command_updates_only_an_unposted_po_line(): void
+    {
+        $supplier = Supplier::create(['code' => 'BACKFILL-SUP', 'name' => 'Backfill supplier']);
+        $item = Item::create([
+            'code' => 'OPP-BACKFILL',
+            'name' => 'Plastik OPP backfill',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'Pack',
+            'purchase_conversion_factor' => 500,
+            'item_role' => 'shipping_supply',
+            'type' => 'material',
+        ]);
+        $order = PurchaseOrder::create([
+            'code' => 'PO-BACKFILL',
+            'date' => now()->toDateString(),
+            'supplier_id' => $supplier->id,
+            'status' => 'draft',
+            'subtotal' => 80000,
+            'grand_total' => 80000,
+        ]);
+        $line = PurchaseOrderLine::create([
+            'purchase_order_id' => $order->id,
+            'item_id' => $item->id,
+            'qty' => 1,
+            'purchase_unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'conversion_factor' => 1,
+            'unit_price' => 80000,
+            'line_total' => 80000,
+        ]);
+
+        $this->artisan('purchasing:backfill-packing-units', ['--item' => $item->id])
+            ->assertExitCode(0);
+        $this->assertSame('pcs', $line->fresh()->purchase_unit);
+
+        $this->artisan('purchasing:backfill-packing-units', [
+            '--item' => $item->id,
+            '--apply' => true,
+        ])->assertExitCode(0);
+
+        $line->refresh();
+        $this->assertSame('Pack', $line->purchase_unit);
+        $this->assertSame('pcs', $line->stock_unit);
+        $this->assertEqualsWithDelta(500, (float) $line->conversion_factor, 0.000001);
     }
 
     public function test_latest_grn_price_uses_item_conversion_when_legacy_line_unit_differs_from_master(): void

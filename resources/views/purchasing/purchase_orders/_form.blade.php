@@ -1556,6 +1556,8 @@
                         $masterStockUnit = trim((string) ($line['item']['stock_unit'] ?? ($line['item']['unit'] ?? 'pcs'))) ?: 'pcs';
                         $masterConversionFactor = (float) ($line['item']['purchase_conversion_factor'] ?? 1);
                         $masterConversionFactor = $masterConversionFactor > 0 ? $masterConversionFactor : 1;
+                        $forcePurchaseUnit = ($line['item']['item_role'] ?? null) === 'shipping_supply'
+                            || ($line['item']['role']['code'] ?? null) === 'PKG';
                         $unitOptions = [];
                         $pushUnitOption = function (string $unit, string $stock, float $factor) use (&$unitOptions): void {
                             $unit = trim($unit) ?: 'pcs';
@@ -1570,7 +1572,9 @@
                         };
                         $pushUnitOption((string) $purchaseUnit, (string) $stockUnit, $conversionFactor);
                         $pushUnitOption($masterPurchaseUnit, $masterStockUnit, $masterConversionFactor);
-                        $pushUnitOption($masterStockUnit, $masterStockUnit, 1);
+                        if (! $forcePurchaseUnit) {
+                            $pushUnitOption($masterStockUnit, $masterStockUnit, 1);
+                        }
 
                         // ✅ NEW: allocation + expense account (hidden, auto)
                         // fallback: hpp
@@ -2196,6 +2200,7 @@
                 stockUnit = 'pcs',
                 conversionFactor = 1,
                 preferredUnit = purchaseUnit,
+                forcePurchaseUnit = false,
             } = {}) {
                 const select = tr?.querySelector('[data-line-unit-select]');
                 if (!select) return;
@@ -2210,7 +2215,7 @@
                 };
 
                 addOption(purchaseUnit, stockUnit, conversionFactor);
-                if (purchaseUnit.toLowerCase() !== stockUnit.toLowerCase()) {
+                if (!forcePurchaseUnit && purchaseUnit.toLowerCase() !== stockUnit.toLowerCase()) {
                     addOption(stockUnit, stockUnit, 1);
                 }
 
@@ -2260,6 +2265,7 @@
                     stockUnit,
                     conversionFactor,
                     preferredUnit: purchaseUnit,
+                    forcePurchaseUnit: !!meta.force_purchase_unit,
                 });
 
                 const alloc = (meta.default_allocation === 'expense') ? 'expense' : 'hpp';

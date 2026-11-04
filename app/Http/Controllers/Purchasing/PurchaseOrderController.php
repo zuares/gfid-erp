@@ -158,11 +158,11 @@ class PurchaseOrderController extends Controller
 
         $itemQuery = Item::query()
             ->select([
-                'id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor', 'item_category_id', 'type', 'active',
+                'id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor', 'item_category_id', 'item_role', 'item_role_id', 'type', 'active',
                 'default_allocation', 'default_expense_account_id',
             ])
             ->where('active', 1)
-            ->with(['category:id,code,name'])
+            ->with(['category:id,code,name', 'role:id,code'])
             ->orderByRaw("
                 CASE
                     WHEN item_category_id = (SELECT id FROM item_categories WHERE code='PACK' LIMIT 1) THEN 0
@@ -191,7 +191,7 @@ class PurchaseOrderController extends Controller
 
         // PR-D: Pre-fill dari Purchase Request jika from_pr dikirim
         if ($request->filled('from_pr') && \Illuminate\Support\Facades\Schema::hasTable('purchase_requests')) {
-            $pr = \App\Models\PurchaseRequest::with('lines.item')->find((int) $request->from_pr);
+            $pr = \App\Models\PurchaseRequest::with('lines.item.role')->find((int) $request->from_pr);
 
             if ($pr && $pr->isApproved() && is_null($pr->converted_to_po_id)) {
                 $fromPr = $pr;
@@ -734,7 +734,7 @@ class PurchaseOrderController extends Controller
                 ->with('error', 'PO terkunci karena sudah ada GRN. Tidak dapat diedit.');
         }
 
-        $purchase_order->load(['lines.item', 'paymentMethod']);
+        $purchase_order->load(['lines.item.role', 'paymentMethod']);
 
         $suppliers = Supplier::query()
             ->where('type', 'supplier')
@@ -766,7 +766,7 @@ class PurchaseOrderController extends Controller
 
         $itemsBaseQuery = Item::query()
             ->where('active', 1)
-            ->with('category')
+            ->with(['category', 'role:id,code'])
             ->orderByRaw("
                 CASE
                     WHEN item_category_id = (SELECT id FROM item_categories WHERE code='PACK' LIMIT 1) THEN 0
@@ -788,7 +788,7 @@ class PurchaseOrderController extends Controller
         if (! empty($lineItemIds)) {
             $itemsLine = Item::query()
                 ->whereIn('id', $lineItemIds)
-                ->with('category')
+                ->with(['category', 'role:id,code'])
                 ->get();
         }
 

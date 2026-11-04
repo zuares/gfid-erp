@@ -374,6 +374,7 @@ class PurchaseOrderService
             ->pluck('item_id')->filter()->map(fn ($v) => (int) $v)->unique()->values()->all();
         $itemsById = Item::query()
             ->whereIn('id', array_merge($incomingItemIds, array_keys($referencedByItem)))
+            ->with('role:id,code')
             ->get()->keyBy('id');
 
         // Agregasi qty incoming per item (form bisa mengirim item sama di >1 baris)
@@ -561,6 +562,18 @@ class PurchaseOrderService
         $masterFactor = $item->purchaseConversionFactor();
         $masterFactor = $masterFactor > 0 ? $masterFactor : 1.0;
 
+        // Perlengkapan packing dibeli mengikuti satuan pembelian di Master.
+        // Satuan stok (mis. pcs) tetap dipakai untuk konversi persediaan, bukan
+        // sebagai pilihan pembelian alternatif. Ini mencegah OPP 1 pack x 500
+        // pcs tersimpan sebagai 1 pcs hanya karena hidden input dari browser.
+        if ($item->isPackaging() && $masterFactor > 1) {
+            return [
+                'purchase_unit' => $masterPurchaseUnit,
+                'stock_unit' => $masterStockUnit,
+                'conversion_factor' => $masterFactor,
+            ];
+        }
+
         $requestedUnit = trim((string) ($row['purchase_unit'] ?? ''));
         $requestedStock = trim((string) ($row['stock_unit'] ?? ''));
         $requestedFactor = (float) ($row['conversion_factor'] ?? 0);
@@ -654,6 +667,8 @@ class PurchaseOrderService
             ->select(array_values(array_filter([
                 'id',
                 'type',
+                'item_role',
+                'item_role_id',
                 'unit',
                 'stock_unit',
                 'purchase_unit',
@@ -662,6 +677,7 @@ class PurchaseOrderService
                 $hasItemDefaultExpAcc ? 'default_expense_account_id' : null,
             ])))
             ->whereIn('id', $itemIds)
+            ->with('role:id,code')
             ->get()
             ->keyBy('id');
 
