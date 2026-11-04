@@ -62,6 +62,73 @@ class FinishingPilotLifecycleTest extends TestCase
         }
     }
 
+    public function test_finishing_sewing_reject_maps_to_reject_inventory_account(): void
+    {
+        config(['accounting.standalone_dual_posting_production_finishing_enabled' => true]);
+
+        // Reject jahit secara fisik masuk REJ-SEW, tetapi pada Akuntansi Baru
+        // tetap dipetakan ke akun persediaan reject 1-153.
+        $this->legacyJournal(StandaloneProductionPostingService::SOURCE_FINISHING_JOB, 8204, [
+            ['code' => '1204', 'debit' => 40, 'credit' => 0],
+            ['code' => '1202', 'debit' => 0, 'credit' => 40],
+        ]);
+
+        $mirrors = app(StandaloneProductionPostingService::class)->mirrorFinishingJob(8204);
+        $mirror = $mirrors[0];
+
+        $this->assertEqualsWithDelta(40, (float) $mirror->lines->sum('debit'), 0.01);
+        $this->assertEqualsWithDelta(40, (float) $mirror->lines->sum('credit'), 0.01);
+        $this->assertDatabaseHas('standalone_accounting_journal_lines', [
+            'journal_id' => $mirror->id,
+            'account_id' => StandaloneAccountingAccount::where('code', '1-153')->value('id'),
+            'debit' => 40,
+            'credit' => 0,
+        ]);
+        $this->assertDatabaseHas('standalone_accounting_journal_lines', [
+            'journal_id' => $mirror->id,
+            'account_id' => StandaloneAccountingAccount::where('code', '1-151-03')->value('id'),
+            'debit' => 0,
+            'credit' => 40,
+        ]);
+    }
+
+    public function test_finishing_material_reject_keeps_ok_and_reject_in_separate_accounts(): void
+    {
+        config(['accounting.standalone_dual_posting_production_finishing_enabled' => true]);
+
+        // Reject bahan/finishing masuk REJ-FIN. OK tetap 1-152, reject 1-153,
+        // dan seluruh WIP yang keluar dikredit ke 1-151-03.
+        $this->legacyJournal(StandaloneProductionPostingService::SOURCE_FINISHING_JOB, 8205, [
+            ['code' => '1203', 'debit' => 60, 'credit' => 0],
+            ['code' => '1204', 'debit' => 40, 'credit' => 0],
+            ['code' => '1202', 'debit' => 0, 'credit' => 100],
+        ]);
+
+        $mirrors = app(StandaloneProductionPostingService::class)->mirrorFinishingJob(8205);
+        $mirror = $mirrors[0];
+
+        $this->assertEqualsWithDelta(100, (float) $mirror->lines->sum('debit'), 0.01);
+        $this->assertEqualsWithDelta(100, (float) $mirror->lines->sum('credit'), 0.01);
+        $this->assertDatabaseHas('standalone_accounting_journal_lines', [
+            'journal_id' => $mirror->id,
+            'account_id' => StandaloneAccountingAccount::where('code', '1-152')->value('id'),
+            'debit' => 60,
+            'credit' => 0,
+        ]);
+        $this->assertDatabaseHas('standalone_accounting_journal_lines', [
+            'journal_id' => $mirror->id,
+            'account_id' => StandaloneAccountingAccount::where('code', '1-153')->value('id'),
+            'debit' => 40,
+            'credit' => 0,
+        ]);
+        $this->assertDatabaseHas('standalone_accounting_journal_lines', [
+            'journal_id' => $mirror->id,
+            'account_id' => StandaloneAccountingAccount::where('code', '1-151-03')->value('id'),
+            'debit' => 0,
+            'credit' => 100,
+        ]);
+    }
+
     public function test_finishing_void_creates_voided_reversals_and_repost_trace(): void
     {
         config(['accounting.standalone_dual_posting_production_finishing_enabled' => true]);

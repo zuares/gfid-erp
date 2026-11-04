@@ -9,10 +9,10 @@ return [
     'purchase_payment_tolerance' => 1.00,
 
     // Payroll memakai transaksi yang sama dengan ledger lama; tanpa saldo awal otomatis.
-    'standalone_dual_posting_payroll_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_PAYROLL_ENABLED', true),
+    'standalone_dual_posting_payroll_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_PAYROLL_ENABLED', false),
 
     // Pencairan/cicilan pinjaman serta penarikan tabungan karyawan di luar payroll.
-    'standalone_dual_posting_employee_balances_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_EMPLOYEE_BALANCES_ENABLED', true),
+    'standalone_dual_posting_employee_balances_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_EMPLOYEE_BALANCES_ENABLED', false),
 
     // Supplier loan siap di-mirror setelah mapping akun disetujui. Sengaja OFF.
     'standalone_dual_posting_supplier_loans_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_SUPPLIER_LOANS_ENABLED', false),

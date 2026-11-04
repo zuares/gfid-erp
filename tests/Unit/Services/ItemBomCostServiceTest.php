@@ -149,6 +149,56 @@ class ItemBomCostServiceTest extends TestCase
         $this->assertEqualsWithDelta(66000, $service->total($bom, true), 0.000001);
     }
 
+    public function test_bom_uses_master_purchase_price_converted_to_stock_unit(): void
+    {
+        $bundle = Item::create([
+            'code' => 'BUNDLE-COST-MASTER-001',
+            'name' => 'Bundle Master Unit Test',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'default_allocation' => 'hpp',
+            'can_make' => true,
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+
+        $opp = Item::create([
+            'code' => 'OPP-MASTER-001',
+            'name' => 'Plastik OPP Master Price',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pack',
+            'purchase_conversion_factor' => 500,
+            'last_purchase_price' => 80000,
+            'hpp' => 0,
+            'base_unit_cost' => 0,
+            'type' => 'material',
+        ]);
+
+        $bom = ItemBom::create([
+            'item_id' => $bundle->id,
+            'name' => 'BOM Master Unit Test',
+            'active' => true,
+        ]);
+
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $opp->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => '1',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+
+        $estimate = app(ItemBomCostService::class)->estimate($bom);
+
+        $this->assertEqualsWithDelta(160, $estimate['components'][0]['unit_cost'], 0.000001);
+        $this->assertEqualsWithDelta(80000, $estimate['components'][0]['purchase_unit_cost'], 0.000001);
+        $this->assertEqualsWithDelta(160, $estimate['total'], 0.000001);
+    }
+
     public function test_active_production_wage_snapshot_is_added_to_bom_cost(): void
     {
         $bundle = Item::create([

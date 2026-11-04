@@ -560,6 +560,49 @@ class Item extends Model
     }
 
     /**
+     * HPP komponen BOM dari nilai yang tersimpan di Master Item.
+     *
+     * Harga beli terakhir legacy kadang tersimpan sebagai harga satuan beli
+     * (mis. harga satu pack), sedangkan data yang sudah dinormalisasi tersimpan
+     * sebagai harga satuan stok. GRN hanya dipakai untuk membedakan dua format
+     * legacy tersebut, bukan sebagai sumber harga BOM.
+     */
+    public function bomUnitCost(): float
+    {
+        $lastPurchasePrice = (float) ($this->last_purchase_price ?? 0);
+        $masterCost = $lastPurchasePrice > 0
+            ? $lastPurchasePrice
+            : max((float) ($this->base_unit_cost ?? 0), (float) ($this->hpp ?? 0));
+
+        if ($masterCost <= 0) {
+            return 0.0;
+        }
+
+        $factor = $this->purchaseConversionFactor();
+        if ($lastPurchasePrice <= 0 || $factor <= 1) {
+            return round($masterCost, 2);
+        }
+
+        $latestPurchase = $this->latestPostedGrnPurchase();
+        if ($latestPurchase) {
+            $purchasePrice = (float) ($latestPurchase->unit_price ?? 0);
+            $stockUnitPrice = (float) ($latestPurchase->stock_unit_price ?? 0);
+
+            if ($purchasePrice > 0 && abs($lastPurchasePrice - $purchasePrice) < 0.01) {
+                return round($lastPurchasePrice / $factor, 2);
+            }
+
+            if ($stockUnitPrice > 0 && abs($lastPurchasePrice - $stockUnitPrice) < 0.01) {
+                return round($lastPurchasePrice, 2);
+            }
+        }
+
+        // Jika tidak ada riwayat yang bisa membedakan formatnya, field
+        // "harga beli terakhir" diperlakukan sebagai harga satuan beli.
+        return round($lastPurchasePrice / $factor, 2);
+    }
+
+    /**
      * HPP aktif (unit_cost) untuk item ini (global).
      */
     public function getActiveUnitCostAttribute(): float

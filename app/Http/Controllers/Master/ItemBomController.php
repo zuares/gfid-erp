@@ -584,7 +584,7 @@ class ItemBomController extends Controller
             ->get(['id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor']);
 
         $results = $items->map(function ($i) {
-            $unitCost = (float) $i->effective_unit_cost;
+            $unitCost = $i->bomUnitCost();
             $purchaseFactor = $i->purchaseConversionFactor();
 
             return [

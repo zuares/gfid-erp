@@ -71,7 +71,7 @@ class ItemBomLine extends Model
 
     public function componentUnitCost(): float
     {
-        return (float) ($this->material?->effective_unit_cost ?? 0);
+        return (float) ($this->material?->bomUnitCost() ?? 0);
     }
 
     public function estimatedCost(): float
