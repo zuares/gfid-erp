@@ -55,19 +55,6 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         $this->actingAs($owner)
             ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'marketplace_empty']))
             ->assertOk()
-            ->assertSee('Pilih platform untuk mulai')
-            ->assertDontSee('JACKET-BLK-M');
-
-        $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'marketplace_empty', 'channel' => 'tiktok']))
-            ->assertOk()
-            ->assertSee('TikTok Stock Audit')
-            ->assertSee('Pilih toko untuk melihat produk')
-            ->assertDontSee('JACKET-BLK-M');
-
-        $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'marketplace_empty', 'store_id' => $store->id]))
-            ->assertOk()
             ->assertSee('Stok Variant Kosong')
             ->assertSee('Marketplace kosong')
             ->assertDontSee('>Semua variant<', false)
@@ -120,7 +107,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertDontSee('Hitam / L');
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'all', 'min_avg_sales' => 0, 'sales_scope' => 'all', 'store_id' => $store->id]))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'all', 'min_avg_sales' => 0, 'sales_scope' => 'all']))
             ->assertOk()
             ->assertSee('Semua variant')
             ->assertSee('Belum Terjual / S')
@@ -145,7 +132,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $item->id, 'qty' => 5, 'allocated_qty' => 0]);
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'marketplace_empty', 'stock_status' => 'zero', 'channel' => 'shopee', 'store_id' => $store->id]))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'marketplace_empty', 'stock_status' => 'zero', 'channel' => 'shopee']))
             ->assertOk()
             ->assertSee('aria-label="Toko Shopee"', false)
             ->assertSee('Navy / XL')
@@ -165,13 +152,13 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $masterItem->id, 'qty' => 12, 'allocated_qty' => 2]);
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'internal_empty_marketplace_stock', 'store_id' => $store->id]))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'internal_empty_marketplace_stock']))
             ->assertOk()
             ->assertDontSee('Produk Bundle S3RDM')
             ->assertDontSee('s3rdm-3');
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'all', 'sales_scope' => 'all', 'store_id' => $store->id]))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'all', 'sales_scope' => 'all']))
             ->assertOk()
             ->assertSee('Produk Bundle S3RDM')
             ->assertSee('s3rdm-3')
@@ -201,14 +188,14 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         InventoryStock::create(['warehouse_id' => $warehouse->id, 'item_id' => $slowItem->id, 'qty' => 8, 'allocated_qty' => 0]);
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['store_id' => $store->id]))
+            ->get(route('marketplace.products.empty-variants'))
             ->assertOk()
             ->assertSee('Produk Cepat')
             ->assertSee('3,0')
             ->assertSee('Inventory · 21 hari');
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 2, 'store_id' => $store->id]))
+            ->get(route('marketplace.products.empty-variants', ['min_avg_sales' => 2]))
             ->assertOk()
             ->assertSee('Produk Cepat')
             ->assertSee('3,0')
@@ -226,7 +213,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         SkuMapping::create(['marketplace_sku' => 'SINGLE-SKU', 'channel_code' => 'shopee', 'item_id' => $item->id]);
         MarketplaceProductModel::create(['marketplace_product_id' => $product->id, 'model_id' => '0', 'model_name' => null, 'model_sku' => 'SINGLE-SKU', 'stock' => 0]);
 
-        $this->actingAs($owner)->get(route('marketplace.products.empty-variants', ['store_id' => $store->id]))->assertOk()->assertDontSee('Produk Single SKU');
+        $this->actingAs($owner)->get(route('marketplace.products.empty-variants'))->assertOk()->assertDontSee('Produk Single SKU');
     }
 
     public function test_dashboard_only_shows_connected_active_stores_and_can_audit_internal_empty_stock(): void
@@ -253,7 +240,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
         MarketplaceProductModel::create(['marketplace_product_id' => $inactiveProduct->id, 'model_id' => 'inactive-model', 'model_name' => 'Inactive / M', 'model_sku' => 'AUDIT-HIDDEN', 'stock' => 9]);
 
         $this->actingAs($owner)
-            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'internal_empty_marketplace_stock', 'store_id' => $connectedStore->id]))
+            ->get(route('marketplace.products.empty-variants', ['stock_scope' => 'internal_empty_marketplace_stock']))
             ->assertOk()
             ->assertSee('Toko API Terhubung')
             ->assertDontSee('Toko Tidak Terhubung')
