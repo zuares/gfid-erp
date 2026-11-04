@@ -250,6 +250,10 @@ class FinishingJobController extends Controller
             ->leftJoin('sewing_pickups as sp', 'sp.id', '=', 'spl.sewing_pickup_id')
             ->leftJoin('employees as e', 'e.id', '=', 'sr.operator_id')
             ->where('sr.status', 'posted')
+            // Finishing hanya boleh mengonsumsi hasil jahit yang benar-benar
+            // masuk WIP-FIN. Return lama yang sudah dipost ke WH-PRD/WH-RTS
+            // adalah barang jadi, sehingga tidak boleh muncul lagi di form.
+            ->where('sr.destination_warehouse_id', $wipFinWarehouseId)
             ->where(function ($q) use ($wipFinWarehouseId) {
                 if ($this->readinessFromLedger()) {
                     $q->whereRaw($this->wipFinLedgerSql('b').' > 0.0001');
@@ -305,6 +309,7 @@ class FinishingJobController extends Controller
             ->join('sewing_return_lines as srl', 'srl.sewing_pickup_line_id', '=', 'spl.id')
             ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
             ->where('sr.status', 'posted')
+            ->where('sr.destination_warehouse_id', $wipFinWarehouseId)
             ->where(function ($q) use ($wipFinWarehouseId) {
                 if ($this->readinessFromLedger()) {
                     $q->whereRaw($this->wipFinLedgerSql('b').' > 0.0001');
@@ -740,6 +745,7 @@ class FinishingJobController extends Controller
                 ->where('spl.finished_item_id', $itemId)
                 ->where('sr.operator_id', $sewingOperatorId)
                 ->where('sr.status', 'posted')
+                ->where('sr.destination_warehouse_id', $wipFinWarehouseId)
                 ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
             if ($setorDate !== null) {
@@ -867,7 +873,7 @@ class FinishingJobController extends Controller
                 $bundles = CuttingJobBundle::query()
                     ->readyForFinishing($wipFinWarehouseId)
                     ->where('finished_item_id', $itemId)
-                    ->whereExists(function ($q) use ($sewingOperatorId, $itemId, $sewingReturnDate, $hasSplVoided, $hasSrVoided) {
+                    ->whereExists(function ($q) use ($sewingOperatorId, $itemId, $sewingReturnDate, $wipFinWarehouseId, $hasSplVoided, $hasSrVoided) {
                         $q->select(DB::raw(1))
                             ->from('sewing_return_lines as srl')
                             ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
@@ -876,6 +882,7 @@ class FinishingJobController extends Controller
                             ->where('spl.finished_item_id', $itemId)
                             ->where('sr.operator_id', $sewingOperatorId)
                             ->where('sr.status', 'posted')
+                            ->where('sr.destination_warehouse_id', $wipFinWarehouseId)
                             ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
                         if ($sewingReturnDate !== null) {
@@ -922,6 +929,7 @@ class FinishingJobController extends Controller
                         ->where('spl.finished_item_id', $itemId)
                         ->where('sr.operator_id', $sewingOperatorId)
                         ->where('sr.status', 'posted')
+                        ->where('sr.destination_warehouse_id', $wipFinWarehouseId)
                         ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
                     if ($sewingReturnDate !== null) {
@@ -963,6 +971,7 @@ class FinishingJobController extends Controller
                         ->where('spl.finished_item_id', $itemId)
                         ->where('sr.operator_id', $sewingOperatorId)
                         ->where('sr.status', 'posted')
+                        ->where('sr.destination_warehouse_id', $wipFinWarehouseId)
                         ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
                     if ($sewingReturnDate !== null) {
