@@ -9,6 +9,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use App\Services\Marketplace\TikTokShop\TikTokFinancialTransactionService;
+use App\Services\Marketplace\TikTokShop\TikTokWalletAdCostService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -151,6 +152,65 @@ class TikTokFinancialTransactionTest extends TestCase
                 'adjustment_amount' => '-25000',
             ], $store)['transaction_type_label'],
         );
+    }
+
+    public function test_wallet_ad_cost_uses_explicit_ad_rows_and_excludes_generic_outflows(): void
+    {
+        $store = $this->createStore();
+        $common = [
+            'store_id' => $store->id,
+            'currency' => 'IDR',
+            'status' => 'SETTLED',
+            'synced_at' => '2026-10-31 23:00:00',
+        ];
+
+        MarketplaceTikTokFinancialTransaction::create(array_merge($common, [
+            'external_transaction_id' => 'GMV-ADS-1',
+            'source' => 'statement_transactions',
+            'transaction_type' => 'GMV_PAYMENT_FOR_ADS',
+            'amount' => 25000,
+            'money_flow' => 'MONEY_OUT',
+            'transaction_created_at' => '2026-10-03 10:00:00',
+            'source_payload' => ['type' => 'GMV_PAYMENT_FOR_ADS'],
+        ]));
+        MarketplaceTikTokFinancialTransaction::create(array_merge($common, [
+            'external_transaction_id' => 'AD-REFUND-1',
+            'source' => 'withdrawals',
+            'transaction_type' => 'AD_REFUND',
+            'amount' => 3000,
+            'money_flow' => 'MONEY_IN',
+            'transaction_created_at' => '2026-10-03 11:00:00',
+            'source_payload' => ['type' => 'AD_REFUND'],
+        ]));
+        MarketplaceTikTokFinancialTransaction::create(array_merge($common, [
+            'external_transaction_id' => 'WITHDRAW-1',
+            'source' => 'withdrawals',
+            'transaction_type' => 'WITHDRAW',
+            'amount' => 100000,
+            'money_flow' => 'MONEY_OUT',
+            'transaction_created_at' => '2026-10-03 12:00:00',
+            'source_payload' => ['type' => 'WITHDRAW'],
+        ]));
+        MarketplaceTikTokFinancialTransaction::create(array_merge($common, [
+            'external_transaction_id' => 'PAYMENT-1',
+            'source' => 'withdrawals',
+            'transaction_type' => 'PAYMENT',
+            'amount' => 8000,
+            'money_flow' => 'MONEY_OUT',
+            'transaction_created_at' => '2026-10-04 12:00:00',
+            'source_payload' => ['description' => 'TikTok Ads billing'],
+        ]));
+
+        $daily = app(TikTokWalletAdCostService::class)->daily(
+            [$store->id],
+            null,
+            '2026-10-01',
+            '2026-10-31',
+        );
+
+        $this->assertSame(-3000.0 + 25000.0, (float) $daily->get('2026-10-03'));
+        $this->assertSame(8000.0, (float) $daily->get('2026-10-04'));
+        $this->assertSame(30000.0, (float) $daily->sum());
     }
 
     public function test_cash_out_reconciliation_separates_gmv_pay_billing_and_other_outflows(): void

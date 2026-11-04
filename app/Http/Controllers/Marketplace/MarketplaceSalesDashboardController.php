@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Marketplace;
 use App\Http\Controllers\Controller;
 use App\Models\Store;
 use App\Services\Marketplace\Ads\AdsDashboardService;
+use App\Services\Marketplace\TikTokShop\TikTokWalletAdCostService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -150,20 +151,71 @@ class MarketplaceSalesDashboardController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+        $adApiStoreIds = $stores
+            ->filter(function ($store) use ($platformCode) {
+                $channelCode = $this->normalizePlatformCode($store->channel->code ?? null);
+
+                return $channelCode !== 'TIKTOK'
+                    && (! $platformCode || $channelCode === $platformCode);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $tiktokAdStoreIds = $stores
+            ->filter(function ($store) use ($platformCode) {
+                $channelCode = $this->normalizePlatformCode($store->channel->code ?? null);
+
+                return $channelCode === 'TIKTOK'
+                    && (! $platformCode || $channelCode === $platformCode);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
         if (! $isSalesExport) {
             $this->queueRecentAdsSync($adSyncStoreIds, $storeId, $from, $to);
         }
         $adDailyMetrics = app(AdsDashboardService::class)->getDailyMetrics(
-            $adStoreIds,
+            $adApiStoreIds,
             $storeId,
             $from->toDateString(),
             $to->toDateString(),
         );
         $adSpendByStoreDay = $this->adSpendByStoreDay(
-            $adStoreIds,
+            $adApiStoreIds,
             $from->toDateString(),
             $to->toDateString(),
         );
+        $adVatDaily = $adDailyMetrics->map(
+            fn (array $metrics): float => max((float) ($metrics['spend'] ?? 0), 0) * self::MARKETPLACE_AD_VAT_RATE,
+        );
+        $tiktokWalletAdDaily = app(TikTokWalletAdCostService::class)->daily(
+            $tiktokAdStoreIds,
+            $storeId,
+            $from->toDateString(),
+            $to->toDateString(),
+        );
+        $tiktokWalletAdStoreDay = app(TikTokWalletAdCostService::class)->storeDaily(
+            $tiktokAdStoreIds,
+            $storeId,
+            $from->toDateString(),
+            $to->toDateString(),
+        );
+        $tiktokWalletAdDaily->each(function (float $walletCost, string $day) use ($adDailyMetrics): void {
+            $metrics = $adDailyMetrics->get($day, [
+                'spend' => 0.0,
+                'impressions' => 0,
+                'clicks' => 0,
+                'orders' => 0,
+                'gmv' => 0.0,
+            ]);
+            $metrics['spend'] = (float) ($metrics['spend'] ?? 0) + $walletCost;
+            $adDailyMetrics->put($day, $metrics);
+        });
+        $tiktokWalletAdStoreDay->each(function (float $walletCost, string $key) use ($adSpendByStoreDay): void {
+            $adSpendByStoreDay->put($key, (float) $adSpendByStoreDay->get($key, 0) + $walletCost);
+        });
         $adSpendDaily = $adDailyMetrics->map(fn (array $metrics) => (float) $metrics['spend']);
         $adOrdersDaily = $adDailyMetrics->map(fn (array $metrics) => (int) $metrics['orders']);
         $adSpendTotal = (float) $adSpendDaily->sum();
@@ -173,6 +225,12 @@ class MarketplaceSalesDashboardController extends Controller
         $adSalesTotal = (float) $adDailyMetrics->sum('gmv');
         $adCtr = $adImpressionsTotal > 0 ? ($adClicksTotal / $adImpressionsTotal) * 100 : 0;
         $adCvr = $adClicksTotal > 0 ? ($adOrdersTotal / $adClicksTotal) * 100 : 0;
+        $adVatTotal = (float) $adVatDaily->sum();
+        $adSpendSourceLabel = match ($platformCode) {
+            'TIKTOK' => 'TikTok Wallet Actual',
+            'SHOPEE' => 'Ads Daily',
+            default => 'Ads Daily + TikTok Wallet Actual',
+        };
 
         $itemTotals = DB::table('marketplace_order_items as oi')
             ->selectRaw('COALESCE(oi.marketplace_order_id, oi.order_id) as order_key')
@@ -1678,12 +1736,12 @@ SQL;
         // gagal kirim tidak masuk payout; keduanya tetap disediakan sebagai
         // informasi agar tidak terpotong dua kali dari laba.
         $profitLossDaily = $incomeDaily
-            ->map(function ($row) use ($adSpendDaily) {
+            ->map(function ($row) use ($adSpendDaily, $adVatDaily) {
                 $payout = (float) $row->final_income;
                 $cogs = (float) $row->cogs;
                 $grossProfit = $payout - $cogs;
                 $adSpend = (float) $adSpendDaily->get((string) $row->day, 0);
-                $adVat = $adSpend * self::MARKETPLACE_AD_VAT_RATE;
+                $adVat = (float) $adVatDaily->get((string) $row->day, 0);
                 $operatingExpense = $adSpend + $adVat;
 
                 return (object) [
@@ -1700,10 +1758,12 @@ SQL;
                 ];
             })
             ->keyBy(fn ($row) => (string) $row->day);
-        $adSpendDaily->each(function ($adSpend, $day) use ($profitLossDaily) {
+        $adSpendDaily->each(function ($adSpend, $day) use ($profitLossDaily, $adVatDaily) {
             if ($profitLossDaily->has((string) $day)) {
                 return;
             }
+
+            $adVat = (float) $adVatDaily->get((string) $day, 0);
 
             $profitLossDaily->put((string) $day, (object) [
                 'day' => (string) $day,
@@ -1711,9 +1771,9 @@ SQL;
                 'cogs' => 0.0,
                 'gross_profit' => 0.0,
                 'ad_spend' => (float) $adSpend,
-                'ad_vat' => (float) $adSpend * self::MARKETPLACE_AD_VAT_RATE,
-                'operating_expense' => (float) $adSpend * (1 + self::MARKETPLACE_AD_VAT_RATE),
-                'net_profit' => -((float) $adSpend * (1 + self::MARKETPLACE_AD_VAT_RATE)),
+                'ad_vat' => $adVat,
+                'operating_expense' => (float) $adSpend + $adVat,
+                'net_profit' => -((float) $adSpend + $adVat),
                 'refund_amount' => 0.0,
                 'failed_shipping_value' => 0.0,
             ]);
@@ -1746,7 +1806,7 @@ SQL;
             $loadComparison = function ($comparisonFrom, $comparisonTo) use ($request) {
                 $comparisonFromDate = $comparisonFrom->toDateString();
                 $comparisonToDate = $comparisonTo->toDateString();
-                $cacheKey = 'marketplace:sales-dashboard:comparison:v3:'.sha1(implode('|', [
+                $cacheKey = 'marketplace:sales-dashboard:comparison:v4:'.sha1(implode('|', [
                     (string) ($request->user()?->getAuthIdentifier() ?? 'guest'),
                     (string) ($request->query('store_id') ?: 'all'),
                     (string) ($request->query('platform') ?: 'all'),
@@ -1782,6 +1842,7 @@ SQL;
                             'promotionDaily',
                             'promotionOrders',
                             'adSpendTotal',
+                            'adVatTotal',
                             'adImpressionsTotal',
                             'adClicksTotal',
                             'adOrdersTotal',
@@ -1836,9 +1897,12 @@ SQL;
             'promotionDaily' => $promotionDaily,
             'promotionOrders' => $promotionOrders,
             'adSpendDaily' => $adSpendDaily,
+            'adVatDaily' => $adVatDaily,
             'adOrdersDaily' => $adOrdersDaily,
             'adDailyMetrics' => $adDailyMetrics,
             'adSpendTotal' => $adSpendTotal,
+            'adVatTotal' => $adVatTotal,
+            'adSpendSourceLabel' => $adSpendSourceLabel,
             'adImpressionsTotal' => $adImpressionsTotal,
             'adClicksTotal' => $adClicksTotal,
             'adOrdersTotal' => $adOrdersTotal,
