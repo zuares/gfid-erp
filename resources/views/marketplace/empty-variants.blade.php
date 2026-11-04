@@ -255,21 +255,27 @@
     .sv-variant-dialog-body .sv-support { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .75fr); }
     .sv-variant-dialog-body .sv-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .sv-variant-dialog-body .sv-metrics > .sv-metric { grid-column: auto; grid-row: auto; min-width: 0; }
+    .sv-variant-dialog-body .sv-metric { display: flex; min-height: 4.5rem; flex-direction: column; }
+    .sv-variant-dialog-body .sv-metric > .sv-cell-label { min-height: 2.1em; }
+    .sv-variant-dialog-body .sv-metric > .sv-meta,
+    .sv-variant-dialog-body .sv-average small { min-height: 1.35em; }
     .sv-variant-dialog-body .sv-action { padding: .65rem; }
-    @media (min-width: 768px) {
+    @media (min-width: 992px) {
         .sv-variant-dialog-body .sv-record {
-            grid-template-columns: minmax(190px, 1.25fr) minmax(130px, .9fr) minmax(225px, 1.4fr) minmax(160px, auto);
-            grid-template-areas: 'variant support metrics action';
+            grid-template-columns: minmax(170px, 1.25fr) minmax(110px, .85fr) repeat(3, minmax(80px, .7fr)) minmax(160px, 1fr);
+            grid-template-areas: 'variant support mp internal average action';
             align-items: start;
         }
         .sv-variant-dialog-body .sv-record > .sv-variant-cell { grid-area: variant; grid-column: auto; grid-row: auto; }
         .sv-variant-dialog-body .sv-record > .sv-support { grid-area: support; grid-column: auto; grid-row: auto; }
-        .sv-variant-dialog-body .sv-record > .sv-metrics { grid-area: metrics; grid-column: auto; grid-row: auto; }
+        .sv-variant-dialog-body .sv-record > .sv-metrics { display: contents; grid-area: none; grid-column: auto; grid-row: auto; }
         .sv-variant-dialog-body .sv-record > .sv-action { grid-area: action; grid-column: auto; grid-row: auto; }
         .sv-variant-dialog-body .sv-support > .sv-map-cell { grid-column: auto; grid-row: auto; }
+        .sv-variant-dialog-body .sv-metrics > .sv-mp-stock-cell { grid-area: mp; grid-column: auto; grid-row: auto; }
+        .sv-variant-dialog-body .sv-metrics > .sv-internal-cell { grid-area: internal; grid-column: auto; grid-row: auto; }
+        .sv-variant-dialog-body .sv-metrics > .sv-average-cell { grid-area: average; grid-column: auto; grid-row: auto; }
         .sv-variant-dialog-body .sv-support { display: block; }
-        .sv-variant-dialog-body .sv-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
-        .sv-variant-dialog-body .sv-action { min-width: 160px; align-self: stretch; padding: .55rem; }
+        .sv-variant-dialog-body .sv-action { min-width: 0; align-self: stretch; padding: .55rem; }
     }
     .sv-record {
         display: grid; grid-template-columns: minmax(0, 1fr);
@@ -729,6 +735,15 @@
                                 <span class="sv-mp-stock @if($variant->stock < 0) is-negative @elseif($variant->stock === 0) is-zero @else is-available @endif" data-mp-stock-val>
                                     {{ number_format($variant->stock) }}
                                 </span>
+                                <div class="sv-meta">
+                                    @if($variant->stock < 0)
+                                        Minus {{ abs($variant->stock) }}
+                                    @elseif($variant->stock === 0)
+                                        Kosong
+                                    @else
+                                        Ada stok
+                                    @endif
+                                </div>
                             </div>
                             <div class="sv-metric sv-internal-cell">
                                 <span class="sv-cell-label">Internal</span>
