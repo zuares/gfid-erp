@@ -548,6 +548,17 @@
         background: #ffe4e6;
         border-color: rgba(225, 29, 72, .45);
     }
+    .sr-delete-btn--request {
+        width: auto;
+        min-width: 0;
+        gap: .28rem;
+        padding-inline: .55rem;
+        border-color: #fed7aa;
+        background: #fff7ed;
+        color: #c2410c;
+        font-size: .66rem;
+    }
+    .sr-delete-btn--request:hover { border-color: #fdba74; background: #ffedd5; }
     .sr-pending-delete {
         display:inline-flex; align-items:center; justify-content:center; padding:.2rem .4rem;
         border-radius:999px; background:#fff7ed; color:#c2410c; font-size:.62rem; font-weight:800;
@@ -559,6 +570,23 @@
         font-size: .78rem;
         font-weight: 800;
     }
+
+    .sr-admin-delete-notice {
+        display: flex;
+        align-items: flex-start;
+        gap: .65rem;
+        margin: .55rem 0;
+        padding: .7rem .8rem;
+        border: 1px solid #fed7aa;
+        border-radius: 9px;
+        background: #fff7ed;
+        color: #9a3412;
+        font-size: .74rem;
+        line-height: 1.4;
+    }
+    .sr-admin-delete-notice i { flex: 0 0 auto; margin-top: .08rem; font-size: 1rem; }
+    .sr-admin-delete-notice strong { display: block; color: #7c2d12; }
+    .sr-admin-delete-notice span { display: block; color: #9a3412; }
 
     .sr-order-items {
         border-top: 1px solid rgba(148, 163, 184, .1);
@@ -1112,6 +1140,7 @@
         ->values();
 
     $canDeleteShipmentRows = in_array(strtolower((string) auth()->user()?->role), ['owner', 'admin'], true);
+    $isAdmin = strtolower((string) auth()->user()?->role) === 'admin';
     $canEditShipmentQty = in_array(auth()->user()?->role, ['owner', 'admin'], true);
 @endphp
 
@@ -1185,6 +1214,16 @@
                 @if(!$shipment->store)
                     <span> Shipment ini belum memiliki toko terpilih—pastikan toko/channel order sudah benar sebelum melanjutkan.</span>
                 @endif
+            </div>
+        @endif
+
+        @if($isAdmin)
+            <div class="sr-admin-delete-notice" role="note">
+                <i class="bi bi-shield-check" aria-hidden="true"></i>
+                <div>
+                    <strong>Penghapusan perlu persetujuan owner</strong>
+                    <span>Tombol “Ajukan hapus” hanya mengirim permintaan. Order/item dan stok tidak langsung dihapus. Owner akan menerima notifikasi untuk menyetujui atau menolak.</span>
+                </div>
             </div>
         @endif
 
@@ -1291,6 +1330,7 @@
     const csrf = @json(csrf_token());
     const isDraft = @json($shipment->status === 'draft');
     const canDelete = @json($canDeleteShipmentRows);
+    const isAdmin = @json($isAdmin);
     const pendingDeletionLineIds = @json($pendingDeletionLineIds);
     const pendingDeletionOrderScanIds = @json($pendingDeletionOrderScanIds);
     const canEditQty = @json($canEditShipmentQty);
@@ -1787,8 +1827,8 @@
                 ? items.map((item, index) => {
                     const deleteButton = canDelete && item.line_id
                         ? (item.pending_deletion
-                            ? `<span class="sr-pending-delete" title="Menunggu persetujuan owner">Menunggu owner</span>`
-                            : `<button type="button" class="sr-delete-btn sr-item-delete" data-delete-line="${esc(item.line_id)}" data-order-code="${esc(order.code)}" title="Hapus item">×</button>`)
+                            ? `<span class="sr-pending-delete" title="Permintaan sudah dikirim dan menunggu persetujuan owner">Menunggu owner</span>`
+                            : `<button type="button" class="sr-delete-btn sr-item-delete${isAdmin ? ' sr-delete-btn--request' : ''}" data-delete-line="${esc(item.line_id)}" data-order-code="${esc(order.code)}" title="${isAdmin ? 'Ajukan penghapusan item ke owner' : 'Hapus item dari shipment'}" aria-label="${isAdmin ? 'Ajukan penghapusan item ke owner' : 'Hapus item dari shipment'}"><i class="bi bi-trash3" aria-hidden="true"></i>${isAdmin ? '<span>Ajukan hapus</span>' : ''}</button>`)
                         : '';
                     const qtyControl = canEditQty && item.line_id
                         ? `<div class="sr-qty-cell">
@@ -1821,8 +1861,8 @@
 
             const deleteOrderButton = canDelete
                 ? (order.pending_deletion
-                    ? `<span class="sr-pending-delete" title="Menunggu persetujuan owner">Menunggu owner</span>`
-                    : `<button type="button" class="sr-delete-btn sr-order-delete" data-delete-order="${esc(order.code)}" title="Hapus order dan itemnya">×</button>`)
+                    ? `<span class="sr-pending-delete" title="Permintaan sudah dikirim dan menunggu persetujuan owner">Menunggu owner</span>`
+                    : `<button type="button" class="sr-delete-btn sr-order-delete${isAdmin ? ' sr-delete-btn--request' : ''}" data-delete-order="${esc(order.code)}" title="${isAdmin ? 'Ajukan penghapusan order ke owner' : 'Hapus order dan semua itemnya'}" aria-label="${isAdmin ? 'Ajukan penghapusan order ke owner' : 'Hapus order dan semua itemnya'}"><i class="bi bi-trash3" aria-hidden="true"></i>${isAdmin ? '<span>Ajukan hapus</span>' : ''}</button>`)
                 : '';
             const duplicateBadge = Number(order.duplicateCount || 0) > 0
                 ? `<span class="sr-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>`
@@ -1864,7 +1904,10 @@
                 event.stopPropagation();
 
                 const orderCode = this.dataset.deleteOrder;
-                if (!orderCode || !confirm(`Hapus order ${orderCode} beserta semua itemnya?`)) return;
+                const confirmMessage = isAdmin
+                    ? `Ajukan penghapusan order ${orderCode} beserta itemnya ke owner? Data tidak langsung dihapus.`
+                    : `Hapus order ${orderCode} beserta semua itemnya?`;
+                if (!orderCode || !confirm(confirmMessage)) return;
 
                 this.disabled = true;
                     deleteOrderScan(orderCode)
@@ -1902,7 +1945,10 @@
 
                 const lineId = this.dataset.deleteLine;
                 const orderCode = this.dataset.orderCode;
-                if (!lineId || !confirm('Hapus item ini dari shipment?')) return;
+                const confirmMessage = isAdmin
+                    ? 'Ajukan penghapusan item ini ke owner? Data tidak langsung dihapus.'
+                    : 'Hapus item ini dari shipment?';
+                if (!lineId || !confirm(confirmMessage)) return;
 
                 this.disabled = true;
                 deleteLine(lineId)
@@ -2505,8 +2551,10 @@
         if (window.Swal) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Reset order?',
-                text: `Item pada order ${order.code} akan dihapus dari shipment ini.`,
+                title: isAdmin ? 'Ajukan penghapusan?' : 'Reset order?',
+                text: isAdmin
+                    ? `Permintaan penghapusan order ${order.code} akan dikirim ke owner. Data tidak langsung dihapus.`
+                    : `Item pada order ${order.code} akan dihapus dari shipment ini.`,
                 showCancelButton: true,
                 confirmButtonText: 'NEXT / Lanjut',
                 cancelButtonText: 'RESET / Batal',
@@ -2518,7 +2566,9 @@
             return;
         }
 
-        if (confirm(`Reset order ${order.code}?`)) runReset();
+        if (confirm(isAdmin
+            ? `Ajukan penghapusan order ${order.code} ke owner? Data tidak langsung dihapus.`
+            : `Reset order ${order.code}?`)) runReset();
     }
 
     function undoLastItemCommand() {

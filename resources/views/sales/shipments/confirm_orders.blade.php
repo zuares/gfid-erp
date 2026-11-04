@@ -667,6 +667,36 @@ body[data-theme="dark"] .sd-order-qty-breakdown .sd-order-qty.is-over strong { c
 }
 .sd-action-delete:hover { border-color: #fda4af; background: #ffe4e6; }
 .sd-action-delete:disabled { opacity: .55; cursor: wait; }
+.sd-action-request {
+  width: auto;
+  min-width: 0;
+  gap: .28rem;
+  padding-inline: .55rem;
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: .66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.sd-action-request:hover { border-color: #fdba74; background: #ffedd5; }
+.sd-admin-delete-notice {
+  max-width: 1040px;
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  margin: .65rem auto 0;
+  padding: .7rem .8rem;
+  border: 1px solid #fed7aa;
+  border-radius: 9px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: .76rem;
+  line-height: 1.4;
+}
+.sd-admin-delete-notice i { flex: 0 0 auto; margin-top: .08rem; font-size: 1rem; }
+.sd-admin-delete-notice strong { display: block; color: #7c2d12; }
+.sd-admin-delete-notice span { display: block; color: #9a3412; }
 .sd-order-item-code,
 .sd-item-code {
   min-width: 0;
@@ -892,6 +922,8 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
     $editShipmentUrl = route('sales.shipments.scan_order', $shipment);
     $pendingDeletionLineIds = $pendingDeletionLineIds ?? [];
     $canDeleteShipmentRows = in_array(strtolower((string) auth()->user()?->role), ['owner', 'admin'], true);
+    $isAdmin = strtolower((string) auth()->user()?->role) === 'admin';
+    $deleteButtonTitle = $isAdmin ? 'Ajukan penghapusan item ke owner' : 'Hapus item dari shipment';
     $canSeeCogs = auth()->user()?->role === 'owner';
     $canSeeScanDiagnostics = auth()->user()?->role !== 'admin';
     $itemGridClass = trim(implode(' ', array_filter([
@@ -1126,6 +1158,16 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
     <div class="sd-flash" role="status">{{ session('message') }}</div>
 @endif
 
+@if($isAdmin)
+    <div class="sd-admin-delete-notice" role="note">
+        <i class="bi bi-shield-check" aria-hidden="true"></i>
+        <div>
+            <strong>Penghapusan perlu persetujuan owner</strong>
+            <span>Tombol “Ajukan hapus” hanya mengirim permintaan. Item dan stok tidak langsung dihapus. Owner akan menerima notifikasi untuk menyetujui atau menolak.</span>
+        </div>
+    </div>
+@endif
+
 <div class="sd-wrap">
 
     <div class="sd-receipt-total sd-receipt-total-top" aria-label="Total shipment">
@@ -1331,7 +1373,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                 <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                                    <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button>
                                                 </form>
                                             @endif
                                         </span>
@@ -1595,7 +1637,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                             <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
                                                                 @csrf
                                                                 @method('DELETE')
-                                                                <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                                                <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button>
                                                             </form>
                                                         @endif
                                                     </span>
@@ -1716,7 +1758,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                                     <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
                                                                         @csrf
                                                                         @method('DELETE')
-                                                                        <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                                                        <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button>
                                                                     </form>
                                                                 @endif
                                                             </span>
@@ -1770,7 +1812,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 <div class="sd-order-items">
                                     <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>SKU Marketplace</span><span>Qty</span><span>Scan Item Gudang</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                     @foreach($ungroupedLines as $line)
-                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action">@if(in_array((int) $line->id, $pendingDeletionLineIds, true))<span class="sd-pill sd-status">Menunggu owner</span>@else<form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form>@endif</span>@endif</div>
+                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action">@if(in_array((int) $line->id, $pendingDeletionLineIds, true))<span class="sd-pill sd-status">Menunggu owner</span>@else<form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button></form>@endif</span>@endif</div>
                                     @endforeach
                                 </div>
                                 <div class="sd-order-summary {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
@@ -1835,7 +1877,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                             <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                                <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button>
                                             </form>
                                         @endif
                                     </span>
@@ -1856,6 +1898,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
 
 <script>
 (function(){
+    var adminDeleteMode = @json($isAdmin);
     var copyToast = document.getElementById('sdCopyToast');
     var copyToastTimer;
     var copyButtonTimer;
@@ -2071,7 +2114,10 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
         form.addEventListener('submit', function(event){
             event.preventDefault();
 
-            if (!window.confirm('Hapus item ini dari shipment?')) return;
+            var confirmMessage = adminDeleteMode
+                ? 'Ajukan penghapusan item ini ke owner? Data tidak langsung dihapus.'
+                : 'Hapus item ini dari shipment?';
+            if (!window.confirm(confirmMessage)) return;
 
             var button = form.querySelector('button[type="submit"]');
             var token = form.querySelector('input[name="_token"]')?.value || '';

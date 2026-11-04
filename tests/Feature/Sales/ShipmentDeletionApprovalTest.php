@@ -99,6 +99,37 @@ class ShipmentDeletionApprovalTest extends TestCase
         ]);
     }
 
+    public function test_admin_sees_clear_guidance_for_deletion_request_flow(): void
+    {
+        [$shipment, $item] = $this->shipmentContext();
+        $admin = $this->user('admin');
+        $scan = ShipmentOrderScan::create([
+            'shipment_id' => $shipment->id,
+            'order_no' => 'ORDER-UX-001',
+            'status' => 'pending',
+            'source' => 'scanner',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'shipment_order_scan_id' => $scan->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('sales.shipments.scan_order', $shipment))
+            ->assertOk()
+            ->assertSee('Penghapusan perlu persetujuan owner')
+            ->assertSee('Ajukan hapus');
+
+        $this->actingAs($admin)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Penghapusan perlu persetujuan owner')
+            ->assertSee('Ajukan hapus');
+    }
+
     private function shipmentContext(): array
     {
         $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
