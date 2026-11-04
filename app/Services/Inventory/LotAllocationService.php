@@ -2,8 +2,11 @@
 
 namespace App\Services\Inventory;
 
+use App\Exceptions\AutoBomLotShortageException;
 use App\Models\InventoryMutation;
+use App\Models\Item;
 use App\Models\Lot;
+use App\Models\Warehouse;
 
 /**
  * Allocates warehouse stock to traceable lots without changing source data.
@@ -53,7 +56,7 @@ class LotAllocationService
             ->values();
 
         if ($balances->isEmpty()) {
-            throw new \RuntimeException(
+            throw new AutoBomLotShortageException(
                 "Stok item #{$itemId} di gudang #{$warehouseId} tidak memiliki saldo lot yang dapat ditelusuri. "
                 .'Auto BOM dihentikan; isi lot asal terlebih dahulu.'
             );
@@ -101,12 +104,42 @@ class LotAllocationService
 
         if ($remaining > self::EPS) {
             $allocated = round($requiredQty - $remaining, 8);
-            throw new \RuntimeException(
-                "Saldo lot item #{$itemId} tidak cukup untuk Auto BOM. "
-                ."Butuh {$requiredQty}, lot terlacak hanya {$allocated}; kekurangan {$remaining}."
+            $item = Item::query()->find($itemId, ['id', 'code', 'name', 'unit']);
+            $warehouse = Warehouse::query()->find($warehouseId, ['id', 'code', 'name']);
+            $itemLabel = trim(implode(' — ', array_filter([
+                $item?->code,
+                $item?->name,
+            ]))) ?: "Item #{$itemId}";
+            $warehouseLabel = trim(implode(' — ', array_filter([
+                $warehouse?->code,
+                $warehouse?->name,
+            ]))) ?: "Gudang #{$warehouseId}";
+            $unit = $item?->unit ?: 'unit';
+
+            throw new AutoBomLotShortageException(
+                "Auto BOM belum dapat diposting karena stok kelengkapan kurang.\n"
+                ."Item: {$itemLabel}\n"
+                ."Gudang: {$warehouseLabel}\n"
+                .'Kebutuhan QC: '.self::formatQty($requiredQty)." {$unit}\n"
+                .'Saldo lot yang dapat dipakai: '.self::formatQty($allocated)." {$unit}\n"
+                .'Kekurangan: '.self::formatQty($remaining)." {$unit}\n\n"
+                .'Tindakan: tambahkan stok dengan lot asal di gudang tersebut, atau sesuaikan Qty OK/BOM. '
+                .'Saldo fisik tanpa lot tidak dapat dipakai untuk Auto BOM. Auto BOM tidak diposting; stok dan jurnal tidak berubah.',
+                item: $itemLabel,
+                warehouse: $warehouseLabel,
+                required: self::formatQty($requiredQty)." {$unit}",
+                available: self::formatQty($allocated)." {$unit}",
+                shortage: self::formatQty($remaining)." {$unit}",
+                itemId: $itemId,
+                shortageQty: $remaining,
             );
         }
 
         return $allocations;
+    }
+
+    private static function formatQty(float $qty): string
+    {
+        return rtrim(rtrim(number_format($qty, 8, ',', '.'), '0'), ',');
     }
 }

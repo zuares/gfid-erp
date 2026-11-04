@@ -27,6 +27,9 @@ use Illuminate\Support\Facades\DB;
 
 class QcService
 {
+    public const CUTTING_QC_PENDING_OWNER_REVIEW = 'qc_pending_owner_review';
+    public const CUTTING_QC_PENDING_OWNER_REVIEW_RESULT = 'pending_owner_review';
+
     public function __construct(
         protected InventoryService $inventory,
         protected FinishingRmHppService $finishingRmHpp,
@@ -64,9 +67,9 @@ class QcService
      * ============================================================
      */
 
-    public function saveCuttingQc(CuttingJob $job, array $payload): void
+    public function saveCuttingQc(CuttingJob $job, array $payload, ?string $statusOverride = null): void
     {
-        DB::transaction(function () use ($job, $payload) {
+        DB::transaction(function () use ($job, $payload, $statusOverride) {
 
             $qcDate = $payload['qc_date'];
             $operatorId = $payload['operator_id'] ?? null;
@@ -127,7 +130,7 @@ class QcService
                     }
                 }
 
-                $status = $this->resolveBundleStatus($qtyOk, $qtyReject, $bundleQty);
+                $status = $statusOverride ?: $this->resolveBundleStatus($qtyOk, $qtyReject, $bundleQty);
 
                 // Simpan ke qc_results
                 QcResult::updateOrCreate(
@@ -173,6 +176,99 @@ class QcService
                 return;
             }
         });
+    }
+
+    /**
+     * Simpan hasil input operator yang tidak dapat diposting karena Auto BOM
+     * kekurangan lot. Tidak ada WIP, mutasi stok, maupun jurnal yang dibuat.
+     */
+    public function saveCuttingQcPendingOwnerReview(CuttingJob $job, array $payload): void
+    {
+        DB::transaction(function () use ($job, $payload): void {
+            $lockedJob = CuttingJob::query()
+                ->whereKey($job->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->saveCuttingQc(
+                $lockedJob,
+                $payload,
+                self::CUTTING_QC_PENDING_OWNER_REVIEW_RESULT,
+            );
+
+            $lockedJob->update([
+                'status' => self::CUTTING_QC_PENDING_OWNER_REVIEW,
+                'updated_by' => $payload['qc_by_user_id'] ?? null,
+            ]);
+        });
+    }
+
+    /**
+     * Cek ketersediaan lot sebelum QC membuat WIP agar input operator dapat
+     * dialihkan ke review Owner tanpa membuat transaksi setengah jadi.
+     *
+     * @param  array<int, array<string, mixed>>  $results
+     */
+    public function assertCuttingQcSewingSupplyLotsAvailable(CuttingJob $job, array $results): void
+    {
+        if (! config('accounting.standalone_production_cutting_qc_auto_bom_enabled', false)) {
+            return;
+        }
+
+        if (! config('accounting.standalone_dual_posting_production_cutting_enabled', false)) {
+            throw new \RuntimeException(
+                'Auto BOM QC Cutting membutuhkan feature flag mirror akuntansi baru Cutting aktif.'
+            );
+        }
+
+        if ($this->hasActiveCuttingQcSewingSupplyJournal((int) $job->id)) {
+            return;
+        }
+
+        $requirements = $this->cuttingQcSewingSupplyRequirements(
+            $this->cuttingQcQtyByFinishedItemFromResults($job, $results),
+        );
+        if ($requirements === []) {
+            return;
+        }
+
+        $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
+        if (! $rmWarehouseId) {
+            throw new \RuntimeException('Gudang RM belum dikonfigurasi untuk auto BOM QC Cutting.');
+        }
+
+        foreach ($requirements as $materialId => $requirement) {
+            $requiredQty = round((float) $requirement['required_qty'], 8);
+            if ($requiredQty > 0.000001) {
+                $this->lotAllocation->allocateFifo((int) $rmWarehouseId, (int) $materialId, $requiredQty);
+            }
+        }
+    }
+
+    /**
+     * Preview read-only untuk halaman detail Cutting sebelum Quick OK dijalankan.
+     *
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array{ready: bool, detail?: array<string, string|null>}|null
+     */
+    public function previewCuttingQcSewingSupplyLots(CuttingJob $job, array $results): ?array
+    {
+        if (! config('accounting.standalone_production_cutting_qc_auto_bom_enabled', false)) {
+            return null;
+        }
+
+        try {
+            DB::transaction(function () use ($job, $results): void {
+                $this->assertCuttingQcSewingSupplyLotsAvailable($job, $results);
+            });
+        } catch (\App\Exceptions\AutoBomLotShortageException $e) {
+            return [
+                'ready' => false,
+                'detail' => $e->flashPayload(),
+            ];
+        }
+
+        return ['ready' => true];
     }
 
     /* ============================================================
@@ -2249,12 +2345,7 @@ class QcService
         // Idempotency: journal aktif menjadi penanda bahwa kebutuhan BOM job
         // ini sudah diproses. Setelah Cancel QC penuh, jurnal di-VOID sehingga
         // QC ulang boleh membuat konsumsi baru.
-        $alreadyPosted = DB::table('journals')
-            ->where('source_type', JournalService::SRC_CUTTING_QC_SEWING_SUPPLY)
-            ->where('source_id', $job->id)
-            ->whereNull('voided_at')
-            ->exists();
-        if ($alreadyPosted) {
+        if ($this->hasActiveCuttingQcSewingSupplyJournal((int) $job->id)) {
             return;
         }
 
@@ -2272,29 +2363,7 @@ class QcService
             throw new \RuntimeException('Gudang RM belum dikonfigurasi untuk auto BOM QC Cutting.');
         }
 
-        $boms = ItemBom::query()
-            ->whereIn('item_id', array_keys($qtyByFinishedItem))
-            ->where('active', true)
-            ->with(['lines.material'])
-            ->get();
-
-        $requirements = [];
-        foreach ($boms as $bom) {
-            $qtyOk = (float) ($qtyByFinishedItem[(int) $bom->item_id] ?? 0);
-            foreach ($bom->lines as $line) {
-                if (! $this->isCuttingQcSewingSupplyLine($line)) {
-                    continue;
-                }
-
-                $materialId = (int) $line->material_item_id;
-                $requirements[$materialId] ??= [
-                    'material' => $line->material,
-                    'required_qty' => 0.0,
-                    'uom' => (string) ($line->uom ?: $line->material?->unit ?: 'pcs'),
-                ];
-                $requirements[$materialId]['required_qty'] += $qtyOk * (float) $line->qty;
-            }
-        }
+        $requirements = $this->cuttingQcSewingSupplyRequirements($qtyByFinishedItem);
 
         if ($requirements === []) {
             return;
@@ -2347,6 +2416,90 @@ class QcService
         }
 
         $this->standaloneProductionPosting->mirrorCuttingQcSewingSupply((int) $job->id);
+    }
+
+    private function hasActiveCuttingQcSewingSupplyJournal(int $jobId): bool
+    {
+        return DB::table('journals')
+            ->where('source_type', JournalService::SRC_CUTTING_QC_SEWING_SUPPLY)
+            ->where('source_id', $jobId)
+            ->whereNull('voided_at')
+            ->exists();
+    }
+
+    /**
+     * @param  array<int, float>  $qtyByFinishedItem
+     * @return array<int, array{material: ?Item, required_qty: float, uom: string}>
+     */
+    private function cuttingQcSewingSupplyRequirements(array $qtyByFinishedItem): array
+    {
+        if ($qtyByFinishedItem === []) {
+            return [];
+        }
+
+        $boms = ItemBom::query()
+            ->whereIn('item_id', array_keys($qtyByFinishedItem))
+            ->where('active', true)
+            ->with(['lines.material'])
+            ->get();
+
+        $requirements = [];
+        foreach ($boms as $bom) {
+            $qtyOk = (float) ($qtyByFinishedItem[(int) $bom->item_id] ?? 0);
+            foreach ($bom->lines as $line) {
+                if (! $this->isCuttingQcSewingSupplyLine($line)) {
+                    continue;
+                }
+
+                $materialId = (int) $line->material_item_id;
+                $requirements[$materialId] ??= [
+                    'material' => $line->material,
+                    'required_qty' => 0.0,
+                    'uom' => (string) ($line->uom ?: $line->material?->unit ?: 'pcs'),
+                ];
+                $requirements[$materialId]['required_qty'] += $qtyOk * (float) $line->qty;
+            }
+        }
+
+        return $requirements;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array<int, float>
+     */
+    private function cuttingQcQtyByFinishedItemFromResults(CuttingJob $job, array $results): array
+    {
+        $bundles = $job->bundles()
+            ->get(['id', 'finished_item_id', 'qty_pcs'])
+            ->keyBy('id');
+        $qtyByFinishedItem = [];
+
+        foreach ($results as $row) {
+            $bundleId = (int) ($row['cutting_job_bundle_id'] ?? $row['bundle_id'] ?? 0);
+            $bundle = $bundles->get($bundleId);
+            if (! $bundle || ! $bundle->finished_item_id) {
+                continue;
+            }
+
+            $qtyOk = max(0, (float) ($row['qty_ok'] ?? 0));
+            $qtyReject = max(0, (float) ($row['qty_reject'] ?? 0));
+            $bundleQty = (float) $bundle->qty_pcs;
+
+            if ($qtyOk + $qtyReject > $bundleQty) {
+                $diff = ($qtyOk + $qtyReject) - $bundleQty;
+                if ($qtyReject >= $diff) {
+                    $qtyReject -= $diff;
+                } else {
+                    $qtyOk = max(0, $bundleQty - $qtyReject);
+                }
+            }
+
+            $qtyByFinishedItem[(int) $bundle->finished_item_id] =
+                ($qtyByFinishedItem[(int) $bundle->finished_item_id] ?? 0.0) + $qtyOk;
+        }
+
+        return array_filter($qtyByFinishedItem, fn (float $qty): bool => $qty > 0.000001);
     }
 
     private function allocateCuttingQcSupplyCostToWip(CuttingJob $job, float $supplyCost): void

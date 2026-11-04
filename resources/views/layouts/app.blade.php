@@ -540,6 +540,43 @@
     </script>
   @endif
 
+  @if (session('qc_auto_bom_shortage'))
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (!window.Swal) return;
+
+        const detail = @json(session('qc_auto_bom_shortage'));
+        const escapeHtml = function(value) {
+          const element = document.createElement('span');
+          element.textContent = String(value ?? '—');
+          return element.innerHTML;
+        };
+        const rows = [
+          ['Item', detail.item],
+          ['Gudang', detail.warehouse],
+          ['Kebutuhan', detail.required],
+          ['Tersedia (lot)', detail.available],
+          ['Kekurangan', detail.shortage],
+        ].filter(function(row) { return row[1]; });
+        const list = rows.length
+          ? '<ul style="margin:0;padding-left:1.2rem;text-align:left;line-height:1.75">' + rows.map(function(row) {
+              return '<li><strong>' + escapeHtml(row[0]) + ':</strong> ' + escapeHtml(row[1]) + '</li>';
+            }).join('') + '</ul>'
+          : '<p style="margin:0;text-align:left">Tidak ada saldo lot yang dapat digunakan.</p>';
+
+        window.Swal.fire({
+          icon: 'warning',
+          title: 'Auto BOM belum bisa diposting',
+          html: list + '<p style="margin:14px 0 0;font-size:.9rem">Lengkapi stok lot atau sesuaikan Qty OK/BOM.</p>',
+          confirmButtonText: 'Mengerti',
+          confirmButtonColor: '#334155',
+          width: 'min(92vw, 500px)',
+          padding: '1rem'
+        });
+      });
+    </script>
+  @endif
+
   @if (session('error'))
     <script>
       document.addEventListener('DOMContentLoaded', function() {
@@ -557,6 +594,24 @@
             popup: 'gf-minimal-error-alert',
             confirmButton: 'gf-minimal-error-alert-button'
           }
+        });
+      });
+    </script>
+  @endif
+
+  @if (session('warning'))
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (!window.Swal) return;
+
+        window.Swal.fire({
+          icon: 'warning',
+          title: 'Perhatian',
+          text: @json(session('warning')),
+          confirmButtonText: 'Mengerti',
+          confirmButtonColor: '#334155',
+          width: 'min(92vw, 520px)',
+          padding: '1rem'
         });
       });
     </script>

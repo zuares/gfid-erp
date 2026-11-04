@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Production;
 
+use App\Exceptions\AutoBomLotShortageException;
 use App\Http\Controllers\Controller;
 use App\Models\CuttingBundleCorrection;
 use App\Models\CuttingJob;
@@ -611,6 +612,23 @@ class QcController extends Controller
             }
         }
 
+        $pendingAutoBomLotPreview = null;
+        if (
+            $isOwner
+            && $cuttingJob->status === QcService::CUTTING_QC_PENDING_OWNER_REVIEW
+        ) {
+            $pendingAutoBomLotPreview = $this->qc->previewCuttingQcSewingSupplyLots(
+                $cuttingJob,
+                $cuttingJob->bundles
+                    ->map(fn ($bundle): array => [
+                        'cutting_job_bundle_id' => (int) $bundle->id,
+                        'qty_ok' => (float) ($existingQc->get($bundle->id)?->qty_ok ?? 0),
+                        'qty_reject' => (float) ($existingQc->get($bundle->id)?->qty_reject ?? 0),
+                    ])
+                    ->all(),
+            );
+        }
+
         return view('production.qc.cutting_edit', compact(
             'cuttingJob',
             'rows',
@@ -627,6 +645,7 @@ class QcController extends Controller
             'cuttingHppRows',
             'cuttingHppTotals',
             'cuttingQcAutoBomRows',
+            'pendingAutoBomLotPreview',
             'cuttingQcBomLotRows',
             'lotStockBeforeById',
             'lotInventoryNowById',
@@ -655,8 +674,25 @@ class QcController extends Controller
         $validated['operator_id'] = Auth::user()->employee?->id;
         $validated['qc_by_user_id'] = Auth::id();
 
+        if (
+            $cuttingJob->status === QcService::CUTTING_QC_PENDING_OWNER_REVIEW
+            && ! (Auth::user()?->isOwner() ?? false)
+        ) {
+            return back()->with('warning', 'QC ini sedang menunggu koreksi Owner. Operator tidak dapat memposting atau mengubahnya.');
+        }
+
         try {
             $this->processCuttingQc($cuttingJob, $validated);
+        } catch (AutoBomLotShortageException $e) {
+            if (! (Auth::user()?->isOwner() ?? false)) {
+                $this->qc->saveCuttingQcPendingOwnerReview($cuttingJob, $validated);
+
+                return redirect()
+                    ->route('production.qc.cutting.edit', $cuttingJob)
+                    ->with('warning', 'QC disimpan sebagai Menunggu Koreksi Owner. Owner perlu memeriksa lot atau Qty OK/BOM.');
+            }
+
+            return $this->autoBomLotShortageResponse($e);
         } catch (\Throwable $e) {
             return back()
                 ->withInput()
@@ -711,6 +747,12 @@ class QcController extends Controller
 
         try {
             $this->processCuttingQc($cuttingJob, $payload);
+        } catch (AutoBomLotShortageException $e) {
+            if (! (Auth::user()?->isOwner() ?? false)) {
+                return $this->queueCuttingQcForOwnerReview($cuttingJob, $payload, $e);
+            }
+
+            return $this->autoBomLotShortageResponse($e);
         } catch (\Throwable $e) {
             return back()
                 ->with('error', 'Selesai Cutting gagal: '.$e->getMessage());
@@ -773,6 +815,12 @@ class QcController extends Controller
 
         try {
             $this->processCuttingQc($cuttingJob, $payload);
+        } catch (AutoBomLotShortageException $e) {
+            if (! (Auth::user()?->isOwner() ?? false)) {
+                return $this->queueCuttingQcForOwnerReview($cuttingJob, $payload, $e);
+            }
+
+            return $this->autoBomLotShortageResponse($e);
         } catch (\Throwable $e) {
             return back()->with('error', 'Quick OK bundle gagal: '.$e->getMessage());
         }
@@ -813,6 +861,12 @@ class QcController extends Controller
 
         try {
             $this->processCuttingQc($cuttingJob, $payload);
+        } catch (AutoBomLotShortageException $e) {
+            if (! (Auth::user()?->isOwner() ?? false)) {
+                return $this->queueCuttingQcForOwnerReview($cuttingJob, $payload, $e);
+            }
+
+            return $this->autoBomLotShortageResponse($e);
         } catch (\Throwable $e) {
             return back()->with('error', 'Simpan bundle gagal: '.$e->getMessage());
         }
@@ -843,6 +897,11 @@ class QcController extends Controller
             // Simpan QC biasa. Koreksi kuantitas harus melalui Adjust atau
             // Partial Cancel supaya stok dan jurnal memiliki jejak reversal.
             $this->assertPostedCuttingQcIsUnchanged($job, $payload['results'] ?? []);
+
+            $this->qc->assertCuttingQcSewingSupplyLotsAvailable(
+                $job,
+                $payload['results'] ?? [],
+            );
 
             $this->cutting->validatePieceRatesForQc(
                 job: $job->fresh('bundles'),
@@ -886,6 +945,25 @@ class QcController extends Controller
                 'updated_by' => Auth::id(),
             ]);
         });
+    }
+
+    private function queueCuttingQcForOwnerReview(
+        CuttingJob $cuttingJob,
+        array $payload,
+        AutoBomLotShortageException $exception,
+    ): RedirectResponse {
+        $this->qc->saveCuttingQcPendingOwnerReview($cuttingJob, $payload);
+
+        return redirect()
+            ->route('production.qc.cutting.edit', $cuttingJob)
+            ->with('warning', 'QC disimpan sebagai Menunggu Koreksi Owner. Owner perlu memeriksa lot atau Qty OK/BOM.');
+    }
+
+    private function autoBomLotShortageResponse(AutoBomLotShortageException $exception): RedirectResponse
+    {
+        return back()
+            ->withInput()
+            ->with('qc_auto_bom_shortage', $exception->flashPayload());
     }
 
     /**

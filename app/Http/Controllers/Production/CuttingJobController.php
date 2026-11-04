@@ -21,6 +21,7 @@ use App\Services\Accounting\StandaloneProductionPostingService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Inventory\LotCostService;
 use App\Services\Production\CuttingService;
+use App\Services\Production\QcService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -36,6 +37,7 @@ class CuttingJobController extends Controller
         protected JournalService $journal,
         protected StandaloneProductionPostingService $standaloneProductionPosting,
         protected LotCostService $lotCost,
+        protected QcService $qc,
     ) {}
 
     /** Kata konfirmasi yang harus diketik untuk membersihkan data produksi. */
@@ -1745,6 +1747,20 @@ class CuttingJobController extends Controller
             })
             ->exists();
 
+        $autoBomLotPreview = null;
+        if (! $hasQcCutting) {
+            $autoBomLotPreview = $this->qc->previewCuttingQcSewingSupplyLots(
+                $cuttingJob,
+                $cuttingJob->bundles
+                    ->map(fn ($bundle): array => [
+                        'cutting_job_bundle_id' => (int) $bundle->id,
+                        'qty_ok' => (float) $bundle->qty_pcs,
+                        'qty_reject' => 0.0,
+                    ])
+                    ->all(),
+            );
+        }
+
         // Read-only trace produksi → Akuntansi Baru. Sertakan repost dan
         // reversal supaya audit tetap utuh saat dokumen pernah dibatalkan.
         $accountingJournalEntries = StandaloneAccountingJournal::query()
@@ -1877,6 +1893,7 @@ class CuttingJobController extends Controller
         return view('production.cutting_jobs.show', [
             'job' => $cuttingJob,
             'hasQcCutting' => $hasQcCutting,
+            'autoBomLotPreview' => $autoBomLotPreview,
             'bundleCorrections' => $bundleCorrections,
             'bomScrapTargets' => $bomScrapTargets,
             'accountingJournalEntries' => $accountingJournalEntries,

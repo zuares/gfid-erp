@@ -12,7 +12,7 @@ $navPendingCount = 0;
 $navPendingItems = [];
 
 if ($navShowBell) {
-    $navCacheKey = 'navbar_notif_owner_v2_' . (int) $navUser->id;
+    $navCacheKey = 'navbar_notif_owner_v3_' . (int) $navUser->id;
     $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () {
         $todayStart = today()->startOfDay();
         $todayEnd   = today()->endOfDay();
@@ -25,6 +25,15 @@ if ($navShowBell) {
 
         $grnDrafts = \App\Models\PurchaseReceipt::where('status', 'draft')
             ->orderByDesc('id')
+            ->limit(10)
+            ->get(['id', 'code']);
+
+        // QC cutting yang gagal mem-post Auto BOM tidak boleh hilang dari
+        // perhatian Owner. QC sudah tersimpan, namun masih perlu koreksi lot
+        // atau Qty OK/BOM sebelum WIP, mutasi stok, dan jurnal dibuat.
+        $cuttingQcOwnerReviews = \App\Models\CuttingJob::query()
+            ->where('status', \App\Services\Production\QcService::CUTTING_QC_PENDING_OWNER_REVIEW)
+            ->orderByDesc('updated_at')
             ->limit(10)
             ->get(['id', 'code']);
 
@@ -63,6 +72,7 @@ if ($navShowBell) {
         return [
             'po_drafts'      => $poDrafts,
             'grn_drafts'     => $grnDrafts,
+            'cutting_qc_owner_reviews' => $cuttingQcOwnerReviews,
             'crm_aging'      => $crmAgingCount,
             'crm_new_orders' => $crmNewOrders,
             'crm_prospects'  => $crmProspects,
@@ -87,6 +97,15 @@ if ($navShowBell) {
                 'sub'   => 'Belum di-post',
                 'url'   => route('purchasing.purchase_receipts.show', $grn->id),
                 'icon'  => '📦',
+            ];
+        }
+        foreach (($navPending['cutting_qc_owner_reviews'] ?? collect()) as $cuttingJob) {
+            $navPendingItems[] = [
+                'type'  => 'cutting_qc_owner_review',
+                'label' => $cuttingJob->code ?? 'Cutting Job #'.$cuttingJob->id,
+                'sub'   => 'Auto BOM kurang stok lot — koreksi persediaan',
+                'url'   => route('production.qc.cutting.edit', $cuttingJob->id),
+                'icon'  => '✂️',
             ];
         }
     }

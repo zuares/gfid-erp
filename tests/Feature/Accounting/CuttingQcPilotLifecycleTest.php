@@ -534,6 +534,231 @@ class CuttingQcPilotLifecycleTest extends TestCase
         $this->assertEqualsWithDelta(120, (float) $allocations[1]['unit_cost'], 0.000001);
     }
 
+    public function test_non_owner_qc_with_auto_bom_lot_shortage_waits_for_owner_correction(): void
+    {
+        config([
+            'accounting.standalone_dual_posting_production_cutting_enabled' => true,
+            'accounting.standalone_production_cutting_qc_auto_bom_enabled' => true,
+        ]);
+
+        [$owner, $job, $bundle] = $this->makePostedCuttingJob();
+        $operator = User::factory()->create([
+            'role' => 'operating',
+            'employee_id' => $job->operator_id,
+            'employee_code' => Employee::query()->findOrFail($job->operator_id)->code,
+        ]);
+        $rm = Warehouse::create([
+            'code' => 'RM',
+            'name' => 'QC Pending Review RM',
+            'type' => 'internal',
+            'active' => true,
+        ]);
+        $supply = Item::create([
+            'code' => 'SUP-PENDING-'.uniqid(),
+            'name' => 'Pending Review Supply',
+            'type' => 'material',
+            'unit' => 'pcs',
+            'is_stocked' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $bundle->finished_item_id,
+            'name' => 'Pending Review BOM',
+            'active' => true,
+        ]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $supply->id,
+            'usage_stage' => ItemBomLine::STAGE_SEWING_SUPPLY,
+            'qty' => 0.2,
+            'uom' => 'pcs',
+            'scrap_pct' => 0,
+            'is_optional' => false,
+            'sort_order' => 1,
+        ]);
+        InventoryStock::create([
+            'warehouse_id' => $rm->id,
+            'item_id' => $supply->id,
+            'qty' => 1,
+            'allocated_qty' => 0,
+        ]);
+        $supplyLot = Lot::create([
+            'code' => 'LOT-PENDING-'.uniqid(),
+            'item_id' => $supply->id,
+            'initial_qty' => 1,
+            'initial_cost' => 100,
+            'qty_onhand' => 1,
+            'total_cost' => 100,
+            'avg_cost' => 100,
+            'status' => 'open',
+        ]);
+        InventoryMutation::create([
+            'date' => '2026-10-27',
+            'warehouse_id' => $rm->id,
+            'item_id' => $supply->id,
+            'qty_change' => 1,
+            'direction' => 'in',
+            'source_type' => 'pending_review_supply_fixture',
+            'source_id' => $job->id,
+            'lot_id' => $supplyLot->id,
+            'unit_cost' => 100,
+            'total_cost' => 100,
+        ]);
+
+        $operatorPayload = [
+            'qc_date' => '2026-10-27',
+            'results' => [[
+                'cutting_job_bundle_id' => $bundle->id,
+                'qty_ok' => 10,
+                'qty_reject' => 0,
+            ]],
+        ];
+
+        $preview = app(\App\Services\Production\QcService::class)
+            ->previewCuttingQcSewingSupplyLots($job, $operatorPayload['results']);
+        $this->assertFalse($preview['ready']);
+        $this->assertSame($supply->code.' — '.$supply->name, $preview['detail']['item']);
+        $this->assertSame('2 pcs', $preview['detail']['required']);
+        $this->assertSame('1 pcs', $preview['detail']['available']);
+        $this->assertSame('1 pcs', $preview['detail']['shortage']);
+        $this->assertSame($supply->id, $preview['detail']['item_id']);
+        $this->assertEqualsWithDelta(1, $preview['detail']['shortage_qty'], 0.000001);
+
+        $operatorResponse = $this->actingAs($operator)
+            ->put(route('production.qc.cutting.update', $job), $operatorPayload);
+        $operatorResponse
+            ->assertRedirect(route('production.qc.cutting.edit', $job))
+            ->assertSessionHas('warning', fn (string $warning): bool => str_contains($warning, 'Menunggu Koreksi Owner'));
+
+        $this->assertDatabaseHas('cutting_jobs', [
+            'id' => $job->id,
+            'status' => 'qc_pending_owner_review',
+        ]);
+        $this->assertDatabaseHas('cutting_job_bundles', [
+            'id' => $bundle->id,
+            'status' => 'pending_owner_review',
+            'qty_qc_ok' => 10,
+            'qty_qc_reject' => 0,
+        ]);
+        $this->assertDatabaseHas('qc_results', [
+            'cutting_job_id' => $job->id,
+            'cutting_job_bundle_id' => $bundle->id,
+            'status' => 'pending_owner_review',
+        ]);
+        $this->assertSame(0, InventoryMutation::query()
+            ->where('source_type', 'cutting_wip')
+            ->where('source_id', $job->id)
+            ->count());
+        $this->assertSame(0, InventoryMutation::query()
+            ->where('source_type', JournalService::SRC_CUTTING_QC_SEWING_SUPPLY)
+            ->where('source_id', $job->id)
+            ->count());
+
+        $this->actingAs($owner)
+            ->get(route('production.qc.cutting.edit', $job))
+            ->assertOk()
+            ->assertSee('Menunggu tindakan Owner')
+            ->assertSee($supply->code.' — '.$supply->name)
+            ->assertSee('Koreksi Persediaan')
+            ->assertDontSee('Koreksi QC')
+            ->assertSee('Buat PO')
+            ->assertSee('Auto BOM kurang stok lot — koreksi persediaan')
+            ->assertSee(route('production.qc.cutting.edit', $job), false);
+
+        $this->actingAs($owner)
+            ->get(route('purchasing.purchase_orders.create', [
+                'item_id' => $supply->id,
+                'qty' => 1,
+                'auto_bom_shortage' => 1,
+            ]))
+            ->assertOk()
+            ->assertSee($supply->code)
+            ->assertSee('name="lines[0][qty]"', false)
+            ->assertSee('value="1"', false)
+            ->assertSee('name="auto_bom_shortage" value="1"', false);
+
+        config(['purchasing.po_approval_enabled' => true]);
+        $supplier = \App\Models\Supplier::create([
+            'code' => 'SUP-QC-'.uniqid(),
+            'name' => 'Supplier QC Auto BOM',
+            'type' => 'supplier',
+            'active' => true,
+        ]);
+        $paymentMethod = \App\Models\PaymentMethod::create([
+            'code' => 'TEMPO-QC-'.uniqid(),
+            'name' => 'Tempo QC Auto BOM',
+            'mode' => 'credit',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('purchasing.purchase_orders.store'), [
+                'date' => '2026-11-04',
+                'supplier_id' => $supplier->id,
+                'payment_method_id' => $paymentMethod->id,
+                'order_type' => 'material',
+                'tax_percent' => '0',
+                'discount' => '0',
+                'shipping_cost' => '0',
+                'auto_bom_shortage' => 1,
+                'lines' => [[
+                    'item_id' => $supply->id,
+                    'qty' => '1',
+                    'purchase_unit' => 'pcs',
+                    'stock_unit' => 'pcs',
+                    'conversion_factor' => 1,
+                    'unit_price' => '100',
+                    'discount' => '0',
+                ]],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'supplier_id' => $supplier->id,
+            'status' => 'approved',
+            'approved_by' => $owner->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->put(route('production.qc.cutting.update', $job), $operatorPayload)
+            ->assertRedirect()
+            ->assertSessionHas('qc_auto_bom_shortage', fn (array $detail): bool =>
+                $detail['item'] === $supply->code.' — '.$supply->name
+                && $detail['required'] === '2 pcs'
+                && $detail['available'] === '1 pcs'
+                && $detail['shortage'] === '1 pcs'
+            )
+            ->assertSessionMissing('error');
+
+        $ownerPayload = array_replace_recursive($operatorPayload, [
+            'results' => [[
+                'qty_ok' => 5,
+                'qty_reject' => 5,
+            ]],
+        ]);
+
+        $ownerResponse = $this->actingAs($owner)
+            ->put(route('production.qc.cutting.update', $job), $ownerPayload);
+        $ownerResponse
+            ->assertRedirect(route('production.cutting_jobs.show', $job));
+
+        $this->assertDatabaseHas('cutting_jobs', [
+            'id' => $job->id,
+            'status' => 'qc_done',
+        ]);
+        $this->assertDatabaseHas('qc_results', [
+            'cutting_job_id' => $job->id,
+            'cutting_job_bundle_id' => $bundle->id,
+            'status' => 'qc_mixed',
+            'qty_ok' => 5,
+            'qty_reject' => 5,
+        ]);
+        $this->assertEqualsWithDelta(-1, (float) InventoryMutation::query()
+            ->where('source_type', JournalService::SRC_CUTTING_QC_SEWING_SUPPLY)
+            ->where('source_id', $job->id)
+            ->sum('qty_change'), 0.000001);
+    }
+
     public function test_auto_bom_lot_allocator_blocks_shortage_and_untraceable_stock(): void
     {
         $warehouse = Warehouse::create([
@@ -573,9 +798,24 @@ class CuttingQcPilotLifecycleTest extends TestCase
         ]);
 
         $allocator = app(\App\Services\Inventory\LotAllocationService::class);
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Saldo lot item');
-        $allocator->allocateFifo($warehouse->id, $item->id, 2);
+        try {
+            $allocator->allocateFifo($warehouse->id, $item->id, 2);
+            $this->fail('Allocator seharusnya menghentikan Auto BOM saat saldo lot kurang.');
+        } catch (\RuntimeException $e) {
+            $message = $e->getMessage();
+
+            foreach ([
+                'Auto BOM belum dapat diposting karena stok kelengkapan kurang.',
+                'Item: '.$item->code.' — '.$item->name,
+                'Gudang: '.$warehouse->code.' — '.$warehouse->name,
+                'Kebutuhan QC: 2 pcs',
+                'Saldo lot yang dapat dipakai: 1 pcs',
+                'Kekurangan: 1 pcs',
+                'Auto BOM tidak diposting; stok dan jurnal tidak berubah.',
+            ] as $expected) {
+                $this->assertStringContainsString($expected, $message);
+            }
+        }
     }
 
     /** @return array{0: User, 1: CuttingJob, 2: \App\Models\CuttingJobBundle} */

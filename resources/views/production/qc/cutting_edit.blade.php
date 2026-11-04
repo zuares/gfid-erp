@@ -1629,6 +1629,7 @@
         $defaultQcDate = old('qc_date', optional($cuttingJob->qc_date ?? ($cuttingJob->date ?? now()))->toDateString());
 
         $status = $cuttingJob->status;
+        $isPendingOwnerReview = $status === \App\Services\Production\QcService::CUTTING_QC_PENDING_OWNER_REVIEW;
 
         $badgeClass = [
             'draft' => 'secondary',
@@ -1639,10 +1640,11 @@
             'sent_to_qc' => 'info',
             'cut_sent_to_qc' => 'info',
             'qc_done' => 'success',
+            'qc_pending_owner_review' => 'warning',
         ][$status] ?? 'secondary';
 
         $stepCurrent = 1;
-        if (in_array($status, ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc'], true)) {
+        if (in_array($status, ['draft', 'cut', 'cut_sent_to_qc', 'sent_to_qc', 'qc_pending_owner_review'], true)) {
             $stepCurrent = 2;
         } elseif (in_array($status, ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done'])) {
             $stepCurrent = 3;
@@ -1653,7 +1655,7 @@
         $step3State = $stepCurrent >= 3 ? ($stepCurrent === 3 ? 'current' : 'done') : '';
 
         // deteksi sudah ada QC
-        $hasExistingQc = in_array($cuttingJob->status, ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done']);
+        $hasExistingQc = in_array($cuttingJob->status, ['qc_ok', 'qc_mixed', 'qc_reject', 'qc_done', 'qc_pending_owner_review']);
         if (!$hasExistingQc && isset($rows) && is_array($rows)) {
             foreach ($rows as $r) {
                 $st = $r['status'] ?? null;
@@ -1767,12 +1769,59 @@
             </div>
 
             {{-- ALERTS --}}
-            @if ($hasExistingQc && !$isOwner)
+            @if ($isPendingOwnerReview)
+                <div class="qcs-alert qcs-alert-warning">
+                    <strong>Menunggu tindakan Owner.</strong> Hasil QC operator sudah dicatat, tetapi Auto BOM belum diposting karena stok lot kurang. Tidak ada WIP, mutasi stok, atau jurnal yang dibuat.
+                    @if ($isOwner)
+                        @php $pendingAutoBomDetail = $pendingAutoBomLotPreview['detail'] ?? []; @endphp
+                        @if (($pendingAutoBomLotPreview['ready'] ?? null) === false)
+                            <div class="table-responsive mt-2 mb-2">
+                                <table class="table table-sm align-middle mb-0" style="font-size:.82rem;">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th class="text-end">Butuh</th>
+                                            <th class="text-end">Lot tersedia</th>
+                                            <th class="text-end">Kekurangan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>{{ $pendingAutoBomDetail['item'] ?? '-' }}</td>
+                                            <td class="text-end">{{ $pendingAutoBomDetail['required'] ?? '-' }}</td>
+                                            <td class="text-end">{{ $pendingAutoBomDetail['available'] ?? '-' }}</td>
+                                            <td class="text-end fw-semibold">{{ $pendingAutoBomDetail['shortage'] ?? '-' }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            @if (Route::has('inventory.adjustments.manual.create'))
+                                <a href="{{ route('inventory.adjustments.manual.create', [
+                                    'item_id' => $pendingAutoBomDetail['item_id'] ?? null,
+                                    'qty' => $pendingAutoBomDetail['shortage_qty'] ?? null,
+                                ]) }}" class="qcs-link-chip qcs-link-chip-outline">Koreksi Persediaan</a>
+                            @endif
+                            @if (Route::has('purchasing.purchase_orders.create') && ! empty($pendingAutoBomDetail['item_id']))
+                                <a href="{{ route('purchasing.purchase_orders.create', [
+                                    'item_id' => $pendingAutoBomDetail['item_id'],
+                                    'qty' => $pendingAutoBomDetail['shortage_qty'] ?? 1,
+                                    'auto_bom_shortage' => 1,
+                                ]) }}" class="qcs-link-chip">Buat PO</a>
+                            @endif
+                        </div>
+                    @else
+                        Owner akan melengkapi persediaan lot sebelum Auto BOM diposting.
+                    @endif
+                </div>
+            @endif
+            @if ($hasExistingQc && !$isOwner && !$isPendingOwnerReview)
                 <div class="qcs-alert qcs-alert-info">
                     QC sudah tersimpan. Jika ada salah input setelah QC done, minta <strong>OWNER</strong> untuk <strong>Batalkan QC</strong> lalu input QC ulang.
                 </div>
             @endif
-            @if ($hasExistingQc && $isOwner)
+            @if ($hasExistingQc && $isOwner && !$isPendingOwnerReview)
                 <div class="qcs-alert qcs-alert-info">
                     QC sudah tersimpan. Untuk mengganti item: <strong>Batalkan QC bundle</strong> → <strong>Ganti Item</strong> → <strong>Simpan QC ulang</strong>. Adjust dipakai hanya untuk koreksi qty.
                 </div>
@@ -1781,7 +1830,7 @@
             {{-- =========================
                  FORM QC NORMAL (PUT)
                  ========================= --}}
-            <form action="{{ route('production.qc.cutting.update', $cuttingJob) }}" method="post">
+            <form id="cuttingQcForm" action="{{ route('production.qc.cutting.update', $cuttingJob) }}" method="post">
                 @csrf
                 @method('PUT')
 
@@ -2835,9 +2884,9 @@
                         <div class="qcs-btn-group">
                             <a href="{{ route('production.cutting_jobs.show', $cuttingJob) }}" class="qcs-btn-cancel">Batal</a>
                             @if ($hasEditableQcRows)
-                                <button type="submit" class="qcs-btn-save">
+                                <button type="submit" class="qcs-btn-save" @disabled($isPendingOwnerReview && !$isOwner)>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                    Simpan QC
+                                    {{ $isPendingOwnerReview && !$isOwner ? 'Menunggu Owner' : 'Simpan QC' }}
                                 </button>
                             @else
                                 <span class="qcs-btn-save" style="opacity:.6;cursor:not-allowed;" title="Semua bundle sudah dikoreksi">

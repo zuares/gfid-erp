@@ -90,6 +90,9 @@
     <form id="po-create-form" action="{{ route('purchasing.purchase_orders.store') }}" method="POST">
         @csrf
         <input type="hidden" name="ignore_duplicate" id="ignore_duplicate" value="0">
+        @if ($autoBomShortage ?? false)
+            <input type="hidden" name="auto_bom_shortage" value="1">
+        @endif
         
         <div class="shp-topbar mb-3">
             <div class="shp-topbar-code">Buat PO Baru</div>

@@ -761,6 +761,7 @@
             'qc_ok' => ['label' => 'QC OK', 'class' => 'success'],
             'qc_mixed' => ['label' => 'QC MIXED', 'class' => 'warning'],
             'qc_reject' => ['label' => 'QC REJECT', 'class' => 'danger'],
+            'qc_pending_owner_review' => ['label' => 'MENUNGGU KOREKSI OWNER', 'class' => 'warning'],
             'sent_to_qc' => ['label' => 'SEDANG DI QC', 'class' => 'info'],
             'cut_sent_to_qc' => ['label' => 'SEDANG DI QC', 'class' => 'info'],
         ];
@@ -786,7 +787,7 @@
         if (in_array($status, ['cut', 'cut_sent_to_qc', 'sent_to_qc'], true)) {
             $stepCurrent = 2;
         }
-        if ($hasQcCutting || in_array($status, ['qc_done', 'qc_ok', 'qc_mixed', 'qc_reject'], true)) {
+        if (($hasQcCutting && $status !== 'qc_pending_owner_review') || in_array($status, ['qc_done', 'qc_ok', 'qc_mixed', 'qc_reject'], true)) {
             $stepCurrent = 3;
         }
 
@@ -1280,6 +1281,24 @@
                     Simpan &amp; Konfirmasi
                 </button>
             </div>
+
+            @if (($autoBomLotPreview['ready'] ?? null) === false)
+                @php $autoBomDetail = $autoBomLotPreview['detail'] ?? []; @endphp
+                <div class="alert alert-warning mb-4" role="alert">
+                    <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Auto BOM perlu koreksi</div>
+                    <ul class="mb-2 ps-3 small">
+                        <li><strong>Item:</strong> {{ $autoBomDetail['item'] ?? '-' }}</li>
+                        <li><strong>Kebutuhan:</strong> {{ $autoBomDetail['required'] ?? '-' }}</li>
+                        <li><strong>Tersedia (lot):</strong> {{ $autoBomDetail['available'] ?? '-' }}</li>
+                        <li><strong>Kekurangan:</strong> {{ $autoBomDetail['shortage'] ?? '-' }}</li>
+                    </ul>
+                    <div class="small">Lengkapi stok lot atau sesuaikan Qty OK/BOM di Input QC.</div>
+                </div>
+            @elseif (($autoBomLotPreview['ready'] ?? null) === true)
+                <div class="alert alert-success mb-4 small" role="status">
+                    <i class="bi bi-check-circle me-1" aria-hidden="true"></i>Auto BOM tervalidasi: saldo lot mencukupi untuk seluruh Qty OK.
+                </div>
+            @endif
         @endif
 
         @if ($canSeeProductionAccounting && $hasBundleCorrections)

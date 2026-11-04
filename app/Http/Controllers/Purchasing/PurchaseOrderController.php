@@ -140,6 +140,8 @@ class PurchaseOrderController extends Controller
 
         $orderType = $this->normalizeOrderType($request->input('order_type', 'material'));
         $order->order_type = $orderType;
+        $autoBomShortage = $request->boolean('auto_bom_shortage')
+            && (bool) $request->user()?->isOwner();
 
         $paymentMethods = PaymentMethod::query()
             ->where('is_active', 1)
@@ -237,6 +239,41 @@ class PurchaseOrderController extends Controller
             }
         }
 
+        // Aksi "Buat PO" dari validasi Auto BOM membawa material dan qty
+        // kekurangannya ke draft PO. PO belum dibuat sampai form disimpan.
+        if ($lines->isEmpty() && $request->filled('item_id')) {
+            $itemId = (int) $request->input('item_id');
+            $item = $items->firstWhere('id', $itemId)
+                ?? Item::query()
+                    ->whereKey($itemId)
+                    ->where('active', 1)
+                    ->first([
+                        'id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor',
+                        'default_allocation', 'default_expense_account_id',
+                    ]);
+            if ($item) {
+                $lines = collect([[
+                    'item_id' => (int) $item->id,
+                    'item' => [
+                        'id' => (int) $item->id,
+                        'code' => (string) $item->code,
+                        'name' => (string) $item->name,
+                        'unit' => (string) $item->unit,
+                        'stock_unit' => $item->stockUnit(),
+                        'purchase_unit' => $item->purchaseUnit(),
+                        'purchase_conversion_factor' => $item->purchaseConversionFactor(),
+                        'default_allocation' => $item->default_allocation ?? 'hpp',
+                        'default_expense_account_id' => $item->default_expense_account_id ?? null,
+                    ],
+                    'qty' => max((float) $request->input('qty', 1), 0.0001),
+                    'unit_price' => 0,
+                    'discount' => 0,
+                    'allocation' => $item->default_allocation ?? 'hpp',
+                    'expense_account_id' => $item->default_expense_account_id ?? '',
+                ]]);
+            }
+        }
+
         return view('purchasing.purchase_orders.create', [
             'order' => $order,
             'suppliers' => $suppliers,
@@ -247,6 +284,7 @@ class PurchaseOrderController extends Controller
             'expenseAccounts' => $expenseAccounts,
             'orderType' => $orderType,
             'fromPr' => $fromPr, // PR-D: null atau PurchaseRequest model
+            'autoBomShortage' => $autoBomShortage,
         ]);
     }
 
@@ -256,6 +294,8 @@ class PurchaseOrderController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateData($request);
+        $autoBomShortage = $request->boolean('auto_bom_shortage')
+            && (bool) $request->user()?->isOwner();
 
         // ==========================================
         // IDEMPOTENCY CHECK
@@ -324,18 +364,34 @@ class PurchaseOrderController extends Controller
         $data['created_by'] = (int) $request->user()->id;
         $data['status'] = 'draft';
 
+        if ($autoBomShortage) {
+            $data['notes'] = trim(implode("\n", array_filter([
+                $data['notes'] ?? null,
+                '[Auto BOM shortage — approval dilewati oleh Owner]',
+            ])));
+        }
+
         // Status pembayaran harus mengikuti nominal pembayaran yang benar-benar
         // tercatat, bukan hanya mode metode pembayaran yang dipilih.
         $data['payment_status'] = 'unpaid';
 
         $order = $this->service->create($data);
 
+        // PO yang dibuat dari kekurangan lot Auto BOM telah diputuskan Owner
+        // pada saat koreksi QC. Tandai langsung siap untuk GRN tanpa menunggu
+        // tombol approval PO terpisah; PO biasa tetap memakai alur lama.
+        if ($autoBomShortage) {
+            $order = $this->service->approve($order, (int) $request->user()->id);
+        }
+
         // auto-create payment from form (pay_now)
         $this->maybeCreatePayNowPayment($request, $order, allowIfHasExistingPayments: true);
         $this->recalcPaymentStatus($order);
 
         // PR-D: Jika PO dibuat dari Purchase Request, simpan relasi + update status PR
-        $successMsg = 'Purchase Order berhasil dibuat.';
+        $successMsg = $autoBomShortage
+            ? 'Purchase Order berhasil dibuat dan siap diproses tanpa approval terpisah.'
+            : 'Purchase Order berhasil dibuat.';
         $prId = (int) $request->input('purchase_request_id', 0);
         if ($prId > 0 && \Illuminate\Support\Facades\Schema::hasTable('purchase_requests')) {
             $pr = \App\Models\PurchaseRequest::find($prId);
