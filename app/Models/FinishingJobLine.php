@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Employee;
-use App\Models\Item;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -23,14 +21,16 @@ class FinishingJobLine extends Model
         'processed_at',
         'sewing_operator_id',
         'sewing_operator_name',
+        'sewing_return_date',
         'bom_has_gaps',
     ];
 
     protected $casts = [
-        'qty_in'       => 'integer',
-        'qty_ok'       => 'integer',
-        'qty_reject'   => 'integer',
+        'qty_in' => 'integer',
+        'qty_ok' => 'integer',
+        'qty_reject' => 'integer',
         'processed_at' => 'datetime',
+        'sewing_return_date' => 'date',
         'bom_has_gaps' => 'boolean',
     ];
 
@@ -76,5 +76,4 @@ class FinishingJobLine extends Model
     {
         $this->attributes['qty_reject'] = (int) round((float) ($value ?? 0));
     }
-
 }

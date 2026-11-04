@@ -277,13 +277,14 @@ class FinishingJobController extends Controller
                 sr.operator_id as operator_id,
                 MAX(e.code) as operator_code,
                 MAX(e.name) as operator_name,
+                sr.date as setor_date,
                 SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining_ok,
-                MAX(sp.date) as pickup_date,
-                MAX(sr.date) as setor_date
+                MAX(sp.date) as pickup_date
             ')
-            ->groupBy('b.finished_item_id', 'sr.operator_id')
+            ->groupBy('b.finished_item_id', 'sr.operator_id', 'sr.date')
             ->orderBy('b.finished_item_id')
             ->orderByRaw('COALESCE(MAX(e.code), "")')
+            ->orderBy('sr.date')
             ->get();
 
         // 4B) remaining per item
@@ -297,33 +298,6 @@ class FinishingJobController extends Controller
             ->groupBy('b.finished_item_id')
             ->orderBy('b.finished_item_id')
             ->get();
-
-        // Rincian sumber setoran dipakai sebagai penjelas di form Finishing.
-        // Total yang bisa diproses tetap dibatasi saldo WIP-FIN di bawah.
-        $setorBreakdownRows = (clone $base)
-            ->selectRaw('
-                b.finished_item_id as item_id,
-                sr.operator_id as operator_id,
-                sr.date as setor_date,
-                SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining_ok
-            ')
-            ->groupBy('b.finished_item_id', 'sr.operator_id', 'sr.date')
-            ->orderBy('sr.date')
-            ->get();
-
-        $setorBreakdownByItemOp = [];
-        foreach ($setorBreakdownRows as $row) {
-            $qty = max(0, (int) round((float) ($row->remaining_ok ?? 0)));
-            if ($qty <= 0) {
-                continue;
-            }
-
-            $key = (int) $row->item_id.':'.(int) ($row->operator_id ?? 0);
-            $setorBreakdownByItemOp[$key][] = [
-                'date' => $row->setor_date,
-                'qty' => $qty,
-            ];
-        }
 
         // 5) eligible WIP per item+op
         $qEligibleBundles = DB::table('cutting_job_bundles as b')
@@ -371,33 +345,17 @@ class FinishingJobController extends Controller
             $eligibleWipByItemOp[$key] = ($eligibleWipByItemOp[$key] ?? 0) + (int) round((float) ($r->bundle_wip ?? 0));
         }
 
-        $linesByOp = collect($rowsByOp)->map(function ($r) use ($items, $eligibleWipByItemOp, $setorBreakdownByItemOp) {
+        $remainingEligibleWipByItemOp = $eligibleWipByItemOp;
+        $linesByOp = collect($rowsByOp)->map(function ($r) use ($items, &$remainingEligibleWipByItemOp) {
             $itemId = (int) $r->item_id;
             $opId = (int) ($r->operator_id ?? 0);
 
             $it = $items->get($itemId);
             $remaining = (int) round((float) ($r->remaining_ok ?? 0));
-            $eligibleWip = (int) ($eligibleWipByItemOp["{$itemId}:{$opId}"] ?? 0);
+            $key = "{$itemId}:{$opId}";
+            $eligibleWip = (int) ($remainingEligibleWipByItemOp[$key] ?? 0);
             $cap = max(0, min($remaining, $eligibleWip));
-
-            // Terapkan batas saldo WIP-FIN ke rincian tanggal secara FIFO,
-            // konsisten dengan urutan konsumsi reservation Finishing.
-            $remainingCap = $cap;
-            $setorBreakdown = [];
-            foreach (($setorBreakdownByItemOp["{$itemId}:{$opId}"] ?? []) as $setor) {
-                if ($remainingCap <= 0) {
-                    break;
-                }
-
-                $qty = min((int) $setor['qty'], $remainingCap);
-                if ($qty > 0) {
-                    $setorBreakdown[] = [
-                        'date' => $setor['date'],
-                        'qty' => $qty,
-                    ];
-                    $remainingCap -= $qty;
-                }
-            }
+            $remainingEligibleWipByItemOp[$key] = max(0, $eligibleWip - $cap);
 
             return [
                 'item_id' => $itemId,
@@ -411,7 +369,6 @@ class FinishingJobController extends Controller
 
                 'pickup_date' => $r->pickup_date ?? null,
                 'setor_date' => $r->setor_date ?? null,
-                'setor_breakdown' => $setorBreakdown,
 
                 'qty_in' => null,
                 'qty_reject' => 0,
@@ -707,6 +664,7 @@ class FinishingJobController extends Controller
 
             $linesKey => ['required', 'array', 'min:1'],
             $linesKey.'.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            $linesKey.'.*.setor_date' => [$mode === 'byop' ? 'required' : 'nullable', 'date'],
             $linesKey.'.*.qty_in' => ['nullable', 'integer', 'min:0'],
             $linesKey.'.*.qty_reject' => ['nullable', 'integer', 'min:0'],
             $linesKey.'.*.reject_reason' => ['nullable', 'string', 'max:100'],
@@ -766,6 +724,9 @@ class FinishingJobController extends Controller
             $sewingOperatorId = ($mode === 'all')
             ? $finishingOperatorId
             : (int) ($line['operator_id'] ?? 0);
+            $setorDate = $mode === 'byop'
+                ? Carbon::parse((string) ($line['setor_date'] ?? ''))->toDateString()
+                : null;
 
             if ($sewingOperatorId <= 0) {
                 throw ValidationException::withMessages([
@@ -780,6 +741,10 @@ class FinishingJobController extends Controller
                 ->where('sr.operator_id', $sewingOperatorId)
                 ->where('sr.status', 'posted')
                 ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
+
+            if ($setorDate !== null) {
+                $qRemaining->whereDate('sr.date', $setorDate);
+            }
 
             if ($hasSplVoided) {
                 $qRemaining->whereNull('spl.voided_at');
@@ -828,6 +793,7 @@ class FinishingJobController extends Controller
                 'index' => $index,
                 'item_id' => $itemId,
                 'sewing_operator_id' => $sewingOperatorId,
+                'sewing_return_date' => $setorDate,
                 'qty_in' => $requestedTotal,
                 'qty_ok_requested' => $qtyIn,
                 'qty_reject' => $qtyRj,
@@ -841,6 +807,29 @@ class FinishingJobController extends Controller
             return back()->withInput()->withErrors([
                 $linesKey => 'Isi minimal satu Qty Setor > 0.',
             ]);
+        }
+
+        // Satu item dapat memiliki beberapa tanggal setoran. Validasi totalnya
+        // agar gabungan baris tanggal tidak melewati saldo WIP-FIN yang sama.
+        $requestedByItem = [];
+        foreach ($workLines as $workLine) {
+            $itemId = (int) $workLine['item_id'];
+            $requestedByItem[$itemId] = ($requestedByItem[$itemId] ?? 0) + (int) $workLine['qty_in'];
+        }
+
+        foreach ($requestedByItem as $itemId => $requestedQty) {
+            $totalWipQuery = CuttingJobBundle::query()
+                ->readyForFinishing($wipFinWarehouseId)
+                ->where('finished_item_id', $itemId);
+            $totalWip = (int) round((float) ($this->readinessFromLedger()
+                ? $totalWipQuery->sum(DB::raw($this->wipFinLedgerSql('cutting_job_bundles')))
+                : $totalWipQuery->sum('wip_qty')));
+
+            if ($requestedQty > $totalWip) {
+                throw ValidationException::withMessages([
+                    $linesKey => "Gabungan Qty Setor + Reject item #{$itemId} melebihi saldo WIP-FIN. Maks total: {$totalWip}.",
+                ]);
+            }
         }
 
         $empNameCache = [];
@@ -870,6 +859,7 @@ class FinishingJobController extends Controller
             foreach ($workLines as $wl) {
                 $itemId = (int) $wl['item_id'];
                 $sewingOperatorId = (int) $wl['sewing_operator_id'];
+                $sewingReturnDate = $wl['sewing_return_date'] ?? null;
 
                 $needOk = (int) ($wl['qty_ok_requested'] ?? 0);
                 $needReject = (int) $wl['qty_reject'];
@@ -877,7 +867,7 @@ class FinishingJobController extends Controller
                 $bundles = CuttingJobBundle::query()
                     ->readyForFinishing($wipFinWarehouseId)
                     ->where('finished_item_id', $itemId)
-                    ->whereExists(function ($q) use ($sewingOperatorId, $itemId, $hasSplVoided, $hasSrVoided) {
+                    ->whereExists(function ($q) use ($sewingOperatorId, $itemId, $sewingReturnDate, $hasSplVoided, $hasSrVoided) {
                         $q->select(DB::raw(1))
                             ->from('sewing_return_lines as srl')
                             ->join('sewing_returns as sr', 'sr.id', '=', 'srl.sewing_return_id')
@@ -887,6 +877,10 @@ class FinishingJobController extends Controller
                             ->where('sr.operator_id', $sewingOperatorId)
                             ->where('sr.status', 'posted')
                             ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
+
+                        if ($sewingReturnDate !== null) {
+                            $q->whereDate('sr.date', $sewingReturnDate);
+                        }
 
                         if ($hasSplVoided) {
                             $q->whereNull('spl.voided_at');
@@ -930,6 +924,10 @@ class FinishingJobController extends Controller
                         ->where('sr.status', 'posted')
                         ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
 
+                    if ($sewingReturnDate !== null) {
+                        $qBundleRemaining->whereDate('sr.date', $sewingReturnDate);
+                    }
+
                     if ($hasSplVoided) {
                         $qBundleRemaining->whereNull('spl.voided_at');
                     }
@@ -966,6 +964,10 @@ class FinishingJobController extends Controller
                         ->where('sr.operator_id', $sewingOperatorId)
                         ->where('sr.status', 'posted')
                         ->whereRaw('(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) > 0');
+
+                    if ($sewingReturnDate !== null) {
+                        $qRows->whereDate('sr.date', $sewingReturnDate);
+                    }
 
                     if ($hasSplVoided) {
                         $qRows->whereNull('spl.voided_at');
@@ -1020,6 +1022,7 @@ class FinishingJobController extends Controller
 
                         'sewing_operator_id' => $sewingOperatorId,
                         'sewing_operator_name' => $sewingOperatorName,
+                        'sewing_return_date' => $sewingReturnDate,
 
                         'item_id' => $itemId,
                         'qty_in' => $takeIn,
@@ -1195,6 +1198,10 @@ class FinishingJobController extends Controller
                         ->where('sr.operator_id', $opId)
                         ->where('sr.status', 'posted')
                         ->whereRaw('COALESCE(srl.finished_qty,0) > 0');
+
+                    if ($line->sewing_return_date) {
+                        $q->whereDate('sr.date', $line->sewing_return_date->toDateString());
+                    }
 
                     if ($hasSplVoided) {
                         $q->whereNull('spl.voided_at');
@@ -1527,6 +1534,10 @@ class FinishingJobController extends Controller
             ->where('sr.operator_id', $operatorId)
             ->where('sr.status', 'posted')
             ->whereRaw('COALESCE(srl.finished_qty,0) > 0');
+
+        if ($line->sewing_return_date) {
+            $query->whereDate('sr.date', $line->sewing_return_date->toDateString());
+        }
 
         if ($hasSplVoided) {
             $query->whereNull('spl.voided_at');
