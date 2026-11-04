@@ -175,11 +175,11 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-finance', [
 // Daftar mutasi akun dan detail statement TikTok disimpan terpisah dari
 // settlement order. Halaman transaksi membaca tabel lokal; scheduler ini
 // mengisi/menyegarkan tabel tersebut tanpa memanggil API dari request UI.
-Schedule::command('marketplace:sync-tiktok-financial-transactions', [
+Schedule::call(fn () => Artisan::call('marketplace:sync-tiktok-financial-transactions', [
     '--days' => 3,
     '--source' => 'all',
     '--store_id' => 'all',
-])
+]))
     ->everyThirtyMinutes()
     ->name('sync-recent-tiktok-financial-transactions')
     ->withoutOverlapping(60);
