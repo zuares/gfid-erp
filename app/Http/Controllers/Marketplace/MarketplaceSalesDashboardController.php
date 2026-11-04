@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Store;
 use App\Services\Marketplace\Ads\AdsDashboardService;
 use App\Services\Marketplace\TikTokShop\TikTokWalletAdCostService;
+use App\Services\Marketplace\TikTokShop\TikTokWalletPayoutService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -173,6 +174,13 @@ class MarketplaceSalesDashboardController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+        $tiktokWalletPayoutDaily = app(TikTokWalletPayoutService::class)->daily(
+            $tiktokAdStoreIds,
+            $storeId,
+            $from->toDateString(),
+            $to->toDateString(),
+        );
+        $tiktokWalletPayoutTotal = (float) $tiktokWalletPayoutDaily->sum();
         if (! $isSalesExport) {
             $this->queueRecentAdsSync($adSyncStoreIds, $storeId, $from, $to);
         }
@@ -1736,7 +1744,7 @@ SQL;
         // gagal kirim tidak masuk payout; keduanya tetap disediakan sebagai
         // informasi agar tidak terpotong dua kali dari laba.
         $profitLossDaily = $incomeDaily
-            ->map(function ($row) use ($adSpendDaily, $adVatDaily) {
+            ->map(function ($row) use ($adSpendDaily, $adVatDaily, $tiktokWalletPayoutDaily) {
                 $payout = (float) $row->final_income;
                 $cogs = (float) $row->cogs;
                 $grossProfit = $payout - $cogs;
@@ -1755,6 +1763,7 @@ SQL;
                     'net_profit' => $grossProfit - $operatingExpense,
                     'refund_amount' => (float) $row->refund_amount,
                     'failed_shipping_value' => (float) $row->failed_shipping_value,
+                    'tiktok_wallet_settlement' => (float) $tiktokWalletPayoutDaily->get((string) $row->day, 0),
                 ];
             })
             ->keyBy(fn ($row) => (string) $row->day);
@@ -1776,6 +1785,26 @@ SQL;
                 'net_profit' => -((float) $adSpend + $adVat),
                 'refund_amount' => 0.0,
                 'failed_shipping_value' => 0.0,
+                'tiktok_wallet_settlement' => 0.0,
+            ]);
+        });
+        $tiktokWalletPayoutDaily->each(function ($payout, $day) use ($profitLossDaily): void {
+            if ($profitLossDaily->has((string) $day)) {
+                return;
+            }
+
+            $profitLossDaily->put((string) $day, (object) [
+                'day' => (string) $day,
+                'payout' => 0.0,
+                'cogs' => 0.0,
+                'gross_profit' => 0.0,
+                'ad_spend' => 0.0,
+                'ad_vat' => 0.0,
+                'operating_expense' => 0.0,
+                'net_profit' => 0.0,
+                'refund_amount' => 0.0,
+                'failed_shipping_value' => 0.0,
+                'tiktok_wallet_settlement' => (float) $payout,
             ]);
         });
         $profitLossDaily = $profitLossDaily->sortByDesc('day')->values();
@@ -1789,6 +1818,7 @@ SQL;
             'net_profit' => (float) $profitLossDaily->sum('net_profit'),
             'refund_amount' => (float) $profitLossDaily->sum('refund_amount'),
             'failed_shipping_value' => (float) $profitLossDaily->sum('failed_shipping_value'),
+            'tiktok_wallet_settlement' => (float) $profitLossDaily->sum('tiktok_wallet_settlement'),
         ];
 
         // Katalog aktif berasal dari sinkronisasi marketplace, bukan dari
@@ -1843,6 +1873,7 @@ SQL;
                             'promotionOrders',
                             'adSpendTotal',
                             'adVatTotal',
+                            'tiktokWalletPayoutTotal',
                             'adImpressionsTotal',
                             'adClicksTotal',
                             'adOrdersTotal',
@@ -1903,6 +1934,8 @@ SQL;
             'adSpendTotal' => $adSpendTotal,
             'adVatTotal' => $adVatTotal,
             'adSpendSourceLabel' => $adSpendSourceLabel,
+            'tiktokWalletPayoutDaily' => $tiktokWalletPayoutDaily,
+            'tiktokWalletPayoutTotal' => $tiktokWalletPayoutTotal,
             'adImpressionsTotal' => $adImpressionsTotal,
             'adClicksTotal' => $adClicksTotal,
             'adOrdersTotal' => $adOrdersTotal,

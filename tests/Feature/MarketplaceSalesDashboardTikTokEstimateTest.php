@@ -7,6 +7,7 @@ use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderIncomeEstimate;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MarketplaceTikTokFinancialTransaction;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -66,6 +67,19 @@ class MarketplaceSalesDashboardTikTokEstimateTest extends TestCase
             'estimated_escrow_amount' => 84000,
             'synced_at' => '2026-09-12 10:00:00',
         ]);
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'TT-WALLET-SETTLE-001',
+            'source' => 'withdrawals',
+            'transaction_type' => 'SETTLE',
+            'amount' => 94000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_IN',
+            'status' => 'COMPLETED',
+            'transaction_created_at' => '2026-09-12 09:00:00',
+            'source_payload' => ['type' => 'SETTLE'],
+            'synced_at' => '2026-09-12 10:00:00',
+        ]);
 
         $view = app(MarketplaceSalesDashboardController::class)->index(Request::create(
             '/marketplace/dashboard/sales',
@@ -87,6 +101,8 @@ class MarketplaceSalesDashboardTikTokEstimateTest extends TestCase
         $this->assertSame(1, $data['incomeSummary']['settled_orders']);
         $this->assertSame(1, $data['incomeSummary']['pending_orders']);
         $this->assertSame(76000.0, (float) $data['incomeSummary']['final_income']);
+        $this->assertSame(94000.0, (float) $data['tiktokWalletPayoutTotal']);
+        $this->assertSame(94000.0, (float) collect($data['profitLossDaily'])->firstWhere('day', '2026-09-12')->tiktok_wallet_settlement);
     }
 
     private function createOrder(Store $store, string $orderId, string $orderedAt): MarketplaceOrder

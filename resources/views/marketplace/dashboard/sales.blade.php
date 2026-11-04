@@ -1572,8 +1572,10 @@
     $adSpendDaily = collect($adSpendDaily ?? []);
     $adVatDaily = collect($adVatDaily ?? []);
     $adOrdersDaily = collect($adOrdersDaily ?? []);
+    $tiktokWalletPayoutDaily = collect($tiktokWalletPayoutDaily ?? []);
     $adSpendTotal = (float) ($adSpendTotal ?? $adSpendDaily->sum());
     $adVatTotal = (float) ($adVatTotal ?? $adVatDaily->sum());
+    $tiktokWalletPayoutTotal = (float) ($tiktokWalletPayoutTotal ?? $tiktokWalletPayoutDaily->sum());
     $adSpendSourceLabel = $adSpendSourceLabel ?? 'Ads Daily + TikTok Wallet Actual';
     $paymentDailyByDay = collect($paymentDaily)->keyBy(fn ($row) => (string) data_get($row, 'day'));
     $comparisonMonthData = $comparisonMonth['data'] ?? null;
@@ -2585,7 +2587,7 @@
 
         return $orders > 0 ? ((float) collect($daily)->sum($field) / $orders) * 100 : 0;
     };
-    $profitLossMetrics = function ($summary, $adSpend, $adVat = null): array {
+    $profitLossMetrics = function ($summary, $adSpend, $adVat = null, $tiktokWalletPayout = null): array {
         $summary = (array) $summary;
         $payout = (float) data_get($summary, 'final_income', 0);
         $cogs = (float) data_get($summary, 'cogs', 0);
@@ -2593,6 +2595,9 @@
         $adSpend = (float) $adSpend;
         $adVat = $adVat === null ? $adSpend * 0.11 : (float) $adVat;
         $operatingExpense = $adSpend + $adVat;
+        $tiktokWalletPayout = $tiktokWalletPayout === null
+            ? (float) data_get($summary, 'tiktok_wallet_settlement', 0)
+            : (float) $tiktokWalletPayout;
 
         return [
             'payout' => $payout,
@@ -2602,6 +2607,7 @@
             'ad_vat' => $adVat,
             'operating_expense' => $operatingExpense,
             'net_profit' => $grossProfit - $operatingExpense,
+            'tiktok_wallet_settlement' => $tiktokWalletPayout,
             'refund_amount' => (float) data_get($summary, 'refund_amount', 0),
             'failed_shipping_value' => (float) data_get($summary, 'failed_shipping_value', 0),
         ];
@@ -2610,24 +2616,26 @@
         data_get($comparisonMonthData, 'incomeSummary', []),
         data_get($comparisonMonthData, 'adSpendTotal', 0),
         data_get($comparisonMonthData, 'adVatTotal', 0),
+        data_get($comparisonMonthData, 'tiktokWalletPayoutTotal', 0),
     );
     $profitLossComparisonPeriod = $profitLossMetrics(
         data_get($comparisonPeriodData, 'incomeSummary', []),
         data_get($comparisonPeriodData, 'adSpendTotal', 0),
         data_get($comparisonPeriodData, 'adVatTotal', 0),
+        data_get($comparisonPeriodData, 'tiktokWalletPayoutTotal', 0),
     );
     $profitLossComparisonSources = $comparisonMode === 'month'
         ? [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'metrics' => $profitLossSummary],
             ['label' => $comparisonPeriodDisplayLabel($comparisonMonth['from'] ?? null, $comparisonMonth['to'] ?? null, 'Bulan -1'), 'from' => $comparisonMonth['from'] ?? null, 'to' => $comparisonMonth['to'] ?? null, 'metrics' => $profitLossComparisonMonth],
-            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPrevious['from'] ?? null, $comparisonMonthPrevious['to'] ?? null, 'Bulan -2'), 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonMonthPreviousData, 'incomeSummary', []), data_get($comparisonMonthPreviousData, 'adSpendTotal', 0), data_get($comparisonMonthPreviousData, 'adVatTotal', 0))],
-            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPreviousTwo['from'] ?? null, $comparisonMonthPreviousTwo['to'] ?? null, 'Bulan -3'), 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonMonthPreviousTwoData, 'incomeSummary', []), data_get($comparisonMonthPreviousTwoData, 'adSpendTotal', 0), data_get($comparisonMonthPreviousTwoData, 'adVatTotal', 0))],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPrevious['from'] ?? null, $comparisonMonthPrevious['to'] ?? null, 'Bulan -2'), 'from' => $comparisonMonthPrevious['from'] ?? null, 'to' => $comparisonMonthPrevious['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonMonthPreviousData, 'incomeSummary', []), data_get($comparisonMonthPreviousData, 'adSpendTotal', 0), data_get($comparisonMonthPreviousData, 'adVatTotal', 0), data_get($comparisonMonthPreviousData, 'tiktokWalletPayoutTotal', 0))],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonMonthPreviousTwo['from'] ?? null, $comparisonMonthPreviousTwo['to'] ?? null, 'Bulan -3'), 'from' => $comparisonMonthPreviousTwo['from'] ?? null, 'to' => $comparisonMonthPreviousTwo['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonMonthPreviousTwoData, 'incomeSummary', []), data_get($comparisonMonthPreviousTwoData, 'adSpendTotal', 0), data_get($comparisonMonthPreviousTwoData, 'adVatTotal', 0), data_get($comparisonMonthPreviousTwoData, 'tiktokWalletPayoutTotal', 0))],
         ]
         : [
             ['label' => 'Aktif', 'from' => $filters['date_from'], 'to' => $filters['date_to'], 'metrics' => $profitLossSummary],
             ['label' => $comparisonPeriodDisplayLabel($comparisonPeriod['from'] ?? null, $comparisonPeriod['to'] ?? null, 'Periode -1'), 'from' => $comparisonPeriod['from'] ?? null, 'to' => $comparisonPeriod['to'] ?? null, 'metrics' => $profitLossComparisonPeriod],
-            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'), 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonPeriodPreviousData, 'incomeSummary', []), data_get($comparisonPeriodPreviousData, 'adSpendTotal', 0), data_get($comparisonPeriodPreviousData, 'adVatTotal', 0))],
-            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'), 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonPeriodPreviousTwoData, 'incomeSummary', []), data_get($comparisonPeriodPreviousTwoData, 'adSpendTotal', 0), data_get($comparisonPeriodPreviousTwoData, 'adVatTotal', 0))],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPrevious['from'] ?? null, $comparisonPeriodPrevious['to'] ?? null, 'Periode -2'), 'from' => $comparisonPeriodPrevious['from'] ?? null, 'to' => $comparisonPeriodPrevious['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonPeriodPreviousData, 'incomeSummary', []), data_get($comparisonPeriodPreviousData, 'adSpendTotal', 0), data_get($comparisonPeriodPreviousData, 'adVatTotal', 0), data_get($comparisonPeriodPreviousData, 'tiktokWalletPayoutTotal', 0))],
+            ['label' => $comparisonPeriodDisplayLabel($comparisonPeriodPreviousTwo['from'] ?? null, $comparisonPeriodPreviousTwo['to'] ?? null, 'Periode -3'), 'from' => $comparisonPeriodPreviousTwo['from'] ?? null, 'to' => $comparisonPeriodPreviousTwo['to'] ?? null, 'metrics' => $profitLossMetrics(data_get($comparisonPeriodPreviousTwoData, 'incomeSummary', []), data_get($comparisonPeriodPreviousTwoData, 'adSpendTotal', 0), data_get($comparisonPeriodPreviousTwoData, 'adVatTotal', 0), data_get($comparisonPeriodPreviousTwoData, 'tiktokWalletPayoutTotal', 0))],
         ];
     $profitLossComparisonRows = [
         ['group' => 'Pendapatan', 'label' => 'Payout Sudah Cair', 'key' => 'payout', 'format' => $currencyDisplay],
@@ -2637,6 +2645,7 @@
         ['group' => 'Beban Operasional', 'label' => 'Pajak Iklan Ads Daily', 'key' => 'ad_vat', 'format' => $currencyDisplay],
         ['group' => 'Beban Operasional', 'label' => 'Total Beban Operasional', 'key' => 'operating_expense', 'format' => $currencyDisplay],
         ['group' => 'Profitabilitas', 'label' => 'Laba Bersih Operasional', 'key' => 'net_profit', 'format' => $currencyDisplay],
+        ['group' => 'Informasi Cash', 'label' => 'Settlement Wallet TikTok', 'key' => 'tiktok_wallet_settlement', 'format' => $currencyDisplay],
         ['group' => 'Informasi Settlement', 'label' => 'Pengembalian Dana', 'key' => 'refund_amount', 'format' => $currencyDisplay],
         ['group' => 'Informasi Settlement', 'label' => 'Pengiriman Gagal', 'key' => 'failed_shipping_value', 'format' => $currencyDisplay],
     ];
@@ -3446,6 +3455,7 @@
                 ['group' => 'Profitabilitas', 'label' => 'Laba Kotor', 'value' => $fmt($profitLossSummary['gross_profit']), 'note' => 'Payout − COGS / HPP', 'icon' => 'bi-graph-up-arrow', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($profitLossSummary['gross_profit'], $profitLossComparisonMonth['gross_profit'], $profitLossComparisonPeriod['gross_profit'], $currencyDisplay)],
                 ['group' => 'Beban Operasional', 'label' => 'Total Beban Operasional', 'value' => $fmt($profitLossSummary['operating_expense']), 'note' => 'Iklan + pajak sumber', 'icon' => 'bi-megaphone', 'comparisons' => $kpiComparisons($profitLossSummary['operating_expense'], $profitLossComparisonMonth['operating_expense'], $profitLossComparisonPeriod['operating_expense'], $currencyDisplay, 'relative', false)],
                 ['group' => 'Profitabilitas', 'label' => 'Laba Bersih Operasional', 'value' => $fmt($profitLossSummary['net_profit']), 'note' => 'Laba Kotor − Total Beban Operasional', 'icon' => 'bi-piggy-bank', 'variant' => 'sales-kpi--success', 'comparisons' => $kpiComparisons($profitLossSummary['net_profit'], $profitLossComparisonMonth['net_profit'], $profitLossComparisonPeriod['net_profit'], $currencyDisplay)],
+                ['group' => 'Informasi Cash', 'label' => 'Payout TikTok Wallet', 'value' => $fmt($profitLossSummary['tiktok_wallet_settlement']), 'note' => 'settlement ke saldo TikTok', 'icon' => 'bi-bank', 'comparisons' => $kpiComparisons($profitLossSummary['tiktok_wallet_settlement'], $profitLossComparisonMonth['tiktok_wallet_settlement'], $profitLossComparisonPeriod['tiktok_wallet_settlement'], $currencyDisplay)],
             ],
         ])
 
@@ -3554,6 +3564,12 @@
                             <td class="text-end">100,0%</td>
                             <td class="text-muted">Final income dari settlement</td>
                         </tr>
+                        <tr>
+                            <td class="ps-4">Payout TikTok Wallet</td>
+                            <td class="text-end fw-semibold">{{ $fmt($profitLossSummary['tiktok_wallet_settlement']) }}</td>
+                            <td class="text-end">{{ $pct($profitLossSummary['tiktok_wallet_settlement'], $profitLossSummary['payout']) }}%</td>
+                            <td class="text-muted">Settlement ke saldo seller; tidak ditambahkan lagi ke laba bersih</td>
+                        </tr>
                         <tr class="table-light">
                             <td colspan="4" class="fw-bold">Beban Pokok Pendapatan</td>
                         </tr>
@@ -3633,6 +3649,7 @@
                                 <th>No.</th>
                                 <th>Tanggal</th>
                                 <th class="text-end">Payout</th>
+                                <th class="text-end">Payout TikTok Wallet</th>
                                 <th class="text-end">COGS / HPP</th>
                                 <th class="text-end">Laba Kotor</th>
                                 <th class="text-end">Biaya Iklan</th>
@@ -3648,6 +3665,7 @@
                                     <td>{{ $loop->iteration }}</td>
                                     <td class="fw-semibold">{{ $dateLabel($profitLoss->day) }}</td>
                                     <td class="text-end">{{ $fmt($profitLoss->payout) }}</td>
+                                    <td class="text-end">{{ $fmt($profitLoss->tiktok_wallet_settlement) }}</td>
                                     <td class="text-end">{{ $fmt($profitLoss->cogs) }}</td>
                                     <td class="text-end fw-semibold">{{ $fmt($profitLoss->gross_profit) }}</td>
                                     <td class="text-end">{{ $fmt($profitLoss->ad_spend) }}</td>
