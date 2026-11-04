@@ -1726,14 +1726,13 @@
                 </li>
             @endif
 
-            {{-- Produksi (admin only) — Setor Jahit + Dadakan + Reject Jahit + QC Jahit + Finishing --}}
+            {{-- Produksi (admin only) — Setor Jahit + Dadakan + Reject Jahit + Finishing --}}
             @php
                 $adminHasSewReturns  = $isAdmin && $router->has('production.sewing.returns.create');
                 $adminHasRejectReturns = $isAdmin && $hasProdSewRejectReturnsIndex;
-                $adminHasQc          = $isAdmin && $hasProdQcIndex;
                 $adminHasFinishingJobs = $isAdmin && $hasProdFinishingJobsIndex;
             @endphp
-            @if ($adminHasSewReturns || $adminHasRejectReturns || $adminHasQc || $adminHasFinishingJobs)
+            @if ($adminHasSewReturns || $adminHasRejectReturns || $adminHasFinishingJobs)
                 <x-sidebar.label text="Produksi" />
                 <li class="mb-1">
                     <button class="sidebar-link sidebar-toggle {{ $openProduction ? 'is-open' : '' }}" type="button"
@@ -1757,13 +1756,6 @@
                         <x-sidebar.sub-link href="{{ route('production.sewing.reject_returns.index') }}" icon="bi bi-arrow-clockwise"
                             :active="request()->routeIs('production.sewing.reject_returns.*')">
                             Setor Reject Jahit
-                        </x-sidebar.sub-link>
-                    @endif
-
-                    @if ($adminHasQc)
-                        <x-sidebar.sub-link href="{{ $prodQcHref }}" icon="bi bi-check-circle"
-                            :active="request()->routeIs('production.qc.*')">
-                            {{ $prodQcLabel }}
                         </x-sidebar.sub-link>
                     @endif
 

@@ -1393,7 +1393,7 @@
                     @endif
 
                     {{-- Produksi (admin) --}}
-                    @if ($isAdmin && ($hasProdSewReturnsCreate || $hasProdSewRejectReturnsIndex || $hasProdQcIndex || $hasProdFinishingJobsIndex))
+                    @if ($isAdmin && ($hasProdSewReturnsCreate || $hasProdSewRejectReturnsIndex || $hasProdFinishingJobsIndex))
                         <div class="mobile-sidebar-section-label">Produksi</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodOpen ? 'is-open' : '' }}"
@@ -1417,13 +1417,6 @@
                                     <a href="{{ route('production.sewing.reject_returns.index') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.sewing.reject_returns.*') ? 'active' : '' }}">
                                         <span class="icon">♻️</span><span>Setor Reject Jahit</span>
-                                    </a>
-                                @endif
-
-                                @if ($hasProdQcIndex)
-                                    <a href="{{ $prodQcHref }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
-                                        <span class="icon">✅</span><span>{{ $prodQcLabel }}</span>
                                     </a>
                                 @endif
 
