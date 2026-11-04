@@ -64,7 +64,7 @@ class ItemBomCostServiceTest extends TestCase
         $this->assertEqualsWithDelta(11, $bom->lines()->first()->requiredQty(2), 0.000001);
     }
 
-    public function test_optional_components_are_excluded_by_default(): void
+    public function test_only_the_most_expensive_optional_component_is_included_by_default(): void
     {
         $bundle = Item::create([
             'code' => 'BUNDLE-COST-002',
@@ -77,13 +77,25 @@ class ItemBomCostServiceTest extends TestCase
             'active' => true,
         ]);
 
-        $material = Item::create([
+        $cheaperMaterial = Item::create([
             'code' => 'MAT-COST-002',
-            'name' => 'Material Optional Cost Test',
+            'name' => 'Material Optional Cheaper',
             'unit' => 'pcs',
             'type' => 'material',
             'hpp' => 15000,
             'base_unit_cost' => 15000,
+            'default_allocation' => 'hpp',
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+
+        $expensiveMaterial = Item::create([
+            'code' => 'MAT-COST-003',
+            'name' => 'Material Optional Expensive',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'hpp' => 12000,
+            'base_unit_cost' => 12000,
             'default_allocation' => 'hpp',
             'is_stocked' => true,
             'active' => true,
@@ -95,9 +107,9 @@ class ItemBomCostServiceTest extends TestCase
             'active' => true,
         ]);
 
-        ItemBomLine::create([
+        $cheaperLine = ItemBomLine::create([
             'item_bom_id' => $bom->id,
-            'material_item_id' => $material->id,
+            'material_item_id' => $cheaperMaterial->id,
             'usage_stage' => ItemBomLine::STAGE_SEWING_SUPPLY,
             'qty' => '2',
             'uom' => 'pcs',
@@ -106,9 +118,27 @@ class ItemBomCostServiceTest extends TestCase
             'sort_order' => 10,
         ]);
 
+        $expensiveLine = ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $expensiveMaterial->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => '3',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => true,
+            'sort_order' => 20,
+        ]);
+
         $service = app(ItemBomCostService::class);
 
-        $this->assertEqualsWithDelta(0, $service->total($bom), 0.000001);
-        $this->assertEqualsWithDelta(30000, $service->total($bom, true), 0.000001);
+        $estimate = $service->estimate($bom);
+        $components = collect($estimate['components'])->keyBy('line_id');
+
+        $this->assertEqualsWithDelta(36000, $estimate['total'], 0.000001);
+        $this->assertSame($expensiveLine->id, $estimate['selected_optional_line_id']);
+        $this->assertSame(1, $estimate['included_optional_line_count']);
+        $this->assertFalse($components[$cheaperLine->id]['included_in_estimate']);
+        $this->assertTrue($components[$expensiveLine->id]['included_in_estimate']);
+        $this->assertEqualsWithDelta(66000, $service->total($bom, true), 0.000001);
     }
 }

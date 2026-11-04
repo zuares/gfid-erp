@@ -153,7 +153,7 @@
                             <div class="item-bom-summary-card">
                                 <div class="item-bom-summary-label">Basis perhitungan</div>
                                 <div class="item-bom-summary-value">Qty + scrap</div>
-                                <div class="item-bom-summary-note">Optional tidak masuk total</div>
+                                <div class="item-bom-summary-note">Optional termahal masuk total</div>
                             </div>
                         </div>
                         @if(!empty($bomEstimate['components']))
@@ -167,7 +167,15 @@
                                                 <td class="text-end font-monospace">{{ decimal_id($component['qty_with_scrap'], 8) }} {{ $component['uom'] }}</td>
                                                 <td class="text-end">{{ $component['unit_cost'] > 0 ? 'Rp '.number_format($component['unit_cost'], 0, ',', '.') : '-' }}</td>
                                                 <td class="text-end fw-bold">{{ $component['estimated_cost'] > 0 ? 'Rp '.number_format($component['estimated_cost'], 0, ',', '.') : '-' }}</td>
-                                                <td>@if($component['is_optional'])<span class="item-bom-optional">Opsional</span>@else<span class="item-detail-note">Wajib</span>@endif</td>
+                                                <td>
+                                                    @if($component['is_optional'] && $component['included_in_estimate'])
+                                                        <span class="item-bom-optional">Opsional terpilih</span>
+                                                    @elseif($component['is_optional'])
+                                                        <span class="item-bom-optional">Opsional</span>
+                                                    @else
+                                                        <span class="item-detail-note">Wajib</span>
+                                                    @endif
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>

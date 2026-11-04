@@ -644,7 +644,7 @@
           <div>
             <div class="bom-cost-summary-label">Estimasi HPP BOM</div>
             <div class="bom-cost-summary-value">{{ $bomEstimate['total'] > 0 ? 'Rp '.number_format($bomEstimate['total'], 0, ',', '.') : 'Belum tersedia' }}</div>
-            <div class="bom-cost-summary-note">Per 1 {{ $bomEstimate['item_unit'] }} · optional tidak dihitung</div>
+            <div class="bom-cost-summary-note">Per 1 {{ $bomEstimate['item_unit'] }} · optional termahal dihitung</div>
           </div>
           <div>
             <div class="bom-cost-summary-label">Komponen</div>

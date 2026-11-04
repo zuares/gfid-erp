@@ -9,9 +9,9 @@ class ItemBomCostService
     /**
      * Calculate a one-level BOM cost estimate.
      *
-     * Optional BOM lines are excluded by default because existing production
-     * consumers treat them as non-required components. Set $includeOptional
-     * to true when a screen needs the full theoretical BOM cost.
+     * By default, all required lines and the optional line with the highest
+     * estimated cost are included. Set $includeOptional to true when a screen
+     * needs the full theoretical BOM cost with every optional line.
      * This method is an estimate only; it does not update item HPP or history.
      */
     public function estimate(ItemBom $bom, bool $includeOptional = false): array
@@ -39,6 +39,31 @@ class ItemBomCostService
             ];
         })->values();
 
+        $selectedOptionalLineId = null;
+
+        if (! $includeOptional) {
+            $selectedOptional = $components
+                ->where('is_optional', true)
+                ->reduce(function (?array $selected, array $component): array {
+                    if ($selected === null || $component['estimated_cost'] > $selected['estimated_cost']) {
+                        return $component;
+                    }
+
+                    return $selected;
+                });
+
+            $selectedOptionalLineId = $selectedOptional['line_id'] ?? null;
+
+            if ($selectedOptionalLineId !== null) {
+                $components = $components->map(function (array $component) use ($selectedOptionalLineId): array {
+                    $component['included_in_estimate'] = ! $component['is_optional']
+                        || $component['line_id'] === $selectedOptionalLineId;
+
+                    return $component;
+                });
+            }
+        }
+
         $includedComponents = $components->filter(
             fn (array $component): bool => $component['included_in_estimate']
         );
@@ -53,6 +78,8 @@ class ItemBomCostService
             'required_line_count' => $components->where('is_optional', false)->count(),
             'optional_line_count' => $components->where('is_optional', true)->count(),
             'include_optional' => $includeOptional,
+            'included_optional_line_count' => $includedComponents->where('is_optional', true)->count(),
+            'selected_optional_line_id' => $selectedOptionalLineId,
             'total' => round((float) $includedComponents->sum('estimated_cost'), 2),
             'components' => $components->all(),
         ];
