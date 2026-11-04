@@ -254,6 +254,7 @@
     .sv-variant-dialog-body .sv-cell-label { display: block; }
     .sv-variant-dialog-body .sv-support { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .75fr); }
     .sv-variant-dialog-body .sv-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .sv-variant-dialog-body .sv-metrics > .sv-metric { grid-column: auto; grid-row: auto; min-width: 0; }
     .sv-variant-dialog-body .sv-action { padding: .65rem; }
     @media (min-width: 768px) {
         .sv-variant-dialog-body .sv-record {
@@ -261,6 +262,11 @@
             grid-template-areas: 'variant support metrics action';
             align-items: start;
         }
+        .sv-variant-dialog-body .sv-record > .sv-variant-cell { grid-area: variant; grid-column: auto; grid-row: auto; }
+        .sv-variant-dialog-body .sv-record > .sv-support { grid-area: support; grid-column: auto; grid-row: auto; }
+        .sv-variant-dialog-body .sv-record > .sv-metrics { grid-area: metrics; grid-column: auto; grid-row: auto; }
+        .sv-variant-dialog-body .sv-record > .sv-action { grid-area: action; grid-column: auto; grid-row: auto; }
+        .sv-variant-dialog-body .sv-support > .sv-map-cell { grid-column: auto; grid-row: auto; }
         .sv-variant-dialog-body .sv-support { display: block; }
         .sv-variant-dialog-body .sv-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
         .sv-variant-dialog-body .sv-action { min-width: 160px; align-self: stretch; padding: .55rem; }
