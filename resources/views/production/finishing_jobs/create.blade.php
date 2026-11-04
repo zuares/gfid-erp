@@ -612,6 +612,7 @@
                                             'operator_id' => $opId,
                                             'operator_label' => $opLabel,
                                             'wip' => (int)($r['total_wip'] ?? 0),
+                                            'setor_breakdown' => $r['setor_breakdown'] ?? [],
                                         ];
                                     })
                                     ->filter(fn($x)=>$x['wip']>0)
@@ -677,6 +678,18 @@
                                                                     <td class="mono">{{ $i+1 }}</td>
                                                                     <td class="mono" style="font-weight:900;">
                                                                         {{ $op['operator_label'] ?: ('OP-'.$op['operator_id']) }}
+                                                                        @php $setorBreakdown = collect($op['setor_breakdown'] ?? []); @endphp
+                                                                        @if($setorBreakdown->isNotEmpty())
+                                                                            <div class="acc-op-sub mt-1" style="font-weight:700;">
+                                                                                Setoran:
+                                                                                @foreach($setorBreakdown as $setor)
+                                                                                    <span class="mono">
+                                                                                        {{ \Illuminate\Support\Carbon::parse($setor['date'])->locale('id')->translatedFormat('d M') }}
+                                                                                        {{ number_format((int)$setor['qty'],0,',','.') }} pcs{{ $loop->last ? '' : ',' }}
+                                                                                    </span>
+                                                                                @endforeach
+                                                                            </div>
+                                                                        @endif
                                                                     </td>
                                                                     <td class="text-end mono" style="font-weight:900;">
                                                                         {{ number_format((int)$op['wip'],0,',','.') }}
@@ -739,6 +752,18 @@
                                 </div>
 
                                 <div class="cardx-b">
+                                    @php $setorBreakdown = collect($line['setor_breakdown'] ?? []); @endphp
+                                    @if($setorBreakdown->isNotEmpty())
+                                        <div class="meta-inline" aria-label="Rincian setoran tersedia">
+                                            <span>Setoran tersedia:</span>
+                                            @foreach($setorBreakdown as $setor)
+                                                <span class="mono">
+                                                    {{ \Illuminate\Support\Carbon::parse($setor['date'])->locale('id')->translatedFormat('d M') }}
+                                                    {{ number_format((int)$setor['qty'],0,',','.') }} pcs{{ $loop->last ? '' : ',' }}
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                     <div class="grid2">
                                         <div class="field">
                                             <label>Setor</label>

@@ -298,6 +298,33 @@ class FinishingJobController extends Controller
             ->orderBy('b.finished_item_id')
             ->get();
 
+        // Rincian sumber setoran dipakai sebagai penjelas di form Finishing.
+        // Total yang bisa diproses tetap dibatasi saldo WIP-FIN di bawah.
+        $setorBreakdownRows = (clone $base)
+            ->selectRaw('
+                b.finished_item_id as item_id,
+                sr.operator_id as operator_id,
+                sr.date as setor_date,
+                SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining_ok
+            ')
+            ->groupBy('b.finished_item_id', 'sr.operator_id', 'sr.date')
+            ->orderBy('sr.date')
+            ->get();
+
+        $setorBreakdownByItemOp = [];
+        foreach ($setorBreakdownRows as $row) {
+            $qty = max(0, (int) round((float) ($row->remaining_ok ?? 0)));
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $key = (int) $row->item_id.':'.(int) ($row->operator_id ?? 0);
+            $setorBreakdownByItemOp[$key][] = [
+                'date' => $row->setor_date,
+                'qty' => $qty,
+            ];
+        }
+
         // 5) eligible WIP per item+op
         $qEligibleBundles = DB::table('cutting_job_bundles as b')
             ->join('sewing_pickup_lines as spl', 'spl.cutting_job_bundle_id', '=', 'b.id')
@@ -344,7 +371,7 @@ class FinishingJobController extends Controller
             $eligibleWipByItemOp[$key] = ($eligibleWipByItemOp[$key] ?? 0) + (int) round((float) ($r->bundle_wip ?? 0));
         }
 
-        $linesByOp = collect($rowsByOp)->map(function ($r) use ($items, $eligibleWipByItemOp) {
+        $linesByOp = collect($rowsByOp)->map(function ($r) use ($items, $eligibleWipByItemOp, $setorBreakdownByItemOp) {
             $itemId = (int) $r->item_id;
             $opId = (int) ($r->operator_id ?? 0);
 
@@ -352,6 +379,25 @@ class FinishingJobController extends Controller
             $remaining = (int) round((float) ($r->remaining_ok ?? 0));
             $eligibleWip = (int) ($eligibleWipByItemOp["{$itemId}:{$opId}"] ?? 0);
             $cap = max(0, min($remaining, $eligibleWip));
+
+            // Terapkan batas saldo WIP-FIN ke rincian tanggal secara FIFO,
+            // konsisten dengan urutan konsumsi reservation Finishing.
+            $remainingCap = $cap;
+            $setorBreakdown = [];
+            foreach (($setorBreakdownByItemOp["{$itemId}:{$opId}"] ?? []) as $setor) {
+                if ($remainingCap <= 0) {
+                    break;
+                }
+
+                $qty = min((int) $setor['qty'], $remainingCap);
+                if ($qty > 0) {
+                    $setorBreakdown[] = [
+                        'date' => $setor['date'],
+                        'qty' => $qty,
+                    ];
+                    $remainingCap -= $qty;
+                }
+            }
 
             return [
                 'item_id' => $itemId,
@@ -365,6 +411,7 @@ class FinishingJobController extends Controller
 
                 'pickup_date' => $r->pickup_date ?? null,
                 'setor_date' => $r->setor_date ?? null,
+                'setor_breakdown' => $setorBreakdown,
 
                 'qty_in' => null,
                 'qty_reject' => 0,

@@ -1518,7 +1518,10 @@ class SewingReturnController extends Controller
                         'qty_ok' => (float) $r['qty_ok'],
                         'qty_reject' => (float) $r['qty_reject'],
                         'notes' => $r['notes'] !== '' ? $r['notes'] : null,
-                        'finished_qty' => (int) round((float) $r['qty_ok']),
+                        // Reservation Finishing dimulai dari nol. Nilai ini hanya
+                        // bertambah saat Finishing benar-benar dibuat, bukan ketika
+                        // penjahit menyetor barang ke WIP-FIN.
+                        'finished_qty' => 0,
                         'source_type' => ((int) ($r['source_finishing_job_line_id'] ?? 0) > 0)
                             ? 'finishing_sewing_rework'
                             : (((int) ($r['source_reject_return_line_id'] ?? 0) > 0) ? 'reject_sewing_rework' : null),
