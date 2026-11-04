@@ -431,6 +431,7 @@
     $hasMarketplacePayout = $router->has('marketplace.payout');
     $hasMarketplaceShopeeTransactions = $router->has('marketplace.shopee.transactions');
     $hasMarketplaceTikTokFinancialTransactions = $router->has('marketplace.tiktok.financial-transactions');
+    $hasMarketplaceTikTokWalletTransactions = $router->has('marketplace.tiktok.wallet.transactions');
     $hasMarketplaceProfit = $router->has('marketplace.profit');
     $hasMarketplaceAds = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics = $router->has('marketplace.analytics');
@@ -2192,6 +2193,12 @@
                                 <a href="{{ route('marketplace.tiktok.financial-transactions') }}"
                                    class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.tiktok.financial-transactions') ? 'active' : '' }}">
                                     <span class="icon">💸</span><span>Transaksi Finansial TikTok</span>
+                                </a>
+                            @endif
+                            @if ($hasMarketplaceTikTokWalletTransactions)
+                                <a href="{{ route('marketplace.tiktok.wallet.transactions') }}"
+                                   class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('marketplace.tiktok.wallet.transactions') ? 'active' : '' }}">
+                                    <span class="icon">👛</span><span>Mutasi Wallet TikTok</span>
                                 </a>
                             @endif
 

@@ -1,5 +1,6 @@
 @extends('layouts.app')
-@section('title', 'Marketplace • Transaksi Finansial TikTok')
+@php($walletMode = $walletMode ?? false)
+@section('title', $walletMode ? 'Marketplace • Mutasi Wallet TikTok' : 'Marketplace • Transaksi Finansial TikTok')
 
 @include('marketplace._shared')
 
@@ -118,10 +119,10 @@
 <div class="page-wrap tt-finance-page">
     <section class="tt-finance-hero">
         <div>
-            <h1>Transaksi Finansial TikTok Shop</h1>
-            <p>Gabungkan mutasi akun seller dengan detail settlement statement TikTok Shop. Data disinkronkan secara idempotent; rincian revenue, ongkir, fee, pajak, reserve, dan adjustment tersedia dari sumber statement.</p>
+            <h1>{{ $walletMode ? 'Mutasi Wallet TikTok Shop' : 'Transaksi Finansial TikTok Shop' }}</h1>
+            <p>{{ $walletMode ? 'Mutasi saldo seller dari endpoint Finance TikTok. Data disimpan lokal secara idempotent untuk rekonsiliasi; mutasi wallet bukan bukti saldo sudah masuk rekening bank.' : 'Gabungkan mutasi akun seller dengan detail settlement statement TikTok Shop. Data disinkronkan secara idempotent; rincian revenue, ongkir, fee, pajak, reserve, dan adjustment tersedia dari sumber statement.' }}</p>
         </div>
-        <span class="tt-finance-badge"><i aria-hidden="true"></i> TikTok Finance · API 202309 + 202501</span>
+        <span class="tt-finance-badge"><i aria-hidden="true"></i> {{ $walletMode ? 'TikTok Wallet · API 202309' : 'TikTok Finance · API 202309 + 202501' }}</span>
     </section>
 
     <div id="ttAlert" class="tt-finance-alert" role="alert"></div>
@@ -143,9 +144,13 @@
             <div class="tt-finance-field">
                 <label for="ttSource">Sumber data</label>
                 <select id="ttSource" class="form-select">
-                    @foreach ($dataSources as $source)
-                        <option value="{{ $source['code'] }}">{{ $source['label'] }}</option>
-                    @endforeach
+                    @if ($walletMode)
+                        <option value="account">Mutasi wallet seller</option>
+                    @else
+                        @foreach ($dataSources as $source)
+                            <option value="{{ $source['code'] }}">{{ $source['label'] }}</option>
+                        @endforeach
+                    @endif
                 </select>
             </div>
             <div class="tt-finance-field"><label for="ttStatus">Status</label><select id="ttStatus" class="form-select"><option value="">Semua status</option>@foreach ($statuses as $status)<option value="{{ $status }}">{{ $status }}</option>@endforeach</select></div>
@@ -180,10 +185,10 @@
 
         <div class="tt-finance-help">
             <i class="bi bi-info-circle-fill text-success" aria-hidden="true"></i>
-            <span id="ttSourceHint">Data dibaca dari database lokal. Rentang maksimal 60 hari; Sync sekarang mengambil data terbaru dari TikTok.</span>
+            <span id="ttSourceHint">{{ $walletMode ? 'Data dibaca dari mutasi wallet yang tersimpan lokal. Sync sekarang menyegarkan WITHDRAW, SETTLE, TRANSFER, REVERSE, PAYMENT, dan REFUND.' : 'Data dibaca dari database lokal. Rentang maksimal 60 hari; Sync sekarang mengambil data terbaru dari TikTok.' }}</span>
         </div>
         <div id="ttTypesField" class="tt-finance-field mt-3">
-            <label>Tipe transaksi untuk sync akun</label>
+            <label>{{ $walletMode ? 'Tipe transaksi wallet' : 'Tipe transaksi untuk sync akun' }}</label>
             <div class="tt-finance-types">
                 @foreach ($transactionTypes as $type)
                     <label class="tt-finance-type"><input type="checkbox" class="form-check-input tt-type" value="{{ $type['code'] }}" checked> {{ $type['label'] }} <code>{{ $type['code'] }}</code></label>
@@ -196,9 +201,9 @@
     </section>
 
     <section class="tt-finance-kpis" aria-label="Ringkasan halaman">
-        <div class="tt-finance-card tt-finance-kpi"><small>Total transaksi</small><strong id="ttCount">—</strong><div class="tt-finance-kpi-note">jumlah baris pada halaman</div></div>
+        <div class="tt-finance-card tt-finance-kpi"><small>Total transaksi</small><strong id="ttCount">—</strong><div class="tt-finance-kpi-note">total hasil filter</div></div>
         <div class="tt-finance-card tt-finance-kpi in"><small>Total dana masuk (+)</small><strong id="ttIn">—</strong><div class="tt-finance-kpi-note">settlement dan dana masuk</div></div>
-        <div class="tt-finance-card tt-finance-kpi out"><small>Total dana keluar (-)</small><strong id="ttOut">—</strong><div class="tt-finance-kpi-note">penarikan dan biaya iklan</div></div>
+        <div class="tt-finance-card tt-finance-kpi out"><small>Total dana keluar (-)</small><strong id="ttOut">—</strong><div class="tt-finance-kpi-note">{{ $walletMode ? 'penarikan dan mutasi keluar wallet' : 'penarikan dan biaya iklan' }}</div></div>
         <div class="tt-finance-card tt-finance-kpi net"><small>Perubahan bersih</small><strong id="ttNet">—</strong><div class="tt-finance-kpi-note">selisih dana masuk dan keluar</div></div>
     </section>
 
@@ -207,6 +212,7 @@
         <div id="ttBreakdownPills" class="tt-finance-breakdown-pills"></div>
     </section>
 
+    @unless ($walletMode)
     <section class="tt-finance-card tt-finance-recon" aria-label="Rekonsiliasi uang keluar">
         <div class="tt-finance-recon-head">
             <div><div class="tt-finance-recon-title">Rekonsiliasi uang keluar</div><div class="tt-finance-recon-note">Sumber sementara: transaksi GMV Pay dan billing yang sudah tersimpan di Finance TikTok. Dipakai untuk mencocokkan kas keluar, bukan menggantikan Cost iklan harian.</div></div>
@@ -220,6 +226,7 @@
         </div>
         <div id="ttReconMeta" class="tt-finance-recon-note mt-2">Pilih toko dan periode, lalu muat data.</div>
     </section>
+    @endunless
 
     <section class="tt-finance-card">
         <div id="ttTableWrap" class="tt-finance-table-wrap">
@@ -248,6 +255,7 @@
 <script>
 (() => {
     const $ = (id) => document.getElementById(id);
+    const walletMode = @json($walletMode);
     const state = { page: 1, lastPage: 1, hasMore: false, items: [], loading: false, syncing: false };
     const pad = (value) => String(value).padStart(2, '0');
     const formatDate = (date) => date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
@@ -303,8 +311,9 @@
     };
 
     const buildUrl = (exportMode = false) => {
-        const path = `/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/tiktok-financial-transactions${exportMode ? '/export' : ''}`;
-        const query = new URLSearchParams({ date_from: $('ttFrom').value, date_to: $('ttTo').value, source: $('ttSource').value, types: selectedTypes().join(',') });
+        const basePath = walletMode ? 'tiktok-wallet-transactions' : 'tiktok-financial-transactions';
+        const path = `/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/${basePath}${exportMode ? '/export' : ''}`;
+        const query = new URLSearchParams({ date_from: $('ttFrom').value, date_to: $('ttTo').value, source: $('ttSource').value, types: selectedTypes().join(','), search: $('ttSearch').value.trim() });
         if ($('ttStatus').value) query.set('status', $('ttStatus').value);
         if (!exportMode) { query.set('page', String(state.page)); query.set('page_size', '100'); }
         return `${path}?${query.toString()}`;
@@ -315,14 +324,16 @@
             $('ttTableWrap').innerHTML = '<div class="tt-finance-empty"><i class="bi bi-inbox"></i>Tidak ada transaksi pada filter ini.</div>';
             return;
         }
-        $('ttTableWrap').innerHTML = `<table class="tt-finance-table"><thead><tr><th>Sumber</th><th>Waktu</th><th>ID</th><th>Statement / Order</th><th>Tipe</th><th>Arah</th><th>Nominal</th><th>Status</th><th>Detail</th></tr></thead><tbody>${items.map((item) => {
+        const sourceHeader = walletMode ? '' : '<th>Sumber</th>';
+        const sourceCell = walletMode ? '' : `<td><span class="tt-finance-pill ${item.source === 'statement_transactions' ? 'success' : 'primary'}">${item.source === 'statement_transactions' ? 'Statement' : 'Akun'}</span></td>`;
+        const referenceHeader = walletMode ? 'Referensi' : 'Statement / Order';
+        $('ttTableWrap').innerHTML = `<table class="tt-finance-table"><thead><tr>${sourceHeader}<th>Waktu</th><th>ID</th><th>${referenceHeader}</th><th>Tipe</th><th>Arah</th><th>Nominal</th><th>Status</th><th>Detail</th></tr></thead><tbody>${items.map((item) => {
             const flowClass = item.money_flow === 'MONEY_IN' ? 'tt-finance-flow-in' : (item.money_flow === 'MONEY_OUT' ? 'tt-finance-flow-out' : 'tt-finance-flow-unknown');
             const flowLabel = item.money_flow === 'MONEY_IN' ? 'Dana masuk' : (item.money_flow === 'MONEY_OUT' ? 'Dana keluar' : 'Belum ditentukan');
-            const sourceLabel = item.source === 'statement_transactions' ? 'Statement' : 'Akun';
             const statementOrder = [item.statement_id ? `S: ${escapeHtml(item.statement_id)}` : '', item.order_id ? `O: ${escapeHtml(item.order_id)}` : ''].filter(Boolean).join('<br>') || '—';
             const detailAmounts = item.source === 'statement_transactions' && item.settlement_amount !== null && item.settlement_amount !== undefined
                 ? `<small class="d-block text-muted">Settlement: ${escapeHtml(money(item.settlement_amount, item.currency))}</small>` : '';
-            return `<tr><td><span class="tt-finance-pill ${item.source === 'statement_transactions' ? 'success' : 'primary'}">${sourceLabel}</span></td><td>${escapeHtml(item.date_formatted)}</td><td><code>${escapeHtml(item.transaction_id)}</code></td><td><code>${statementOrder}</code></td><td><span class="tt-finance-pill ${escapeHtml(item.badge || 'secondary')}">${escapeHtml(item.transaction_type_label)}<br><small>${escapeHtml(item.transaction_type)}</small></span></td><td class="${flowClass}">${flowLabel}</td><td class="${flowClass}">${escapeHtml(item.signed_formatted_amount || item.formatted_amount)}${detailAmounts}</td><td><span class="tt-finance-pill secondary">${escapeHtml(item.status)}</span></td><td>${escapeHtml(item.reason || 'Tidak ada deskripsi')}<details><summary>Raw JSON</summary><pre class="tt-finance-raw">${escapeHtml(JSON.stringify(item.raw_payload || item, null, 2))}</pre></details></td></tr>`;
+            return `<tr>${sourceCell}<td>${escapeHtml(item.date_formatted)}</td><td><code>${escapeHtml(item.transaction_id)}</code></td><td><code>${statementOrder}</code></td><td><span class="tt-finance-pill ${escapeHtml(item.badge || 'secondary')}">${escapeHtml(item.transaction_type_label)}<br><small>${escapeHtml(item.transaction_type)}</small></span></td><td class="${flowClass}">${flowLabel}</td><td class="${flowClass}">${escapeHtml(item.signed_formatted_amount || item.formatted_amount)}${detailAmounts}</td><td><span class="tt-finance-pill secondary">${escapeHtml(item.status)}</span></td><td>${escapeHtml(item.reason || 'Tidak ada deskripsi')}<details><summary>Raw JSON</summary><pre class="tt-finance-raw">${escapeHtml(JSON.stringify(item.raw_payload || item, null, 2))}</pre></details></td></tr>`;
         }).join('')}</tbody></table>`;
     };
 
@@ -393,7 +404,7 @@
         $('ttTableWrap').innerHTML = '<div class="tt-finance-empty"><i class="bi bi-database"></i>Membaca database lokal…</div>';
         try {
             const response = await fetch(buildUrl(), { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
-            const reconciliationPromise = $('ttStore').value
+            const reconciliationPromise = !walletMode && $('ttStore').value
                 ? fetch(`/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/tiktok-financial-transactions/reconciliation?date_from=${encodeURIComponent($('ttFrom').value)}&date_to=${encodeURIComponent($('ttTo').value)}`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
                 : Promise.resolve(null);
             const json = await response.json().catch(() => ({}));
@@ -457,7 +468,7 @@
             const response = await fetch(`/api/marketplace/stores/${encodeURIComponent($('ttStore').value)}/tiktok-financial-transactions/sync`, {
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
-                body: JSON.stringify({ date_from: $('ttFrom').value, date_to: $('ttTo').value, source: $('ttSource').value }),
+                body: JSON.stringify({ date_from: $('ttFrom').value, date_to: $('ttTo').value, source: 'all' }),
             });
             const json = await response.json().catch(() => ({}));
             if (!response.ok || json.success === false) throw new Error(json.message || `Gagal memasukkan sync (${response.status})`);
@@ -469,9 +480,10 @@
 
     const reset = () => {
         state.page = 1; state.lastPage = 1; state.hasMore = false; state.items = [];
-        $('ttStatus').value = ''; $('ttSearch').value = ''; $('ttSearchClear').classList.remove('show');
+        $('ttStatus').value = ''; $('ttSource').value = walletMode ? 'account' : 'statements'; $('ttSearch').value = ''; $('ttSearchClear').classList.remove('show');
         applyPreset('15days');
         document.querySelectorAll('.tt-type').forEach((input) => { input.checked = true; });
+        updateSourceControls();
         load();
     };
     $('ttLoad').addEventListener('click', () => { state.page = 1; load(); });
@@ -505,12 +517,15 @@
         if (event.key === 'Escape') $('ttModalBackdrop').classList.remove('show');
     });
     const updateSourceControls = () => {
-        const accountSource = $('ttSource').value === 'account';
+        const accountSource = walletMode || $('ttSource').value === 'account';
         $('ttTypesField').style.opacity = accountSource ? '1' : '.62';
+        $('ttTypesField').style.display = accountSource ? '' : 'none';
         document.querySelectorAll('.tt-type').forEach((input) => { input.disabled = !accountSource; });
-        $('ttSourceHint').textContent = accountSource
-            ? 'Data ditampilkan dari tabel lokal; Sync sekarang mengambil mutasi akun dari TikTok.'
-            : 'Data ditampilkan dari tabel lokal; Sync sekarang mengambil statement final dari TikTok.';
+        $('ttSourceHint').textContent = walletMode
+            ? 'Data ditampilkan dari mutasi wallet yang tersimpan lokal; Sync sekarang menyegarkan semua tipe transaksi akun TikTok.'
+            : accountSource
+            ? 'Data ditampilkan dari tabel lokal; Sync sekarang menyegarkan mutasi akun dan statement TikTok.'
+            : 'Data ditampilkan dari tabel lokal; Sync sekarang menyegarkan account + statement TikTok.';
     };
     ['ttStore', 'ttFrom', 'ttTo', 'ttStatus', 'ttSource'].forEach((id) => $(id).addEventListener('change', () => { state.page = 1; if (id === 'ttSource') updateSourceControls(); }));
     updateSourceControls();

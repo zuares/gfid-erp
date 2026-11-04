@@ -113,6 +113,7 @@
     $hasMarketplacePayout = $router->has('marketplace.payout');
     $hasMarketplaceShopeeTransactions = $router->has('marketplace.shopee.transactions');
     $hasMarketplaceTikTokFinancialTransactions = $router->has('marketplace.tiktok.financial-transactions');
+    $hasMarketplaceTikTokWalletTransactions = $router->has('marketplace.tiktok.wallet.transactions');
     $hasMarketplaceProfit      = $router->has('marketplace.profit');
     $hasMarketplaceAds         = $router->has('marketplace.ads');
     $hasMarketplaceAnalytics   = $router->has('marketplace.analytics');
@@ -367,6 +368,8 @@
         $open('marketplace.escrow') ||
         $open('marketplace.payout') ||
         $open('marketplace.shopee.transactions') ||
+        $open('marketplace.tiktok.financial-transactions') ||
+        $open('marketplace.tiktok.wallet.transactions') ||
         $open('marketplace.profit') ||
         $open('marketplace.reports.*') ||
         $open('marketplace.finance.*') ||
@@ -407,6 +410,8 @@
         $open('marketplace.escrow') ||
         $open('marketplace.payout') ||
         $open('marketplace.shopee.transactions') ||
+        $open('marketplace.tiktok.financial-transactions') ||
+        $open('marketplace.tiktok.wallet.transactions') ||
         $open('marketplace.profit') ||
         $open('marketplace.ads') ||
         $open('marketplace.ads.dashboard') ||
@@ -2383,6 +2388,12 @@
                             <x-sidebar.sub-link href="{{ route('marketplace.tiktok.financial-transactions') }}" icon="bi bi-cash-stack"
                                 :active="request()->routeIs('marketplace.tiktok.financial-transactions')">
                                 Transaksi Finansial TikTok
+                            </x-sidebar.sub-link>
+                        @endif
+                        @if ($hasMarketplaceTikTokWalletTransactions)
+                            <x-sidebar.sub-link href="{{ route('marketplace.tiktok.wallet.transactions') }}" icon="bi bi-wallet2"
+                                :active="request()->routeIs('marketplace.tiktok.wallet.transactions')">
+                                Mutasi Wallet TikTok
                             </x-sidebar.sub-link>
                         @endif
                         @if ($hasMarketplaceProfit)

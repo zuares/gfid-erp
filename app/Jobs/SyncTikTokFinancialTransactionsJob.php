@@ -70,12 +70,15 @@ class SyncTikTokFinancialTransactionsJob implements ShouldQueue
                 Carbon::createFromFormat('!Y-m-d', $this->dateTo, config('app.timezone'))->endOfDay(),
                 $this->source,
             );
+            $resultLabel = ($result['truncated'] ?? false)
+                ? "Finance TikTok {$store->name} selesai sebagian: {$result['total']} transaksi disimpan; rentang melebihi batas halaman API."
+                : "Finance TikTok {$store->name} selesai: {$result['total']} transaksi disimpan.";
 
             Cache::put($progressKey, [
                 'status' => 'success',
                 'phase' => 'completed',
                 'percent' => 100,
-                'label' => "Finance TikTok {$store->name} selesai: {$result['total']} transaksi disimpan.",
+                'label' => $resultLabel,
                 'store_id' => $store->id,
                 'store_name' => $store->name,
                 'source' => $this->source,
@@ -103,7 +106,6 @@ class SyncTikTokFinancialTransactionsJob implements ShouldQueue
                 'source' => $this->source,
                 'date_from' => $this->dateFrom,
                 'date_to' => $this->dateTo,
-                'error' => $e->getMessage(),
                 'exception' => get_class($e),
             ]);
 

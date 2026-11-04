@@ -31,7 +31,7 @@ class MarketplaceApiGateway
         // Max 10 requests per 1 second per store
         // Bisa disesuaikan jika ingin membedakan per channel (Shopee vs TikTok)
         $allowed = RateLimiter::attempt(
-            'marketplace_api_gw_store_' . $store->id,
+            'marketplace_api_gw_store_'.$store->id,
             10,
             static fn () => true,
             1
@@ -49,22 +49,32 @@ class MarketplaceApiGateway
         $durationMs = round($duration * 1000, 2);
         Log::info("[ApiGateway][{$store->id}] {$method} - {$durationMs}ms", [
             'store_id' => $store->id,
-            'method'   => $method,
+            'method' => $method,
             // 'args'     => $this->maskSensitiveArgs($args), // Opsi untuk masking
-            'success'  => true,
+            'success' => true,
         ]);
     }
 
     protected function logApiError(Store $store, string $method, array $args, \Throwable $e, float $duration): void
     {
         $durationMs = round($duration * 1000, 2);
-        Log::error("[ApiGateway][{$store->id}] {$method} FAILED - {$durationMs}ms - " . $e->getMessage(), [
+        $message = $this->maskSensitiveMessage($e->getMessage());
+        Log::error("[ApiGateway][{$store->id}] {$method} FAILED - {$durationMs}ms - {$message}", [
             'store_id' => $store->id,
-            'method'   => $method,
-            'error'    => $e->getMessage(),
-            'file'     => $e->getFile(),
-            'line'     => $e->getLine(),
+            'method' => $method,
+            'error' => $message,
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
         ]);
+    }
+
+    private function maskSensitiveMessage(string $message): string
+    {
+        return preg_replace(
+            '/((?:app_key|shop_cipher|sign|access_token|x-tts-access-token)=)[^&\s]+/i',
+            '$1***',
+            $message,
+        ) ?? '[masked marketplace API error]';
     }
 
     /**
@@ -90,6 +100,7 @@ class MarketplaceApiGateway
         try {
             $result = $driver->{$method}(...$parameters);
             $this->logApiCall($store, $method, $parameters, $result, microtime(true) - $startTime);
+
             return $result;
         } catch (\Throwable $e) {
             $this->logApiError($store, $method, $parameters, $e, microtime(true) - $startTime);

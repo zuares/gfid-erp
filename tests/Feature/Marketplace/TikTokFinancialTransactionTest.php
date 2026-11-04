@@ -278,7 +278,7 @@ class TikTokFinancialTransactionTest extends TestCase
         $this->assertNotNull($store->fresh()->tiktok_financial_last_synced_at);
     }
 
-    public function test_tiktok_gmv_variant_feeds_analytics_without_counting_matching_payment_twice(): void
+    public function test_tiktok_cash_out_reconciliation_does_not_become_analytics_ad_cost(): void
     {
         $store = $this->createStore();
         MarketplaceTikTokFinancialTransaction::create([
@@ -331,9 +331,10 @@ class TikTokFinancialTransactionTest extends TestCase
             'compare_mode' => 'prev_period',
         ]);
 
-        $this->assertSame(15000.0, (float) $summary['current']['ad_cost_before_tax']);
-        $this->assertSame(16650.0, (float) $summary['current']['ad_cost']);
-        $this->assertSame(16650.0, (float) data_get($summary, 'daily.0.ad_cost'));
+        $this->assertSame(0.0, (float) $summary['current']['ad_cost_before_tax']);
+        $this->assertSame(0.0, (float) $summary['current']['ad_cost']);
+        $this->assertSame('none', $summary['current']['ad_cost_source']);
+        $this->assertSame(0.0, (float) data_get($summary, 'daily.0.ad_cost'));
     }
 
     public function test_upsert_is_idempotent_and_non_tiktok_store_is_rejected(): void
@@ -548,16 +549,38 @@ class TikTokFinancialTransactionTest extends TestCase
             ->assertSee('Data ditampilkan dari tabel lokal', false);
 
         $this->actingAs($user)
+            ->get(route('marketplace.tiktok.wallet.transactions'))
+            ->assertOk()
+            ->assertViewIs('marketplace.tiktok.financial-transactions')
+            ->assertSee('Mutasi Wallet TikTok Shop')
+            ->assertSee('TikTok Wallet · API 202309', false)
+            ->assertSee('Mutasi wallet seller', false)
+            ->assertDontSee('Rekonsiliasi uang keluar', false);
+
+        $this->actingAs($user)
             ->getJson(route('marketplace.api.tiktok-financial-transactions', [
                 'store' => $store->id,
                 'date_from' => now()->subDays(3)->toDateString(),
                 'date_to' => now()->toDateString(),
                 'source' => 'account',
+                'search' => 'TT-WITHDRAW-1',
             ]))
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('source', 'tiktok_financial_transactions')
             ->assertJsonPath('storage', 'local_database')
+            ->assertJsonPath('data.items.0.transaction_id', 'TT-WITHDRAW-1');
+
+        $this->actingAs($user)
+            ->getJson(route('marketplace.api.tiktok-wallet-transactions', [
+                'store' => $store->id,
+                'date_from' => now()->subDays(3)->toDateString(),
+                'date_to' => now()->toDateString(),
+                'source' => 'statements',
+            ]))
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data_source', 'account')
             ->assertJsonPath('data.items.0.transaction_id', 'TT-WITHDRAW-1');
 
         Http::assertNothingSent();
@@ -585,6 +608,25 @@ class TikTokFinancialTransactionTest extends TestCase
             return $job->storeId === $store->id
                 && $job->source === 'all';
         });
+    }
+
+    public function test_controller_rejects_sync_for_inactive_store(): void
+    {
+        Queue::fake();
+        $store = $this->createStore();
+        $store->update(['is_active' => false]);
+
+        $response = $this->actingAs($this->user())->postJson(
+            route('marketplace.api.tiktok-financial-transactions.sync', ['store' => $store->id]),
+            [
+                'date_from' => now()->subDays(3)->toDateString(),
+                'date_to' => now()->toDateString(),
+                'source' => 'all',
+            ],
+        );
+
+        $response->assertStatus(422)->assertJsonPath('code', 'TIKTOK_STORE_INACTIVE');
+        Queue::assertNothingPushed();
     }
 
     public function test_controller_rejects_date_window_over_sixty_days(): void

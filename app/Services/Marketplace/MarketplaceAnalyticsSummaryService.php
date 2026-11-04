@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Schema;
 class MarketplaceAnalyticsSummaryService
 {
     private const ESTIMATED_MARKETPLACE_FEE_RATE = 0.21;
+
     private const ADS_VAT_RATE = 0.11;
 
     private const MARKETPLACE_FEE_FIELDS = [
@@ -51,9 +52,7 @@ class MarketplaceAnalyticsSummaryService
         'REFUNDED',
     ];
 
-    public function __construct(private MarketplaceProfitReportService $profitReport)
-    {
-    }
+    public function __construct(private MarketplaceProfitReportService $profitReport) {}
 
     public function summary(array $filters): array
     {
@@ -263,33 +262,33 @@ class MarketplaceAnalyticsSummaryService
         $gross = 'COALESCE(NULLIF(ms.buyer_payment_amount, 0), NULLIF(mo.total_amount, 0), NULLIF(mo.total_paid_customer, 0), NULLIF(mo.subtotal_items, 0), 0)';
 
         $query = DB::table('marketplace_order_items as oi')
-                ->join('marketplace_orders as mo', 'mo.id', '=', 'oi.marketplace_order_id')
-                ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
-                ->whereNotNull('mo.ordered_at')
-                ->whereRaw($this->isRevenueStatus())
-                ->where(function ($query) {
-                    $query->whereNull('mo.financial_data_status')
-                        ->orWhere('mo.financial_data_status', '!=', MarketplaceFinancialDataQualityService::ORDER_READY);
-                })
-                ->where(function ($query) {
-                    $query->where('oi.data_status', 'valid')
-                        ->orWhereNull('oi.data_status');
-                })
-                ->select([
-                    'oi.id',
-                    'oi.marketplace_order_id as order_id',
-                    'oi.internal_item_id',
-                    'oi.item_name',
-                    'oi.item_name_snapshot',
-                    'oi.model_sku',
-                    'oi.item_sku',
-                    'oi.external_sku',
-                    'oi.qty',
-                    'oi.price',
-                    'oi.hpp_snapshot',
-                    'ms.final_income',
-                ])
-                ->selectRaw("{$gross} AS order_gross_sales");
+            ->join('marketplace_orders as mo', 'mo.id', '=', 'oi.marketplace_order_id')
+            ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+            ->whereNotNull('mo.ordered_at')
+            ->whereRaw($this->isRevenueStatus())
+            ->where(function ($query) {
+                $query->whereNull('mo.financial_data_status')
+                    ->orWhere('mo.financial_data_status', '!=', MarketplaceFinancialDataQualityService::ORDER_READY);
+            })
+            ->where(function ($query) {
+                $query->where('oi.data_status', 'valid')
+                    ->orWhereNull('oi.data_status');
+            })
+            ->select([
+                'oi.id',
+                'oi.marketplace_order_id as order_id',
+                'oi.internal_item_id',
+                'oi.item_name',
+                'oi.item_name_snapshot',
+                'oi.model_sku',
+                'oi.item_sku',
+                'oi.external_sku',
+                'oi.qty',
+                'oi.price',
+                'oi.hpp_snapshot',
+                'ms.final_income',
+            ])
+            ->selectRaw("{$gross} AS order_gross_sales");
         $rows = $this->applyDateAndStoreFilters($query, $filters, 'mo')->get();
 
         $productRows = [];
@@ -389,8 +388,8 @@ class MarketplaceAnalyticsSummaryService
                 'ms.activity_fee',
                 'ms.shipping_insurance_fee',
                 'ms.escrow_tax',
-                DB::raw($this->returnRefundExistsSql() . ' AS has_return_refund'),
-                DB::raw($this->warehouseBookingExistsSql() . ' AS has_warehouse_booking'),
+                DB::raw($this->returnRefundExistsSql().' AS has_return_refund'),
+                DB::raw($this->warehouseBookingExistsSql().' AS has_warehouse_booking'),
             ])
             ->orderByDesc('ms.settlement_time')
             ->orderByDesc('mo.ordered_at')
@@ -462,6 +461,7 @@ class MarketplaceAnalyticsSummaryService
             }
 
             $decoded = json_decode((string) $value, true);
+
             return is_array($decoded) ? $decoded : [];
         };
         $settlement = $decode($row->settlement_raw_json ?? null);
@@ -495,6 +495,7 @@ class MarketplaceAnalyticsSummaryService
 
                     $price = (float) ($item['selling_price'] ?? $item['discounted_price'] ?? $item['model_discounted_price'] ?? 0);
                     $qty = (float) ($item['quantity_purchased'] ?? $item['model_quantity_purchased'] ?? $item['active_qty'] ?? 1);
+
                     return $price * max(1, $qty);
                 });
                 if ($total > 0) {
@@ -560,7 +561,7 @@ class MarketplaceAnalyticsSummaryService
         }
 
         if ($status === 'COMPLETED') {
-            return ['key' => 'completed', 'label' => 'Completed · ' . (! empty($row->settlement_time) ? 'Sudah cair' : 'Belum cair')];
+            return ['key' => 'completed', 'label' => 'Completed · '.(! empty($row->settlement_time) ? 'Sudah cair' : 'Belum cair')];
         }
 
         if ($status === 'TO_CONFIRM_RECEIVE') {
@@ -586,17 +587,17 @@ class MarketplaceAnalyticsSummaryService
         return match ($group) {
             'shipped' => $base
                 ->whereRaw("{$status} IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER')")
-                ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
+                ->whereRaw('NOT '.$this->returnRefundExistsSql()),
             'warehouse' => $base
                 ->whereRaw($this->warehouseBookingExistsSql())
                 ->whereRaw("{$status} NOT IN ('CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL', 'TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')")
-                ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
+                ->whereRaw('NOT '.$this->returnRefundExistsSql()),
             'confirm' => $base
                 ->whereRaw("{$status} = 'TO_CONFIRM_RECEIVE'")
-                ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
+                ->whereRaw('NOT '.$this->returnRefundExistsSql()),
             'cancelled' => $base
                 ->whereRaw("{$status} IN ('CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL')")
-                ->whereRaw('NOT ' . $this->returnRefundExistsSql()),
+                ->whereRaw('NOT '.$this->returnRefundExistsSql()),
             'return_refund' => $base->where(function ($query) use ($status) {
                 $query->whereRaw($this->returnRefundExistsSql())
                     ->orWhereRaw("{$status} IN ('TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')");
@@ -646,8 +647,8 @@ class MarketplaceAnalyticsSummaryService
             ->whereNotNull('mo.ordered_at')
             ->whereRaw($this->isRevenueStatus())
             ->whereBetween('mo.ordered_at', [
-                $filters['date_from'] . ' 00:00:00',
-                $filters['date_to'] . ' 23:59:59',
+                $filters['date_from'].' 00:00:00',
+                $filters['date_to'].' 23:59:59',
             ])
             ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId))
             ->selectRaw("SUM({$hppExpression}) AS hpp_total")
@@ -676,8 +677,8 @@ class MarketplaceAnalyticsSummaryService
             ->whereNotNull('mo.raw_json')
             ->whereRaw($this->isRevenueStatus())
             ->whereBetween('mo.ordered_at', [
-                $filters['date_from'] . ' 00:00:00',
-                $filters['date_to'] . ' 23:59:59',
+                $filters['date_from'].' 00:00:00',
+                $filters['date_to'].' 23:59:59',
             ])
             ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId))
             ->whereNotExists(function ($query) {
@@ -705,6 +706,7 @@ class MarketplaceAnalyticsSummaryService
             }
 
             $decoded = json_decode((string) $value, true);
+
             return is_array($decoded) ? $decoded : [];
         };
 
@@ -820,7 +822,7 @@ class MarketplaceAnalyticsSummaryService
         foreach ($orders as $order) {
             foreach ([(string) $order->channel_order_id, (string) $order->external_order_id] as $key) {
                 if ($key !== '') {
-                    $ordersByKey[$order->store_id . '|' . $key] = $order;
+                    $ordersByKey[$order->store_id.'|'.$key] = $order;
                 }
             }
         }
@@ -849,6 +851,7 @@ class MarketplaceAnalyticsSummaryService
             }
 
             $decoded = json_decode((string) $value, true);
+
             return is_array($decoded) ? $decoded : [];
         };
 
@@ -861,6 +864,7 @@ class MarketplaceAnalyticsSummaryService
 
             $unitHpp = (float) ($cost->active_unit_cost ?: $cost->base_unit_cost ?: $cost->hpp ?: 0);
             $quantity = max(1, (int) ($returnItem->return_item_quantity ?? 1));
+
             return $unitHpp * $quantity;
         };
 
@@ -868,11 +872,12 @@ class MarketplaceAnalyticsSummaryService
         $settled = 0.0;
         foreach ($returns->groupBy('return_id') as $returnItems) {
             $return = $returnItems->first();
-            $order = $ordersByKey[$return->store_id . '|' . (string) $return->order_sn] ?? null;
+            $order = $ordersByKey[$return->store_id.'|'.(string) $return->order_sn] ?? null;
             if (! $order) {
                 foreach ($returnItems as $returnItem) {
                     $total += $fallbackAmount($returnItem);
                 }
+
                 continue;
             }
 
@@ -884,6 +889,7 @@ class MarketplaceAnalyticsSummaryService
                     $raw = $decode($item->raw_json);
                     $rawItemSku = (string) ($raw['item_sku'] ?? '');
                     $rawVariationSku = (string) ($raw['model_sku'] ?? '');
+
                     return ($variationSku !== '' && $rawVariationSku === $variationSku)
                         || ($itemSku !== '' && $rawItemSku === $itemSku);
                 });
@@ -1018,7 +1024,7 @@ class MarketplaceAnalyticsSummaryService
             $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
             $orderRows = DB::table('marketplace_orders as mo')
                 ->join('stores as st', 'st.id', '=', 'mo.store_id')
-                ->whereBetween('mo.ordered_at', [$filters['date_from'] . ' 00:00:00', $filters['date_to'] . ' 23:59:59'])
+                ->whereBetween('mo.ordered_at', [$filters['date_from'].' 00:00:00', $filters['date_to'].' 23:59:59'])
                 ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId))
                 ->where(function ($query) use ($status) {
                     $query->whereRaw("{$status} IN ('FAILED_DELIVERY', 'DELIVERY_FAILED', 'RETURN_TO_SELLER', 'RETURNED_TO_SELLER', 'UNDELIVERED')")
@@ -1046,7 +1052,7 @@ class MarketplaceAnalyticsSummaryService
                 ->get()
                 ->map(fn ($row): array => [
                     'id' => (int) $row->id,
-                    'reference' => 'RTS-' . (string) ($row->channel_order_id ?: $row->external_order_id ?: $row->id),
+                    'reference' => 'RTS-'.(string) ($row->channel_order_id ?: $row->external_order_id ?: $row->id),
                     'order_sn' => (string) ($row->channel_order_id ?: $row->external_order_id ?: '-'),
                     'store_id' => (int) $row->store_id,
                     'store_name' => (string) ($row->store_name ?: 'Tanpa toko'),
@@ -1060,7 +1066,7 @@ class MarketplaceAnalyticsSummaryService
                     'source' => 'marketplace_orders',
                 ]);
 
-            $rows = $returnRows->concat($orderRows)->unique(fn (array $row) => $row['source'] . ':' . $row['reference'])->values();
+            $rows = $returnRows->concat($orderRows)->unique(fn (array $row) => $row['source'].':'.$row['reference'])->values();
         }
 
         $rows = $rows->sortByDesc('event_time')->values();
@@ -1158,8 +1164,8 @@ class MarketplaceAnalyticsSummaryService
             ->where('fmo.financial_data_status', MarketplaceFinancialDataQualityService::ORDER_READY)
             ->whereRaw('COALESCE(fmo.ordered_at, fmo.order_date) IS NOT NULL')
             ->whereBetween(DB::raw('COALESCE(fmo.ordered_at, fmo.order_date)'), [
-                $filters['date_from'] . ' 00:00:00',
-                $filters['date_to'] . ' 23:59:59',
+                $filters['date_from'].' 00:00:00',
+                $filters['date_to'].' 23:59:59',
             ])
             ->when($filters['store_id'], fn ($query, $storeId) => $query->where('fmo.store_id', $storeId))
             ->groupBy('oi.marketplace_order_id');
@@ -1284,7 +1290,7 @@ class MarketplaceAnalyticsSummaryService
         foreach ($orders as $order) {
             foreach ([(string) $order->channel_order_id, (string) $order->external_order_id] as $key) {
                 if ($key !== '') {
-                    $settlementByKey[$order->store_id . '|' . $key] = [
+                    $settlementByKey[$order->store_id.'|'.$key] = [
                         'status' => $order->settlement_status,
                         'refund_amount' => max(0, (float) ($order->settlement_refund_amount ?? 0)),
                     ];
@@ -1298,7 +1304,8 @@ class MarketplaceAnalyticsSummaryService
         $returnRefundAmount = 0.0;
         foreach ($returns->groupBy(function ($return): string {
             $orderKey = (string) ($return->order_sn ?? '');
-            return $return->store_id . '|' . ($orderKey !== '' ? $orderKey : 'return:' . $return->id);
+
+            return $return->store_id.'|'.($orderKey !== '' ? $orderKey : 'return:'.$return->id);
         }) as $key => $returnRows) {
             $seenReturnOrders[$key] = true;
             $settlement = $settlementByKey[$key] ?? null;
@@ -1432,8 +1439,8 @@ class MarketplaceAnalyticsSummaryService
             ->whereNotNull('mo.ordered_at')
             ->whereRaw($this->isRevenueStatus())
             ->whereBetween('mo.ordered_at', [
-                $filters['date_from'] . ' 00:00:00',
-                $filters['date_to'] . ' 23:59:59',
+                $filters['date_from'].' 00:00:00',
+                $filters['date_to'].' 23:59:59',
             ])
             ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId));
 
@@ -1463,6 +1470,7 @@ class MarketplaceAnalyticsSummaryService
             }
 
             $decoded = json_decode((string) $value, true);
+
             return is_array($decoded) ? $decoded : [];
         };
 
@@ -1529,13 +1537,13 @@ class MarketplaceAnalyticsSummaryService
             ->leftJoin('marketplace_order_settlements as od_ms', 'od_ms.order_id', '=', 'mo.id')
             ->leftJoin('marketplace_order_income_estimates as od_ie', 'od_ie.marketplace_order_id', '=', 'mo.id')
             ->selectRaw('DATE(COALESCE(mo.ordered_at, mo.order_date)) AS date')
-            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS orders')
-            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv')
+            ->selectRaw('SUM(CASE WHEN '.$this->isRevenueStatus().' THEN 1 ELSE 0 END) AS orders')
+            ->selectRaw('SUM(CASE WHEN '.$this->isRevenueStatus().' THEN '.$this->orderValueExpression().' ELSE 0 END) AS gmv')
             ->selectRaw("SUM(CASE WHEN {$this->isRevenueStatus()} THEN {$salesGross} ELSE 0 END) AS gross_sales")
             ->selectRaw("SUM(CASE WHEN {$this->isRevenueStatus()} THEN {$buyerPaid} ELSE 0 END) AS paid")
-            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN COALESCE(od_items.qty, 0) ELSE 0 END) AS qty')
-            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $estimatedPayout . ' ELSE 0 END) AS payout')
-            ->selectRaw('SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN COALESCE(od_items.hpp, 0) ELSE 0 END) AS hpp')
+            ->selectRaw('SUM(CASE WHEN '.$this->isRevenueStatus().' THEN COALESCE(od_items.qty, 0) ELSE 0 END) AS qty')
+            ->selectRaw('SUM(CASE WHEN '.$this->isRevenueStatus().' THEN '.$estimatedPayout.' ELSE 0 END) AS payout')
+            ->selectRaw('SUM(CASE WHEN '.$this->isRevenueStatus().' THEN COALESCE(od_items.hpp, 0) ELSE 0 END) AS hpp')
             ->groupByRaw('DATE(COALESCE(mo.ordered_at, mo.order_date))')
             ->orderByRaw('DATE(COALESCE(mo.ordered_at, mo.order_date))')
             ->get();
@@ -1777,13 +1785,16 @@ class MarketplaceAnalyticsSummaryService
 
     private function adsAggregate(array $filters): array
     {
-        $beforeTax = (float) collect($this->adsFacts($filters))
+        $facts = $this->adsFacts($filters);
+        $beforeTax = (float) collect($facts)
             ->sum(fn (array $row): float => (float) ($row['spend'] ?? 0));
 
         return [
             'ad_cost_before_tax' => round($beforeTax, 2),
             'ad_cost_vat' => round($beforeTax * self::ADS_VAT_RATE, 2),
             'ad_cost' => round($beforeTax * (1 + self::ADS_VAT_RATE), 2),
+            'ad_cost_source' => $beforeTax > 0 ? 'ads_api_or_import' : 'none',
+            'ad_cost_is_estimate' => false,
         ];
     }
 
@@ -1835,8 +1846,8 @@ class MarketplaceAnalyticsSummaryService
      * Ads API facts take precedence. Imported income reports (including
      * TikTok advertising deductions) fill the gap when a store/day has no
      * positive API spend, matching AdsDashboardService's source policy.
-     * TikTok finance cash-out facts are the final temporary fallback while
-     * the delivery-cost API/import is not available yet.
+     * TikTok Finance cash-out is deliberately excluded: it is a cash-control
+     * source and must not be promoted to ad-delivery cost automatically.
      *
      * @return array<int, array{store_id: int, date: string, spend: float}>
      */
@@ -1859,22 +1870,16 @@ class MarketplaceAnalyticsSummaryService
                 ->get();
         }
 
-        $cashOutRows = $this->tiktokCashOutAdSpends($filters);
-
         $apiByKey = $apiRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
         $importedByKey = $importedRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
-        $cashOutByKey = collect($cashOutRows)->keyBy(fn (array $row): string => ((int) $row['store_id']).'|'.substr((string) $row['date'], 0, 10));
         $facts = [];
 
-        foreach ($apiByKey->keys()->merge($importedByKey->keys())->merge($cashOutByKey->keys())->unique() as $key) {
+        foreach ($apiByKey->keys()->merge($importedByKey->keys())->unique() as $key) {
             $api = $apiByKey->get($key);
             $imported = $importedByKey->get($key);
-            $cashOut = $cashOutByKey->get($key);
             $spend = $api && (float) ($api->spend ?? 0) > 0
                 ? (float) $api->spend
-                : ((float) ($imported->spend ?? 0) > 0
-                    ? (float) $imported->spend
-                    : (float) ($cashOut['spend'] ?? 0));
+                : (float) ($imported->spend ?? 0);
 
             if ($spend <= 0) {
                 continue;
@@ -1889,139 +1894,6 @@ class MarketplaceAnalyticsSummaryService
         }
 
         return $facts;
-    }
-
-    /**
-     * Temporary TikTok fallback based on money leaving GMV Pay / Ads billing.
-     * Statement GMV rows are authoritative; matching account PAYMENT rows are
-     * skipped to avoid counting the same charge twice.
-     *
-     * @return array<int, array{store_id:int, date:string, spend:float}>
-     */
-    private function tiktokCashOutAdSpends(array $filters): array
-    {
-        if (! Schema::hasTable('marketplace_tiktok_financial_transactions')) {
-            return [];
-        }
-
-        $rows = DB::table('marketplace_tiktok_financial_transactions as t')
-            ->join('stores as st', 'st.id', '=', 't.store_id')
-            ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
-            ->whereBetween('t.transaction_created_at', [
-                $filters['date_from'].' 00:00:00',
-                $filters['date_to'].' 23:59:59',
-            ])
-            ->whereRaw("LOWER(ch.code) IN ('tiktok', 'ttk', 'tkt', 'tt')")
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('t.store_id', $storeId))
-            ->where(function ($query): void {
-                $query
-                    ->whereRaw("UPPER(t.transaction_type) LIKE 'GMV_PAYMENT%'")
-                    ->orWhereIn('t.transaction_type', [
-                        'GMV_PAY',
-                        'GMV_PAYMENT',
-                        'PAYMENT',
-                        'BILLING',
-                        'AD_BILLING',
-                        'AD_PAYMENT',
-                        'AD_CHARGE',
-                        'TOP_UP',
-                    ]);
-            })
-            ->select([
-                't.store_id',
-                't.external_transaction_id',
-                't.transaction_type',
-                't.amount',
-                't.money_flow',
-                't.transaction_created_at',
-                't.source_payload',
-            ])
-            ->orderBy('t.id')
-            ->get();
-
-        $gmvReferences = [];
-        foreach ($rows as $row) {
-            if (! $this->isTikTokGmvAdType($row->transaction_type)) {
-                continue;
-            }
-
-            $gmvReferences[(string) $row->external_transaction_id] = true;
-            $payload = $this->decodeJsonPayload($row->source_payload);
-            if (filled($payload['adjustment_id'] ?? null)) {
-                $gmvReferences[(string) $payload['adjustment_id']] = true;
-            }
-        }
-
-        $totals = [];
-        foreach ($rows as $row) {
-            $type = strtoupper(trim((string) $row->transaction_type));
-            $isGmv = $this->isTikTokGmvAdType($type);
-            $isBilling = ! $isGmv && $this->isTikTokBillingType($type, $row->source_payload);
-            if (! $isGmv && ! $isBilling) {
-                continue;
-            }
-
-            if ($isBilling && isset($gmvReferences[(string) $row->external_transaction_id])) {
-                continue;
-            }
-
-            $amount = abs((float) $row->amount);
-            if ($amount <= 0 || strtoupper((string) ($row->money_flow ?? '')) === 'MONEY_IN') {
-                continue;
-            }
-
-            $date = Carbon::parse($row->transaction_created_at)->toDateString();
-            $key = ((int) $row->store_id).'|'.$date;
-            $totals[$key] = ($totals[$key] ?? 0) + $amount;
-        }
-
-        return collect($totals)
-            ->map(function (float $spend, string $key): array {
-                [$storeId, $date] = explode('|', $key, 2);
-
-                return [
-                    'store_id' => (int) $storeId,
-                    'date' => $date,
-                    'spend' => round($spend, 2),
-                ];
-            })
-            ->values()
-            ->all();
-    }
-
-    private function isTikTokGmvAdType(mixed $type): bool
-    {
-        $type = strtoupper(trim((string) $type));
-
-        return in_array($type, ['GMV_PAYMENT_FOR_ADS', 'GMV_PAY', 'GMV_PAYMENT'], true)
-            || str_contains($type, 'GMV_PAYMENT_FOR_');
-    }
-
-    private function isTikTokBillingType(string $type, mixed $payload): bool
-    {
-        $payloadText = strtoupper(json_encode($this->decodeJsonPayload($payload), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
-
-        return in_array($type, ['PAYMENT', 'BILLING', 'AD_BILLING', 'AD_PAYMENT', 'AD_CHARGE', 'TOP_UP'], true)
-            || str_contains($type, 'BILL')
-            || str_contains($type, 'AD_PAYMENT')
-            || str_contains($payloadText, 'BILLING')
-            || str_contains($payloadText, 'ADVERTIS')
-            || str_contains($payloadText, 'IKLAN');
-    }
-
-    private function decodeJsonPayload(mixed $payload): array
-    {
-        if (is_array($payload)) {
-            return $payload;
-        }
-
-        if (! is_string($payload) || trim($payload) === '') {
-            return [];
-        }
-
-        $decoded = json_decode($payload, true);
-
-        return is_array($decoded) ? $decoded : [];
     }
 
     private function operationalBase(array $filters)
@@ -2067,8 +1939,8 @@ class MarketplaceAnalyticsSummaryService
 
         return $query
             ->whereBetween(DB::raw($dateExpression), [
-                $filters['date_from'] . ' 00:00:00',
-                $filters['date_to'] . ' 23:59:59',
+                $filters['date_from'].' 00:00:00',
+                $filters['date_to'].' 23:59:59',
             ])
             ->when($filters['store_id'], fn ($q, $storeId) => $q->where("{$alias}.store_id", $storeId));
     }
@@ -2100,17 +1972,17 @@ class MarketplaceAnalyticsSummaryService
     {
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
         $cancelled = "{$status} IN ('CANCELLED', 'CANCELED', 'CANCELLED_BEFORE_SHIPPING', 'BATAL', 'IN_CANCEL')"
-            . ' AND NOT ' . $this->returnRefundExistsSql();
+            .' AND NOT '.$this->returnRefundExistsSql();
 
         return implode(', ', [
             'COUNT(DISTINCT mo.id) AS placed_order_count',
-            'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN 1 ELSE 0 END) AS order_total',
+            'SUM(CASE WHEN '.$this->isRevenueStatus().' THEN 1 ELSE 0 END) AS order_total',
             "SUM(CASE WHEN {$status} IN ('SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED') THEN 1 ELSE 0 END) AS shipped_count",
             // Keep completed orders on the same eligible/revenue basis as order_total.
             "SUM(CASE WHEN {$status} = 'COMPLETED' AND ({$this->isRevenueStatus()}) THEN 1 ELSE 0 END) AS completed_count",
             "SUM(CASE WHEN {$cancelled} THEN 1 ELSE 0 END) AS cancelled_count",
             "SUM(CASE WHEN {$cancelled} THEN {$this->orderValueExpression()} ELSE 0 END) AS cancelled_amount",
-            'SUM(CASE WHEN ' . $this->isRevenueStatus() . ' THEN ' . $this->orderValueExpression() . ' ELSE 0 END) AS gmv',
+            'SUM(CASE WHEN '.$this->isRevenueStatus().' THEN '.$this->orderValueExpression().' ELSE 0 END) AS gmv',
         ]);
     }
 
@@ -2122,17 +1994,17 @@ class MarketplaceAnalyticsSummaryService
     private function isRevenueStatus(): string
     {
         $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
-        $excluded = "'" . implode("', '", self::NON_REVENUE_ORDER_STATUSES) . "'";
+        $excluded = "'".implode("', '", self::NON_REVENUE_ORDER_STATUSES)."'";
 
         return "{$status} NOT IN ({$excluded})"
-            . ' AND NOT ' . $this->returnRefundExistsSql();
+            .' AND NOT '.$this->returnRefundExistsSql();
     }
 
     private function returnRefundExistsSql(): string
     {
-        return "EXISTS (SELECT 1 FROM marketplace_returns AS mr_status"
-            . " WHERE mr_status.store_id = mo.store_id"
-            . " AND (mr_status.order_sn = mo.channel_order_id OR mr_status.order_sn = mo.external_order_id))";
+        return 'EXISTS (SELECT 1 FROM marketplace_returns AS mr_status'
+            .' WHERE mr_status.store_id = mo.store_id'
+            .' AND (mr_status.order_sn = mo.channel_order_id OR mr_status.order_sn = mo.external_order_id))';
     }
 
     /**
@@ -2142,12 +2014,12 @@ class MarketplaceAnalyticsSummaryService
      */
     private function warehouseBookingExistsSql(): string
     {
-        return "EXISTS (SELECT 1 FROM marketplace_bookings AS mb_status"
-            . " WHERE mb_status.store_id = mo.store_id"
-            . " AND UPPER(COALESCE(mb_status.booking_status, '')) = 'SHIPPED'"
-            . " AND (mb_status.booking_sn = mo.booking_sn"
-            . " OR mb_status.order_sn = mo.channel_order_id"
-            . " OR mb_status.order_sn = mo.external_order_id))";
+        return 'EXISTS (SELECT 1 FROM marketplace_bookings AS mb_status'
+            .' WHERE mb_status.store_id = mo.store_id'
+            ." AND UPPER(COALESCE(mb_status.booking_status, '')) = 'SHIPPED'"
+            .' AND (mb_status.booking_sn = mo.booking_sn'
+            .' OR mb_status.order_sn = mo.channel_order_id'
+            .' OR mb_status.order_sn = mo.external_order_id))';
     }
 
     private function normalizeAggregate($row): array
@@ -2182,6 +2054,7 @@ class MarketplaceAnalyticsSummaryService
             ->mapWithKeys(function (string $key) use ($current, $previous) {
                 $now = (float) ($current[$key] ?? 0);
                 $before = (float) ($previous[$key] ?? 0);
+
                 return [$key => $before == 0 ? ($now > 0 ? null : 0) : round((($now - $before) / $before) * 100, 2)];
             })->all();
     }
@@ -2205,6 +2078,8 @@ class MarketplaceAnalyticsSummaryService
         $aggregate['ad_cost_vat'] = round((float) ($ads['ad_cost_vat'] ?? $aggregate['ad_cost_vat'] ?? 0), 2);
         $aggregate['ad_cost_vat_rate'] = self::ADS_VAT_RATE * 100;
         $aggregate['ad_cost'] = round((float) ($ads['ad_cost'] ?? 0), 2);
+        $aggregate['ad_cost_source'] = (string) ($ads['ad_cost_source'] ?? 'none');
+        $aggregate['ad_cost_is_estimate'] = (bool) ($ads['ad_cost_is_estimate'] ?? false);
         $payout = (float) ($aggregate['payout'] ?? 0);
         $hpp = (float) ($aggregate['hpp'] ?? 0);
         $aggregate['gross_profit'] = round($payout - $hpp, 2);

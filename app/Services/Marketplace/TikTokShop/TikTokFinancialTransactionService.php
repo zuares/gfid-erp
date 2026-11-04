@@ -126,6 +126,7 @@ class TikTokFinancialTransactionService
         $pageToken = '';
         $pages = 0;
         $lastPage = [];
+        $truncated = false;
 
         do {
             $pages++;
@@ -136,7 +137,11 @@ class TikTokFinancialTransactionService
             $items = array_merge($items, $page['items']);
             $lastPage = $page;
             $next = (string) data_get($page, 'pagination.next_page_token', '');
-            if ($next === '' || $next === $pageToken || $pages >= 100) {
+            if ($next === '' || $next === $pageToken) {
+                break;
+            }
+            if ($pages >= 100) {
+                $truncated = true;
                 break;
             }
             $pageToken = $next;
@@ -147,7 +152,8 @@ class TikTokFinancialTransactionService
             'summary' => $this->summary($items),
             'pagination' => [
                 'page_size' => count($items),
-                'has_more' => false,
+                'has_more' => $truncated,
+                'truncated' => $truncated,
                 'next_page_token' => '',
                 'pages_fetched' => $pages,
                 'source_total_count' => data_get($lastPage, 'pagination.source_total_count', count($items)),
@@ -175,6 +181,7 @@ class TikTokFinancialTransactionService
         };
         $types = $this->normalizeTypes($options['types'] ?? []);
         $statusFilter = strtoupper(trim((string) ($options['status'] ?? '')));
+        $search = trim((string) ($options['search'] ?? ''));
         $pageSize = min(100, max(1, (int) ($options['page_size'] ?? 100)));
         $page = max(1, (int) ($options['page'] ?? 1));
 
@@ -184,6 +191,19 @@ class TikTokFinancialTransactionService
             ->whereBetween('transaction_created_at', [$from, $to]);
         $query = (clone $baseQuery)
             ->when($statusFilter !== '', fn ($query) => $query->where('status', $statusFilter))
+            ->when($search !== '', function ($query) use ($search): void {
+                $like = '%'.$search.'%';
+                $query->where(function ($query) use ($like): void {
+                    $query
+                        ->where('external_transaction_id', 'like', $like)
+                        ->orWhere('statement_id', 'like', $like)
+                        ->orWhere('order_id', 'like', $like)
+                        ->orWhere('adjustment_id', 'like', $like)
+                        ->orWhere('transaction_type', 'like', $like)
+                        ->orWhere('status', 'like', $like)
+                        ->orWhere('source_payload', 'like', $like);
+                });
+            })
             ->when($source === 'account', fn ($query) => $query->whereIn('transaction_type', $types));
 
         $summary = $this->storedSummary(clone $query);
@@ -208,6 +228,7 @@ class TikTokFinancialTransactionService
                     'total' => $summary['total_count'],
                     'has_more' => false,
                 ],
+                'filters' => ['search' => $search, 'status' => $statusFilter, 'types' => $types],
                 'last_synced_at' => $this->formatSyncTime($lastSyncedAt),
             ];
         }
@@ -229,8 +250,56 @@ class TikTokFinancialTransactionService
                 'total' => $paginator->total(),
                 'has_more' => $paginator->hasMorePages(),
             ],
+            'filters' => ['search' => $search, 'status' => $statusFilter, 'types' => $types],
             'last_synced_at' => $this->formatSyncTime($lastSyncedAt),
         ];
+    }
+
+    /**
+     * Stream local rows for CSV export without materializing the full result
+     * set in memory. The query uses the same filters as storedTransactions().
+     *
+     * @return \Illuminate\Support\LazyCollection<int, array<string, mixed>>
+     */
+    public function streamStoredTransactions(Store $store, Carbon $from, Carbon $to, array $options = []): \Illuminate\Support\LazyCollection
+    {
+        $this->assertTikTok($store);
+
+        $source = strtolower(trim((string) ($options['source'] ?? 'statements')));
+        $sourceValue = match ($source) {
+            'account' => 'withdrawals',
+            'statements' => 'statement_transactions',
+            default => throw new RuntimeException('Sumber data TikTok tidak valid.'),
+        };
+        $types = $this->normalizeTypes($options['types'] ?? []);
+        $statusFilter = strtoupper(trim((string) ($options['status'] ?? '')));
+        $search = trim((string) ($options['search'] ?? ''));
+
+        $query = MarketplaceTikTokFinancialTransaction::query()
+            ->where('store_id', $store->id)
+            ->where('source', $sourceValue)
+            ->whereBetween('transaction_created_at', [$from, $to])
+            ->when($statusFilter !== '', fn ($query) => $query->where('status', $statusFilter))
+            ->when($search !== '', function ($query) use ($search): void {
+                $like = '%'.$search.'%';
+                $query->where(function ($query) use ($like): void {
+                    $query
+                        ->where('external_transaction_id', 'like', $like)
+                        ->orWhere('statement_id', 'like', $like)
+                        ->orWhere('order_id', 'like', $like)
+                        ->orWhere('adjustment_id', 'like', $like)
+                        ->orWhere('transaction_type', 'like', $like)
+                        ->orWhere('status', 'like', $like)
+                        ->orWhere('source_payload', 'like', $like);
+                });
+            })
+            ->when($source === 'account', fn ($query) => $query->whereIn('transaction_type', $types))
+            ->orderByDesc('transaction_created_at')
+            ->orderByDesc('id');
+
+        return $query->lazy(500)->map(
+            fn (MarketplaceTikTokFinancialTransaction $row): array => $this->presentStoredRow($row, $store->name),
+        );
     }
 
     /**
@@ -244,12 +313,18 @@ class TikTokFinancialTransactionService
     {
         $this->assertTikTok($store);
 
-        $rows = MarketplaceTikTokFinancialTransaction::query()
+        $baseQuery = MarketplaceTikTokFinancialTransaction::query()
             ->where('store_id', $store->id)
-            ->whereBetween('transaction_created_at', [$from, $to])
-            ->orderBy('transaction_created_at')
-            ->orderBy('id')
-            ->get();
+            ->whereBetween('transaction_created_at', [$from, $to]);
+
+        $gmvRows = (clone $baseQuery)
+            ->where(function ($query): void {
+                $query
+                    ->whereRaw("UPPER(transaction_type) LIKE 'GMV_PAYMENT%'")
+                    ->orWhereIn('transaction_type', ['GMV_PAY', 'GMV_PAYMENT']);
+            })
+            ->get(['external_transaction_id', 'source_payload']);
+        $rows = (clone $baseQuery)->orderBy('id')->lazy(500);
 
         $buckets = [
             'gmv_pay' => ['label' => 'GMV Pay', 'count' => 0, 'amount' => 0.0, 'sources' => []],
@@ -261,12 +336,10 @@ class TikTokFinancialTransactionService
         $unknown = 0;
         $latestSync = $store->tiktok_financial_last_synced_at;
         $gmvReferences = [];
+        $totalRows = 0;
+        $sourcesPresent = [];
 
-        foreach ($rows as $candidate) {
-            if (! $this->isGmvAdType($candidate->transaction_type)) {
-                continue;
-            }
-
+        foreach ($gmvRows as $candidate) {
             $gmvReferences[(string) $candidate->external_transaction_id] = true;
             $adjustmentId = data_get($candidate->source_payload ?? [], 'adjustment_id');
             if (filled($adjustmentId)) {
@@ -275,6 +348,8 @@ class TikTokFinancialTransactionService
         }
 
         foreach ($rows as $row) {
+            $totalRows++;
+            $sourcesPresent[(string) $row->source] = true;
             $flow = strtoupper((string) ($row->money_flow ?? 'UNKNOWN'));
             $amount = (float) $row->amount;
             $latestSync = $latestSync === null || $row->synced_at?->greaterThan($latestSync)
@@ -321,11 +396,11 @@ class TikTokFinancialTransactionService
             'store_name' => $store->name,
             'date_from' => $from->toDateString(),
             'date_to' => $to->toDateString(),
-            'status' => $rows->isEmpty() ? 'NO_DATA' : ($reconciled > 0 ? 'READY' : 'NO_AD_CASH_OUT'),
+            'status' => $totalRows === 0 ? 'NO_DATA' : ($reconciled > 0 ? 'READY' : 'NO_AD_CASH_OUT'),
             'source' => 'local_database',
-            'sources_present' => $rows->pluck('source')->unique()->values()->all(),
+            'sources_present' => array_keys($sourcesPresent),
             'last_synced_at' => $latestSync?->toISOString(),
-            'total_transactions' => $rows->count(),
+            'total_transactions' => $totalRows,
             'total_money_in' => round($moneyIn, 2),
             'total_money_out' => round($moneyOut, 2),
             'reconciled_ad_cash_out' => $reconciled,
@@ -350,8 +425,8 @@ class TikTokFinancialTransactionService
         }
 
         $result = [
-            'account' => ['count' => 0],
-            'statements' => ['count' => 0],
+            'account' => ['count' => 0, 'truncated' => false],
+            'statements' => ['count' => 0, 'truncated' => false],
             'total' => 0,
         ];
 
@@ -360,6 +435,7 @@ class TikTokFinancialTransactionService
             $result['account'] = [
                 'count' => count($account['items'] ?? []),
                 'pages' => (int) data_get($account, 'pagination.pages_fetched', 1),
+                'truncated' => (bool) data_get($account, 'pagination.truncated', false),
             ];
         }
 
@@ -369,10 +445,12 @@ class TikTokFinancialTransactionService
                 'count' => count($statements['items'] ?? []),
                 'statements' => (int) data_get($statements, 'pagination.statements_fetched', 0),
                 'pages' => (int) data_get($statements, 'pagination.transaction_pages_fetched', 0),
+                'truncated' => (bool) data_get($statements, 'pagination.truncated', false),
             ];
         }
 
         $result['total'] = $result['account']['count'] + $result['statements']['count'];
+        $result['truncated'] = (bool) ($result['account']['truncated'] || $result['statements']['truncated']);
         $syncedAt = now();
         $store->forceFill(['tiktok_financial_last_synced_at' => $syncedAt])->saveQuietly();
         $result['last_synced_at'] = $syncedAt->toISOString();
@@ -415,6 +493,7 @@ class TikTokFinancialTransactionService
         $transactionPages = 0;
         $statements = 0;
         $maxPages = 100;
+        $truncated = false;
 
         for ($statementPages = 1; $statementPages <= $maxPages; $statementPages++) {
             $statementResponse = $this->gateway->getStatements(
@@ -458,12 +537,20 @@ class TikTokFinancialTransactionService
                     if ($nextTransactionToken === '' || $nextTransactionToken === $transactionToken) {
                         break;
                     }
+                    if ($statementTransactionPage >= $maxPages) {
+                        $truncated = true;
+                        break;
+                    }
                     $transactionToken = $nextTransactionToken;
                 }
             }
 
             $nextStatementToken = $this->nextPageToken($statementResponse);
             if ($nextStatementToken === '' || $nextStatementToken === $statementToken) {
+                break;
+            }
+            if ($statementPages >= $maxPages) {
+                $truncated = true;
                 break;
             }
             $statementToken = $nextStatementToken;
@@ -474,7 +561,8 @@ class TikTokFinancialTransactionService
             'summary' => $this->summary($items),
             'pagination' => [
                 'page_size' => count($items),
-                'has_more' => false,
+                'has_more' => $truncated,
+                'truncated' => $truncated,
                 'next_page_token' => '',
                 'statements_fetched' => $statements,
                 'statement_pages_fetched' => $statementPages,

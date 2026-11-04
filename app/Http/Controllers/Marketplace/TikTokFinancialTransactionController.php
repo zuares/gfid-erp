@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Marketplace\TikTokFinancialTransactionRequest;
+use App\Http\Requests\Marketplace\TikTokFinancialTransactionSyncRequest;
 use App\Jobs\SyncTikTokFinancialTransactionsJob;
 use App\Models\Store;
 use App\Services\Marketplace\TikTokShop\TikTokFinancialTransactionService;
@@ -22,6 +24,16 @@ class TikTokFinancialTransactionController extends Controller
 
     public function index(): \Illuminate\View\View
     {
+        return $this->renderIndex(false);
+    }
+
+    public function wallet(): \Illuminate\View\View
+    {
+        return $this->renderIndex(true);
+    }
+
+    private function renderIndex(bool $walletMode): \Illuminate\View\View
+    {
         $stores = Store::query()
             ->whereHas('channel', fn ($query) => $query->whereIn('code', ['tiktok', 'ttk', 'tkt', 'tt']))
             ->where('is_active', true)
@@ -33,20 +45,13 @@ class TikTokFinancialTransactionController extends Controller
             'transactionTypes' => $this->service->getTransactionTypes(),
             'dataSources' => $this->service->getDataSources(),
             'statuses' => ['PROCESSING', 'COMPLETED', 'SUCCESS', 'FAILED', 'REVERSED', 'SETTLED', 'UNKNOWN'],
+            'walletMode' => $walletMode,
         ]);
     }
 
-    public function data(Request $request, Store $store): JsonResponse
+    public function data(TikTokFinancialTransactionRequest $request, Store $store): JsonResponse
     {
-        $validated = $request->validate([
-            'date_from' => ['required', 'date_format:Y-m-d'],
-            'date_to' => ['required', 'date_format:Y-m-d'],
-            'types' => ['nullable', 'string', 'max:200'],
-            'status' => ['nullable', 'string', 'max:40'],
-            'source' => ['nullable', 'in:account,statements'],
-            'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'page' => ['nullable', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validated();
 
         [$from, $to, $error] = $this->parseDateWindow($validated['date_from'], $validated['date_to']);
         if ($error !== null) {
@@ -54,9 +59,12 @@ class TikTokFinancialTransactionController extends Controller
         }
 
         try {
-            $source = $validated['source'] ?? 'statements';
+            $source = $request->routeIs('marketplace.api.tiktok-wallet-transactions')
+                ? 'account'
+                : ($validated['source'] ?? 'statements');
             $result = $this->service->storedTransactions($store, $from, $to, [
                 'source' => $source,
+                'search' => $validated['search'] ?? '',
                 'types' => $validated['types'] ?? '',
                 'status' => $validated['status'] ?? '',
                 'page_size' => $validated['page_size'] ?? 100,
@@ -71,21 +79,22 @@ class TikTokFinancialTransactionController extends Controller
                 'data' => $result,
             ]);
         } catch (RuntimeException $e) {
+            [$message, $status, $code] = $this->safeFailure($e, 'Transaksi TikTok belum dapat dibaca dari database lokal.');
             Log::warning('[tiktok-financial-transactions] API gagal', [
                 'store_id' => $store->id,
-                'error' => $e->getMessage(),
+                'code' => $code,
+                'exception' => get_class($e),
             ]);
-
-            $rateLimited = preg_match('/too many requests|rate[ _-]?limit/i', $e->getMessage()) === 1;
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
-            ], str_contains($e->getMessage(), 'bukan channel') ? 422 : ($rateLimited ? 429 : 502));
+                'code' => $code,
+                'message' => $message,
+            ], $status);
         } catch (\Throwable $e) {
             Log::error('[tiktok-financial-transactions] Kesalahan internal', [
                 'store_id' => $store->id,
-                'exception' => $e,
+                'exception' => get_class($e),
             ]);
 
             return response()->json([
@@ -113,17 +122,15 @@ class TikTokFinancialTransactionController extends Controller
                 'data' => $this->service->cashOutReconciliation($store, $from, $to),
             ]);
         } catch (RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            [$message, $status, $code] = $this->safeFailure($e, 'Rekonsiliasi kas TikTok belum dapat dihitung.');
+
+            return response()->json(['success' => false, 'code' => $code, 'message' => $message], $status);
         }
     }
 
-    public function sync(Request $request, Store $store): JsonResponse
+    public function sync(TikTokFinancialTransactionSyncRequest $request, Store $store): JsonResponse
     {
-        $validated = $request->validate([
-            'date_from' => ['required', 'date_format:Y-m-d'],
-            'date_to' => ['required', 'date_format:Y-m-d'],
-            'source' => ['nullable', 'in:account,statements,all'],
-        ]);
+        $validated = $request->validated();
 
         [$from, $to, $error] = $this->parseDateWindow($validated['date_from'], $validated['date_to']);
         if ($error !== null) {
@@ -148,7 +155,14 @@ class TikTokFinancialTransactionController extends Controller
             ], 401);
         }
 
-        $store->loadMissing('channel');
+        if (! $store->is_active || strtolower((string) $store->status) !== 'active') {
+            return response()->json([
+                'success' => false,
+                'code' => 'TIKTOK_STORE_INACTIVE',
+                'message' => 'Toko TikTok sedang tidak aktif dan tidak dapat disinkronkan.',
+            ], 422);
+        }
+
         $source = $validated['source'] ?? 'all';
         $activeKey = SyncTikTokFinancialTransactionsJob::activeKey((int) $store->id);
         $progressKey = SyncTikTokFinancialTransactionsJob::progressKey((int) $store->id);
@@ -203,7 +217,7 @@ class TikTokFinancialTransactionController extends Controller
             ], 3600);
             Log::error('[tiktok-financial-transactions] Dispatch sync gagal', [
                 'store_id' => $store->id,
-                'error' => $e->getMessage(),
+                'exception' => get_class($e),
             ]);
 
             return response()->json([
@@ -249,23 +263,24 @@ class TikTokFinancialTransactionController extends Controller
                 'data' => $this->service->fetchOrderStatementTransactions($store, $orderId),
             ]);
         } catch (RuntimeException $e) {
+            [$message, $status, $code] = $this->safeFailure($e, 'Statement order TikTok belum dapat diambil.');
             Log::warning('[tiktok-order-statement] API gagal', [
                 'store_id' => $store->id,
                 'order_id' => $orderId,
-                'error' => $e->getMessage(),
+                'code' => $code,
+                'exception' => get_class($e),
             ]);
-
-            $rateLimited = preg_match('/too many requests|rate[ _-]?limit/i', $e->getMessage()) === 1;
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
-            ], str_contains($e->getMessage(), 'bukan channel') ? 422 : ($rateLimited ? 429 : 502));
+                'code' => $code,
+                'message' => $message,
+            ], $status);
         } catch (\Throwable $e) {
             Log::error('[tiktok-order-statement] Kesalahan internal', [
                 'store_id' => $store->id,
                 'order_id' => $orderId,
-                'exception' => $e,
+                'exception' => get_class($e),
             ]);
 
             return response()->json([
@@ -275,16 +290,9 @@ class TikTokFinancialTransactionController extends Controller
         }
     }
 
-    public function export(Request $request, Store $store): StreamedResponse|JsonResponse
+    public function export(TikTokFinancialTransactionRequest $request, Store $store): StreamedResponse|JsonResponse
     {
-        $validated = $request->validate([
-            'date_from' => ['required', 'date_format:Y-m-d'],
-            'date_to' => ['required', 'date_format:Y-m-d'],
-            'types' => ['nullable', 'string', 'max:200'],
-            'status' => ['nullable', 'string', 'max:40'],
-            'source' => ['nullable', 'in:account,statements'],
-            'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         [$from, $to, $error] = $this->parseDateWindow($validated['date_from'], $validated['date_to']);
         if ($error !== null) {
@@ -292,13 +300,15 @@ class TikTokFinancialTransactionController extends Controller
         }
 
         try {
-            $source = $validated['source'] ?? 'statements';
-            $result = $this->service->storedTransactions($store, $from, $to, [
+            $source = $request->routeIs('marketplace.api.tiktok-wallet-transactions.export')
+                ? 'account'
+                : ($validated['source'] ?? 'statements');
+            $items = $this->service->streamStoredTransactions($store, $from, $to, [
                 'source' => $source,
+                'search' => $validated['search'] ?? '',
                 'types' => $validated['types'] ?? '',
                 'status' => $validated['status'] ?? '',
                 'page_size' => $validated['page_size'] ?? 100,
-                'all' => true,
             ]);
             $filename = sprintf(
                 'tiktok_%s_%s_%s_%s.csv',
@@ -308,11 +318,11 @@ class TikTokFinancialTransactionController extends Controller
                 $to->format('Ymd'),
             );
 
-            return response()->streamDownload(function () use ($result): void {
+            return response()->streamDownload(function () use ($items): void {
                 $handle = fopen('php://output', 'w');
-                fputs($handle, "\xEF\xBB\xBF");
+                fwrite($handle, "\xEF\xBB\xBF");
                 fputcsv($handle, ['Sumber', 'Waktu', 'ID Transaksi', 'Statement ID', 'Order ID', 'Tipe', 'Arah Dana', 'Nominal', 'Mata Uang', 'Status', 'Keterangan']);
-                foreach ($result['items'] as $item) {
+                foreach ($items as $item) {
                     fputcsv($handle, [
                         $item['source'],
                         $item['date_formatted'],
@@ -330,8 +340,27 @@ class TikTokFinancialTransactionController extends Controller
                 fclose($handle);
             }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
         } catch (RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 502);
+            [$message, $status, $code] = $this->safeFailure($e, 'Export transaksi TikTok belum dapat dibuat.');
+
+            return response()->json(['success' => false, 'code' => $code, 'message' => $message], $status);
         }
+    }
+
+    /** @return array{0:string,1:int,2:string} */
+    private function safeFailure(RuntimeException $exception, string $fallback): array
+    {
+        $raw = strtolower($exception->getMessage());
+        if (str_contains($raw, 'bukan channel')) {
+            return ['Toko yang dipilih bukan channel TikTok Shop.', 422, 'NOT_TIKTOK_STORE'];
+        }
+        if (str_contains($raw, 'too many requests') || str_contains($raw, 'rate limit')) {
+            return ['TikTok sedang membatasi permintaan. Coba lagi beberapa saat lagi.', 429, 'TIKTOK_RATE_LIMITED'];
+        }
+        if (str_contains($raw, 'access token') || str_contains($raw, 'invalid token') || str_contains($raw, 'expired')) {
+            return ['Koneksi TikTok perlu diperbarui sebelum data dapat diambil.', 401, 'TIKTOK_AUTH_REQUIRED'];
+        }
+
+        return [$fallback, 502, 'TIKTOK_FINANCE_UNAVAILABLE'];
     }
 
     /** @return array{0:Carbon,1:Carbon,2:?string} */
