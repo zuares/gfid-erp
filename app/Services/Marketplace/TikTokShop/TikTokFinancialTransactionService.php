@@ -543,37 +543,15 @@ class TikTokFinancialTransactionService
                 }
 
                 $statements++;
-                $transactionToken = '';
-                for ($statementTransactionPage = 1; $statementTransactionPage <= $maxPages; $statementTransactionPage++) {
-                    $transactionPages++;
-                    $transactionResponse = $this->gateway->getTransactionsByStatement(
-                        $store,
-                        $statementId,
-                        $transactionToken,
-                        $pageSize,
-                    );
-                    $this->assertSuccessfulResponse($transactionResponse);
-
-                    foreach ($this->extractStatementTransactions($transactionResponse) as $row) {
-                        $item = $this->normalizeStatementTransactionRow($row, $store, $statement);
-                        if ($statusFilter !== '' && $item['status'] !== $statusFilter) {
-                            continue;
-                        }
-
-                        $this->persist($item);
-                        $items[] = $item;
-                    }
-
-                    $nextTransactionToken = $this->nextPageToken($transactionResponse);
-                    if ($nextTransactionToken === '' || $nextTransactionToken === $transactionToken) {
-                        break;
-                    }
-                    if ($statementTransactionPage >= $maxPages) {
-                        $truncated = true;
-                        break;
-                    }
-                    $transactionToken = $nextTransactionToken;
-                }
+                $detail = $this->fetchStatementTransactionsById($store, $statementId, [
+                    'page_size' => $pageSize,
+                    'status' => $statusFilter,
+                    'max_pages' => $maxPages,
+                    'statement' => $statement,
+                ]);
+                $items = array_merge($items, $detail['items']);
+                $transactionPages += (int) data_get($detail, 'pagination.pages_fetched', 0);
+                $truncated = $truncated || (bool) data_get($detail, 'pagination.truncated', false);
             }
 
             $nextStatementToken = $this->nextPageToken($statementResponse);
@@ -598,6 +576,90 @@ class TikTokFinancialTransactionService
                 'statements_fetched' => $statements,
                 'statement_pages_fetched' => $statementPages,
                 'transaction_pages_fetched' => $transactionPages,
+                'source_total_count' => count($items),
+            ],
+        ];
+    }
+
+    /**
+     * Fetch and persist all transactions for one statement through the
+     * TikTok Finance v202501 endpoint.
+     *
+     * This is intentionally separate from Get Statements (v202309): the
+     * latter only discovers statement IDs, while this endpoint returns the
+     * authoritative ORDER/RESERVE/adjustment transaction rows.
+     *
+     * @return array<string, mixed>
+     */
+    public function fetchStatementTransactionsById(Store $store, string $statementId, array $options = []): array
+    {
+        $this->assertTikTok($store);
+
+        $statementId = trim($statementId);
+        if ($statementId === '') {
+            throw new RuntimeException('Statement ID TikTok wajib diisi.');
+        }
+
+        $pageSize = min(100, max(1, (int) ($options['page_size'] ?? 100)));
+        $maxPages = min(100, max(1, (int) ($options['max_pages'] ?? 100)));
+        $statusFilter = strtoupper(trim((string) ($options['status'] ?? '')));
+        $statement = is_array($options['statement'] ?? null) ? $options['statement'] : [];
+        $items = [];
+        $pageToken = '';
+        $pages = 0;
+        $truncated = false;
+
+        do {
+            $pages++;
+            $response = $this->gateway->getTransactionsByStatement(
+                $store,
+                $statementId,
+                $pageToken,
+                $pageSize,
+            );
+            $this->assertSuccessfulResponse($response);
+
+            $statementContext = array_merge([
+                'id' => $statementId,
+                'statement_id' => $statementId,
+                'status' => 'SETTLED',
+            ], $statement);
+            $statementContext['id'] = (string) (data_get($response, 'data.id') ?: $statementContext['id']);
+            $statementContext['currency'] = data_get($response, 'data.currency', $statementContext['currency'] ?? null);
+            $statementContext['create_time'] = data_get($response, 'data.create_time', $statementContext['create_time'] ?? null);
+            $statementContext['statement_time'] = data_get($response, 'data.statement_time', $statementContext['statement_time'] ?? null);
+            $statementContext['status'] = data_get($response, 'data.status', $statementContext['status']);
+
+            foreach ($this->extractStatementTransactions($response) as $row) {
+                $item = $this->normalizeStatementTransactionRow($row, $store, $statementContext);
+                if ($statusFilter !== '' && $item['status'] !== $statusFilter) {
+                    continue;
+                }
+
+                $this->persist($item);
+                $items[] = $item;
+            }
+
+            $nextPageToken = $this->nextPageToken($response);
+            if ($nextPageToken === '' || $nextPageToken === $pageToken) {
+                break;
+            }
+            if ($pages >= $maxPages) {
+                $truncated = true;
+                break;
+            }
+            $pageToken = $nextPageToken;
+        } while (true);
+
+        return [
+            'items' => $items,
+            'summary' => $this->summary($items),
+            'pagination' => [
+                'page_size' => count($items),
+                'pages_fetched' => $pages,
+                'has_more' => $truncated,
+                'truncated' => $truncated,
+                'next_page_token' => '',
                 'source_total_count' => count($items),
             ],
         ];

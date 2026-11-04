@@ -245,6 +245,52 @@ class TikTokFinancialTransactionController extends Controller
         ], Cache::get(SyncTikTokFinancialTransactionsJob::progressKey((int) $store->id), [])));
     }
 
+    public function statementTransactions(Store $store, string $statementId): JsonResponse
+    {
+        $statementId = trim($statementId);
+        if ($statementId === '' || mb_strlen($statementId) > 128) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Statement ID TikTok wajib diisi dan maksimal 128 karakter.',
+            ], 422);
+        }
+
+        try {
+            return response()->json([
+                'success' => true,
+                'source' => 'tiktok_live',
+                'endpoint' => 'get_transactions_by_statement_202501',
+                'statement_id' => $statementId,
+                'data' => $this->service->fetchStatementTransactionsById($store, $statementId),
+            ]);
+        } catch (RuntimeException $e) {
+            [$message, $status, $code] = $this->safeFailure($e, 'Transaksi statement TikTok belum dapat diambil.');
+            Log::warning('[tiktok-statement-transactions] API gagal', [
+                'store_id' => $store->id,
+                'statement_id' => $statementId,
+                'code' => $code,
+                'exception' => get_class($e),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'code' => $code,
+                'message' => $message,
+            ], $status);
+        } catch (\Throwable $e) {
+            Log::error('[tiktok-statement-transactions] Kesalahan internal', [
+                'store_id' => $store->id,
+                'statement_id' => $statementId,
+                'exception' => get_class($e),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan sistem saat mengambil transaksi statement TikTok.',
+            ], 500);
+        }
+    }
+
     public function orderStatement(Store $store, string $orderId): JsonResponse
     {
         $orderId = trim($orderId);

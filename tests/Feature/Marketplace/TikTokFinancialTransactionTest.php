@@ -542,6 +542,47 @@ class TikTokFinancialTransactionTest extends TestCase
             ->assertJsonPath('data.data.transactions.0.id', 'ORDER-TX-1');
     }
 
+    public function test_controller_fetches_transactions_by_statement_v202501(): void
+    {
+        $store = $this->createStore();
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202501/statements/STATEMENT-1/statement_transactions*' => Http::response([
+                'code' => 0,
+                'message' => 'Success',
+                'data' => [
+                    'id' => 'STATEMENT-1',
+                    'status' => 'SETTLED',
+                    'currency' => 'IDR',
+                    'transactions' => [[
+                        'id' => 'STATEMENT-TX-1',
+                        'type' => 'GMV_PAYMENT_FOR_ADS',
+                        'adjustment_amount' => '-12500',
+                    ]],
+                    'next_page_token' => '',
+                ],
+            ], 200),
+        ]);
+
+        $this->actingAs($this->user())
+            ->getJson(route('marketplace.api.tiktok-statement-transactions', [
+                'store' => $store->id,
+                'statementId' => 'STATEMENT-1',
+            ]))
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('endpoint', 'get_transactions_by_statement_202501')
+            ->assertJsonPath('statement_id', 'STATEMENT-1')
+            ->assertJsonPath('data.items.0.transaction_id', 'STATEMENT-TX-1')
+            ->assertJsonPath('data.items.0.transaction_type', 'GMV_PAYMENT_FOR_ADS');
+
+        $this->assertDatabaseHas('marketplace_tiktok_financial_transactions', [
+            'store_id' => $store->id,
+            'external_transaction_id' => 'STATEMENT-TX-1',
+            'source' => 'statement_transactions',
+        ]);
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), '/finance/202501/statements/STATEMENT-1/statement_transactions'));
+    }
+
     public function test_controller_page_and_json_endpoint_are_available(): void
     {
         $store = $this->createStore();

@@ -185,6 +185,8 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
         ->name('marketplace.api.tiktok-financial-transactions.sync');
     Route::get('/stores/{store}/tiktok-financial-transactions/sync-status', [TikTokFinancialTransactionController::class, 'syncStatus'])
         ->name('marketplace.api.tiktok-financial-transactions.sync-status');
+    Route::get('/stores/{store}/tiktok-statements/{statementId}/transactions', [TikTokFinancialTransactionController::class, 'statementTransactions'])
+        ->name('marketplace.api.tiktok-statement-transactions');
     Route::get('/stores/{store}/tiktok-orders/{orderId}/statement-transactions', [TikTokFinancialTransactionController::class, 'orderStatement'])->name('marketplace.api.tiktok-order-statement');
     Route::post('/stores/{store}/sync-orders', [MarketplaceController::class, 'syncOrders'])
         ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
