@@ -227,34 +227,44 @@
     }
     .sv-product-toggle-chevron { color: var(--sv-muted); font-size: .8rem; transition: transform .16s ease; }
     .sv-variant-dialog {
-        width: min(1120px, calc(100% - 1rem)); height: min(88dvh, 820px); margin: auto; padding: 0; overflow: hidden;
+        width: min(900px, calc(100% - 1rem)); max-height: min(84dvh, 720px); margin: auto; padding: 0; overflow: hidden;
         border: 1px solid var(--sv-line); border-radius: var(--sv-radius-card); background: var(--sv-surface) !important;
         color: var(--sv-content); opacity: 1 !important; isolation: isolate; box-shadow: 0 24px 70px rgba(16, 24, 40, .26);
     }
     .sv-variant-dialog::backdrop { background: rgba(16, 24, 40, .46); backdrop-filter: blur(2px); }
-    .sv-variant-dialog-panel { display: flex; min-height: 0; height: 100%; flex-direction: column; }
-    .sv-variant-dialog-head { display: flex; min-width: 0; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
+    .sv-variant-dialog-panel { display: flex; min-height: 0; max-height: inherit; flex-direction: column; }
+    .sv-variant-dialog-head { display: flex; min-width: 0; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: .85rem; padding: .85rem 1rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
     .sv-variant-dialog-product { display: flex; min-width: 0; max-width: 100%; align-items: center; gap: .7rem; }
     .sv-variant-dialog-thumb { display: grid; width: 52px; height: 52px; flex: 0 0 auto; place-items: center; overflow: hidden; border: 1px solid var(--sv-line); border-radius: var(--sv-radius-control); background: var(--sv-soft); color: var(--sv-muted); }
     .sv-variant-dialog-thumb img { width: 100%; height: 100%; object-fit: cover; }
     .sv-variant-dialog-product > div { min-width: 0; }
     .sv-variant-dialog-kicker { display: block; margin-bottom: .25rem; color: var(--sv-brand-strong); font-size: .62rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
-    .sv-variant-dialog-title { margin: 0; overflow: hidden; color: var(--sv-content); font-size: clamp(.95rem, 2vw, 1.15rem); font-weight: 800; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+    .sv-variant-dialog-title { display: -webkit-box; margin: 0; overflow: hidden; color: var(--sv-content); font-size: clamp(.95rem, 2vw, 1.1rem); font-weight: 800; line-height: 1.25; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .sv-variant-dialog-meta { display: block; margin-top: .25rem; color: var(--sv-muted); font-size: .68rem; }
     .sv-variant-dialog-close { display: inline-grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border: 1px solid transparent; border-radius: 50%; background: transparent; color: var(--sv-muted); font-size: .95rem; }
     .sv-variant-dialog-close:hover { border-color: var(--sv-line); background: var(--sv-soft); color: var(--sv-content); }
     .sv-variant-dialog-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--sv-brand) 28%, transparent); outline-offset: 2px; }
-    .sv-variant-dialog-body { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; background: color-mix(in srgb, var(--sv-soft) 45%, var(--sv-surface)); overscroll-behavior: contain; }
-    .sv-variant-dialog-body .sv-product-group-body { display: grid; gap: .5rem; padding: .65rem; }
+    .sv-variant-dialog-body { min-width: 0; min-height: 0; max-height: calc(84dvh - 6rem); overflow-x: hidden; overflow-y: auto; background: color-mix(in srgb, var(--sv-soft) 45%, var(--sv-surface)); overscroll-behavior: contain; }
+    .sv-variant-dialog-body .sv-product-group-body { display: grid; gap: .45rem; padding: .6rem; }
     .sv-variant-dialog-body .sv-record {
         display: grid; grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'variant' 'support' 'metrics' 'action'; width: 100%; min-width: 0; box-sizing: border-box;
-        padding: .8rem; box-shadow: 0 1px 2px rgba(16, 24, 40, .035);
+        padding: .7rem; box-shadow: 0 1px 2px rgba(16, 24, 40, .035);
     }
     .sv-variant-dialog-body .sv-cell-label { display: block; }
     .sv-variant-dialog-body .sv-support { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .75fr); }
     .sv-variant-dialog-body .sv-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .sv-variant-dialog-body .sv-action { padding: .65rem; }
+    @media (min-width: 768px) {
+        .sv-variant-dialog-body .sv-record {
+            grid-template-columns: minmax(180px, 1.2fr) minmax(160px, 1fr) minmax(235px, 1.35fr) auto;
+            grid-template-areas: 'variant support metrics action';
+            align-items: start;
+        }
+        .sv-variant-dialog-body .sv-support { grid-template-columns: minmax(0, 1fr); gap: .45rem; }
+        .sv-variant-dialog-body .sv-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
+        .sv-variant-dialog-body .sv-action { min-width: 142px; align-self: stretch; padding: .55rem; }
+    }
     .sv-record {
         display: grid; grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'variant' 'support' 'metrics' 'action';
@@ -467,7 +477,7 @@
         .sv-panel-head { padding: .7rem; }
         .sv-panel-title { font-size: .86rem; }
         .sv-panel-summary { gap: .15rem .45rem; }
-        .sv-variant-dialog { width: calc(100% - .75rem); height: calc(100dvh - .75rem); border-radius: 18px; }
+        .sv-variant-dialog { width: calc(100% - .75rem); max-height: calc(100dvh - .75rem); border-radius: 18px; }
         .sv-variant-dialog-head { padding: .85rem .9rem; }
         .sv-variant-dialog-thumb { width: 44px; height: 44px; }
         .sv-variant-dialog-body .sv-product-group-body { padding: .5rem; }
