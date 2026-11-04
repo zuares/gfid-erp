@@ -1065,6 +1065,7 @@ body[data-theme="dark"] #modalAddPayment .payment-modal-alert-warning{border-col
 
 
     @if ($canManagePayments)
+    @push('modals')
     {{-- =========================================================
     MODAL: ADD PAYMENT / DP
 ========================================================= --}}
@@ -1262,6 +1263,7 @@ body[data-theme="dark"] #modalAddPayment .payment-modal-alert-warning{border-col
                             </div>
                         @endif
                     </div>
+                </div>
 
                     <div class="modal-footer payment-modal-footer">
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
@@ -1453,6 +1455,7 @@ body[data-theme="dark"] #modalAddPayment .payment-modal-alert-warning{border-col
         </div>
     </div>
 
+    @endpush
 
 
     @push('scripts')

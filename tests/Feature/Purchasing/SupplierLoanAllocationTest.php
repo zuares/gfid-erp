@@ -29,13 +29,15 @@ class SupplierLoanAllocationTest extends TestCase
             'name' => 'Supplier Alokasi',
             'active' => true,
         ]);
-        $bank = Account::create([
-            'code' => '1111',
-            'name' => 'Bank Alokasi',
-            'type' => 'asset',
-            'is_cash' => true,
-            'is_active' => true,
-        ]);
+        $bank = Account::firstOrCreate(
+            ['code' => '1111'],
+            [
+                'name' => 'Bank Alokasi',
+                'type' => 'asset',
+                'is_cash' => true,
+                'is_active' => true,
+            ],
+        );
         $receivable = Account::firstOrCreate(
             ['code' => '1306'],
             ['name' => 'Piutang Pinjaman Supplier', 'type' => 'asset', 'is_cash' => false, 'is_active' => true],
@@ -119,6 +121,27 @@ class SupplierLoanAllocationTest extends TestCase
         $this->assertSame(600000.0, $loan->fresh()->allocation_available_amount);
         $this->assertSame(600000.0, $loan->fresh()->outstanding_amount);
 
+        $page = $this->actingAs($user)
+            ->get(route('purchasing.purchase_orders.show', $order));
+
+        $page->assertOk()->assertSee('Alokasi Pinjaman Supplier');
+
+        $previousLibxmlErrors = libxml_use_internal_errors(true);
+        $document = new \DOMDocument;
+        $document->loadHTML($page->getContent());
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousLibxmlErrors);
+
+        $loanModal = $document->getElementById('modalApplySupplierLoan');
+
+        $this->assertNotNull($loanModal);
+
+        $parent = $loanModal->parentNode;
+        while ($parent !== null) {
+            $this->assertNotSame('modalAddPayment', $parent->attributes?->getNamedItem('id')?->nodeValue);
+            $parent = $parent->parentNode;
+        }
+
         // Setelah GRN posted, alokasi pinjaman harus bisa di-offset ke AP.
         PurchaseReceipt::create([
             'code' => 'GRN-ALLOC-001',
@@ -191,13 +214,15 @@ class SupplierLoanAllocationTest extends TestCase
         ]);
         $supplierA = Supplier::create(['code' => 'SUP-ALLOC-A', 'name' => 'Supplier A', 'active' => true]);
         $supplierB = Supplier::create(['code' => 'SUP-ALLOC-B', 'name' => 'Supplier B', 'active' => true]);
-        $bank = Account::create([
-            'code' => '1112',
-            'name' => 'Bank Alokasi 2',
-            'type' => 'asset',
-            'is_cash' => true,
-            'is_active' => true,
-        ]);
+        $bank = Account::firstOrCreate(
+            ['code' => '1112'],
+            [
+                'name' => 'Bank Alokasi 2',
+                'type' => 'asset',
+                'is_cash' => true,
+                'is_active' => true,
+            ],
+        );
         $receivable = Account::firstOrCreate(
             ['code' => '1306'],
             ['name' => 'Piutang Pinjaman Supplier', 'type' => 'asset', 'is_cash' => false, 'is_active' => true],
