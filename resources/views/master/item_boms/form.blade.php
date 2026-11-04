@@ -668,9 +668,13 @@
       @if($isEdit && $bomEstimate)
         <div class="bom-cost-summary" aria-label="Ringkasan estimasi HPP BOM">
           <div>
-            <div class="bom-cost-summary-label">Estimasi HPP BOM</div>
+            <div class="bom-cost-summary-label">Total HPP BOM</div>
             <div class="bom-cost-summary-value">{{ $bomEstimate['total'] > 0 ? 'Rp '.number_format($bomEstimate['total'], 0, ',', '.') : 'Belum tersedia' }}</div>
-            <div class="bom-cost-summary-note">Per 1 {{ $bomEstimate['item_unit'] }} · optional termahal dihitung</div>
+            <div class="bom-cost-summary-note">
+              Material Rp {{ number_format($bomEstimate['material_total'], 0, ',', '.') }} +
+              upah Rp {{ number_format($bomEstimate['production_wage_total'], 0, ',', '.') }}
+              · per 1 {{ $bomEstimate['item_unit'] }} · optional termahal dihitung
+            </div>
           </div>
           <div>
             <div class="bom-cost-summary-label">Komponen</div>
@@ -678,10 +682,16 @@
             <div class="bom-cost-summary-note">{{ $bomEstimate['required_line_count'] }} wajib · {{ $bomEstimate['optional_line_count'] }} opsional</div>
           </div>
           <div>
-            <div class="bom-cost-summary-label">Upah produksi</div>
+            <div class="bom-cost-summary-label">Estimasi upah produksi</div>
             <div class="bom-cost-summary-value">Rp {{ number_format($bomEstimate['production_wage_total'], 0, ',', '.') }}</div>
             <div class="bom-cost-summary-note">
-              {{ $bomEstimate['production_wage']['available'] ? 'Cutting + sewing + finishing' : 'Belum ada snapshot payroll aktif' }}
+              @if(($bomEstimate['production_wage']['source'] ?? null) === 'payroll_snapshot')
+                Snapshot payroll aktif
+              @elseif(($bomEstimate['production_wage']['source'] ?? null) === 'piece_rate_estimate')
+                Estimasi tarif tertinggi · cutting Rp {{ number_format($bomEstimate['production_wage']['cutting'], 0, ',', '.') }} · sewing Rp {{ number_format($bomEstimate['production_wage']['sewing'], 0, ',', '.') }}
+              @else
+                Belum ada snapshot payroll atau tarif piece rate aktif
+              @endif
             </div>
           </div>
           <div>

@@ -6,6 +6,8 @@ use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
 use App\Models\ItemCostSnapshot;
+use App\Models\Employee;
+use App\Models\PieceRate;
 use App\Services\Production\ItemBomCostService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -264,5 +266,78 @@ class ItemBomCostServiceTest extends TestCase
         $this->assertEqualsWithDelta(4000, $estimate['production_wage_total'], 0.000001);
         $this->assertEqualsWithDelta(24000, $estimate['total'], 0.000001);
         $this->assertSame($snapshot->id, $estimate['production_wage']['snapshot_id']);
+    }
+
+    public function test_active_piece_rates_are_used_when_payroll_snapshot_is_not_available(): void
+    {
+        $bundle = Item::create([
+            'code' => 'BUNDLE-COST-RATE-001',
+            'name' => 'Bundle Piece Rate Cost Test',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'MAT-COST-RATE-001',
+            'name' => 'Material Piece Rate Cost Test',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'hpp' => 20000,
+            'base_unit_cost' => 20000,
+            'active' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $bundle->id,
+            'name' => 'BOM Piece Rate Cost Test',
+            'active' => true,
+        ]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
+            'qty' => '1',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+
+        $cuttingOperator = Employee::create([
+            'code' => 'RATE-CUT-001',
+            'name' => 'Operator Cutting Rate Test',
+            'role' => 'cutting',
+            'payment_type' => 'variable',
+            'active' => true,
+        ]);
+        $sewingOperator = Employee::create([
+            'code' => 'RATE-SEW-001',
+            'name' => 'Operator Sewing Rate Test',
+            'role' => 'sewing',
+            'payment_type' => 'variable',
+            'active' => true,
+        ]);
+        PieceRate::create([
+            'module' => 'cutting',
+            'employee_id' => $cuttingOperator->id,
+            'item_id' => $bundle->id,
+            'rate_per_pcs' => 1000,
+            'effective_from' => now()->subDay()->toDateString(),
+        ]);
+        PieceRate::create([
+            'module' => 'sewing',
+            'employee_id' => $sewingOperator->id,
+            'item_id' => $bundle->id,
+            'rate_per_pcs' => 4000,
+            'effective_from' => now()->subDay()->toDateString(),
+        ]);
+
+        $estimate = app(ItemBomCostService::class)->estimate($bom);
+
+        $this->assertSame('piece_rate_estimate', $estimate['production_wage']['source']);
+        $this->assertTrue($estimate['production_wage']['is_estimate']);
+        $this->assertEqualsWithDelta(1000, $estimate['production_wage']['cutting'], 0.000001);
+        $this->assertEqualsWithDelta(4000, $estimate['production_wage']['sewing'], 0.000001);
+        $this->assertEqualsWithDelta(5000, $estimate['production_wage_total'], 0.000001);
+        $this->assertEqualsWithDelta(25000, $estimate['total'], 0.000001);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services\Production;
 
 use App\Models\ItemBom;
 use App\Models\ItemCostSnapshot;
+use App\Models\PieceRate;
 
 class ItemBomCostService
 {
@@ -75,7 +76,7 @@ class ItemBomCostService
             fn (array $component): bool => $component['included_in_estimate']
         );
         $materialTotal = round((float) $includedComponents->sum('estimated_cost'), 2);
-        $productionWage = $this->getProductionWage((int) $bom->item_id);
+        $productionWage = $this->getProductionWage($bom->item);
 
         return [
             'bom_id' => (int) $bom->id,
@@ -99,14 +100,14 @@ class ItemBomCostService
 
     /**
      * Ambil upah produksi per pcs dari snapshot HPP produksi aktif.
-     * Snapshot ini berasal dari payroll cutting, sewing, dan finishing.
+     * Jika snapshot belum tersedia, gunakan estimasi tarif piece rate aktif.
      *
-     * @return array{cutting: float, sewing: float, finishing: float, total: float, available: bool, snapshot_id: int|null}
+     * @return array{cutting: float, sewing: float, finishing: float, total: float, available: bool, snapshot_id: int|null, source: string, is_estimate: bool}
      */
-    private function getProductionWage(int $itemId): array
+    private function getProductionWage($item): array
     {
         $snapshot = ItemCostSnapshot::query()
-            ->where('item_id', $itemId)
+            ->where('item_id', (int) $item->id)
             ->whereNull('warehouse_id')
             ->where('is_active', true)
             ->whereIn('reference_type', ['production_cost_period', 'auto_hpp_period'])
@@ -123,14 +124,68 @@ class ItemBomCostService
         $sewing = round((float) ($snapshot?->sewing_unit_cost ?? 0), 4);
         $finishing = round((float) ($snapshot?->finishing_unit_cost ?? 0), 4);
 
+        if ($snapshot) {
+            return [
+                'cutting' => $cutting,
+                'sewing' => $sewing,
+                'finishing' => $finishing,
+                'total' => round($cutting + $sewing + $finishing, 2),
+                'available' => true,
+                'snapshot_id' => (int) $snapshot->id,
+                'source' => 'payroll_snapshot',
+                'is_estimate' => false,
+            ];
+        }
+
+        // Sebelum snapshot payroll tersedia, gunakan tarif piece rate aktif
+        // tertinggi per modul sebagai estimasi konservatif. Tarif tertinggi
+        // mencegah HPP BOM terlihat terlalu rendah ketika operator produksi
+        // belum ditentukan pada saat BOM dibuat.
+        $cuttingEstimate = $this->highestActivePieceRate($item, 'cutting');
+        $sewingEstimate = $this->highestActivePieceRate($item, 'sewing');
+        $estimatedTotal = round($cuttingEstimate + $sewingEstimate, 2);
+
         return [
-            'cutting' => $cutting,
-            'sewing' => $sewing,
-            'finishing' => $finishing,
-            'total' => round($cutting + $sewing + $finishing, 2),
-            'available' => $snapshot !== null,
-            'snapshot_id' => $snapshot?->id ? (int) $snapshot->id : null,
+            'cutting' => $cuttingEstimate,
+            'sewing' => $sewingEstimate,
+            'finishing' => 0.0,
+            'total' => $estimatedTotal,
+            'available' => $estimatedTotal > 0,
+            'snapshot_id' => null,
+            'source' => $estimatedTotal > 0 ? 'piece_rate_estimate' : 'unavailable',
+            'is_estimate' => true,
         ];
+    }
+
+    private function highestActivePieceRate($item, string $module): float
+    {
+        $query = PieceRate::query()
+            ->where('module', $module)
+            ->whereDate('effective_from', '<=', now()->toDateString())
+            ->where(function ($query): void {
+                $query->whereNull('effective_to')
+                    ->orWhereDate('effective_to', '>=', now()->toDateString());
+            });
+
+        $rate = (float) (clone $query)
+            ->where('item_id', (int) $item->id)
+            ->max('rate_per_pcs');
+
+        if ($rate <= 0 && (int) ($item->item_category_id ?? 0) > 0) {
+            $rate = (float) (clone $query)
+                ->whereNull('item_id')
+                ->where('item_category_id', (int) $item->item_category_id)
+                ->max('rate_per_pcs');
+        }
+
+        if ($rate <= 0) {
+            $rate = (float) (clone $query)
+                ->whereNull('item_id')
+                ->whereNull('item_category_id')
+                ->max('rate_per_pcs');
+        }
+
+        return round(max(0, $rate), 4);
     }
 
     public function total(ItemBom $bom, bool $includeOptional = false): float
