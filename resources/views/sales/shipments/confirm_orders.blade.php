@@ -890,7 +890,8 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
             ->all();
     }
     $editShipmentUrl = route('sales.shipments.scan_order', $shipment);
-    $canDeleteShipmentRows = auth()->user()?->role === 'owner';
+    $pendingDeletionLineIds = $pendingDeletionLineIds ?? [];
+    $canDeleteShipmentRows = in_array(strtolower((string) auth()->user()?->role), ['owner', 'admin'], true);
     $canSeeCogs = auth()->user()?->role === 'owner';
     $canSeeScanDiagnostics = auth()->user()?->role !== 'admin';
     $itemGridClass = trim(implode(' ', array_filter([
@@ -1324,11 +1325,15 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                     @endif
                                     @if($canDeleteShipmentRows)
                                         <span class="sd-line-action">
-                                            <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
-                                            </form>
+                                            @if(in_array((int) $line->id, $pendingDeletionLineIds, true))
+                                                <span class="sd-pill sd-status">Menunggu owner</span>
+                                            @else
+                                                <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                                </form>
+                                            @endif
                                         </span>
                                     @endif
                                 </div>
@@ -1584,11 +1589,15 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                 @endif
                                                 @if($canDeleteShipmentRows)
                                                     <span class="sd-line-action">
-                                                        <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
-                                                        </form>
+                                                        @if(in_array((int) $line->id, $pendingDeletionLineIds, true))
+                                                            <span class="sd-pill sd-status">Menunggu owner</span>
+                                                        @else
+                                                            <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                                            </form>
+                                                        @endif
                                                     </span>
                                                 @endif
                                             </div>
@@ -1701,11 +1710,15 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                         @endif
                                                         @if($canDeleteShipmentRows && !empty($line->id))
                                                             <span class="sd-line-action">
-                                                                <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
-                                                                    @csrf
-                                                                    @method('DELETE')
-                                                                    <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
-                                                                </form>
+                                                                @if(in_array((int) $line->id, $pendingDeletionLineIds, true))
+                                                                    <span class="sd-pill sd-status">Menunggu owner</span>
+                                                                @else
+                                                                    <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                                                    </form>
+                                                                @endif
                                                             </span>
                                                         @endif
                                                     </div>
@@ -1757,7 +1770,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 <div class="sd-order-items">
                                     <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>SKU Marketplace</span><span>Qty</span><span>Scan Item Gudang</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                     @foreach($ungroupedLines as $line)
-                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action"><form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form></span>@endif</div>
+                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action">@if(in_array((int) $line->id, $pendingDeletionLineIds, true))<span class="sd-pill sd-status">Menunggu owner</span>@else<form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button></form>@endif</span>@endif</div>
                                     @endforeach
                                 </div>
                                 <div class="sd-order-summary {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
@@ -1816,11 +1829,15 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 @endif
                                 @if($canDeleteShipmentRows)
                                     <span class="sd-line-action">
-                                        <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
-                                        </form>
+                                        @if(in_array((int) $line->id, $pendingDeletionLineIds, true))
+                                            <span class="sd-pill sd-status">Menunggu owner</span>
+                                        @else
+                                            <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="sd-action-delete" title="Hapus item"><i class="bi bi-trash3" aria-hidden="true"></i><span class="visually-hidden">Hapus item</span></button>
+                                            </form>
+                                        @endif
                                     </span>
                                 @endif
                             </div>
@@ -2069,8 +2086,11 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                 },
             }).then(async function(response){
                 var payload = await response.json().catch(function(){ return {}; });
-                if (!response.ok || payload.status !== 'ok') {
+                if (!response.ok && payload.status !== 'pending') {
                     throw new Error(payload.message || 'Gagal menghapus item.');
+                }
+                if (payload.status === 'pending') {
+                    window.alert(payload.message || 'Permintaan hapus dikirim dan menunggu persetujuan owner.');
                 }
                 window.location.reload();
             }).catch(function(error){

@@ -21,6 +21,7 @@ use App\Services\Accounting\StandaloneProductionPostingService;
 use App\Services\Inventory\InventoryService;
 use App\Services\Sales\DailySalesRealtimeService;
 use App\Services\Sales\ShipmentMarketplaceLinker;
+use App\Services\Sales\ShipmentDeletionApprovalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -1467,7 +1468,25 @@ class ShipmentController extends Controller
             })
             ->values();
 
-        return view('sales.shipments.edit_order_first', compact('shipment', 'savedOrderScans'));
+        $pendingDeletionRequests = Schema::hasTable('shipment_deletion_requests')
+            ? \App\Models\ShipmentDeletionRequest::query()
+                ->where('shipment_id', $shipment->id)
+                ->where('status', \App\Models\ShipmentDeletionRequest::STATUS_PENDING)
+                ->get(['target_type', 'shipment_order_scan_id', 'shipment_line_id'])
+            : collect();
+        $pendingDeletionOrderScanIds = $pendingDeletionRequests
+            ->where('target_type', \App\Models\ShipmentDeletionRequest::TARGET_ORDER)
+            ->pluck('shipment_order_scan_id')->filter()->map(fn ($id) => (int) $id)->values()->all();
+        $pendingDeletionLineIds = $pendingDeletionRequests
+            ->where('target_type', \App\Models\ShipmentDeletionRequest::TARGET_ITEM)
+            ->pluck('shipment_line_id')->filter()->map(fn ($id) => (int) $id)->values()->all();
+
+        return view('sales.shipments.edit_order_first', compact(
+            'shipment',
+            'savedOrderScans',
+            'pendingDeletionOrderScanIds',
+            'pendingDeletionLineIds',
+        ));
     }
 
     /**
@@ -1616,15 +1635,9 @@ class ShipmentController extends Controller
 
     public function deleteOrderScan(Request $request, Shipment $shipment)
     {
-        if (($request->user()?->role ?? null) !== 'owner') {
+        $user = $request->user();
+        if (! $user || ! in_array(strtolower((string) $user->role), ['owner', 'admin'], true)) {
             abort(403);
-        }
-
-        if ($shipment->status !== 'draft') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Shipment sudah tidak berstatus draft.',
-            ], 409);
         }
 
         $data = $request->validate([
@@ -1633,58 +1646,25 @@ class ShipmentController extends Controller
 
         $orderNo = mb_strtoupper(trim($data['order_no']));
 
-        DB::transaction(function () use ($shipment, $orderNo) {
-            Shipment::query()
-                ->lockForUpdate()
-                ->findOrFail($shipment->id);
+        try {
+            if (strtolower((string) $user->role) === 'admin') {
+                $deletionRequest = app(ShipmentDeletionApprovalService::class)
+                    ->requestOrderDeletion($shipment, $orderNo, $user);
 
-            $scan = ShipmentOrderScan::query()
-                ->where('shipment_id', $shipment->id)
-                ->where('order_no', $orderNo)
-                ->lockForUpdate()
-                ->first();
-
-            if (! $scan) {
-                return;
+                return response()->json([
+                    'status' => 'pending',
+                    'message' => 'Permintaan hapus order dikirim. Menunggu persetujuan owner.',
+                    'request_id' => $deletionRequest->id,
+                ], 202);
             }
 
-            $activeScanCount = ShipmentOrderScan::query()
-                ->where('shipment_id', $shipment->id)
-                ->where('status', '!=', 'skip')
-                ->count();
-
-            $lines = ShipmentLine::query()
-                ->where('shipment_id', $shipment->id)
-                ->where(function ($query) use ($scan, $activeScanCount) {
-                    $query->where('shipment_order_scan_id', $scan->id);
-
-                    // Kompatibilitas shipment lama: jika hanya ada satu order,
-                    // line tanpa grouping juga termasuk item order tersebut.
-                    if ($activeScanCount === 1) {
-                        $query->orWhereNull('shipment_order_scan_id');
-                    }
-                })
-                ->lockForUpdate()
-                ->get();
-
-            if ($lines->contains(fn ($line) => $line->wave?->isPosted())) {
-                throw new RuntimeException('Item pada gelombang yang sudah diposting tidak bisa dihapus.');
-            }
-
-            $warehouse = $this->whRts();
-            foreach ($lines as $line) {
-                if ($warehouse && $line->allocated_qty > 0) {
-                    app(\App\Services\Inventory\InventoryService::class)->releaseStock(
-                        $warehouse->id,
-                        $line->item_id,
-                        $line->allocated_qty
-                    );
-                }
-                $line->delete();
-            }
-
-            $scan->delete();
-        });
+            app(ShipmentDeletionApprovalService::class)->deleteOrder($shipment, $orderNo);
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 409);
+        }
 
         return response()->json([
             'status' => 'ok',
@@ -3255,45 +3235,37 @@ class ShipmentController extends Controller
 
     public function destroyLine(Request $request, ShipmentLine $line)
     {
-        if (($request->user()?->role ?? null) !== 'owner') {
+        $user = $request->user();
+        if (! $user || ! in_array(strtolower((string) $user->role), ['owner', 'admin'], true)) {
             abort(403);
         }
 
         $shipment = $line->shipment;
+        if (! $shipment) {
+            return response()->json(['status' => 'error', 'message' => 'Shipment tidak ditemukan.'], 404);
+        }
 
-        if (! $shipment || $shipment->status !== 'draft') {
-            $message = 'Shipment sudah tidak draft, baris tidak bisa dihapus.';
+        try {
+            if (strtolower((string) $user->role) === 'admin') {
+                $deletionRequest = app(ShipmentDeletionApprovalService::class)
+                    ->requestLineDeletion($line, $user);
 
+                return response()->json([
+                    'status' => 'pending',
+                    'message' => 'Permintaan hapus item dikirim. Menunggu persetujuan owner.',
+                    'request_id' => $deletionRequest->id,
+                ], 202);
+            }
+
+            app(ShipmentDeletionApprovalService::class)->deleteLine($line);
+        } catch (RuntimeException $exception) {
+            $message = $exception->getMessage();
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['status' => 'error', 'message' => $message], 409);
             }
 
-            return redirect()->route('sales.shipments.show', $shipment?->id ?? null)
-                ->with('status', 'error')->with('message', $message);
+            return back()->with('status', 'error')->with('message', $message);
         }
-
-        if ($line->wave?->isPosted()) {
-            $message = 'Baris pada gelombang yang sudah diposting tidak bisa diubah.';
-
-            if ($request->expectsJson() || $request->ajax()) {
-                return response()->json(['status' => 'error', 'message' => $message], 409);
-            }
-
-            return redirect()->route('sales.shipments.edit', $shipment)
-                ->with('status', 'error')->with('message', $message);
-        }
-
-        DB::transaction(function () use ($line) {
-            $warehouse = $this->whRts();
-            if ($warehouse && $line->allocated_qty > 0) {
-                app(\App\Services\Inventory\InventoryService::class)->releaseStock(
-                    $warehouse->id,
-                    $line->item_id,
-                    $line->allocated_qty
-                );
-            }
-            $line->delete();
-        });
 
         $totals = ShipmentLine::query()
             ->where('shipment_id', $shipment->id)
@@ -4340,6 +4312,15 @@ class ShipmentController extends Controller
             : [];
         $mappingErrors = $this->shipmentMappingErrors($shipment, $currentWave);
         $isDaily = $this->usesDailyWaves($shipment);
+        $pendingDeletionRequests = Schema::hasTable('shipment_deletion_requests')
+            ? \App\Models\ShipmentDeletionRequest::query()
+                ->where('shipment_id', $shipment->id)
+                ->where('status', \App\Models\ShipmentDeletionRequest::STATUS_PENDING)
+                ->get(['target_type', 'shipment_order_scan_id', 'shipment_line_id'])
+            : collect();
+        $pendingDeletionLineIds = $pendingDeletionRequests
+            ->where('target_type', \App\Models\ShipmentDeletionRequest::TARGET_ITEM)
+            ->pluck('shipment_line_id')->filter()->map(fn ($id) => (int) $id)->values()->all();
 
         return view('sales.shipments.confirm_orders', compact(
             'shipment',
@@ -4354,6 +4335,7 @@ class ShipmentController extends Controller
             'bookingOrderQtyByScan',
             'bookingStatusesByScan',
             'bookingIdentifiersByScan',
+            'pendingDeletionLineIds',
         ));
     }
 

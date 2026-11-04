@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Sales\ShipmentController;
+use App\Http\Controllers\Sales\ShipmentDeletionApprovalController;
 use App\Http\Controllers\Sales\ShipmentReturnController;
 use App\Models\Shipment;
 use Illuminate\Support\Facades\Route;
@@ -15,6 +16,16 @@ Route::middleware(['web', 'auth', 'access:sales'])
          *  SHIPMENTS
          * =========================
          */
+        Route::get('shipments/deletion-requests', [ShipmentDeletionApprovalController::class, 'index'])
+            ->name('shipments.deletion_requests.index')
+            ->middleware('role:owner');
+        Route::post('shipments/deletion-requests/{deletionRequest}/approve', [ShipmentDeletionApprovalController::class, 'approve'])
+            ->name('shipments.deletion_requests.approve')
+            ->middleware('role:owner');
+        Route::post('shipments/deletion-requests/{deletionRequest}/reject', [ShipmentDeletionApprovalController::class, 'reject'])
+            ->name('shipments.deletion_requests.reject')
+            ->middleware('role:owner');
+
         Route::prefix('shipments')
             ->as('shipments.')
             ->controller(ShipmentController::class)
@@ -43,8 +54,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
                 Route::get('{shipment}/scan-lookup', 'scanLookup')->name('scan_lookup');
                 Route::post('{shipment}/scan-order', 'scanOrder')->name('scan_order_store');
                 Route::post('{shipment}/order-scans/delete', 'deleteOrderScan')
-                    ->name('delete_order_scan')
-                    ->middleware('role:owner');
+                    ->name('delete_order_scan');
                 Route::post('{shipment}/scan-item', 'scanItem')->name('scan_item');
 
                 Route::post('{shipment}/submit', 'submit')->name('submit');
@@ -86,8 +96,7 @@ Route::middleware(['web', 'auth', 'access:sales'])
             ->name('shipments.update_line_qty');
 
         Route::delete('shipments/lines/{line}', [ShipmentController::class, 'destroyLine'])
-            ->name('shipments.destroy_line')
-            ->middleware('role:owner');
+            ->name('shipments.destroy_line');
 
         /**
          * =========================

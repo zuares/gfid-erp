@@ -1,6 +1,7 @@
 {{-- resources/views/layouts/partials/navbar.blade.php --}}
 @php
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 $navUser     = auth()->user();
 $navIsOwner  = $navUser && method_exists($navUser, 'isOwner') && $navUser->isOwner();
@@ -12,7 +13,7 @@ $navPendingCount = 0;
 $navPendingItems = [];
 
 if ($navShowBell) {
-    $navCacheKey = 'navbar_notif_owner_v3_' . (int) $navUser->id;
+    $navCacheKey = 'navbar_notif_owner_v4_' . (int) $navUser->id;
     $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () {
         $todayStart = today()->startOfDay();
         $todayEnd   = today()->endOfDay();
@@ -36,6 +37,15 @@ if ($navShowBell) {
             ->orderByDesc('updated_at')
             ->limit(10)
             ->get(['id', 'code']);
+
+        $shipmentDeletionRequests = Schema::hasTable('shipment_deletion_requests')
+            ? \App\Models\ShipmentDeletionRequest::query()
+                ->with(['shipment:id,code', 'requestedBy:id,name', 'orderScan:id,order_no', 'line:id,item_id', 'line.item:id,code'])
+                ->where('status', \App\Models\ShipmentDeletionRequest::STATUS_PENDING)
+                ->latest('id')
+                ->limit(10)
+                ->get()
+            : collect();
 
         // ── CRM Storefront notifications ──────────────────────────────────────
         $crmAgingCount = 0;
@@ -73,6 +83,7 @@ if ($navShowBell) {
             'po_drafts'      => $poDrafts,
             'grn_drafts'     => $grnDrafts,
             'cutting_qc_owner_reviews' => $cuttingQcOwnerReviews,
+            'shipment_deletion_requests' => $shipmentDeletionRequests,
             'crm_aging'      => $crmAgingCount,
             'crm_new_orders' => $crmNewOrders,
             'crm_prospects'  => $crmProspects,
@@ -81,6 +92,18 @@ if ($navShowBell) {
 
     // PO & GRN hanya untuk owner
     if ($navIsOwner) {
+        foreach (($navPending['shipment_deletion_requests'] ?? collect()) as $deletionRequest) {
+            $targetLabel = $deletionRequest->target_type === 'order'
+                ? 'Order '.($deletionRequest->orderScan?->order_no ?: $deletionRequest->target_label)
+                : 'Item '.($deletionRequest->line?->item?->code ?: $deletionRequest->target_label);
+            $navPendingItems[] = [
+                'type'  => 'shipment_deletion_request',
+                'label' => $targetLabel,
+                'sub'   => 'Menunggu approval hapus · '.($deletionRequest->requestedBy?->name ?: 'Admin'),
+                'url'   => route('sales.shipments.deletion_requests.index'),
+                'icon'  => '🗑️',
+            ];
+        }
         foreach (($navPending['po_drafts'] ?? collect()) as $po) {
             $navPendingItems[] = [
                 'type'  => 'po',

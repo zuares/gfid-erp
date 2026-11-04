@@ -548,6 +548,11 @@
         background: #ffe4e6;
         border-color: rgba(225, 29, 72, .45);
     }
+    .sr-pending-delete {
+        display:inline-flex; align-items:center; justify-content:center; padding:.2rem .4rem;
+        border-radius:999px; background:#fff7ed; color:#c2410c; font-size:.62rem; font-weight:800;
+        white-space:nowrap;
+    }
 
     .sr-order-chevron {
         color: #94a3b8;
@@ -1071,9 +1076,12 @@
 
 @section('content')
 @php
+    $pendingDeletionOrderScanIds = $pendingDeletionOrderScanIds ?? [];
+    $pendingDeletionLineIds = $pendingDeletionLineIds ?? [];
     $initialOrders = collect($savedOrderScans ?? [])
-        ->map(function ($scan) {
+        ->map(function ($scan) use ($pendingDeletionLineIds, $pendingDeletionOrderScanIds) {
             return [
+                'id' => (int) ($scan['id'] ?? 0),
                 'code' => strtoupper((string) ($scan['code'] ?? $scan['order_no'] ?? '')),
                 'label' => $scan['label'] ?? 'Pencatatan order',
                 'duplicateCount' => (int) ($scan['duplicate_count'] ?? 0),
@@ -1081,7 +1089,11 @@
                 'platformLabel' => $scan['platform_label'] ?? null,
                 'storeId' => $scan['store_id'] ?? null,
                 'storeLabel' => $scan['store_label'] ?? null,
-                'items' => $scan['items'] ?? [],
+                'items' => collect($scan['items'] ?? [])->map(function ($item) use ($pendingDeletionLineIds) {
+                    $item['pending_deletion'] = in_array((int) ($item['line_id'] ?? $item['id'] ?? 0), $pendingDeletionLineIds, true);
+                    return $item;
+                })->values()->all(),
+                'pending_deletion' => in_array((int) ($scan['id'] ?? 0), $pendingDeletionOrderScanIds, true),
             ];
         })
         ->filter(fn ($scan) => $scan['code'] !== '')
@@ -1095,10 +1107,11 @@
             'code' => $line->item->code ?? '-',
             'name' => $line->item->name ?? '',
             'qty' => (int) $line->qty_scanned,
+            'pending_deletion' => in_array((int) $line->id, $pendingDeletionLineIds, true),
         ])
         ->values();
 
-    $canDeleteShipmentRows = auth()->user()?->role === 'owner';
+    $canDeleteShipmentRows = in_array(strtolower((string) auth()->user()?->role), ['owner', 'admin'], true);
     $canEditShipmentQty = in_array(auth()->user()?->role, ['owner', 'admin'], true);
 @endphp
 
@@ -1278,6 +1291,8 @@
     const csrf = @json(csrf_token());
     const isDraft = @json($shipment->status === 'draft');
     const canDelete = @json($canDeleteShipmentRows);
+    const pendingDeletionLineIds = @json($pendingDeletionLineIds);
+    const pendingDeletionOrderScanIds = @json($pendingDeletionOrderScanIds);
     const canEditQty = @json($canEditShipmentQty);
     const initialOrders = @json($initialOrders);
     const initialLines = @json($initialLines);
@@ -1549,6 +1564,8 @@
                 platformLabel: meta.platformLabel || '',
                 storeId: meta.storeId || '',
                 storeLabel: meta.storeLabel || '',
+                id: meta.id || null,
+                pending_deletion: !!meta.pending_deletion,
                 items: Array.isArray(meta.items) ? meta.items : []
             };
             state.orders.push(order);
@@ -1558,6 +1575,8 @@
         ['platformKey', 'platformLabel', 'storeId', 'storeLabel'].forEach(key => {
             if (meta[key]) order[key] = meta[key];
         });
+        if (meta.id) order.id = meta.id;
+        if (meta.pending_deletion !== undefined) order.pending_deletion = !!meta.pending_deletion;
         if (!order.platformKey) {
             const upper = normalize(code);
             if (upper.startsWith('SPX') || upper.startsWith('JY')) {
@@ -1767,7 +1786,9 @@
             const rows = items.length
                 ? items.map((item, index) => {
                     const deleteButton = canDelete && item.line_id
-                        ? `<button type="button" class="sr-delete-btn sr-item-delete" data-delete-line="${esc(item.line_id)}" data-order-code="${esc(order.code)}" title="Hapus item">×</button>`
+                        ? (item.pending_deletion
+                            ? `<span class="sr-pending-delete" title="Menunggu persetujuan owner">Menunggu owner</span>`
+                            : `<button type="button" class="sr-delete-btn sr-item-delete" data-delete-line="${esc(item.line_id)}" data-order-code="${esc(order.code)}" title="Hapus item">×</button>`)
                         : '';
                     const qtyControl = canEditQty && item.line_id
                         ? `<div class="sr-qty-cell">
@@ -1799,7 +1820,9 @@
                 : '<div class="sr-empty">Belum ada item untuk order ini.</div>';
 
             const deleteOrderButton = canDelete
-                ? `<button type="button" class="sr-delete-btn sr-order-delete" data-delete-order="${esc(order.code)}" title="Hapus order dan itemnya">×</button>`
+                ? (order.pending_deletion
+                    ? `<span class="sr-pending-delete" title="Menunggu persetujuan owner">Menunggu owner</span>`
+                    : `<button type="button" class="sr-delete-btn sr-order-delete" data-delete-order="${esc(order.code)}" title="Hapus order dan itemnya">×</button>`)
                 : '';
             const duplicateBadge = Number(order.duplicateCount || 0) > 0
                 ? `<span class="sr-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>`
@@ -1844,8 +1867,13 @@
                 if (!orderCode || !confirm(`Hapus order ${orderCode} beserta semua itemnya?`)) return;
 
                 this.disabled = true;
-                deleteOrderScan(orderCode)
-                    .then(() => {
+                    deleteOrderScan(orderCode)
+                    .then(payload => {
+                        if (payload.status === 'pending') {
+                            toast('ok', payload.message || 'Menunggu persetujuan owner.');
+                            window.location.reload();
+                            return;
+                        }
                         state.orders = state.orders.filter(order => order.code !== orderCode);
                         for (let i = lastScanStack.length - 1; i >= 0; i--) {
                             if (lastScanStack[i].orderCode === orderCode) lastScanStack.splice(i, 1);
@@ -1878,7 +1906,12 @@
 
                 this.disabled = true;
                 deleteLine(lineId)
-                    .then(() => {
+                    .then(payload => {
+                        if (payload.status === 'pending') {
+                            toast('ok', payload.message || 'Menunggu persetujuan owner.');
+                            window.location.reload();
+                            return;
+                        }
                         for (let i = lastScanStack.length - 1; i >= 0; i--) {
                             if (String(lastScanStack[i].lineId || '') === String(lineId)) lastScanStack.splice(i, 1);
                         }
@@ -2410,7 +2443,12 @@
 
             if (!lineIds.length) {
                 deleteOrderScan(order.code)
-                    .then(() => {
+                    .then(payload => {
+                        if (payload.status === 'pending') {
+                            toast('ok', payload.message || 'Menunggu persetujuan owner.');
+                            window.location.reload();
+                            return;
+                        }
                         state.orders = state.orders.filter(row => row.code !== order.code);
                         state.current = null;
                         state.expanded = null;
@@ -2432,8 +2470,19 @@
                         return;
                     }
 
+                    if (results.some(row => row && row.status === 'pending')) {
+                        toast('ok', 'Permintaan hapus item dikirim. Menunggu persetujuan owner.');
+                        window.location.reload();
+                        return;
+                    }
+
                     deleteOrderScan(order.code)
-                        .then(() => {
+                        .then(payload => {
+                            if (payload.status === 'pending') {
+                                toast('ok', payload.message || 'Menunggu persetujuan owner.');
+                                window.location.reload();
+                                return;
+                            }
                             state.orders = state.orders.filter(row => row.code !== order.code);
                             state.current = null;
                             state.expanded = null;
@@ -2496,7 +2545,12 @@
             : deleteLine(last.lineId);
 
         request
-            .then(() => {
+            .then(payload => {
+                if (payload.status === 'pending') {
+                    toast('ok', payload.message || 'Menunggu persetujuan owner.');
+                    window.location.reload();
+                    return;
+                }
                 setItemLocalQty(last.orderCode, last.lineId, nextUiQty, last.code);
 
                 playTone('undo');
@@ -2529,11 +2583,13 @@
 
     initialOrders.forEach(order => {
         ensureOrder(order.code, {
+            id: order.id,
             label: order.label || 'Pencatatan order',
             platformKey: order.platformKey,
             platformLabel: order.platformLabel,
             storeId: order.storeId,
             storeLabel: order.storeLabel,
+            pending_deletion: order.pending_deletion,
             items: order.items || [],
         });
     });
