@@ -8,6 +8,16 @@ return [
     // Selisih pembulatan nominal purchasing maksimal yang dianggap lunas.
     'purchase_payment_tolerance' => 1.00,
 
+    // Payroll memakai transaksi yang sama dengan ledger lama; tanpa saldo awal otomatis.
+    'standalone_dual_posting_payroll_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_PAYROLL_ENABLED', true),
+
+    // Pencairan/cicilan pinjaman serta penarikan tabungan karyawan di luar payroll.
+    'standalone_dual_posting_employee_balances_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_EMPLOYEE_BALANCES_ENABLED', true),
+
+    // Supplier loan siap di-mirror setelah mapping akun disetujui. Sengaja OFF.
+    'standalone_dual_posting_supplier_loans_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_SUPPLIER_LOANS_ENABLED', false),
+    'standalone_payroll_wip_accounts' => ['cutting' => '1-151-01', 'sewing' => '1-151-02'],
+
     // Mirror pembayaran purchasing ke Akuntansi Baru selama masa trial.
     'standalone_dual_posting_enabled' => env('ACCOUNTING_STANDALONE_DUAL_POSTING_ENABLED', true),
     'standalone_dual_posting_types' => ['dp', 'payment', 'dp_apply'],

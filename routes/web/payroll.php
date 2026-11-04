@@ -6,6 +6,7 @@ use App\Http\Controllers\Payroll\PieceRateController;
 use App\Http\Controllers\Payroll\PieceworkPayrollController;
 
 Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
+    Route::redirect('payroll', '/payroll/dashboard')->name('payroll.index');
 
     /*
     |--------------------------------------------------------------------------
@@ -69,7 +70,7 @@ Route::middleware(['web', 'auth', 'access:payroll'])->group(function () {
             Route::get('/{period}/slip-all', [PieceworkPayrollController::class, 'slipAll'])
                 ->name('slip_all');
 
-            // FINALIZE → Dr HPP / Cr Hutang
+            // FINALIZE → rekonsiliasi selisih WIP / Hutang
             Route::post('/{period}/finalize', [PieceworkPayrollController::class, 'finalize'])
                 ->name('finalize');
 

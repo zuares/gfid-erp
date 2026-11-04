@@ -869,6 +869,8 @@
             <div class="alert alert-danger">{{ session('error') }}</div>
         @endif
 
+        @include('payroll.piecework.partials.standalone-accounting')
+
         <div class="pw-grid">
             {{-- LEFT: Summary + Actions --}}
             <div class="pw-card">
@@ -885,7 +887,7 @@
                                 action="{{ $moduleRoute('finalize', ['period' => $period]) }}">
                                 @csrf
                                 <button class="pw-btn primary" type="submit"
-                                    onclick="return confirm('Finalkan periode ini? Ini akan mencatat: Dr HPP (5101) / Cr Hutang Upah Borongan (2102).')">
+                                    onclick="return confirm('{{ $module === 'daily' ? 'Finalkan periode ini? Beban gaji operasional dan hutang upah akan dicatat.' : 'Finalkan periode ini? Upah produksi akan direkonsiliasi dan hanya selisih WIP serta hutang upah yang dicatat.' }}')">
                                     FINALIZE
                                 </button>
                             </form>

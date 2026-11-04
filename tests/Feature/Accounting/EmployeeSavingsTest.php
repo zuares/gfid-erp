@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Employee;
 use App\Models\EmployeeSavingsTransaction;
 use App\Models\Journal;
+use App\Models\StandaloneAccountingAccountMapping;
 use App\Models\User;
 use App\Services\Accounting\EmployeeSavingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -130,6 +131,9 @@ class EmployeeSavingsTest extends TestCase
         $bank = Account::create([
             'code' => '1198', 'name' => 'Bank Tabungan Test', 'type' => 'asset',
             'is_cash' => true, 'is_active' => true,
+        ]);
+        StandaloneAccountingAccountMapping::updateOrCreate(['legacy_account_code' => $bank->code], [
+            'standalone_account_code' => '1-120', 'purpose' => 'Kas fixture tabungan karyawan', 'is_active' => true,
         ]);
 
         return [$employee, $savings, $bank];

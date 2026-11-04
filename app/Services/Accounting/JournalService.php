@@ -18,6 +18,8 @@ class JournalService
 {
     public function __construct(
         protected StandalonePurchasePaymentPostingService $standalonePurchasePaymentPostingService,
+        protected StandaloneEmployeeBalancePostingService $standaloneEmployeeBalancePostingService,
+        protected StandaloneSupplierLoanPostingService $standaloneSupplierLoanPostingService,
     ) {}
 
     // ====== COA CODES ======
@@ -150,6 +152,10 @@ class JournalService
 
     public const SRC_EMPLOYEE_LOAN_REPAYMENT = 'employee_loan_repayment';
 
+    public const SRC_EMPLOYEE_LOAN_RECEIVABLE_RECLASS = 'employee_loan_receivable_reclass';
+
+    public const SRC_PAYROLL_OVERPAYMENT_RECOVERY = 'payroll_overpayment_recovery';
+
     public const SRC_EMPLOYEE_SAVINGS_PAYMENT = 'employee_savings_payment';
 
     // public const SRC_PO_EXPENSE_APPROVE = 'purchase_order_expense_approve';
@@ -227,6 +233,8 @@ class JournalService
                     ->first();
 
                 if ($existing) {
+                    $this->mirrorStandaloneSupplierLoan($sourceType, $sourceId);
+
                     return $existing;
                 }
             }
@@ -258,6 +266,8 @@ class JournalService
                     'credit' => (float) ($line['credit'] ?? 0),
                 ];
             }, $lines));
+
+            $this->mirrorStandaloneSupplierLoan($sourceType, $sourceId);
 
             return $journal;
         });
@@ -304,6 +314,12 @@ class JournalService
                 );
             }
 
+            $this->standaloneEmployeeBalancePostingService->voidLegacyJournal($journal);
+
+            $this->standaloneSupplierLoanPostingService->voidLegacyJournal($journal);
+
+            app(StandalonePayrollPostingService::class)->voidLegacyJournal($journal);
+
             // 2) Deskripsi reversal
             $revDesc = trim(
                 'Reversal: '.($journal->description ?? '-').
@@ -332,6 +348,15 @@ class JournalService
 
             return $rev;
         });
+    }
+
+    private function mirrorStandaloneSupplierLoan(string $sourceType, ?int $sourceId): void
+    {
+        if ($sourceId === null || ! $this->standaloneSupplierLoanPostingService->supportsSourceType($sourceType)) {
+            return;
+        }
+
+        $this->standaloneSupplierLoanPostingService->syncLegacyJournal($sourceType, $sourceId);
     }
 
     /**

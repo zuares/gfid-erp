@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Employee;
 use App\Models\EmployeeLoan;
 use App\Models\EmployeeLoanRepayment;
+use App\Models\StandaloneAccountingAccountMapping;
 use App\Models\User;
 use App\Services\Accounting\EmployeeLoanService;
 use App\Services\Accounting\JournalService;
@@ -24,6 +25,9 @@ class EmployeeLoanTest extends TestCase
             'payment_type' => 'fixed', 'active' => true,
         ]);
         $bank = Account::create(['code' => '1199', 'name' => 'Bank Pinjaman Test', 'type' => 'asset', 'is_cash' => true, 'is_active' => true]);
+        StandaloneAccountingAccountMapping::updateOrCreate(['legacy_account_code' => $bank->code], [
+            'standalone_account_code' => '1-120', 'purpose' => 'Kas fixture pinjaman karyawan', 'is_active' => true,
+        ]);
         $receivable = Account::firstOrCreate(['code' => JournalService::CODE_EMPLOYEE_LOAN], ['name' => 'Piutang Pinjaman Karyawan', 'type' => 'asset', 'is_cash' => false, 'is_active' => true]);
 
         $loan = EmployeeLoan::create([

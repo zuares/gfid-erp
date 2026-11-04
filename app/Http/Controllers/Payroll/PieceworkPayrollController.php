@@ -58,6 +58,7 @@ class PieceworkPayrollController extends Controller
     {
         if ($module === 'daily') {
             unset($parameters['module']);
+
             return route("payroll.daily.{$action}", $parameters);
         }
 
@@ -80,11 +81,11 @@ class PieceworkPayrollController extends Controller
             ? (string) $request->input('to')
             : '';
 
-        if (!in_array($module, $allowedModules, true)) {
+        if (! in_array($module, $allowedModules, true)) {
             $module = 'all';
         }
 
-        if (!in_array($status, $allowedStatuses, true)) {
+        if (! in_array($status, $allowedStatuses, true)) {
             $status = 'draft';
         }
 
@@ -294,8 +295,8 @@ class PieceworkPayrollController extends Controller
         }
 
         $message = $existing
-        ? "Payroll {$cfg['label']} periode " . id_date($period->period_start) . " s/d " . id_date($period->period_end) . " berhasil di-UPDATE (regenerate)."
-        : "Payroll {$cfg['label']} berhasil digenerate untuk periode " . id_date($period->period_start) . " s/d " . id_date($period->period_end) . ".";
+        ? "Payroll {$cfg['label']} periode ".id_date($period->period_start).' s/d '.id_date($period->period_end).' berhasil di-UPDATE (regenerate).'
+        : "Payroll {$cfg['label']} berhasil digenerate untuk periode ".id_date($period->period_start).' s/d '.id_date($period->period_end).'.';
 
         if ($returnToOverview) {
             return redirect()
@@ -435,6 +436,7 @@ class PieceworkPayrollController extends Controller
             'employeeLoansByEmployee' => $employeeLoansByEmployee,
             'attendanceBonuses' => $attendanceBonuses,
             'allowSlipAll' => (bool) $cfg['allow_slip_all'],
+            'standalonePayroll' => app(\App\Services\Accounting\StandalonePayrollPostingService::class)->status($period),
         ]);
     }
 
@@ -712,7 +714,7 @@ class PieceworkPayrollController extends Controller
     }
 
     /**
-     * FINALIZE: Dr HPP (borongan) atau Beban Operasional (harian), Cr Hutang.
+     * FINALIZE: rekonsiliasi WIP (borongan) atau Beban Operasional (harian) dan Hutang.
      */
     public function finalize(string $module, PieceworkPayrollPeriod $period, PieceworkPayrollPostingService $svc): RedirectResponse
     {
@@ -729,7 +731,7 @@ class PieceworkPayrollController extends Controller
             $svc->finalize($period);
             $finalizeMessage = $cfg['module'] === 'daily'
                 ? 'Biaya Operasional + Hutang dicatat'
-                : 'HPP + Hutang dicatat';
+                : 'Selisih WIP + Hutang direkonsiliasi';
 
             return redirect()
                 ->to($this->moduleRoute($cfg['module'], 'show', ['period' => $period]))
@@ -851,6 +853,6 @@ class PieceworkPayrollController extends Controller
 
         return redirect()
             ->route('payroll.piecework.overview', ['module' => $cfg['module']])
-            ->with('status', "Payroll {$cfg['label']} periode " . id_date($period->period_start) . ' s/d ' . id_date($period->period_end) . ' berhasil dihapus.');
+            ->with('status', "Payroll {$cfg['label']} periode ".id_date($period->period_start).' s/d '.id_date($period->period_end).' berhasil dihapus.');
     }
 }

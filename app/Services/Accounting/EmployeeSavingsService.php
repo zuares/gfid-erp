@@ -9,7 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class EmployeeSavingsService
 {
-    public function __construct(private JournalService $journals) {}
+    public function __construct(
+        private JournalService $journals,
+        private StandaloneEmployeeBalancePostingService $standalone,
+    ) {}
 
     public function post(EmployeeSavingsTransaction $transaction): EmployeeSavingsTransaction
     {
@@ -75,6 +78,7 @@ class EmployeeSavingsService
             );
 
             $locked->update(['status' => 'posted', 'journal_id' => $journal->id]);
+            $this->standalone->syncSavingsPayment($locked);
 
             return $locked->fresh(['employee', 'cashAccount', 'journal']);
         });

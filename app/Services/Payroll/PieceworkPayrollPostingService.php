@@ -9,14 +9,15 @@ use App\Models\EmployeeSavingsTransaction;
 use App\Models\Journal;
 use App\Models\PieceworkPayrollPeriod;
 use App\Services\Accounting\JournalService;
-use App\Services\Payroll\DailyAttendanceBonusCalculator;
+use App\Services\Accounting\StandalonePayrollPostingService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class PieceworkPayrollPostingService
 {
     public function __construct(
-        protected JournalService $journalService
+        protected JournalService $journalService,
+        protected StandalonePayrollPostingService $standalonePayroll,
     ) {}
 
     /**
@@ -62,6 +63,8 @@ class PieceworkPayrollPostingService
                     $period->forceFill($updates)->save();
                 }
 
+                $this->standalonePayroll->sync($period);
+
                 return $period->fresh();
             }
 
@@ -81,24 +84,21 @@ class PieceworkPayrollPostingService
                 }
             }
 
-            $sourceTypes = match ((string) $period->module) {
-                'cutting' => [JournalService::SRC_CUTTING_JOB_WAGE, JournalService::SRC_CUTTING_WIP],
-                'sewing' => [JournalService::SRC_SEWING_PICKUP_WAGE, JournalService::SRC_SEWING_RETURN_OK, JournalService::SRC_SEWING_REWORK_OK],
-                default => [],
-            };
+            $sourceTypes = StandalonePayrollPostingService::productionSources((string) $period->module);
 
             $alreadyAccrued = empty($sourceTypes) ? 0.0 : (float) DB::table('journal_lines as jl')
                 ->join('journals as j', 'j.id', '=', 'jl.journal_id')
                 ->whereNull('j.voided_at')
                 ->whereIn('j.source_type', $sourceTypes)
-                ->whereBetween('j.date', [$period->period_start, $period->period_end])
+                ->whereDate('j.date', '>=', $period->period_start->toDateString())
+                ->whereDate('j.date', '<=', $period->period_end->toDateString())
                 ->where('jl.account_id', $payable->id)
                 ->sum('jl.credit');
 
             $difference = round($total - $alreadyAccrued, 2);
             $journal = null;
 
-            if (abs($difference) > 0.01) {
+            if (abs($difference) >= 0.01) {
                 $debitAccount = $period->module === 'daily'
                     ? Account::where('code', JournalService::CODE_EXP_DAILY_PAYROLL)
                         ->where('type', 'expense')
@@ -136,6 +136,8 @@ class PieceworkPayrollPostingService
                 'payable_account_id' => $payable->id,
                 'accrual_journal_id' => $journal?->id ?: $activeAccrual?->id,
             ])->save();
+
+            $this->standalonePayroll->sync($period, requireReconciled: true);
 
             return $period;
         });
@@ -269,8 +271,7 @@ class PieceworkPayrollPostingService
         int $paidFromAccountId,
         array $loanDeductions = [],
         array $attendanceBonusDestinations = [],
-    ): PieceworkPayrollPeriod
-    {
+    ): PieceworkPayrollPeriod {
         return DB::transaction(function () use ($period, $paidFromAccountId, $loanDeductions, $attendanceBonusDestinations) {
             // Satu lock per payroll period menjadi guard utama terhadap double
             // submit dari dua request yang datang hampir bersamaan.
@@ -313,6 +314,8 @@ class PieceworkPayrollPostingService
                     'paid_at' => $period->paid_at ?: ($existingPayment->posted_at ?: now()),
                     'total_amount' => $period->total_amount ?: $paidAmount,
                 ])->save();
+
+                $this->standalonePayroll->sync($period);
 
                 return $period->fresh();
             }
@@ -527,6 +530,8 @@ class PieceworkPayrollPostingService
                 'payment_journal_id' => $journal->id,
                 'total_amount' => $total,
             ])->save();
+
+            $this->standalonePayroll->sync($period, requireReconciled: true);
 
             return $period->fresh();
         });

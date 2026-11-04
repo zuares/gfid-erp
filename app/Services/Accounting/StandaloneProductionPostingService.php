@@ -796,6 +796,39 @@ class StandaloneProductionPostingService
         });
     }
 
+    /** Read-only preparation of production wages required by payroll reconciliation. */
+    public function preparePayrollSource(Journal $journal): array
+    {
+        if (! in_array($journal->source_type, [self::SOURCE_CUTTING_WAGE, self::SOURCE_CUTTING_WIP,
+            self::SOURCE_SEWING_PICKUP_WAGE, self::SOURCE_SEWING_RETURN_OK, self::SOURCE_SEWING_REWORK_OK], true)
+            || $journal->voided_at || ! $journal->posted_at || ! $journal->source_id) {
+            throw ValidationException::withMessages(['standalone_accounting' => "Sumber upah produksi #{$journal->id} tidak valid."]);
+        }
+        $journal->loadMissing('lines.account');
+        $lines = $this->mapLegacyLines($journal);
+        $existing = StandaloneAccountingJournal::query()
+            ->where('source_id', $journal->source_id)
+            ->where(fn ($q) => $q->where('source_type', $journal->source_type)
+                ->orWhere('source_type', 'like', $journal->source_type.'_repost_%'))
+            ->whereNull('voided_at')->with('lines')->get();
+        if ($existing->count() > 1) {
+            throw ValidationException::withMessages(['standalone_accounting' => "Mirror produksi #{$journal->id} ganda."]);
+        }
+
+        return ['legacy' => $journal, 'lines' => $lines, 'existing' => $existing->first(), 'production' => true];
+    }
+
+    /** Payroll may backfill its wage dependencies even when a production pilot is disabled. */
+    public function mirrorPayrollSource(Journal $journal): StandaloneAccountingJournal
+    {
+        return DB::transaction(function () use ($journal) {
+            $journal = Journal::whereKey($journal->id)->lockForUpdate()->firstOrFail();
+            $this->preparePayrollSource($journal);
+
+            return $this->mirrorLegacyJournal($journal);
+        });
+    }
+
     private function mirrorLegacyJournal(Journal $legacyJournal): StandaloneAccountingJournal
     {
         $baseSourceType = (string) $legacyJournal->source_type;

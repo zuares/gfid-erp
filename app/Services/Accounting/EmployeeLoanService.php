@@ -10,7 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class EmployeeLoanService
 {
-    public function __construct(private JournalService $journals) {}
+    public function __construct(
+        private JournalService $journals,
+        private StandaloneEmployeeBalancePostingService $standalone,
+    ) {}
 
     public function post(EmployeeLoan $loan): EmployeeLoan
     {
@@ -38,6 +41,7 @@ class EmployeeLoanService
             );
 
             $locked->update(['status' => 'posted', 'journal_id' => $journal->id]);
+            $this->standalone->syncLoan($locked);
 
             return $locked->fresh();
         });
@@ -110,6 +114,7 @@ class EmployeeLoanService
             );
 
             $locked->update(['status' => 'posted', 'journal_id' => $journal->id]);
+            $this->standalone->syncRepayment($locked);
             if ($paid + $amount >= (float) $locked->employeeLoan->principal_amount - 0.01) {
                 $locked->employeeLoan->update(['status' => 'settled']);
             }

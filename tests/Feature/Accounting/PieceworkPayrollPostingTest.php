@@ -278,6 +278,10 @@ class PieceworkPayrollPostingTest extends TestCase
             'is_cash' => true,
             'is_active' => true,
         ]);
+        \App\Models\StandaloneAccountingAccountMapping::create([
+            'legacy_account_code' => '1102', 'standalone_account_code' => '1-110',
+            'purpose' => 'Bank fixture payroll', 'is_active' => true,
+        ]);
         $employee = Employee::create([
             'code' => 'EMP-DAILY-BONUS-TEST',
             'name' => 'Payroll Bonus Test',
@@ -322,6 +326,13 @@ class PieceworkPayrollPostingTest extends TestCase
             ->where('source_id', $period->id)
             ->firstOrFail();
         $this->assertSame(660000.0, (float) $period->fresh()->total_amount);
+        $mirror = \App\Models\StandaloneAccountingJournal::where('reference', 'SA-PAYROLL-J'.$payment->id)->firstOrFail();
+        $this->assertDatabaseHas('standalone_accounting_journal_lines', [
+            'journal_id' => $mirror->id,
+            'account_id' => \App\Models\StandaloneAccountingAccount::where('code', '2-140')->value('id'),
+            'credit' => 60000,
+        ]);
+
         $this->assertDatabaseHas('journal_lines', [
             'journal_id' => $payment->id,
             'account_id' => $bank->id,
