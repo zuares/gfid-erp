@@ -49,7 +49,7 @@
     .item-detail-table td { padding:.55rem .85rem; border-top:1px solid rgba(148,163,184,.12); border-bottom:0; vertical-align:middle; font-size:.78rem; }
     .item-detail-table tbody tr:hover { background:#f8fafc; }
     .item-detail-empty { padding:18px; color:#94a3b8; text-align:center; font-size:.78rem; }
-    .item-bom-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0; }
+    .item-bom-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:12px 0; }
     .item-bom-summary-card { padding:10px 12px; border:1px solid #dbeafe; border-radius:12px; background:#eff6ff; }
     .item-bom-summary-label { color:#64748b; font-size:.64rem; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
     .item-bom-summary-value { margin-top:3px; color:#0f172a; font-size:.92rem; font-weight:900; }
@@ -151,21 +151,27 @@
                                 <div class="item-bom-summary-note">{{ $bomEstimate['required_line_count'] }} wajib · {{ $bomEstimate['optional_line_count'] }} opsional</div>
                             </div>
                             <div class="item-bom-summary-card">
+                                <div class="item-bom-summary-label">Upah produksi</div>
+                                <div class="item-bom-summary-value">Rp {{ number_format($bomEstimate['production_wage_total'], 0, ',', '.') }}</div>
+                                <div class="item-bom-summary-note">{{ $bomEstimate['production_wage']['available'] ? 'Cutting + sewing + finishing' : 'Belum ada snapshot payroll aktif' }}</div>
+                            </div>
+                            <div class="item-bom-summary-card">
                                 <div class="item-bom-summary-label">Basis perhitungan</div>
-                                <div class="item-bom-summary-value">Qty + scrap</div>
+                                <div class="item-bom-summary-value">Material + upah</div>
                                 <div class="item-bom-summary-note">Optional termahal masuk total</div>
                             </div>
                         </div>
                         @if(!empty($bomEstimate['components']))
                             <div class="table-responsive">
                                 <table class="table item-bom-component-table align-middle">
-                                    <thead><tr><th>Komponen</th><th class="text-end">Qty efektif</th><th class="text-end">HPP/unit</th><th class="text-end">Estimasi</th><th>Status</th></tr></thead>
+                                    <thead><tr><th>Komponen</th><th class="text-end">Qty efektif</th><th class="text-end">Harga / stok</th><th class="text-end">Harga / beli</th><th class="text-end">Biaya</th><th>Status</th></tr></thead>
                                     <tbody>
                                         @foreach($bomEstimate['components'] as $component)
                                             <tr>
                                                 <td><strong class="font-monospace">{{ $component['code'] ?: '-' }}</strong><div class="item-detail-note">{{ $component['name'] ?: 'Komponen' }}</div></td>
                                                 <td class="text-end font-monospace">{{ decimal_id($component['qty_with_scrap'], 8) }} {{ $component['uom'] }}</td>
-                                                <td class="text-end">{{ $component['unit_cost'] > 0 ? 'Rp '.number_format($component['unit_cost'], 0, ',', '.') : '-' }}</td>
+                                                <td class="text-end">{{ $component['unit_cost'] > 0 ? 'Rp '.number_format($component['unit_cost'], 0, ',', '.') : '-' }}<div class="item-detail-note">/{{ $component['stock_unit'] }}</div></td>
+                                                <td class="text-end">{{ $component['purchase_unit_cost'] > 0 ? 'Rp '.number_format($component['purchase_unit_cost'], 0, ',', '.') : '-' }}<div class="item-detail-note">/{{ $component['purchase_unit'] }}</div></td>
                                                 <td class="text-end fw-bold">{{ $component['estimated_cost'] > 0 ? 'Rp '.number_format($component['estimated_cost'], 0, ',', '.') : '-' }}</td>
                                                 <td>
                                                     @if($component['is_optional'] && $component['included_in_estimate'])

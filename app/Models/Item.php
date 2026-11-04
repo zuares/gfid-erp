@@ -460,6 +460,7 @@ class Item extends Model
                 'pr.date as grn_date',
                 'prl.unit_price',
                 'prl.conversion_factor',
+                'prl.purchase_unit',
             ])
             ->first();
 
@@ -467,7 +468,28 @@ class Item extends Model
             return null;
         }
 
-        $factor = max(0.000001, (float) ($row->conversion_factor ?: 1));
+        $masterFactor = $this->purchaseConversionFactor();
+        $factor = (float) ($row->conversion_factor ?? 0);
+
+        // GRN lama bisa belum menyimpan conversion_factor. Jika kosong,
+        // gunakan konversi master item agar harga pembelian per pack tidak
+        // terbaca sebagai harga satu pcs di BOM/HPP.
+        if ($factor <= 0) {
+            $factor = $masterFactor;
+        }
+
+        // Sebagian GRN legacy menyimpan satuan pembelian sebagai "Pcs"
+        // walaupun master item sudah ditetapkan "Pack". Untuk HPP material,
+        // master item menjadi sumber konversi yang benar pada kondisi ini.
+        $linePurchaseUnit = trim((string) ($row->purchase_unit ?? ''));
+        if ($masterFactor > 1
+            && $linePurchaseUnit !== ''
+            && strcasecmp($linePurchaseUnit, $this->purchaseUnit()) !== 0
+            && $factor <= 1
+        ) {
+            $factor = $masterFactor;
+        }
+        $factor = max(0.000001, $factor);
         $row->stock_unit_price = round((float) $row->unit_price / $factor, 2);
 
         return $row;

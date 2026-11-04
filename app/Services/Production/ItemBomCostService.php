@@ -3,6 +3,7 @@
 namespace App\Services\Production;
 
 use App\Models\ItemBom;
+use App\Models\ItemCostSnapshot;
 
 class ItemBomCostService
 {
@@ -21,6 +22,8 @@ class ItemBomCostService
         $components = $bom->lines->map(function ($line) use ($includeOptional): array {
             $material = $line->material;
             $included = $includeOptional || ! $line->is_optional;
+            $unitCost = $line->componentUnitCost();
+            $purchaseFactor = $material?->purchaseConversionFactor() ?? 1.0;
             $estimatedCost = $line->estimatedCost();
 
             return [
@@ -34,7 +37,11 @@ class ItemBomCostService
                 'scrap_pct' => (float) ($line->scrap_pct ?? 0),
                 'is_optional' => (bool) $line->is_optional,
                 'included_in_estimate' => $included,
-                'unit_cost' => $line->componentUnitCost(),
+                'stock_unit' => (string) ($material?->stockUnit() ?? $line->uom ?? 'pcs'),
+                'purchase_unit' => (string) ($material?->purchaseUnit() ?? $material?->stockUnit() ?? $line->uom ?? 'pcs'),
+                'purchase_conversion_factor' => $purchaseFactor,
+                'unit_cost' => $unitCost,
+                'purchase_unit_cost' => round($unitCost * $purchaseFactor, 2),
                 'estimated_cost' => $estimatedCost,
             ];
         })->values();
@@ -67,6 +74,8 @@ class ItemBomCostService
         $includedComponents = $components->filter(
             fn (array $component): bool => $component['included_in_estimate']
         );
+        $materialTotal = round((float) $includedComponents->sum('estimated_cost'), 2);
+        $productionWage = $this->getProductionWage((int) $bom->item_id);
 
         return [
             'bom_id' => (int) $bom->id,
@@ -80,8 +89,47 @@ class ItemBomCostService
             'include_optional' => $includeOptional,
             'included_optional_line_count' => $includedComponents->where('is_optional', true)->count(),
             'selected_optional_line_id' => $selectedOptionalLineId,
-            'total' => round((float) $includedComponents->sum('estimated_cost'), 2),
+            'material_total' => $materialTotal,
+            'production_wage' => $productionWage,
+            'production_wage_total' => $productionWage['total'],
+            'total' => round($materialTotal + $productionWage['total'], 2),
             'components' => $components->all(),
+        ];
+    }
+
+    /**
+     * Ambil upah produksi per pcs dari snapshot HPP produksi aktif.
+     * Snapshot ini berasal dari payroll cutting, sewing, dan finishing.
+     *
+     * @return array{cutting: float, sewing: float, finishing: float, total: float, available: bool, snapshot_id: int|null}
+     */
+    private function getProductionWage(int $itemId): array
+    {
+        $snapshot = ItemCostSnapshot::query()
+            ->where('item_id', $itemId)
+            ->whereNull('warehouse_id')
+            ->where('is_active', true)
+            ->whereIn('reference_type', ['production_cost_period', 'auto_hpp_period'])
+            ->orderByDesc('snapshot_date')
+            ->orderByDesc('id')
+            ->first([
+                'id',
+                'cutting_unit_cost',
+                'sewing_unit_cost',
+                'finishing_unit_cost',
+            ]);
+
+        $cutting = round((float) ($snapshot?->cutting_unit_cost ?? 0), 4);
+        $sewing = round((float) ($snapshot?->sewing_unit_cost ?? 0), 4);
+        $finishing = round((float) ($snapshot?->finishing_unit_cost ?? 0), 4);
+
+        return [
+            'cutting' => $cutting,
+            'sewing' => $sewing,
+            'finishing' => $finishing,
+            'total' => round($cutting + $sewing + $finishing, 2),
+            'available' => $snapshot !== null,
+            'snapshot_id' => $snapshot?->id ? (int) $snapshot->id : null,
         ];
     }
 

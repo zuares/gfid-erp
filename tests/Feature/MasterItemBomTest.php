@@ -71,6 +71,9 @@ class MasterItemBomTest extends TestCase
         $searchResponse->assertOk()->assertJsonFragment([
             'id' => $accessory->id,
             'text' => 'ZIP-BOM-001 — Resleting Accessories Test',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pcs',
+            'purchase_conversion_factor' => 1,
         ]);
 
         $response = $this->actingAs($this->owner)->post(route('master.item_boms.store'), [

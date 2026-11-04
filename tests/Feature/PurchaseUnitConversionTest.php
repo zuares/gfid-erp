@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Item;
+use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReceiptLine;
 use App\Models\Supplier;
 use App\Services\Purchasing\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -114,5 +116,44 @@ class PurchaseUnitConversionTest extends TestCase
         $this->assertSame('pcs', $line->stock_unit);
         $this->assertEqualsWithDelta(1, (float) $line->conversion_factor, 0.000001);
         $this->assertEqualsWithDelta(3000, (float) $po->subtotal, 0.01);
+    }
+
+    public function test_latest_grn_price_uses_item_conversion_when_legacy_line_unit_differs_from_master(): void
+    {
+        $supplier = Supplier::create(['code' => 'LEGACY-GRN-SUP', 'name' => 'Legacy GRN supplier']);
+        $item = Item::create([
+            'code' => 'OPP-LEGACY-UNIT',
+            'name' => 'Plastik OPP legacy',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pack',
+            'purchase_conversion_factor' => 500,
+            'type' => 'material',
+        ]);
+
+        $receipt = PurchaseReceipt::create([
+            'code' => 'GRN-LEGACY-UNIT',
+            'date' => now()->toDateString(),
+            'supplier_id' => $supplier->id,
+            'subtotal' => 100000,
+            'grand_total' => 100000,
+            'status' => 'posted',
+        ]);
+
+        PurchaseReceiptLine::create([
+            'purchase_receipt_id' => $receipt->id,
+            'item_id' => $item->id,
+            'qty_received' => 1,
+            'unit_price' => 100000,
+            'line_total' => 100000,
+            'purchase_unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'conversion_factor' => 1,
+        ]);
+
+        $purchase = $item->latestPostedGrnPurchase();
+
+        $this->assertNotNull($purchase);
+        $this->assertEqualsWithDelta(200, $purchase->stock_unit_price, 0.000001);
     }
 }

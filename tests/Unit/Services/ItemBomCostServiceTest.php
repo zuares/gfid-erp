@@ -5,6 +5,7 @@ namespace Tests\Unit\Services;
 use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
+use App\Models\ItemCostSnapshot;
 use App\Services\Production\ItemBomCostService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -30,6 +31,9 @@ class ItemBomCostServiceTest extends TestCase
             'code' => 'MAT-COST-001',
             'name' => 'Material Cost Test',
             'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pack',
+            'purchase_conversion_factor' => 5,
             'type' => 'material',
             'hpp' => 20000,
             'base_unit_cost' => 20000,
@@ -60,6 +64,9 @@ class ItemBomCostServiceTest extends TestCase
         $this->assertSame(1, $estimate['line_count']);
         $this->assertEqualsWithDelta(5.5, $estimate['components'][0]['qty_with_scrap'], 0.000001);
         $this->assertEqualsWithDelta(20000, $estimate['components'][0]['unit_cost'], 0.000001);
+        $this->assertSame('pcs', $estimate['components'][0]['stock_unit']);
+        $this->assertSame('pack', $estimate['components'][0]['purchase_unit']);
+        $this->assertEqualsWithDelta(100000, $estimate['components'][0]['purchase_unit_cost'], 0.000001);
         $this->assertEqualsWithDelta(110000, $estimate['total'], 0.000001);
         $this->assertEqualsWithDelta(11, $bom->lines()->first()->requiredQty(2), 0.000001);
     }
@@ -140,5 +147,72 @@ class ItemBomCostServiceTest extends TestCase
         $this->assertFalse($components[$cheaperLine->id]['included_in_estimate']);
         $this->assertTrue($components[$expensiveLine->id]['included_in_estimate']);
         $this->assertEqualsWithDelta(66000, $service->total($bom, true), 0.000001);
+    }
+
+    public function test_active_production_wage_snapshot_is_added_to_bom_cost(): void
+    {
+        $bundle = Item::create([
+            'code' => 'BUNDLE-COST-WAGE-001',
+            'name' => 'Bundle Wage Cost Test',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'default_allocation' => 'hpp',
+            'can_make' => true,
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+
+        $material = Item::create([
+            'code' => 'MAT-COST-WAGE-001',
+            'name' => 'Material Wage Cost Test',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'hpp' => 10000,
+            'base_unit_cost' => 10000,
+            'default_allocation' => 'hpp',
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+
+        $bom = ItemBom::create([
+            'item_id' => $bundle->id,
+            'name' => 'BOM Wage Cost Test',
+            'active' => true,
+        ]);
+
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
+            'qty' => '2',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+
+        $snapshot = ItemCostSnapshot::create([
+            'item_id' => $bundle->id,
+            'warehouse_id' => null,
+            'snapshot_date' => '2026-11-01',
+            'reference_type' => 'production_cost_period',
+            'reference_id' => 1,
+            'qty_basis' => 100,
+            'rm_unit_cost' => 20000,
+            'cutting_unit_cost' => 1000,
+            'sewing_unit_cost' => 2500,
+            'finishing_unit_cost' => 500,
+            'packaging_unit_cost' => 0,
+            'overhead_unit_cost' => 0,
+            'unit_cost' => 24000,
+            'is_active' => true,
+        ]);
+
+        $estimate = app(ItemBomCostService::class)->estimate($bom);
+
+        $this->assertEqualsWithDelta(20000, $estimate['material_total'], 0.000001);
+        $this->assertEqualsWithDelta(4000, $estimate['production_wage_total'], 0.000001);
+        $this->assertEqualsWithDelta(24000, $estimate['total'], 0.000001);
+        $this->assertSame($snapshot->id, $estimate['production_wage']['snapshot_id']);
     }
 }

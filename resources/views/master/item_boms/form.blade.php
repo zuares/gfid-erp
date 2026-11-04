@@ -71,7 +71,7 @@
 
     .bom-cost-summary {
         display: grid !important;
-        grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, .8fr)) !important;
+        grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, .8fr)) !important;
         gap: 8px !important;
         margin-top: 0 !important;
         padding: 12px !important;
@@ -246,6 +246,23 @@
     .gf-clean-table tbody tr:hover td {
         background: #f8fbff !important;
     }
+
+    .bom-price-cell {
+        min-width: 118px;
+        white-space: nowrap;
+    }
+    .bom-price-value {
+        display: block;
+        font-weight: 850;
+        color: #0f172a;
+    }
+    .bom-price-unit {
+        display: block;
+        margin-top: 2px;
+        color: #64748b;
+        font-size: .68rem;
+    }
+    body[data-theme="dark"] .bom-price-value { color: #f8fafc; }
 
     .table-bom td:nth-child(3) .inp,
     .table-bom td:nth-child(4) .inp,
@@ -437,16 +454,22 @@
         .table-bom tbody td:nth-child(1) { grid-column: 1 / -1 !important; }
         .table-bom tbody td:nth-child(1)::before { content: 'Baris'; }
         .table-bom tbody td:nth-child(2),
-        .table-bom tbody td:nth-child(8) { grid-column: 1 / -1 !important; }
+        .table-bom tbody td:nth-child(8),
+        .table-bom tbody td:nth-child(9),
+        .table-bom tbody td:nth-child(10),
+        .table-bom tbody td:nth-child(11) { grid-column: 1 / -1 !important; }
         .table-bom tbody td:nth-child(2)::before { content: 'Komponen'; }
         .table-bom tbody td:nth-child(3)::before { content: 'Kelompok'; }
         .table-bom tbody td:nth-child(4)::before { content: 'Qty'; }
         .table-bom tbody td:nth-child(5)::before { content: 'UOM'; }
         .table-bom tbody td:nth-child(6)::before { content: 'Waste'; }
         .table-bom tbody td:nth-child(7)::before { content: 'Optional'; }
-        .table-bom tbody td:nth-child(8)::before { content: ''; }
-        .table-bom tbody td:nth-child(8) { align-items: flex-end !important; }
-        .table-bom tbody td:nth-child(8) .btnx { width: auto !important; }
+        .table-bom tbody td:nth-child(8)::before { content: 'Harga / satuan stok'; }
+        .table-bom tbody td:nth-child(9)::before { content: 'Harga / satuan beli'; }
+        .table-bom tbody td:nth-child(10)::before { content: 'Biaya baris'; }
+        .table-bom tbody td:nth-child(11)::before { content: ''; }
+        .table-bom tbody td:nth-child(11) { align-items: flex-end !important; }
+        .table-bom tbody td:nth-child(11) .btnx { width: auto !important; }
 
         .usage-history-wrap { overflow: visible !important; }
         .usage-history-table { min-width: 0 !important; }
@@ -464,7 +487,10 @@
         .table-bom th:nth-child(5) { width: 10% !important; }
         .table-bom th:nth-child(6) { width: 10% !important; }
         .table-bom th:nth-child(7) { width: 10% !important; }
-        .table-bom th:nth-child(8) { width: 6% !important; }
+        .table-bom th:nth-child(8),
+        .table-bom th:nth-child(9),
+        .table-bom th:nth-child(10) { width: 10% !important; }
+        .table-bom th:nth-child(11) { width: 6% !important; }
     }
 
     .bom-form-head {
@@ -652,6 +678,13 @@
             <div class="bom-cost-summary-note">{{ $bomEstimate['required_line_count'] }} wajib · {{ $bomEstimate['optional_line_count'] }} opsional</div>
           </div>
           <div>
+            <div class="bom-cost-summary-label">Upah produksi</div>
+            <div class="bom-cost-summary-value">Rp {{ number_format($bomEstimate['production_wage_total'], 0, ',', '.') }}</div>
+            <div class="bom-cost-summary-note">
+              {{ $bomEstimate['production_wage']['available'] ? 'Cutting + sewing + finishing' : 'Belum ada snapshot payroll aktif' }}
+            </div>
+          </div>
+          <div>
             <div class="bom-cost-summary-label">Status</div>
             <div class="bom-cost-summary-value">{{ $bom->active ? 'Aktif' : 'Nonaktif' }}</div>
             <div class="bom-cost-summary-note">Tidak mengubah histori</div>
@@ -666,7 +699,7 @@
       <div class="rowx" style="justify-content:space-between;align-items:flex-start">
         <div>
           <div class="lbl" style="margin:0">Lines</div>
-          <div class="small">Qty 3 desimal · bahan baku utama di atas.</div>
+          <div class="small">Qty 3 desimal · harga stok per kg/pcs dan harga beli per pack ditampilkan per baris.</div>
         </div>
       </div>
 
@@ -737,6 +770,9 @@
       </div>
 
       <div class="table-wrap mt-3">
+        @php
+          $bomComponentsByLine = collect($bomEstimate['components'] ?? [])->keyBy('line_id');
+        @endphp
         <table class="table table-hover table-sm table-bom gf-clean-table gf-sticky-table align-middle mb-0">
           <thead>
             <tr>
@@ -747,6 +783,9 @@
               <th style="width:82px">UOM</th>
               <th style="width:92px">Waste (%)</th>
               <th style="width:88px">Optional</th>
+              <th style="width:130px">Harga / stok</th>
+              <th style="width:130px">Harga / beli</th>
+              <th style="width:130px">Biaya baris</th>
               <th style="width:76px"></th>
             </tr>
           </thead>
@@ -755,6 +794,7 @@
               @php
                 $mid = data_get($r,'material_item_id');
                 $mtext = data_get($r,'material_text');
+                $component = $bomComponentsByLine->get((int) data_get($r, 'id'));
                 $qtyRaw = data_get($r, 'qty', '');
                 $qtyDisplay = ($qtyRaw === null || $qtyRaw === '')
                     ? ''
@@ -809,6 +849,18 @@
                     <option value="0" {{ (int) data_get($r,'is_optional',0)===0 ? 'selected':'' }}>No</option>
                     <option value="1" {{ (int) data_get($r,'is_optional',0)===1 ? 'selected':'' }}>Yes</option>
                   </select>
+                </td>
+                <td class="text-end bom-price-cell line-stock-price" data-price-value="{{ (float) data_get($component, 'unit_cost', 0) }}" data-price-unit="{{ data_get($component, 'stock_unit', data_get($r, 'uom', 'pcs')) }}">
+                  <span class="bom-price-value">-</span>
+                  <span class="bom-price-unit">/{{ data_get($component, 'stock_unit', data_get($r, 'uom', 'pcs')) }}</span>
+                </td>
+                <td class="text-end bom-price-cell line-purchase-price" data-price-value="{{ (float) data_get($component, 'purchase_unit_cost', 0) }}" data-price-unit="{{ data_get($component, 'purchase_unit', data_get($r, 'uom', 'pcs')) }}">
+                  <span class="bom-price-value">-</span>
+                  <span class="bom-price-unit">/{{ data_get($component, 'purchase_unit', data_get($r, 'uom', 'pcs')) }}</span>
+                </td>
+                <td class="text-end bom-price-cell line-estimated-price" data-price-value="{{ (float) data_get($component, 'estimated_cost', 0) }}">
+                  <span class="bom-price-value">-</span>
+                  <span class="bom-price-unit">qty × harga stok</span>
                 </td>
                 <td><button type="button" class="btnx danger btn-del">Hapus</button></td>
               </tr>
@@ -887,14 +939,13 @@
     // auto set UOM from ajaxItems() -> unit
     $select.on('select2:select', function(e){
       const data = e.params.data || {};
-      const unit = data.unit || '';
-      if (!unit) return;
-
       const $row = $(this).closest('tr.line');
+      const unit = data.unit || '';
       const $uom = $row.find('input.uom');
-      if ($uom.length && (!$uom.val() || $uom.val().trim() === 'pcs')) {
+      if (unit && $uom.length && (!$uom.val() || $uom.val().trim() === 'pcs')) {
         $uom.val(unit);
       }
+      if (typeof renderCostCells === 'function') renderCostCells($row);
     });
   }
 
@@ -940,6 +991,18 @@
             <option value="1">Yes</option>
           </select>
         </td>
+        <td class="text-end bom-price-cell line-stock-price" data-price-value="0" data-price-unit="pcs">
+          <span class="bom-price-value">-</span>
+          <span class="bom-price-unit">/pcs</span>
+        </td>
+        <td class="text-end bom-price-cell line-purchase-price" data-price-value="0" data-price-unit="pcs">
+          <span class="bom-price-value">-</span>
+          <span class="bom-price-unit">/pcs</span>
+        </td>
+        <td class="text-end bom-price-cell line-estimated-price" data-price-value="0">
+          <span class="bom-price-value">-</span>
+          <span class="bom-price-unit">qty × harga stok</span>
+        </td>
         <td><button type="button" class="btnx danger btn-del">Hapus</button></td>
       </tr>
     `;
@@ -983,6 +1046,52 @@
   // ── Pemakaian aktual terakhir per material (dari cutting job non-void) ──
   // { material_item_id: { kg_per_pcs, job_code, date, history: [..3] } }
   const bomUsage = @json($usageByMaterial ?? []);
+  const bomPrices = @json($bomComponentsByLine->keyBy('material_item_id')->values()->all());
+
+  function formatRupiah(value){
+    const amount = Number(value || 0);
+    return amount > 0
+      ? `Rp ${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(amount)}`
+      : '-';
+  }
+
+  function selectedMaterialMeta($row){
+    const $select = $row.find('select.mat');
+    const selected = $select.select2('data')[0] || {};
+    const materialId = Number($select.val() || 0);
+    const fromBom = bomPrices.find(item => Number(item.material_item_id) === materialId) || {};
+
+    return {
+      stockUnit: selected.stock_unit || fromBom.stock_unit || selected.unit || fromBom.uom || $row.find('input.uom').val() || 'pcs',
+      purchaseUnit: selected.purchase_unit || fromBom.purchase_unit || selected.stock_unit || fromBom.stock_unit || 'pcs',
+      unitCost: Number(selected.unit_cost ?? fromBom.unit_cost ?? 0),
+      purchaseUnitCost: Number(selected.purchase_unit_cost ?? fromBom.purchase_unit_cost ?? 0),
+      conversionFactor: Number(selected.purchase_conversion_factor ?? fromBom.purchase_conversion_factor ?? 1) || 1,
+    };
+  }
+
+  function renderCostCells($row){
+    const meta = selectedMaterialMeta($row);
+    const qty = Number(String($row.find('input.qty').val() || '0').replace(',', '.')) || 0;
+    const scrap = Number($row.find('input.scrap').val() || 0) || 0;
+    const purchaseUnitCost = meta.purchaseUnitCost || (meta.unitCost * meta.conversionFactor);
+    const estimated = qty * (1 + scrap / 100) * meta.unitCost;
+
+    const $stock = $row.find('.line-stock-price');
+    const $purchase = $row.find('.line-purchase-price');
+    const $estimated = $row.find('.line-estimated-price');
+
+    $stock.attr('data-price-value', meta.unitCost);
+    $stock.find('.bom-price-value').text(formatRupiah(meta.unitCost));
+    $stock.find('.bom-price-unit').text(`/${meta.stockUnit}`);
+
+    $purchase.attr('data-price-value', purchaseUnitCost);
+    $purchase.find('.bom-price-value').text(formatRupiah(purchaseUnitCost));
+    $purchase.find('.bom-price-unit').text(`/${meta.purchaseUnit}`);
+
+    $estimated.attr('data-price-value', estimated);
+    $estimated.find('.bom-price-value').text(formatRupiah(estimated));
+  }
 
   function renderUsageHint($tr){
     const $hint = $tr.find('.bom-usage-hint');
@@ -1017,9 +1126,14 @@
   }
 
   $('#lines tr.line').each(function(){ renderUsageHint($(this)); });
+  $('#lines tr.line').each(function(){ renderCostCells($(this)); });
   $('#lines').on('change', 'select.mat, select.usage-stage', function(){
     const $row = $(this).closest('tr.line');
     renderUsageHint($row);
+    renderCostCells($row);
+  });
+  $('#lines').on('input change', 'input.qty, input.scrap', function(){
+    renderCostCells($(this).closest('tr.line'));
   });
 
   // ── "Pakai sebagai bahan utama" dari panel riwayat pemakaian ──

@@ -581,13 +581,23 @@ class ItemBomController extends Controller
             })
             ->orderBy('code')
             ->limit(30)
-            ->get(['id', 'code', 'name', 'unit']);
+            ->get(['id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor']);
 
-        $results = $items->map(fn($i) => [
-            'id' => $i->id,
-            'text' => "{$i->code} — {$i->name}",
-            'unit' => $i->unit,
-        ]);
+        $results = $items->map(function ($i) {
+            $unitCost = (float) $i->effective_unit_cost;
+            $purchaseFactor = $i->purchaseConversionFactor();
+
+            return [
+                'id' => $i->id,
+                'text' => "{$i->code} — {$i->name}",
+                'unit' => $i->stockUnit(),
+                'stock_unit' => $i->stockUnit(),
+                'purchase_unit' => $i->purchaseUnit(),
+                'purchase_conversion_factor' => $purchaseFactor,
+                'unit_cost' => $unitCost,
+                'purchase_unit_cost' => round($unitCost * $purchaseFactor, 2),
+            ];
+        });
 
         return response()->json(['results' => $results]);
     }
