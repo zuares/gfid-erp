@@ -1279,13 +1279,6 @@
                                     </a>
                                 @endif
 
-                                @if ($isAdmin && $hasRtsDirectReceiveIndex)
-                                    <a href="{{ route('rts.direct-receives.index') }}"
-                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('rts.direct-receives.*') ? 'active' : '' }}">
-                                        <span class="icon">⚡</span><span>Setor Jahit Dadakan</span>
-                                    </a>
-                                @endif
-
                                 @if (!$isAdmin && $canManageRts && $hasRtsDirectReceiveIndex)
                                     <a href="{{ route('rts.direct-receives.index') }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('rts.direct-receives.*') ? 'active' : '' }}">

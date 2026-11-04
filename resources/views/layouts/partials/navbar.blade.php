@@ -13,16 +13,10 @@ $navPendingCount = 0;
 $navPendingItems = [];
 
 if ($navShowBell) {
-    $navCacheKey = 'navbar_notif_owner_v4_' . (int) $navUser->id;
+    $navCacheKey = 'navbar_notif_owner_v5_' . (int) $navUser->id;
     $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () {
         $todayStart = today()->startOfDay();
         $todayEnd   = today()->endOfDay();
-
-        $poDrafts = \App\Models\PurchaseOrder::where('status', 'draft')
-            ->where('grand_total', '>', 0)
-            ->orderByDesc('id')
-            ->limit(10)
-            ->get(['id', 'code', 'grand_total']);
 
         $grnDrafts = \App\Models\PurchaseReceipt::where('status', 'draft')
             ->orderByDesc('id')
@@ -80,7 +74,6 @@ if ($navShowBell) {
         }
 
         return [
-            'po_drafts'      => $poDrafts,
             'grn_drafts'     => $grnDrafts,
             'cutting_qc_owner_reviews' => $cuttingQcOwnerReviews,
             'shipment_deletion_requests' => $shipmentDeletionRequests,
@@ -90,7 +83,7 @@ if ($navShowBell) {
         ];
     });
 
-    // PO & GRN hanya untuk owner
+    // GRN hanya untuk owner.
     if ($navIsOwner) {
         foreach (($navPending['shipment_deletion_requests'] ?? collect()) as $deletionRequest) {
             $targetLabel = $deletionRequest->target_type === 'order'
@@ -102,15 +95,6 @@ if ($navShowBell) {
                 'sub'   => 'Menunggu approval hapus · '.($deletionRequest->requestedBy?->name ?: 'Admin'),
                 'url'   => route('sales.shipments.deletion_requests.index'),
                 'icon'  => '🗑️',
-            ];
-        }
-        foreach (($navPending['po_drafts'] ?? collect()) as $po) {
-            $navPendingItems[] = [
-                'type'  => 'po',
-                'label' => $po->code ?? 'PO #' . $po->id,
-                'sub'   => 'Menunggu approval',
-                'url'   => route('purchasing.purchase_orders.show', $po->id),
-                'icon'  => '🧾',
             ];
         }
         foreach (($navPending['grn_drafts'] ?? collect()) as $grn) {

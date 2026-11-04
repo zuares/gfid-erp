@@ -1406,13 +1406,6 @@
                             </x-sidebar.sub-link>
                         @endif
 
-                        @if ($isAdmin && $hasRtsDirectReceiveIndex)
-                            <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
-                                :active="request()->routeIs('rts.direct-receives.*')">
-                                Setor Jahit Dadakan
-                            </x-sidebar.sub-link>
-                        @endif
-
                         @if (!$isAdmin && $canManageRts && $hasRtsDirectReceiveIndex)
                             <x-sidebar.sub-link href="{{ route('rts.direct-receives.index') }}" icon="bi bi-lightning"
                                 :active="request()->routeIs('rts.direct-receives.*')">
