@@ -336,6 +336,46 @@ class TikTokShopChannel implements MarketplaceChannel
     }
 
     /**
+     * Mutation endpoints return a provider error when the OAuth token does
+     * not contain the required seller scope. Refreshing that token cannot
+     * grant a new permission, so surface an actionable reauthorization error.
+     */
+    protected function isScopeDeniedResponse(array $result): bool
+    {
+        $code = (string) ($result['code'] ?? '');
+        $message = strtolower(trim((string) ($result['message'] ?? $result['error'] ?? '')));
+
+        return $code === '105005'
+            || str_contains($message, 'access denied')
+            || str_contains($message, 'scope')
+            || str_contains($message, 'permission')
+            || str_contains($message, 'not authorized');
+    }
+
+    protected function normalizeScopeDeniedResponse(
+        Store $store,
+        array $result,
+        string $requiredScope,
+        string $message
+    ): array {
+        Log::warning('[TikTokShopChannel] Mutation scope is missing.', [
+            'store_id' => $store->id,
+            'required_scope' => $requiredScope,
+            'code' => $result['code'] ?? null,
+            'request_id' => $result['request_id'] ?? null,
+        ]);
+
+        return [
+            'error' => 'scope_missing',
+            'code' => $result['code'] ?? null,
+            'required_scope' => $requiredScope,
+            'request_id' => $result['request_id'] ?? null,
+            'message' => $message,
+            '_meta' => $result['_meta'] ?? [],
+        ];
+    }
+
+    /**
      * Jaga jarak khusus endpoint Finance. Panggilan statement detail bersifat
      * N+1 sehingga burst request mudah memicu rate limit TikTok walaupun setiap
      * request sendiri berhasil secara HTTP.
@@ -543,9 +583,20 @@ class TikTokShopChannel implements MarketplaceChannel
             ];
         }
 
-        return $this->post($store, '/product/202309/products/'.rawurlencode($productId).'/inventory/update', [
+        $result = $this->post($store, '/product/202309/products/'.rawurlencode($productId).'/inventory/update', [
             'skus' => $skus,
         ]);
+
+        if ($this->isScopeDeniedResponse($result)) {
+            return $this->normalizeScopeDeniedResponse(
+                $store,
+                $result,
+                'seller.product.write',
+                'TikTok Shop menolak pembaruan stok. Aktifkan scope Product Modify (seller.product.write) di Partner Center, lalu hubungkan ulang toko TikTok sebelum mencoba lagi.'
+            );
+        }
+
+        return $result;
     }
 
     /**

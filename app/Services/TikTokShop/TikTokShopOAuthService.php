@@ -118,7 +118,11 @@ class TikTokShopOAuthService
 
             $accessTokenExpiresIn = $data['access_token_expire_in'] ?? $data['expires_in'] ?? null;
             $refreshTokenExpiresIn = $data['refresh_token_expire_in'] ?? $data['refresh_expires_in'] ?? null;
-            $grantedScopes = array_values((array) ($data['granted_scopes'] ?? $data['scopes'] ?? []));
+            $grantedScopes = $data['granted_scopes'] ?? $data['scopes'] ?? $data['scope'] ?? [];
+            if (is_string($grantedScopes)) {
+                $grantedScopes = preg_split('/[\s,]+/', trim($grantedScopes), -1, PREG_SPLIT_NO_EMPTY);
+            }
+            $grantedScopes = array_values(array_filter((array) $grantedScopes, 'is_string'));
             $channel = Channel::firstOrCreate(
                 ['code' => 'tiktok'],
                 ['name' => 'TikTok Shop', 'status' => 'active']

@@ -486,6 +486,86 @@ class TikTokShopChannelTest extends TestCase
         });
     }
 
+    public function test_update_product_inventory_uses_product_modify_endpoint(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-INVENTORY-UPDATE',
+            'name' => 'TikTok Inventory Update Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/product/202309/products/product-1/inventory/update*' => Http::response([
+                'code' => 0,
+                'message' => 'Success',
+            ]),
+        ]);
+
+        $response = app(TikTokShopChannel::class)->updateProductInventory($store, 'product-1', [[
+            'model_id' => 'sku-1',
+            'warehouse_id' => 'warehouse-1',
+            'stock' => 7,
+        ]]);
+
+        $this->assertSame(0, $response['code']);
+        Http::assertSent(function ($request): bool {
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/product/202309/products/product-1/inventory/update?')
+                && str_contains($request->url(), 'shop_cipher=shop-cipher-test')
+                && $request->body() === '{"skus":[{"id":"sku-1","inventory":[{"warehouse_id":"warehouse-1","quantity":7}]}]}';
+        });
+    }
+
+    public function test_update_product_inventory_exposes_missing_product_modify_scope(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-INVENTORY-SCOPE',
+            'name' => 'TikTok Inventory Scope Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/product/202309/products/product-1/inventory/update*' => Http::response([
+                'code' => 105005,
+                'message' => 'Access denied. This app has not been granted any access scope required by this endpoint.',
+                'request_id' => 'request-id-inventory-scope',
+            ], 403),
+        ]);
+
+        $response = app(TikTokShopChannel::class)->updateProductInventory($store, 'product-1', [[
+            'model_id' => 'sku-1',
+            'warehouse_id' => 'warehouse-1',
+            'stock' => 7,
+        ]]);
+
+        $this->assertSame('scope_missing', $response['error']);
+        $this->assertSame('seller.product.write', $response['required_scope']);
+        $this->assertSame('request-id-inventory-scope', $response['request_id']);
+        $this->assertStringContainsString('seller.product.write', $response['message']);
+    }
+
     public function test_order_finance_uses_the_v202501_statement_transactions_endpoint(): void
     {
         config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');

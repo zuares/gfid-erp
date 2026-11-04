@@ -805,7 +805,17 @@ class MarketplaceProductController extends Controller
         $res = $this->products->updateStock($product, $data['stock_list']);
 
         if (! empty($res['error'])) {
-            return response()->json(['message' => $res['message'] ?? 'Gagal update stok di Shopee.'], 422);
+            $isTikTok = $this->isTikTokStore($product->store);
+
+            return response()->json(array_filter([
+                'message' => $res['message'] ?? ($isTikTok
+                    ? 'Gagal update stok di TikTok Shop.'
+                    : 'Gagal update stok di Shopee.'),
+                'error' => $res['error'],
+                'code' => $res['code'] ?? null,
+                'required_scope' => $res['required_scope'] ?? null,
+                'request_id' => $res['request_id'] ?? null,
+            ], static fn (mixed $value): bool => $value !== null && $value !== ''), 422);
         }
 
         return response()->json(['success' => true]);
