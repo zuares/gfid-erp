@@ -21,6 +21,7 @@ class Store extends Model
         'token_expires_at',
         'last_synced_at',
         'tiktok_financial_last_synced_at',
+        'shopee_wallet_last_synced_at',
         'meta',
     ];
 
@@ -31,6 +32,7 @@ class Store extends Model
         'token_expires_at' => 'datetime',
         'last_synced_at' => 'datetime',
         'tiktok_financial_last_synced_at' => 'datetime',
+        'shopee_wallet_last_synced_at' => 'datetime',
     ];
 
     protected $hidden = ['credentials'];

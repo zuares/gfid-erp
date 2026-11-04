@@ -492,12 +492,12 @@
         <div>
             <h1>Transaksi Dompet Shopee (Mutasi Saldo)</h1>
             <p>
-                Penarikan riwayat mutasi saldo penjual langsung secara live dari Shopee Open Platform v2
-                (<code>v2.payment.get_wallet_transaction_list</code>) tanpa menyentuh atau menulis ke database.
+                Mutasi saldo penjual Shopee disimpan lokal secara idempotent dari Shopee Open Platform v2
+                (<code>v2.payment.get_wallet_transaction_list</code>) agar histori, filter, dan audit tetap tersedia.
             </p>
         </div>
         <div class="shopee-tx-live-badge">
-            <i></i> Live Shopee API · Tanpa Database
+            <i></i> Shopee Wallet · Database Lokal
         </div>
     </div>
 
@@ -572,8 +572,11 @@
                 <button id="txResetBtn" type="button" class="btn btn-outline-secondary btn-pill" title="Reset filter ke kondisi awal">
                     <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
                 </button>
+                <button id="txSyncBtn" type="button" class="btn btn-outline-primary btn-pill" title="Ambil data terbaru dari Shopee">
+                    <span id="txSyncLabel"><i class="bi bi-arrow-repeat me-1"></i> Sync sekarang</span>
+                </button>
                 <button id="txLoadBtn" type="button" class="btn btn-warning text-white fw-bold btn-pill" style="background:#ea580c; border-color:#ea580c;">
-                    <span id="txLoadLabel"><i class="bi bi-cloud-arrow-down me-1"></i> Tarik Data</span>
+                    <span id="txLoadLabel"><i class="bi bi-database me-1"></i> Muat Data Lokal</span>
                 </button>
                 <button id="txExportBtn" type="button" class="btn btn-outline-secondary btn-pill" title="Unduh CSV">
                     <i class="bi bi-download me-1"></i> CSV
@@ -583,8 +586,9 @@
 
         <div class="shopee-tx-help">
             <i class="bi bi-info-circle-fill text-warning"></i>
-            <span>Rentang waktu maksimal 60 hari. Shopee membatasi 15 hari per pemanggilan, sehingga rentang di atas 15 hari otomatis dipecah secara bertahap oleh sistem.</span>
+            <span>Data halaman dibaca dari database lokal. Sync mengambil data terbaru dari Shopee dan otomatis memecah rentang di atas 15 hari.</span>
         </div>
+        <div class="shopee-tx-help"><i class="bi bi-database-check text-success"></i><span id="txStorageStatus">Sumber: database lokal · Belum ada sinkronisasi</span></div>
     </div>
 
     {{-- KPI Cards --}}
@@ -621,7 +625,7 @@
     <div id="txTableWrap" class="shopee-tx-table-wrap">
         <div class="shopee-tx-empty">
             <i class="bi bi-wallet2 fs-2 d-block mb-2 text-muted"></i>
-            Pilih toko Shopee dan rentang tanggal, lalu klik <strong>Tarik Data</strong> untuk mengambil mutasi dompet secara live.
+            Pilih toko dan periode, lalu klik <strong>Muat Data Lokal</strong>. Gunakan <strong>Sync sekarang</strong> untuk mengambil data terbaru dari Shopee.
         </div>
     </div>
 
@@ -789,7 +793,7 @@
         const diffDays = Math.round((dTo - dFrom) / 86400000) + 1;
 
         if (diffDays > 60) {
-            showAlert(`Rentang tanggal yang dipilih ${diffDays} hari. Batas maksimal penarikan live Shopee adalah 60 hari.`);
+            showAlert(`Rentang tanggal yang dipilih ${diffDays} hari. Batas maksimal sync Shopee adalah 60 hari.`);
             return false;
         }
 
@@ -974,7 +978,7 @@
         $('txLoadLabel').innerHTML = '<span class="shopee-tx-spinner me-1"></span> Mengambil…';
         $('txTableWrap').innerHTML = `
             <div class="shopee-tx-empty">
-                <span class="shopee-tx-spinner me-2"></span> Mengambil mutasi wallet live dari Shopee API…
+                <span class="shopee-tx-spinner me-2"></span> Membaca mutasi wallet dari database lokal…
             </div>
         `;
 
@@ -1003,6 +1007,9 @@
             $('kpiIn').textContent = moneyFormat(summary.total_money_in);
             $('kpiOut').textContent = moneyFormat(summary.total_money_out);
             $('kpiNet').textContent = (summary.net_amount < 0 ? '- ' : '+ ') + moneyFormat(Math.abs(summary.net_amount || 0));
+            $('txStorageStatus').textContent = data.last_synced_at
+                ? `Sumber: database lokal · Sync terakhir ${new Date(data.last_synced_at).toLocaleString('id-ID')}`
+                : 'Sumber: database lokal · Belum ada sinkronisasi untuk periode ini';
 
             // Render breakdown pills
             renderBreakdownPills(summary.type_breakdown || []);
@@ -1021,7 +1028,60 @@
         } finally {
             state.loading = false;
             $('txLoadBtn').disabled = false;
-            $('txLoadLabel').innerHTML = '<i class="bi bi-cloud-arrow-down me-1"></i> Tarik Data';
+            $('txLoadLabel').innerHTML = '<i class="bi bi-database me-1"></i> Muat Data Lokal';
+        }
+    };
+
+    const syncStatusUrl = () => `/api/marketplace/stores/${encodeURIComponent($('txStore').value)}/shopee-transactions/sync-status`;
+    const pollSync = async () => {
+        for (let attempt = 0; attempt < 40; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            try {
+                const response = await fetch(syncStatusUrl(), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                const status = await response.json();
+                if (status.label) $('txStorageStatus').textContent = status.label;
+                if (status.status === 'success') {
+                    showAlert('Sinkronisasi selesai. Data lokal diperbarui.', 'info');
+                    await loadData();
+                    return;
+                }
+                if (status.status === 'error') {
+                    showAlert(status.message || status.label || 'Sinkronisasi gagal.');
+                    return;
+                }
+            } catch (error) {
+                // Polling berikutnya akan mencoba kembali.
+            }
+        }
+        showAlert('Sinkronisasi masih berjalan di background. Muat ulang beberapa saat lagi.', 'info');
+    };
+
+    const syncNow = async () => {
+        hideAlert();
+        if (!validateInputs()) return;
+        const storeId = $('txStore').value;
+        $('txSyncBtn').disabled = true;
+        $('txSyncLabel').innerHTML = '<span class="shopee-tx-spinner me-1"></span> Masuk antrean…';
+        try {
+            const response = await fetch(`/api/marketplace/stores/${encodeURIComponent(storeId)}/shopee-transactions/sync`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({ date_from: $('txFrom').value, date_to: $('txTo').value }),
+            });
+            const json = await response.json().catch(() => ({}));
+            if (!response.ok || json.success === false) throw new Error(json.message || `Gagal memasukkan sync (${response.status})`);
+            showAlert('Sinkronisasi masuk antrean. Data lokal akan diperbarui setelah selesai.', 'info');
+            pollSync();
+        } catch (error) {
+            showAlert(error.message);
+        } finally {
+            $('txSyncBtn').disabled = false;
+            $('txSyncLabel').innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Sync sekarang';
         }
     };
 
@@ -1151,6 +1211,7 @@
         state.pageNo = 0;
         loadData();
     });
+    $('txSyncBtn').addEventListener('click', syncNow);
 
     // Pagination buttons
     $('txPrev').addEventListener('click', () => {

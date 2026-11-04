@@ -184,6 +184,16 @@ Schedule::call(fn () => Artisan::call('marketplace:sync-tiktok-financial-transac
     ->name('sync-recent-tiktok-financial-transactions')
     ->withoutOverlapping(60);
 
+// Mutasi wallet Shopee disimpan lokal agar halaman transaksi tidak perlu
+// memanggil API Shopee setiap kali filter atau pagination berubah.
+Schedule::call(fn () => Artisan::call('marketplace:sync-shopee-wallet-transactions', [
+    '--days' => 3,
+    '--store_id' => 'all',
+]))
+    ->everyThirtyMinutes()
+    ->name('sync-recent-shopee-wallet-transactions')
+    ->withoutOverlapping(60);
+
 // Refresh audit kualitas setelah finance sync selesai. Perintah ini hanya
 // membaca settlement/item lokal dan memperbarui status kualitas; tidak memanggil
 // API marketplace sehingga aman dijalankan terpisah dari sync TikTok.

@@ -19,7 +19,7 @@ class FetchShopeeTransactionsCommand extends Command
         {--limit=50 : Batas data per request (1-100)}
         {--raw : Tampilkan format raw JSON response}';
 
-    protected $description = 'Tarik riwayat transaksi wallet Shopee secara live tanpa menyentuh database.';
+    protected $description = 'Tampilkan riwayat transaksi wallet Shopee secara live untuk diagnostic (tanpa menyimpan).';
 
     public function handle(ShopeeWalletTransactionService $service): int
     {
@@ -33,16 +33,19 @@ class FetchShopeeTransactionsCommand extends Command
             $to = Carbon::createFromFormat('Y-m-d', $toInput, $timezone)->endOfDay();
         } catch (\Throwable) {
             $this->error('Format tanggal tidak valid. Gunakan format Y-m-d.');
+
             return self::FAILURE;
         }
 
         if ($from->greaterThan($to)) {
             $this->error('Tanggal --from tidak boleh melewati tanggal --to.');
+
             return self::FAILURE;
         }
 
         if ($from->diffInDays($to) > 60) {
             $this->error('Rentang waktu maksimal 60 hari.');
+
             return self::FAILURE;
         }
 
@@ -63,6 +66,7 @@ class FetchShopeeTransactionsCommand extends Command
 
         if (! $store) {
             $this->error('Toko Shopee aktif tidak ditemukan.');
+
             return self::FAILURE;
         }
 
@@ -75,15 +79,16 @@ class FetchShopeeTransactionsCommand extends Command
 
         try {
             $result = $service->fetchTransactions($store, $from, $to, [
-                'page_no'          => 0,
-                'page_size'        => $limit,
-                'money_flow'       => $flow,
+                'page_no' => 0,
+                'page_size' => $limit,
+                'money_flow' => $flow,
                 'transaction_type' => $type,
-                'search'           => $this->option('search'),
+                'search' => $this->option('search'),
             ]);
 
             if ($this->option('raw')) {
                 $this->line(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+
                 return self::SUCCESS;
             }
 
@@ -96,14 +101,15 @@ class FetchShopeeTransactionsCommand extends Command
                 ['Metrik', 'Nilai'],
                 [
                     ['Total Transaksi', number_format($summary['total_count'])],
-                    ['Total Dana Masuk (+)', 'Rp ' . number_format($summary['total_money_in'], 0, ',', '.')],
-                    ['Total Dana Keluar (-)', 'Rp ' . number_format($summary['total_money_out'], 0, ',', '.')],
-                    ['Perubahan Bersih (Net)', ($summary['net_amount'] < 0 ? '- Rp ' : '+ Rp ') . number_format(abs($summary['net_amount']), 0, ',', '.')],
+                    ['Total Dana Masuk (+)', 'Rp '.number_format($summary['total_money_in'], 0, ',', '.')],
+                    ['Total Dana Keluar (-)', 'Rp '.number_format($summary['total_money_out'], 0, ',', '.')],
+                    ['Perubahan Bersih (Net)', ($summary['net_amount'] < 0 ? '- Rp ' : '+ Rp ').number_format(abs($summary['net_amount']), 0, ',', '.')],
                 ]
             );
 
             if (empty($items)) {
                 $this->warn('Tidak ada transaksi ditemukan pada rentang waktu dan filter tersebut.');
+
                 return self::SUCCESS;
             }
 
@@ -127,11 +133,12 @@ class FetchShopeeTransactionsCommand extends Command
                 $tableRows
             );
 
-            $this->info("Catatan: Data ini ditarik secara live in-memory dari Shopee dan TIDAK disimpan ke database.");
+            $this->info('Catatan: mode diagnostic ini membaca Shopee secara live dan tidak menyimpan data. Gunakan marketplace:sync-shopee-wallet-transactions untuk persist ke database.');
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $this->error("Gagal menarik data dari Shopee: " . $e->getMessage());
+            $this->error('Gagal menarik data dari Shopee: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

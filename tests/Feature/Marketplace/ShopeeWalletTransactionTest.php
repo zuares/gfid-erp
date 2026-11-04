@@ -2,14 +2,16 @@
 
 namespace Tests\Feature\Marketplace;
 
+use App\Jobs\SyncShopeeWalletTransactionsJob;
 use App\Models\Channel;
-use App\Models\MarketplacePayout;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\Marketplace\Shopee\ShopeeWalletTransactionService;
+use App\Services\Marketplace\Shopee\ShopeeWalletTransactionStorageService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ShopeeWalletTransactionTest extends TestCase
@@ -21,17 +23,17 @@ class ShopeeWalletTransactionTest extends TestCase
         $channel = Channel::firstOrCreate(['code' => 'shopee'], ['name' => 'Shopee']);
 
         return Store::create([
-            'channel_id'       => $channel->id,
-            'code'             => $code,
-            'name'             => "Toko {$code}",
-            'status'           => 'active',
-            'is_active'        => true,
-            'connection_status'=> 'CONNECTED',
+            'channel_id' => $channel->id,
+            'code' => $code,
+            'name' => "Toko {$code}",
+            'status' => 'active',
+            'is_active' => true,
+            'connection_status' => 'CONNECTED',
             'external_shop_id' => '12345678',
-            'credentials'      => [
-                'partner_id'   => '2000001',
-                'partner_key'  => 'test_key',
-                'shop_id'      => '12345678',
+            'credentials' => [
+                'partner_id' => '2000001',
+                'partner_key' => 'test_key',
+                'shop_id' => '12345678',
                 'access_token' => 'dummy_access_token',
             ],
             'token_expires_at' => now()->addHours(3),
@@ -41,8 +43,8 @@ class ShopeeWalletTransactionTest extends TestCase
     protected function createTestUser(string $role = 'admin'): User
     {
         return User::factory()->create([
-            'employee_code' => 'EMP' . rand(1000, 9999),
-            'role'          => $role,
+            'employee_code' => 'EMP'.rand(1000, 9999),
+            'role' => $role,
         ]);
     }
 
@@ -52,37 +54,37 @@ class ShopeeWalletTransactionTest extends TestCase
             'response' => [
                 'transaction_list' => [
                     [
-                        'transaction_id'   => 90001,
-                        'status'           => 'COMPLETED',
+                        'transaction_id' => 90001,
+                        'status' => 'COMPLETED',
                         'transaction_type' => 'escrow_verified_add',
-                        'amount'           => 350000,
-                        'current_balance'  => 1350000,
-                        'create_time'      => 1787220000,
-                        'order_sn'         => '261023ABCD1234',
-                        'wallet_type'      => 'seller_balance',
-                        'reason'           => 'Pelepasan pesanan selesai',
+                        'amount' => 350000,
+                        'current_balance' => 1350000,
+                        'create_time' => 1787220000,
+                        'order_sn' => '261023ABCD1234',
+                        'wallet_type' => 'seller_balance',
+                        'reason' => 'Pelepasan pesanan selesai',
                     ],
                     [
-                        'transaction_id'   => 90002,
-                        'status'           => 'COMPLETED',
+                        'transaction_id' => 90002,
+                        'status' => 'COMPLETED',
                         'transaction_type' => 'withdrawal_created',
-                        'amount'           => -150000,
-                        'current_balance'  => 1200000,
-                        'create_time'      => 1787223600,
-                        'order_sn'         => '',
-                        'wallet_type'      => 'seller_balance',
-                        'reason'           => 'Penarikan dana ke rekening BCA',
+                        'amount' => -150000,
+                        'current_balance' => 1200000,
+                        'create_time' => 1787223600,
+                        'order_sn' => '',
+                        'wallet_type' => 'seller_balance',
+                        'reason' => 'Penarikan dana ke rekening BCA',
                     ],
                     [
-                        'transaction_id'   => 90003,
-                        'status'           => 'COMPLETED',
+                        'transaction_id' => 90003,
+                        'status' => 'COMPLETED',
                         'transaction_type' => 'paid_ads_charge',
-                        'amount'           => -25000,
-                        'current_balance'  => 1175000,
-                        'create_time'      => 1787227200,
-                        'order_sn'         => '',
-                        'wallet_type'      => 'seller_balance',
-                        'reason'           => 'Biaya iklan otomatis',
+                        'amount' => -25000,
+                        'current_balance' => 1175000,
+                        'create_time' => 1787227200,
+                        'order_sn' => '',
+                        'wallet_type' => 'seller_balance',
+                        'reason' => 'Biaya iklan otomatis',
                     ],
                 ],
                 'more' => false,
@@ -145,10 +147,10 @@ class ShopeeWalletTransactionTest extends TestCase
         $tiktokChannel = Channel::firstOrCreate(['code' => 'tiktok'], ['name' => 'TikTok Shop']);
         $tiktokStore = Store::create([
             'channel_id' => $tiktokChannel->id,
-            'code'       => 'TT-01',
-            'name'       => 'Toko TikTok',
-            'status'     => 'active',
-            'is_active'  => true,
+            'code' => 'TT-01',
+            'name' => 'Toko TikTok',
+            'status' => 'active',
+            'is_active' => true,
         ]);
 
         $service = app(ShopeeWalletTransactionService::class);
@@ -181,23 +183,25 @@ class ShopeeWalletTransactionTest extends TestCase
         Http::fake([
             '*/api/v2/payment/get_wallet_transaction_list*' => Http::response($this->dummyShopeeApiResponse(), 200),
         ]);
+        $from = Carbon::createFromTimestamp(1787220000)->startOfDay();
+        $to = Carbon::createFromTimestamp(1787227200)->endOfDay();
+        app(ShopeeWalletTransactionStorageService::class)->sync($store, $from, $to);
 
         $response = $this->actingAs($user)->getJson(route('marketplace.api.shopee-transactions', [
-            'store'     => $store->id,
-            'date_from' => now()->subDays(6)->toDateString(),
-            'date_to'   => now()->toDateString(),
+            'store' => $store->id,
+            'date_from' => $from->toDateString(),
+            'date_to' => $to->toDateString(),
         ]));
 
         $response->assertOk();
         $response->assertJson([
             'success' => true,
-            'source'  => 'shopee_live',
+            'source' => 'shopee_local',
         ]);
         $response->assertJsonPath('data.summary.total_count', 3);
-        $response->assertJsonPath('data.items.0.transaction_id', '90001');
+        $response->assertJsonPath('data.items.0.transaction_id', '90003');
 
-        // Pastikan database tetap kosong
-        $this->assertDatabaseCount('marketplace_payouts', 0);
+        $this->assertDatabaseCount('marketplace_shopee_wallet_transactions', 3);
     }
 
     public function test_controller_validates_60_days_limit(): void
@@ -206,9 +210,9 @@ class ShopeeWalletTransactionTest extends TestCase
         $store = $this->createShopeeStore();
 
         $response = $this->actingAs($user)->getJson(route('marketplace.api.shopee-transactions', [
-            'store'     => $store->id,
+            'store' => $store->id,
             'date_from' => now()->subDays(70)->toDateString(),
-            'date_to'   => now()->toDateString(),
+            'date_to' => now()->toDateString(),
         ]));
 
         $response->assertStatus(422);
@@ -218,7 +222,29 @@ class ShopeeWalletTransactionTest extends TestCase
         $this->assertStringContainsString('maksimal 60 hari', $response->json('message'));
     }
 
-    public function test_controller_export_streams_csv_without_database(): void
+    public function test_controller_sync_endpoint_queues_local_wallet_sync(): void
+    {
+        Queue::fake();
+        $user = $this->createTestUser('admin');
+        $store = $this->createShopeeStore();
+
+        $response = $this->actingAs($user)->postJson(route('marketplace.api.shopee-transactions.sync', [
+            'store' => $store->id,
+        ]), [
+            'date_from' => now()->subDays(2)->toDateString(),
+            'date_to' => now()->toDateString(),
+        ]);
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'status' => 'queued',
+            'storage' => 'local_database',
+        ]);
+        Queue::assertPushed(SyncShopeeWalletTransactionsJob::class, fn (SyncShopeeWalletTransactionsJob $job): bool => $job->storeId === $store->id);
+    }
+
+    public function test_controller_export_streams_csv_from_database(): void
     {
         $user = $this->createTestUser('admin');
         $store = $this->createShopeeStore();
@@ -226,11 +252,14 @@ class ShopeeWalletTransactionTest extends TestCase
         Http::fake([
             '*/api/v2/payment/get_wallet_transaction_list*' => Http::response($this->dummyShopeeApiResponse(), 200),
         ]);
+        $from = Carbon::createFromTimestamp(1787220000)->startOfDay();
+        $to = Carbon::createFromTimestamp(1787227200)->endOfDay();
+        app(ShopeeWalletTransactionStorageService::class)->sync($store, $from, $to);
 
         $response = $this->actingAs($user)->get(route('marketplace.api.shopee-transactions.export', [
-            'store'     => $store->id,
-            'date_from' => now()->subDays(5)->toDateString(),
-            'date_to'   => now()->toDateString(),
+            'store' => $store->id,
+            'date_from' => $from->toDateString(),
+            'date_to' => $to->toDateString(),
         ]));
 
         $response->assertOk();
@@ -244,8 +273,7 @@ class ShopeeWalletTransactionTest extends TestCase
         $this->assertStringContainsString('261023ABCD1234', $content);
         $this->assertStringContainsString('350000', $content);
 
-        // Pastikan database tetap kosong
-        $this->assertDatabaseCount('marketplace_payouts', 0);
+        $this->assertDatabaseCount('marketplace_shopee_wallet_transactions', 3);
     }
 
     public function test_artisan_command_fetches_and_displays_transactions(): void
@@ -257,9 +285,9 @@ class ShopeeWalletTransactionTest extends TestCase
         ]);
 
         $this->artisan('shopee:fetch-transactions', [
-            'store'  => (string) $store->id,
+            'store' => (string) $store->id,
             '--from' => now()->subDays(4)->toDateString(),
-            '--to'   => now()->toDateString(),
+            '--to' => now()->toDateString(),
         ])
             ->expectsOutputToContain('Total Transaksi')
             ->expectsOutputToContain('Pelepasan pesanan selesai')
@@ -306,17 +334,47 @@ class ShopeeWalletTransactionTest extends TestCase
         Http::fake([
             '*/api/v2/payment/get_wallet_transaction_list*' => Http::response($this->dummyShopeeApiResponse(), 200),
         ]);
+        $from = Carbon::createFromTimestamp(1787220000)->startOfDay();
+        $to = Carbon::createFromTimestamp(1787227200)->endOfDay();
+        app(ShopeeWalletTransactionStorageService::class)->sync($store, $from, $to);
 
         $response = $this->actingAs($user)->getJson(route('marketplace.api.shopee-transactions', [
-            'store'     => $store->id,
-            'date_from' => now()->subDays(6)->toDateString(),
-            'date_to'   => now()->toDateString(),
-            'search'    => '261023ABCD1234',
+            'store' => $store->id,
+            'date_from' => $from->toDateString(),
+            'date_to' => $to->toDateString(),
+            'search' => '261023ABCD1234',
         ]));
 
         $response->assertOk();
         $response->assertJsonPath('data.summary.total_count', 1);
         $response->assertJsonPath('data.items.0.order_sn', '261023ABCD1234');
+    }
+
+    public function test_storage_sync_is_idempotent_and_keeps_wallet_rows_separate_from_payouts(): void
+    {
+        $store = $this->createShopeeStore();
+
+        Http::fake([
+            '*/api/v2/payment/get_wallet_transaction_list*' => Http::response($this->dummyShopeeApiResponse(), 200),
+        ]);
+
+        $from = Carbon::createFromTimestamp(1787220000)->startOfDay();
+        $to = Carbon::createFromTimestamp(1787227200)->endOfDay();
+        $storage = app(ShopeeWalletTransactionStorageService::class);
+
+        $first = $storage->sync($store, $from, $to);
+        $second = $storage->sync($store, $from, $to);
+
+        $this->assertSame(3, $first['stored']);
+        $this->assertSame(3, $second['stored']);
+        $this->assertDatabaseCount('marketplace_shopee_wallet_transactions', 3);
+        $this->assertDatabaseCount('marketplace_payouts', 0);
+        $this->assertDatabaseHas('marketplace_shopee_wallet_transactions', [
+            'store_id' => $store->id,
+            'external_transaction_id' => '90001',
+            'money_flow' => 'MONEY_IN',
+            'order_sn' => '261023ABCD1234',
+        ]);
     }
 
     public function test_artisan_command_supports_search_option(): void
@@ -328,9 +386,9 @@ class ShopeeWalletTransactionTest extends TestCase
         ]);
 
         $this->artisan('shopee:fetch-transactions', [
-            'store'    => (string) $store->id,
-            '--from'   => now()->subDays(4)->toDateString(),
-            '--to'     => now()->toDateString(),
+            'store' => (string) $store->id,
+            '--from' => now()->subDays(4)->toDateString(),
+            '--to' => now()->toDateString(),
             '--search' => '261023ABCD1234',
         ])
             ->expectsOutputToContain('Total Transaksi')
