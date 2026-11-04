@@ -1393,7 +1393,7 @@
                     @endif
 
                     {{-- Produksi (admin) --}}
-                    @if ($isAdmin && ($hasProdSewReturnsCreate || $hasProdSewRejectReturnsIndex || $hasProdQcIndex))
+                    @if ($isAdmin && ($hasProdSewReturnsCreate || $hasProdSewRejectReturnsIndex || $hasProdQcIndex || $hasProdFinishingJobsIndex))
                         <div class="mobile-sidebar-section-label">Produksi</div>
                         <li class="mb-1">
                             <button class="mobile-sidebar-link mobile-sidebar-toggle {{ $prodOpen ? 'is-open' : '' }}"
@@ -1424,6 +1424,13 @@
                                     <a href="{{ $prodQcHref }}"
                                        class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.qc.*') ? 'active' : '' }}">
                                         <span class="icon">✅</span><span>{{ $prodQcLabel }}</span>
+                                    </a>
+                                @endif
+
+                                @if ($hasProdFinishingJobsIndex)
+                                    <a href="{{ route('production.finishing_jobs.index') }}"
+                                       class="mobile-sidebar-link mobile-sidebar-link-sub {{ request()->routeIs('production.finishing_jobs.*') ? 'active' : '' }}">
+                                        <span class="icon">🧶</span><span>Finishing</span>
                                     </a>
                                 @endif
                             </div>
