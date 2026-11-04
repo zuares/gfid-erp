@@ -94,6 +94,7 @@
             </div>
             <div class="table-responsive">
                 <table class="allocation-table">
+                    <thead>
                         <tr>
                             <th class="text-center" style="width:50px">No</th>
                             <th>Barang</th>
