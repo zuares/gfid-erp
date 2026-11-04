@@ -101,6 +101,8 @@ class TikTokFinancialTransactionTest extends TestCase
         );
 
         $this->assertCount(3, $result['items']);
+        $this->assertSame('Penarikan ke Bank', $result['items'][0]['transaction_type_label']);
+        $this->assertSame('Seller menarik saldo settlement ke rekening atau kartu bank.', $result['items'][0]['transaction_type_description']);
         $this->assertSame('MONEY_OUT', $result['items'][0]['money_flow']);
         $this->assertSame('MONEY_IN', $result['items'][1]['money_flow']);
         $this->assertSame('UNKNOWN', $result['items'][2]['money_flow']);
@@ -126,6 +128,29 @@ class TikTokFinancialTransactionTest extends TestCase
                 && ! empty($query['sign'])
                 && ! empty($query['app_key']);
         });
+    }
+
+    public function test_transaction_type_catalog_explains_account_and_statement_types(): void
+    {
+        $service = app(TikTokFinancialTransactionService::class);
+        $store = $this->createStore();
+        $catalog = collect($service->getTransactionTypes())->keyBy('code');
+
+        $this->assertSame('Subsidi / Potongan Platform', $catalog['TRANSFER']['label']);
+        $this->assertNotEmpty($catalog['TRANSFER']['description']);
+        $this->assertNotEmpty($service->normalizeStatementTransactionRow([
+            'id' => 'STMT-TX-PENALTY',
+            'type' => 'PLATFORM_PENALTY',
+            'adjustment_amount' => '-15000',
+        ], $store)['transaction_type_description']);
+        $this->assertSame(
+            'Pembayaran Iklan dari GMV',
+            $service->normalizeStatementTransactionRow([
+                'id' => 'STMT-TX-ADS',
+                'type' => 'GMV_PAYMENT_FOR_ADS',
+                'adjustment_amount' => '-25000',
+            ], $store)['transaction_type_label'],
+        );
     }
 
     public function test_cash_out_reconciliation_separates_gmv_pay_billing_and_other_outflows(): void

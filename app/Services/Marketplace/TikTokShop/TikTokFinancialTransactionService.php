@@ -14,25 +14,56 @@ class TikTokFinancialTransactionService
     private const TIKTOK_CODES = ['tiktok', 'ttk', 'tkt', 'tt'];
 
     private const TYPES = [
-        'WITHDRAW' => ['label' => 'Penarikan ke Bank', 'flow' => 'MONEY_OUT', 'badge' => 'primary'],
-        'SETTLE' => ['label' => 'Settlement ke Seller', 'flow' => 'MONEY_IN', 'badge' => 'success'],
-        'TRANSFER' => ['label' => 'Transfer / Penyesuaian Platform', 'flow' => 'UNKNOWN', 'badge' => 'warning'],
-        'REVERSE' => ['label' => 'Pembalikan Penarikan', 'flow' => 'MONEY_IN', 'badge' => 'info'],
-        'PAYMENT' => ['label' => 'Pembayaran', 'flow' => 'UNKNOWN', 'badge' => 'secondary'],
-        'REFUND' => ['label' => 'Refund', 'flow' => 'MONEY_OUT', 'badge' => 'danger'],
+        'WITHDRAW' => [
+            'label' => 'Penarikan ke Bank',
+            'description' => 'Seller menarik saldo settlement ke rekening atau kartu bank.',
+            'flow' => 'MONEY_OUT',
+            'badge' => 'primary',
+        ],
+        'SETTLE' => [
+            'label' => 'Settlement ke Saldo Seller',
+            'description' => 'TikTok menyelesaikan dana penjualan ke saldo seller.',
+            'flow' => 'MONEY_IN',
+            'badge' => 'success',
+        ],
+        'TRANSFER' => [
+            'label' => 'Subsidi / Potongan Platform',
+            'description' => 'Subsidi atau potongan akibat kebijakan platform; arah mengikuti nominal API.',
+            'flow' => 'UNKNOWN',
+            'badge' => 'warning',
+        ],
+        'REVERSE' => [
+            'label' => 'Pembalikan Penarikan',
+            'description' => 'Penarikan dikembalikan karena gagal, misalnya informasi bank tidak sesuai.',
+            'flow' => 'MONEY_IN',
+            'badge' => 'info',
+        ],
+        'PAYMENT' => [
+            'label' => 'Transaksi Pembayaran',
+            'description' => 'Transaksi pembayaran yang dicatat oleh TikTok Finance.',
+            'flow' => 'UNKNOWN',
+            'badge' => 'secondary',
+        ],
+        'REFUND' => [
+            'label' => 'Pengembalian Dana',
+            'description' => 'Pengembalian dana kepada pembeli atau pembalikan transaksi.',
+            'flow' => 'MONEY_OUT',
+            'badge' => 'danger',
+        ],
     ];
 
     public function __construct(
         protected MarketplaceApiGateway $gateway,
     ) {}
 
-    /** @return array<int, array{code:string,label:string,flow:string,badge:string}> */
+    /** @return array<int, array{code:string,label:string,description:string,flow:string,badge:string}> */
     public function getTransactionTypes(): array
     {
         return collect(self::TYPES)
             ->map(fn (array $meta, string $code): array => [
                 'code' => $code,
                 'label' => $meta['label'],
+                'description' => $meta['description'],
                 'flow' => $meta['flow'],
                 'badge' => $meta['badge'],
             ])
@@ -581,11 +612,7 @@ class TikTokFinancialTransactionService
         }
 
         $type = strtoupper(trim((string) ($row['type'] ?? $row['transaction_type'] ?? 'UNKNOWN')));
-        $meta = self::TYPES[$type] ?? [
-            'label' => ucwords(strtolower(str_replace('_', ' ', $type))),
-            'flow' => 'UNKNOWN',
-            'badge' => 'secondary',
-        ];
+        $meta = $this->typeMeta($type);
         $rawAmount = $row['amount'] ?? $row['transaction_amount'] ?? 0;
         $signedRawAmount = $this->numericAmount($rawAmount);
         $flow = $meta['flow'];
@@ -613,6 +640,7 @@ class TikTokFinancialTransactionService
             'money_flow' => $flow,
             'transaction_type' => $type,
             'transaction_type_label' => $meta['label'],
+            'transaction_type_description' => $meta['description'],
             'badge' => $meta['badge'],
             'status' => $status,
             'reason' => trim((string) ($row['reason'] ?? $row['description'] ?? '')) ?: null,
@@ -692,6 +720,7 @@ class TikTokFinancialTransactionService
             'money_flow' => $flow,
             'transaction_type' => $type,
             'transaction_type_label' => $meta['label'],
+            'transaction_type_description' => $meta['description'],
             'badge' => $meta['badge'],
             'status' => $status,
             'reason' => trim((string) ($row['reason'] ?? $row['description'] ?? $row['adjustment_type'] ?? '')) ?: null,
@@ -731,6 +760,7 @@ class TikTokFinancialTransactionService
             $breakdown[$type] ??= [
                 'type' => $type,
                 'label' => $item['transaction_type_label'],
+                'description' => $item['transaction_type_description'],
                 'count' => 0,
                 'total_amount' => 0.0,
                 'badge' => $item['badge'],
@@ -834,6 +864,7 @@ class TikTokFinancialTransactionService
                 return [
                     'type' => (string) $row->transaction_type,
                     'label' => $meta['label'],
+                    'description' => $meta['description'],
                     'count' => (int) $row->count,
                     'total_amount' => round((float) $row->total_amount, 2),
                     'badge' => $meta['badge'],
@@ -878,6 +909,7 @@ class TikTokFinancialTransactionService
             'money_flow' => $flow,
             'transaction_type' => $type,
             'transaction_type_label' => $meta['label'],
+            'transaction_type_description' => $meta['description'],
             'badge' => $meta['badge'],
             'status' => strtoupper((string) ($row->status ?: 'UNKNOWN')),
             'reason' => trim((string) ($payload['reason'] ?? $payload['description'] ?? $payload['adjustment_type'] ?? '')) ?: null,
@@ -894,7 +926,7 @@ class TikTokFinancialTransactionService
         ];
     }
 
-    /** @return array{label:string,flow:string,badge:string} */
+    /** @return array{label:string,description:string,flow:string,badge:string} */
     private function typeMeta(string $type): array
     {
         if (isset(self::TYPES[$type])) {
@@ -905,6 +937,7 @@ class TikTokFinancialTransactionService
 
         return [
             'label' => $statementMeta['label'],
+            'description' => $statementMeta['description'],
             'flow' => 'UNKNOWN',
             'badge' => $statementMeta['badge'],
         ];
@@ -993,19 +1026,128 @@ class TikTokFinancialTransactionService
         ));
     }
 
-    /** @return array{label:string,badge:string} */
+    /** @return array{label:string,description:string,badge:string} */
     private function statementTypeMeta(string $type): array
     {
         return match ($type) {
-            'ORDER' => ['label' => 'Order Settlement', 'badge' => 'success'],
-            'RESERVE' => ['label' => 'Reserve', 'badge' => 'warning'],
-            'PLATFORM_REIMBURSEMENT', 'PLATFORM_COMPENSATION', 'LOGISTICS_REIMBURSEMENT' => [
-                'label' => 'Kompensasi Platform',
+            'ORDER' => [
+                'label' => 'Settlement Pesanan',
+                'description' => 'Settlement yang berasal dari penjualan/order.',
+                'badge' => 'success',
+            ],
+            'RESERVE' => [
+                'label' => 'Dana Reserve',
+                'description' => 'Dana ditahan atau dilepas sesuai kebijakan reserve TikTok.',
+                'badge' => 'warning',
+            ],
+            'CHARGE_BACK' => [
+                'label' => 'Chargeback Pembeli',
+                'description' => 'Dana dikembalikan ke kartu pembayaran setelah sengketa pembeli disetujui.',
+                'badge' => 'danger',
+            ],
+            'CUSTOMER_SERVICE_COMPENSATION' => [
+                'label' => 'Kompensasi Customer Service',
+                'description' => 'Kompensasi tambahan dari customer service setelah proses purna jual.',
                 'badge' => 'info',
             ],
-            'GMV_PAYMENT_FOR_ADS', 'GMV_PAYMENT_FOR_TIKTOK_ADS' => ['label' => 'Pembayaran Iklan dari GMV', 'badge' => 'danger'],
+            'DEDUCTIONS_INCURRED_BY_SELLER' => [
+                'label' => 'Potongan karena Tanggung Jawab Seller',
+                'description' => 'Potongan akibat ketidakpuasan pembeli yang menjadi tanggung jawab seller.',
+                'badge' => 'danger',
+            ],
+            'GMV_PAYMENT_FOR_ADS', 'GMV_PAYMENT_FOR_TIKTOK_ADS' => [
+                'label' => 'Pembayaran Iklan dari GMV',
+                'description' => 'Dana GMV dipakai untuk membayar TikTok Ads atau TikTok Promote.',
+                'badge' => 'danger',
+            ],
+            'PLATFORM_COMMISSION_ADJUSTMENT' => [
+                'label' => 'Penyesuaian Komisi Platform',
+                'description' => 'Penyesuaian karena perbedaan komisi platform yang dibebankan.',
+                'badge' => 'warning',
+            ],
+            'PLATFORM_COMMISSION_COMPENSATION' => [
+                'label' => 'Kompensasi Komisi Platform',
+                'description' => 'Kompensasi atas perbedaan komisi platform yang dibebankan.',
+                'badge' => 'info',
+            ],
+            'PLATFORM_PENALTY' => [
+                'label' => 'Penalti Pelanggaran Platform',
+                'description' => 'Denda karena pelanggaran kebijakan TikTok Shop.',
+                'badge' => 'danger',
+            ],
+            'PROMOTION_ADJUSTMENT' => [
+                'label' => 'Penyesuaian Promosi',
+                'description' => 'Penyesuaian karena selisih harga promo dan nominal yang dibayar seller.',
+                'badge' => 'warning',
+            ],
+            'REBATE' => [
+                'label' => 'Rebate Referral Fee',
+                'description' => 'Potongan atau rebate atas biaya referral untuk seller yang memenuhi syarat.',
+                'badge' => 'info',
+            ],
+            'PLATFORM_COMPENSATION' => [
+                'label' => 'Kompensasi Platform',
+                'description' => 'Kompensasi setelah seller berhasil mengajukan banding sengketa pembeli.',
+                'badge' => 'info',
+            ],
+            'PLATFORM_REIMBURSEMENT' => [
+                'label' => 'Penggantian Dana Platform',
+                'description' => 'Penggantian dari TikTok untuk refund tanpa pengembalian barang yang bukan tanggung jawab seller.',
+                'badge' => 'info',
+            ],
+            'COFUNDED_CREATOR_REWARDS' => [
+                'label' => 'Biaya Creator Rewards',
+                'description' => 'Biaya program co-funded creator rewards.',
+                'badge' => 'danger',
+            ],
+            'STAMP_DUTY' => [
+                'label' => 'Bea Meterai',
+                'description' => 'Pemotongan bea meterai sesuai aturan pajak negara terkait.',
+                'badge' => 'danger',
+            ],
+            'FBT_WAREHOUSE_SERVICE_FEE' => [
+                'label' => 'Biaya Gudang FBT',
+                'description' => 'Biaya layanan gudang Fulfilled by TikTok (FBT).',
+                'badge' => 'danger',
+            ],
+            'LOGISTICS_REIMBURSEMENT' => [
+                'label' => 'Penggantian Dana Logistik',
+                'description' => 'Penggantian karena masalah logistik seperti paket hilang atau rusak.',
+                'badge' => 'info',
+            ],
+            'SHIPPING_FEE_ADJUSTMENT' => [
+                'label' => 'Penyesuaian Biaya Kirim',
+                'description' => 'Penyesuaian karena selisih atau kesalahan biaya pengiriman.',
+                'badge' => 'warning',
+            ],
+            'SHIPPING_FEE_COMPENSATION' => [
+                'label' => 'Kompensasi Biaya Kirim',
+                'description' => 'Kompensasi atas perbedaan biaya kirim aktual dan biaya prabayar.',
+                'badge' => 'info',
+            ],
+            'SHIPPING_FEE_REBATE' => [
+                'label' => 'Rebate Biaya Kirim',
+                'description' => 'Rebate biaya kirim dari program atau kampanye platform.',
+                'badge' => 'info',
+            ],
+            'SAMPLE_SHIPPING_FEE' => [
+                'label' => 'Biaya Kirim Sampel',
+                'description' => 'Biaya pengiriman sampel melalui logistik TikTok.',
+                'badge' => 'danger',
+            ],
+            'SELLER_MISSION_REWARD' => [
+                'label' => 'Hadiah Misi Seller',
+                'description' => 'Reward tunai dari TikTok setelah misi seller selesai.',
+                'badge' => 'success',
+            ],
+            'OTHER_ADJUSTMENT' => [
+                'label' => 'Penyesuaian Lainnya',
+                'description' => 'Penyesuaian TikTok yang tidak masuk kategori lain.',
+                'badge' => 'secondary',
+            ],
             default => [
                 'label' => ucwords(strtolower(str_replace('_', ' ', $type))),
+                'description' => 'Tipe transaksi TikTok yang belum memiliki keterangan khusus; lihat Raw JSON untuk detail sumber.',
                 'badge' => 'secondary',
             ],
         };

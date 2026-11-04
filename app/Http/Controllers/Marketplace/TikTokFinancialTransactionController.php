@@ -321,7 +321,7 @@ class TikTokFinancialTransactionController extends Controller
             return response()->streamDownload(function () use ($items): void {
                 $handle = fopen('php://output', 'w');
                 fwrite($handle, "\xEF\xBB\xBF");
-                fputcsv($handle, ['Sumber', 'Waktu', 'ID Transaksi', 'Statement ID', 'Order ID', 'Tipe', 'Arah Dana', 'Nominal', 'Mata Uang', 'Status', 'Keterangan']);
+                fputcsv($handle, ['Sumber', 'Waktu', 'ID Transaksi', 'Statement ID', 'Order ID', 'Tipe', 'Kode Tipe', 'Penjelasan Tipe', 'Arah Dana', 'Nominal', 'Mata Uang', 'Status', 'Keterangan']);
                 foreach ($items as $item) {
                     fputcsv($handle, [
                         $item['source'],
@@ -330,6 +330,8 @@ class TikTokFinancialTransactionController extends Controller
                         $item['statement_id'] ?? '',
                         $item['order_id'] ?? '',
                         $item['transaction_type_label'],
+                        $item['transaction_type'],
+                        $item['transaction_type_description'] ?? '',
                         $item['money_flow'],
                         $item['amount'],
                         $item['currency'],

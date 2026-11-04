@@ -17,8 +17,13 @@
     .tt-finance-filters-grid { display:grid; grid-template-columns:minmax(180px,1.2fr) minmax(135px,.9fr) minmax(135px,.9fr) minmax(140px,1fr) minmax(160px,1.2fr); gap:.75rem; align-items:end; }
     .tt-finance-field label { display:block; margin-bottom:.3rem; color:#64748b; font-size:.68rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
     .tt-finance-field .form-control, .tt-finance-field .form-select { font-size:.82rem; border-radius:9px; }
-    .tt-finance-types { display:flex; flex-wrap:wrap; gap:.45rem .8rem; padding-top:.2rem; }
-    .tt-finance-type { display:inline-flex; align-items:center; gap:.35rem; color:#475569; font-size:.76rem; }
+    .tt-finance-types { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; padding-top:.2rem; }
+    .tt-finance-type { display:flex; align-items:flex-start; gap:.45rem; min-width:0; padding:.52rem .62rem; border:1px solid #e5e7eb; border-radius:9px; color:#475569; background:#fff; font-size:.76rem; }
+    .tt-finance-type-copy { display:flex; flex-direction:column; gap:.16rem; min-width:0; }
+    .tt-finance-type-copy code { color:#64748b; font-size:.66rem; }
+    .tt-finance-type-copy small { color:#64748b; font-size:.66rem; line-height:1.35; }
+    @media (max-width: 900px) { .tt-finance-types { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 600px) { .tt-finance-types { grid-template-columns:1fr; } }
     .tt-finance-preset-row { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; margin-top:.75rem; padding-top:.75rem; border-top:1px dashed #e5e7eb; }
     .tt-finance-quick-presets { display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; }
     .tt-finance-quick-label { margin-right:.2rem; color:#64748b; font-size:.67rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
@@ -191,7 +196,13 @@
             <label>{{ $walletMode ? 'Tipe transaksi wallet' : 'Tipe transaksi untuk sync akun' }}</label>
             <div class="tt-finance-types">
                 @foreach ($transactionTypes as $type)
-                    <label class="tt-finance-type"><input type="checkbox" class="form-check-input tt-type" value="{{ $type['code'] }}" checked> {{ $type['label'] }} <code>{{ $type['code'] }}</code></label>
+                    <label class="tt-finance-type" title="{{ $type['description'] }}">
+                        <input type="checkbox" class="form-check-input tt-type" value="{{ $type['code'] }}" checked>
+                        <span class="tt-finance-type-copy">
+                            <span>{{ $type['label'] }} <code>{{ $type['code'] }}</code></span>
+                            <small>{{ $type['description'] }}</small>
+                        </span>
+                    </label>
                 @endforeach
             </div>
         </div>
@@ -325,15 +336,17 @@
             return;
         }
         const sourceHeader = walletMode ? '' : '<th>Sumber</th>';
-        const sourceCell = walletMode ? '' : `<td><span class="tt-finance-pill ${item.source === 'statement_transactions' ? 'success' : 'primary'}">${item.source === 'statement_transactions' ? 'Statement' : 'Akun'}</span></td>`;
         const referenceHeader = walletMode ? 'Referensi' : 'Statement / Order';
         $('ttTableWrap').innerHTML = `<table class="tt-finance-table"><thead><tr>${sourceHeader}<th>Waktu</th><th>ID</th><th>${referenceHeader}</th><th>Tipe</th><th>Arah</th><th>Nominal</th><th>Status</th><th>Detail</th></tr></thead><tbody>${items.map((item) => {
             const flowClass = item.money_flow === 'MONEY_IN' ? 'tt-finance-flow-in' : (item.money_flow === 'MONEY_OUT' ? 'tt-finance-flow-out' : 'tt-finance-flow-unknown');
             const flowLabel = item.money_flow === 'MONEY_IN' ? 'Dana masuk' : (item.money_flow === 'MONEY_OUT' ? 'Dana keluar' : 'Belum ditentukan');
+            const sourceCell = walletMode ? '' : `<td><span class="tt-finance-pill ${item.source === 'statement_transactions' ? 'success' : 'primary'}">${item.source === 'statement_transactions' ? 'Statement' : 'Akun'}</span></td>`;
             const statementOrder = [item.statement_id ? `S: ${escapeHtml(item.statement_id)}` : '', item.order_id ? `O: ${escapeHtml(item.order_id)}` : ''].filter(Boolean).join('<br>') || '—';
             const detailAmounts = item.source === 'statement_transactions' && item.settlement_amount !== null && item.settlement_amount !== undefined
                 ? `<small class="d-block text-muted">Settlement: ${escapeHtml(money(item.settlement_amount, item.currency))}</small>` : '';
-            return `<tr>${sourceCell}<td>${escapeHtml(item.date_formatted)}</td><td><code>${escapeHtml(item.transaction_id)}</code></td><td><code>${statementOrder}</code></td><td><span class="tt-finance-pill ${escapeHtml(item.badge || 'secondary')}">${escapeHtml(item.transaction_type_label)}<br><small>${escapeHtml(item.transaction_type)}</small></span></td><td class="${flowClass}">${flowLabel}</td><td class="${flowClass}">${escapeHtml(item.signed_formatted_amount || item.formatted_amount)}${detailAmounts}</td><td><span class="tt-finance-pill secondary">${escapeHtml(item.status)}</span></td><td>${escapeHtml(item.reason || 'Tidak ada deskripsi')}<details><summary>Raw JSON</summary><pre class="tt-finance-raw">${escapeHtml(JSON.stringify(item.raw_payload || item, null, 2))}</pre></details></td></tr>`;
+            const typeLabel = item.transaction_type_label || item.transaction_type || 'Tipe tidak dikenal';
+            const typeDescription = item.transaction_type_description || 'Lihat detail transaksi dan Raw JSON untuk keterangan dari TikTok.';
+            return `<tr>${sourceCell}<td>${escapeHtml(item.date_formatted)}</td><td><code>${escapeHtml(item.transaction_id)}</code></td><td><code>${statementOrder}</code></td><td><span class="tt-finance-pill ${escapeHtml(item.badge || 'secondary')}" title="${escapeHtml(typeDescription)}">${escapeHtml(typeLabel)}<br><small>${escapeHtml(item.transaction_type)}</small></span></td><td class="${flowClass}">${flowLabel}</td><td class="${flowClass}">${escapeHtml(item.signed_formatted_amount || item.formatted_amount)}${detailAmounts}</td><td><span class="tt-finance-pill secondary">${escapeHtml(item.status)}</span></td><td>${escapeHtml(item.reason || 'Tidak ada deskripsi')}<details><summary>Raw JSON</summary><pre class="tt-finance-raw">${escapeHtml(JSON.stringify(item.raw_payload || item, null, 2))}</pre></details></td></tr>`;
         }).join('')}</tbody></table>`;
     };
 
@@ -363,12 +376,18 @@
         wrap.style.display = 'flex';
         container.innerHTML = breakdowns.map((breakdown) => {
             const badge = breakdown.badge || 'secondary';
-            return '<button type="button" class="tt-finance-pill-button tt-finance-pill ' + escapeHtml(badge) + '" data-type="' + escapeHtml(breakdown.type) + '">' +
+            return '<button type="button" class="tt-finance-pill-button tt-finance-pill ' + escapeHtml(badge) + '" title="' + escapeHtml(breakdown.description || '') + '" data-type="' + escapeHtml(breakdown.type) + '">' +
                 '<span>' + escapeHtml(breakdown.label) + '</span><span class="badge bg-dark-subtle text-dark">' + Number(breakdown.count || 0).toLocaleString('id-ID') + '</span></button>';
         }).join('');
         container.querySelectorAll('[data-type]').forEach((button) => button.addEventListener('click', () => {
-            $('ttSource').value = 'account';
-            document.querySelectorAll('.tt-type').forEach((input) => { input.checked = input.value === button.dataset.type; });
+            const accountType = [...document.querySelectorAll('.tt-type')].some((input) => input.value === button.dataset.type);
+            $('ttSource').value = accountType ? 'account' : 'statements';
+            if (accountType) {
+                document.querySelectorAll('.tt-type').forEach((input) => { input.checked = input.value === button.dataset.type; });
+            } else {
+                $('ttSearch').value = button.dataset.type;
+                $('ttSearchClear').classList.add('show');
+            }
             state.page = 1;
             updateSourceControls();
             load();
@@ -382,6 +401,7 @@
             ['Toko', item.store_name || '—'],
             ['Waktu transaksi', item.date_formatted || '—'],
             ['Tipe transaksi', (item.transaction_type_label || '—') + ' (' + (item.transaction_type || '—') + ')'],
+            ['Penjelasan tipe', item.transaction_type_description || 'Lihat Raw JSON untuk detail dari TikTok.'],
             ['Arah dana', item.money_flow === 'MONEY_IN' ? 'Dana masuk (+)' : (item.money_flow === 'MONEY_OUT' ? 'Dana keluar (-)' : 'Belum ditentukan')],
             ['Nominal', item.signed_formatted_amount || item.formatted_amount || '—'],
             ['Statement ID', item.statement_id || '—'],
