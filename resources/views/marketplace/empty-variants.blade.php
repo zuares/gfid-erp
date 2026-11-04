@@ -257,13 +257,13 @@
     .sv-variant-dialog-body .sv-action { padding: .65rem; }
     @media (min-width: 768px) {
         .sv-variant-dialog-body .sv-record {
-            grid-template-columns: minmax(180px, 1.2fr) minmax(160px, 1fr) minmax(235px, 1.35fr) auto;
+            grid-template-columns: minmax(190px, 1.25fr) minmax(130px, .9fr) minmax(225px, 1.4fr) minmax(160px, auto);
             grid-template-areas: 'variant support metrics action';
             align-items: start;
         }
-        .sv-variant-dialog-body .sv-support { grid-template-columns: minmax(0, 1fr); gap: .45rem; }
+        .sv-variant-dialog-body .sv-support { display: block; }
         .sv-variant-dialog-body .sv-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
-        .sv-variant-dialog-body .sv-action { min-width: 142px; align-self: stretch; padding: .55rem; }
+        .sv-variant-dialog-body .sv-action { min-width: 160px; align-self: stretch; padding: .55rem; }
     }
     .sv-record {
         display: grid; grid-template-columns: minmax(0, 1fr);
@@ -283,12 +283,6 @@
             z-index: 20; border-color: color-mix(in srgb, var(--sv-brand) 42%, var(--sv-line));
             box-shadow: 0 10px 24px rgba(16, 24, 40, .2); transform: scale(2.15);
         }
-    }
-    .sv-item-id {
-        display: inline-block; max-width: 100%; overflow: hidden;
-        border-bottom: 1px dotted color-mix(in srgb, var(--sv-muted) 55%, transparent);
-        color: var(--sv-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: .67rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; cursor: help;
     }
     .sv-variant-name {
         margin-top: .22rem; overflow: hidden; color: var(--sv-content); font-size: .82rem;
@@ -712,47 +706,31 @@
                         $averageWindow = max(1, (int) ($mapping['avg_daily_sales_window'] ?? 30));
                     @endphp
                     <article class="sv-record" data-stock-row data-stock-scope="{{ $stockScope }}" data-current-stock="{{ $variant->stock }}">
-                        <div class="sv-variant-cell">
+                        <div class="sv-variant-cell" title="{{ $product?->item_name ?: 'Produk tanpa nama' }}">
                             <span class="sv-cell-label">Variant</span>
-                            <span class="sv-item-id" tabindex="0" title="{{ $product?->item_name ?: 'Produk tanpa nama' }}" aria-label="Item ID {{ $product?->item_id }}. {{ $product?->item_name ?: 'Produk tanpa nama' }}">ID {{ $product?->item_id ?: '—' }}</span>
                             <div class="sv-variant-name">{{ $variant->model_name ?: 'Variant tanpa nama' }}</div>
                             <div class="sv-sku">{{ $variant->model_sku }}</div>
-                            <div class="sv-meta">{{ $product?->store?->name ?: 'Toko tidak ditemukan' }}</div>
                         </div>
                         <div class="sv-support">
-                            <div class="sv-map-cell">
-                                <span class="sv-cell-label">Mapping internal</span>
+                            <div class="sv-map-cell" title="{{ $mapping['item_name'] ?? 'Item internal' }}">
+                                <span class="sv-cell-label">Mapping</span>
                                 <div class="sv-map-code">{{ $mapping['item_code'] ?? '—' }}</div>
-                                <div class="sv-meta">{{ $mapping['item_name'] ?? 'Item internal' }}</div>
-                            </div>
-                            <div class="sv-sync-cell">
-                                <span class="sv-cell-label">Terakhir sync</span>
-                                <span class="sv-sync">{{ $product?->synced_at?->diffForHumans() ?: 'Belum pernah' }}</span>
                             </div>
                         </div>
                         <div class="sv-metrics">
                             <div class="sv-metric sv-mp-stock-cell">
-                                <span class="sv-cell-label">Stok Marketplace</span>
+                                <span class="sv-cell-label">MP</span>
                                 <span class="sv-mp-stock @if($variant->stock < 0) is-negative @elseif($variant->stock === 0) is-zero @else is-available @endif" data-mp-stock-val>
                                     {{ number_format($variant->stock) }}
                                 </span>
-                                <div class="sv-meta">
-                                    @if($variant->stock < 0)
-                                        <span class="text-danger fw-bold">Minus {{ abs($variant->stock) }}</span>
-                                    @elseif($variant->stock === 0)
-                                        <span class="text-muted">Kosong (0)</span>
-                                    @else
-                                        <span class="text-primary fw-bold">Ada stok</span>
-                                    @endif
-                                </div>
                             </div>
                             <div class="sv-metric sv-internal-cell">
-                                <span class="sv-cell-label">Stok internal</span>
+                                <span class="sv-cell-label">Internal</span>
                                 <span class="sv-internal">{{ number_format($available, 0, ',', '.') }}</span>
                                 <div class="sv-meta">Fisik {{ number_format($mapping['internal_physical'] ?? 0, 0, ',', '.') }} · dialokasi {{ number_format($mapping['internal_allocated'] ?? 0, 0, ',', '.') }}</div>
                             </div>
                             <div class="sv-metric sv-average-cell">
-                                <span class="sv-cell-label">Rata² terjual/hari</span>
+                                <span class="sv-cell-label">Terjual / hari</span>
                                 <span class="sv-average">{{ number_format((float) $variant->average_daily_sales, 1, ',', '.') }}<small>Inventory · {{ $averageWindow }} hari</small></span>
                             </div>
                         </div>

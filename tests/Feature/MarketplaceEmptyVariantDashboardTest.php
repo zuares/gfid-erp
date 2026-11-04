@@ -89,13 +89,13 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertDontSee('id="svStore"', false)
             ->assertSee('sv-product-toggle-icon', false)
             ->assertDontSee('sv-product-photo', false)
-            ->assertSee('class="sv-item-id"', false)
+            ->assertDontSee('class="sv-item-id"', false)
             ->assertSee('class="sv-record"', false)
             ->assertDontSee('sv-modal-list-head', false)
             ->assertSee('Terlaris')
             ->assertSee('title="Jaket Multi Variant"', false)
             ->assertSee('ID product-variants')
-            ->assertSee('Stok internal')
+            ->assertSee('Internal')
             ->assertSee('id="stock-'.$emptyModel->id.'"', false)
             ->assertSee('value="12"', false)
             ->assertDontSee('Belum Terjual / S')
@@ -163,7 +163,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('Produk Bundle S3RDM')
             ->assertSee('s3rdm-3')
             ->assertSee('S3RDM Master')
-            ->assertSee('Stok internal');
+            ->assertSee('Internal');
     }
 
     public function test_dashboard_filters_variants_by_inventory_average_daily_sales(): void
