@@ -65,19 +65,6 @@ class FinishingJobController extends Controller
             ->values();
     }
 
-    private function defaultDestinationCodeForUser($user): string
-    {
-        return 'WH-PRD';
-    }
-
-    private function defaultDestinationIdForUser($user, $destinationWarehouses): ?int
-    {
-        $defaultCode = $this->defaultDestinationCodeForUser($user);
-
-        return $destinationWarehouses->firstWhere('code', $defaultCode)?->id
-            ?? $destinationWarehouses->first()?->id;
-    }
-
     /* ============================================================
      * INDEX
      * ============================================================
@@ -137,9 +124,9 @@ class FinishingJobController extends Controller
         $today = Carbon::today()->toDateString();
         $wipFinWarehouseId = Warehouse::where('code', 'WIP-FIN')->value('id');
 
-        // Admin default ke WH-PRD, role lain tetap ke WH-RTS.
+        // Tujuan gudang harus dipilih pengguna; opsi selalu dibatasi ke
+        // gudang hasil Finishing yang sah.
         $destinationWarehouses = $this->finishingDestinationWarehouses();
-        $defaultDestinationId = $this->defaultDestinationIdForUser($request->user(), $destinationWarehouses);
 
         $operators = Employee::query()
             ->whereIn('role', ['sewing', 'operating'])
@@ -153,7 +140,6 @@ class FinishingJobController extends Controller
                 'linesByOp' => [],
                 'operators' => $operators,
                 'destinationWarehouses' => $destinationWarehouses,
-                'defaultDestinationId' => $defaultDestinationId,
                 'wipUnitCostByItemId' => [],
                 'finishingSupplyUnitCostByItemId' => [],
             ])->withErrors(['warehouse' => 'Gudang WIP-FIN belum dikonfigurasi.']);
@@ -179,7 +165,6 @@ class FinishingJobController extends Controller
                 'linesByOp' => [],
                 'operators' => $operators,
                 'destinationWarehouses' => $destinationWarehouses,
-                'defaultDestinationId' => $defaultDestinationId,
                 'packingSupplies' => collect(),
                 'wipUnitCostByItemId' => [],
                 'finishingSupplyUnitCostByItemId' => [],
@@ -479,7 +464,6 @@ class FinishingJobController extends Controller
             'linesByOp' => $linesByOp,
             'operators' => $operators,
             'destinationWarehouses' => $destinationWarehouses,
-            'defaultDestinationId' => $defaultDestinationId,
             'packingSupplies' => $packingSupplies,
             'wipUnitCostByItemId' => $wipUnitCostByItemId,
             'finishingSupplyUnitCostByItemId' => $finishingSupplyUnitCostByItemId,
@@ -658,7 +642,7 @@ class FinishingJobController extends Controller
         $rules = [
             'date' => ['required', 'date'],
             'notes' => ['nullable', 'string'],
-            'destination_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'destination_warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'operator_mode' => ['required', 'in:all,byop'],
 
             'operator_global_id' => [
@@ -693,12 +677,7 @@ class FinishingJobController extends Controller
         }
 
         $destinationWarehouses = $this->finishingDestinationWarehouses();
-        $defaultDestinationId = $this->defaultDestinationIdForUser($request->user(), $destinationWarehouses);
         $destinationWarehouseId = (int) ($validated['destination_warehouse_id'] ?? 0);
-
-        if ($destinationWarehouseId <= 0) {
-            $destinationWarehouseId = (int) ($defaultDestinationId ?? 0);
-        }
 
         if ($destinationWarehouseId <= 0 || ! $destinationWarehouses->contains('id', $destinationWarehouseId)) {
             throw ValidationException::withMessages([
