@@ -10,6 +10,7 @@ use App\Models\PieceRate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class PieceRateController extends Controller
 {
@@ -163,7 +164,7 @@ class PieceRateController extends Controller
             'module' => ['required', 'string', 'in:cutting,sewing'],
             'employee_id' => ['required', 'exists:employees,id'],
             'item_id' => ['nullable', 'exists:items,id'],
-            'item_category_id' => ['nullable', 'exists:item_categories,id'],
+            'item_category_id' => ['required', 'exists:item_categories,id'],
             'rate_per_pcs' => ['required', 'numeric', 'min:0'],
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
@@ -173,8 +174,18 @@ class PieceRateController extends Controller
             'rate_per_pcs.required' => 'Tarif per pcs wajib diisi.',
         ]);
 
-        // aturan bisnis: minimal salah satu item/item_category terisi boleh, atau dua-duanya null?
-        // Di sini kita biarkan dua-duanya null artinya rate default per operator & module.
+        $itemId = (int) ($data['item_id'] ?? 0);
+        $categoryId = (int) ($data['item_category_id'] ?? 0);
+
+        if ($itemId > 0) {
+            $item = Item::query()->find($itemId);
+
+            if (! $item || (int) $item->item_category_id !== $categoryId) {
+                throw ValidationException::withMessages([
+                    'item_id' => 'Item harus masuk ke kategori yang dipilih pada tarif piece rate.',
+                ]);
+            }
+        }
 
         return $data;
     }

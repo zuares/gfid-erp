@@ -32,10 +32,10 @@
     </div>
 
     <div class="col-12 col-md-6">
-        <label class="form-label small mb-1">Kategori Item (optional)</label>
-        <select name="item_category_id"
+        <label class="form-label small mb-1">Kategori Item</label>
+        <select name="item_category_id" id="piece-rate-category"
             class="form-select form-select-sm @error('item_category_id') is-invalid @enderror">
-            <option value="">-- Tidak spesifik kategori --</option>
+            <option value="">Pilih kategori item...</option>
             @foreach ($categories as $cat)
                 <option value="{{ $cat->id }}"
                     {{ old('item_category_id', $rate->item_category_id) == $cat->id ? 'selected' : '' }}>
@@ -47,16 +47,16 @@
             <div class="invalid-feedback">{{ $message }}</div>
         @enderror
         <div class="form-text small">
-            Kalau mengisi ini saja (item kosong), tarif berlaku untuk semua item dalam kategori ini.
+            Tarif berlaku untuk semua item dalam kategori ini jika item spesifik dikosongkan.
         </div>
     </div>
 
     <div class="col-12 col-md-6">
         <label class="form-label small mb-1">Item (optional, lebih spesifik)</label>
-        <select name="item_id" class="form-select form-select-sm @error('item_id') is-invalid @enderror">
+        <select name="item_id" id="piece-rate-item" class="form-select form-select-sm @error('item_id') is-invalid @enderror">
             <option value="">-- Tidak spesifik item --</option>
             @foreach ($items as $it)
-                <option value="{{ $it->id }}" {{ old('item_id', $rate->item_id) == $it->id ? 'selected' : '' }}>
+                <option value="{{ $it->id }}" data-category-id="{{ $it->item_category_id }}" {{ old('item_id', $rate->item_id) == $it->id ? 'selected' : '' }}>
                     {{ $it->code }} - {{ $it->name }}
                 </option>
             @endforeach
@@ -65,7 +65,7 @@
             <div class="invalid-feedback">{{ $message }}</div>
         @enderror
         <div class="form-text small">
-            Kalau diisi, tarif ini akan meng-override tarif kategori.
+            Jika diisi, item wajib termasuk kategori yang dipilih dan tarif ini meng-override tarif kategori.
         </div>
     </div>
 
@@ -99,6 +99,38 @@
         @enderror
     </div>
 </div>
+
+@push('scripts')
+    <script>
+        (() => {
+            const category = document.getElementById('piece-rate-category');
+            const item = document.getElementById('piece-rate-item');
+            if (!category || !item) return;
+
+            const filterItemsByCategory = () => {
+                const categoryId = category.value;
+                const selected = item.value;
+
+                [...item.options].forEach((option) => {
+                    if (!option.value) {
+                        option.hidden = false;
+                        return;
+                    }
+
+                    option.hidden = !categoryId || option.dataset.categoryId !== categoryId;
+                });
+
+                const selectedOption = item.options[item.selectedIndex];
+                if (selected && selectedOption?.hidden) {
+                    item.value = '';
+                }
+            };
+
+            category.addEventListener('change', filterItemsByCategory);
+            filterItemsByCategory();
+        })();
+    </script>
+@endpush
 
 <div class="mt-3 d-flex justify-content-end gap-2">
     <a href="{{ route('payroll.piece_rates.index') }}" class="btn btn-light btn-sm">
