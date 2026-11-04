@@ -923,7 +923,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
     $pendingDeletionLineIds = $pendingDeletionLineIds ?? [];
     $canDeleteShipmentRows = in_array(strtolower((string) auth()->user()?->role), ['owner', 'admin'], true);
     $isAdmin = strtolower((string) auth()->user()?->role) === 'admin';
-    $deleteButtonTitle = $isAdmin ? 'Ajukan penghapusan item ke owner' : 'Hapus item dari shipment';
+    $deleteButtonTitle = $isAdmin ? 'Hapus item — menunggu persetujuan owner' : 'Hapus item dari shipment';
     $canSeeCogs = auth()->user()?->role === 'owner';
     $canSeeScanDiagnostics = auth()->user()?->role !== 'admin';
     $itemGridClass = trim(implode(' ', array_filter([
@@ -1163,7 +1163,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
         <i class="bi bi-shield-check" aria-hidden="true"></i>
         <div>
             <strong>Penghapusan perlu persetujuan owner</strong>
-            <span>Tombol “Ajukan hapus” hanya mengirim permintaan. Item dan stok tidak langsung dihapus. Owner akan menerima notifikasi untuk menyetujui atau menolak.</span>
+            <span>Tombol “Hapus” mengirim permintaan dan menunggu persetujuan owner. Item dan stok tidak langsung dihapus.</span>
         </div>
     </div>
 @endif
@@ -1373,7 +1373,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                 <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button>
+                                                    <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Hapus' : 'Hapus item' }}</span></button>
                                                 </form>
                                             @endif
                                         </span>
@@ -1637,7 +1637,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                             <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
                                                                 @csrf
                                                                 @method('DELETE')
-                                                                <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button>
+                                                                <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Hapus' : 'Hapus item' }}</span></button>
                                                             </form>
                                                         @endif
                                                     </span>
@@ -1758,7 +1758,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                                                     <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
                                                                         @csrf
                                                                         @method('DELETE')
-                                                                        <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button>
+                                                                        <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Hapus' : 'Hapus item' }}</span></button>
                                                                     </form>
                                                                 @endif
                                                             </span>
@@ -1812,7 +1812,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 <div class="sd-order-items">
                                     <div class="sd-items-head {{ $orderItemGridClass }}"><span>No</span><span>SKU Marketplace</span><span>Qty</span><span>Scan Item Gudang</span>@if($canSeeCogs)<span>COGS</span><span>Subtotal COGS</span>@endif @if($canDeleteShipmentRows)<span aria-label="Aksi"><i class="bi bi-three-dots" aria-hidden="true"></i></span>@endif</div>
                                     @foreach($ungroupedLines as $line)
-                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action">@if(in_array((int) $line->id, $pendingDeletionLineIds, true))<span class="sd-pill sd-status">Menunggu owner</span>@else<form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button></form>@endif</span>@endif</div>
+                                        <div class="sd-order-item {{ $orderItemGridClass }}"><span class="sd-order-item-num">{{ $loop->iteration }}</span><div class="sd-order-item-marketplace-sku">—</div><div class="sd-order-item-qty">{{ number_format((int) $line->qty_scanned, 0, ',', '.') }}</div><div><div class="sd-order-item-code">{{ $line->item?->code ?? '-' }}</div></div>@if($canSeeCogs)<div class="sd-order-item-cogs">Rp{{ number_format($lineUnitCogs($line), 0, ',', '.') }}</div><div class="sd-order-item-subtotal-cogs">Rp{{ number_format($lineCogs($line), 0, ',', '.') }}</div>@endif @if($canDeleteShipmentRows)<span class="sd-line-action">@if(in_array((int) $line->id, $pendingDeletionLineIds, true))<span class="sd-pill sd-status">Menunggu owner</span>@else<form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">@csrf @method('DELETE')<button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Hapus' : 'Hapus item' }}</span></button></form>@endif</span>@endif</div>
                                     @endforeach
                                 </div>
                                 <div class="sd-order-summary {{ $canSeeCogs ? 'sd-summary-has-cogs' : '' }}">
@@ -1877,7 +1877,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                             <form class="sd-line-delete-form" action="{{ route('sales.shipments.destroy_line', $line) }}" method="POST">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Ajukan hapus' : 'Hapus item' }}</span></button>
+                                                <button type="submit" class="sd-action-delete {{ $isAdmin ? 'sd-action-request' : '' }}" title="{{ $deleteButtonTitle }}" aria-label="{{ $deleteButtonTitle }}"><i class="bi bi-trash3" aria-hidden="true"></i><span class="{{ $isAdmin ? '' : 'visually-hidden' }}">{{ $isAdmin ? 'Hapus' : 'Hapus item' }}</span></button>
                                             </form>
                                         @endif
                                     </span>
@@ -2115,7 +2115,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
             event.preventDefault();
 
             var confirmMessage = adminDeleteMode
-                ? 'Ajukan penghapusan item ini ke owner? Data tidak langsung dihapus.'
+                ? 'Hapus item ini? Permintaan akan menunggu persetujuan owner.'
                 : 'Hapus item ini dari shipment?';
             if (!window.confirm(confirmMessage)) return;
 

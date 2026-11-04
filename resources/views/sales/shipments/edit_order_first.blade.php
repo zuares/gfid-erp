@@ -1222,7 +1222,7 @@
                 <i class="bi bi-shield-check" aria-hidden="true"></i>
                 <div>
                     <strong>Penghapusan perlu persetujuan owner</strong>
-                    <span>Tombol “Ajukan hapus” hanya mengirim permintaan. Order/item dan stok tidak langsung dihapus. Owner akan menerima notifikasi untuk menyetujui atau menolak.</span>
+                    <span>Tombol “Hapus” mengirim permintaan dan menunggu persetujuan owner. Order/item dan stok tidak langsung dihapus.</span>
                 </div>
             </div>
         @endif
@@ -1828,7 +1828,7 @@
                     const deleteButton = canDelete && item.line_id
                         ? (item.pending_deletion
                             ? `<span class="sr-pending-delete" title="Permintaan sudah dikirim dan menunggu persetujuan owner">Menunggu owner</span>`
-                            : `<button type="button" class="sr-delete-btn sr-item-delete${isAdmin ? ' sr-delete-btn--request' : ''}" data-delete-line="${esc(item.line_id)}" data-order-code="${esc(order.code)}" title="${isAdmin ? 'Ajukan penghapusan item ke owner' : 'Hapus item dari shipment'}" aria-label="${isAdmin ? 'Ajukan penghapusan item ke owner' : 'Hapus item dari shipment'}"><i class="bi bi-trash3" aria-hidden="true"></i>${isAdmin ? '<span>Ajukan hapus</span>' : ''}</button>`)
+                            : `<button type="button" class="sr-delete-btn sr-item-delete${isAdmin ? ' sr-delete-btn--request' : ''}" data-delete-line="${esc(item.line_id)}" data-order-code="${esc(order.code)}" title="${isAdmin ? 'Hapus item — menunggu persetujuan owner' : 'Hapus item dari shipment'}" aria-label="${isAdmin ? 'Hapus item — menunggu persetujuan owner' : 'Hapus item dari shipment'}"><i class="bi bi-trash3" aria-hidden="true"></i>${isAdmin ? '<span>Hapus</span>' : ''}</button>`)
                         : '';
                     const qtyControl = canEditQty && item.line_id
                         ? `<div class="sr-qty-cell">
@@ -1862,7 +1862,7 @@
             const deleteOrderButton = canDelete
                 ? (order.pending_deletion
                     ? `<span class="sr-pending-delete" title="Permintaan sudah dikirim dan menunggu persetujuan owner">Menunggu owner</span>`
-                    : `<button type="button" class="sr-delete-btn sr-order-delete${isAdmin ? ' sr-delete-btn--request' : ''}" data-delete-order="${esc(order.code)}" title="${isAdmin ? 'Ajukan penghapusan order ke owner' : 'Hapus order dan semua itemnya'}" aria-label="${isAdmin ? 'Ajukan penghapusan order ke owner' : 'Hapus order dan semua itemnya'}"><i class="bi bi-trash3" aria-hidden="true"></i>${isAdmin ? '<span>Ajukan hapus</span>' : ''}</button>`)
+                    : `<button type="button" class="sr-delete-btn sr-order-delete${isAdmin ? ' sr-delete-btn--request' : ''}" data-delete-order="${esc(order.code)}" title="${isAdmin ? 'Hapus order — menunggu persetujuan owner' : 'Hapus order dan semua itemnya'}" aria-label="${isAdmin ? 'Hapus order — menunggu persetujuan owner' : 'Hapus order dan semua itemnya'}"><i class="bi bi-trash3" aria-hidden="true"></i>${isAdmin ? '<span>Hapus</span>' : ''}</button>`)
                 : '';
             const duplicateBadge = Number(order.duplicateCount || 0) > 0
                 ? `<span class="sr-duplicate-badge" title="Order ini discan lebih dari sekali">Duplikat</span>`
@@ -1905,7 +1905,7 @@
 
                 const orderCode = this.dataset.deleteOrder;
                 const confirmMessage = isAdmin
-                    ? `Ajukan penghapusan order ${orderCode} beserta itemnya ke owner? Data tidak langsung dihapus.`
+                    ? `Hapus order ${orderCode} beserta itemnya? Permintaan akan menunggu persetujuan owner.`
                     : `Hapus order ${orderCode} beserta semua itemnya?`;
                 if (!orderCode || !confirm(confirmMessage)) return;
 
@@ -1946,7 +1946,7 @@
                 const lineId = this.dataset.deleteLine;
                 const orderCode = this.dataset.orderCode;
                 const confirmMessage = isAdmin
-                    ? 'Ajukan penghapusan item ini ke owner? Data tidak langsung dihapus.'
+                    ? 'Hapus item ini? Permintaan akan menunggu persetujuan owner.'
                     : 'Hapus item ini dari shipment?';
                 if (!lineId || !confirm(confirmMessage)) return;
 
@@ -2551,9 +2551,9 @@
         if (window.Swal) {
             Swal.fire({
                 icon: 'warning',
-                title: isAdmin ? 'Ajukan penghapusan?' : 'Reset order?',
+                title: isAdmin ? 'Hapus order?' : 'Reset order?',
                 text: isAdmin
-                    ? `Permintaan penghapusan order ${order.code} akan dikirim ke owner. Data tidak langsung dihapus.`
+                    ? `Permintaan hapus order ${order.code} akan menunggu persetujuan owner. Data tidak langsung dihapus.`
                     : `Item pada order ${order.code} akan dihapus dari shipment ini.`,
                 showCancelButton: true,
                 confirmButtonText: 'NEXT / Lanjut',
@@ -2567,7 +2567,7 @@
         }
 
         if (confirm(isAdmin
-            ? `Ajukan penghapusan order ${order.code} ke owner? Data tidak langsung dihapus.`
+            ? `Hapus order ${order.code}? Permintaan akan menunggu persetujuan owner.`
             : `Reset order ${order.code}?`)) runReset();
     }
 

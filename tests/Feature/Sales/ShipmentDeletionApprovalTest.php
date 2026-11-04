@@ -121,13 +121,15 @@ class ShipmentDeletionApprovalTest extends TestCase
             ->get(route('sales.shipments.scan_order', $shipment))
             ->assertOk()
             ->assertSee('Penghapusan perlu persetujuan owner')
-            ->assertSee('Ajukan hapus');
+            ->assertSee('Hapus')
+            ->assertDontSee('Ajukan');
 
         $this->actingAs($admin)
             ->get(route('sales.shipments.confirm_orders', $shipment))
             ->assertOk()
             ->assertSee('Penghapusan perlu persetujuan owner')
-            ->assertSee('Ajukan hapus');
+            ->assertSee('Hapus')
+            ->assertDontSee('Ajukan');
     }
 
     private function shipmentContext(): array
