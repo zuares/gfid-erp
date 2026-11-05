@@ -1218,6 +1218,14 @@ class MarketplaceSyncService
         $gmvMaxAdCost = round($gmvMaxAdFee + $gmvMaxCouponFee + $gmvMaxAdTax, 2);
         $commission = round(max(0, $feeTotal - $gmvMaxAdFee - $gmvMaxCouponFee), 2);
         $tax = round(max(0, $taxTotal - $gmvMaxAdTax), 2);
+        $refundAmount = MarketplaceOrderSettlement::tiktokRefundAmountFromPayload([
+            'sku_transactions' => $skuTransactions,
+            'refund_total' => $data['refund_total'] ?? null,
+            'refund_amount' => $data['refund_amount'] ?? null,
+            'seller_return_refund_amount' => $data['seller_return_refund_amount'] ?? null,
+            'seller_return_refund' => $data['seller_return_refund'] ?? null,
+            'drc_adjustable_refund' => $data['drc_adjustable_refund'] ?? null,
+        ]);
 
         $tiktokFeeBreakdown['fee_total'] = $feeTotal;
         $tiktokFeeBreakdown['tax_total'] = $taxTotal;
@@ -1241,6 +1249,7 @@ class MarketplaceSyncService
             'shipping_cost_amount' => $data['shipping_cost_amount'] ?? null,
             'settlement_amount' => $data['settlement_amount'] ?? null,
             'adjustment_amount' => $data['adjustment_amount'] ?? null,
+            'drc_adjustable_refund' => $refundAmount,
             'ad_cost' => $gmvMaxAdCost,
             'escrow_amount' => $hasStatement ? ($data['settlement_amount'] ?? null) : null,
             'fee_tax_amount' => $tax,
@@ -1310,6 +1319,7 @@ class MarketplaceSyncService
             'actual_shipping_fee' => $this->nn($this->decimalValue($shippingAmounts['actual_shipping_fee_amount'])),
             'shipping_cost_amount' => $shippingCostAmount,
             'shipping_fee_subsidy' => $this->nn($this->decimalValue($shippingAmounts['shipping_fee_discount_amount'])),
+            'drc_adjustable_refund' => $this->nn($this->decimalValue($refundAmount)),
             'final_income' => $this->nn($this->decimalValue($settlementAmount)),
             'settlement_time' => $settlementTime,
             'raw_json' => $raw,
@@ -1809,6 +1819,117 @@ class MarketplaceSyncService
             } catch (\Throwable $e) {
                 $stats['errors']++;
                 Log::warning('[TikTok Finance] Gagal backfill duplicate affiliate fee', [
+                    'store_id' => $store->id,
+                    'order_id' => $settlement->channel_order_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Project TikTok Finance refund components into the canonical settlement
+     * column used by Marketplace Analytics. The default command mode is
+     * dry-run so historical rows can be reviewed before they are changed.
+     *
+     * @return array{scanned:int,candidates:int,updated:int,unchanged:int,refund_total:float,errors:int,examples:array<int,array<string,mixed>>}
+     */
+    public function backfillTikTokRefundAmounts(
+        Store $store,
+        bool $apply = false,
+        int $limit = 5000,
+    ): array {
+        $store->loadMissing('channel');
+        $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
+            return [
+                'scanned' => 0,
+                'candidates' => 0,
+                'updated' => 0,
+                'unchanged' => 0,
+                'refund_total' => 0.0,
+                'errors' => 1,
+                'examples' => [],
+            ];
+        }
+
+        $settlements = MarketplaceOrderSettlement::query()
+            ->where('store_id', $store->id)
+            ->orderBy('id')
+            ->limit(max(1, $limit))
+            ->get();
+
+        $stats = [
+            'scanned' => $settlements->count(),
+            'candidates' => 0,
+            'updated' => 0,
+            'unchanged' => 0,
+            'refund_total' => 0.0,
+            'errors' => 0,
+            'examples' => [],
+        ];
+
+        foreach ($settlements as $settlement) {
+            $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+            $source = strtolower((string) ($raw['source'] ?? ''));
+            if (! str_starts_with($source, 'tiktok_finance_')) {
+                continue;
+            }
+
+            $refundAmount = MarketplaceOrderSettlement::tiktokRefundAmountFromPayload($raw);
+            if ($refundAmount <= 0) {
+                continue;
+            }
+
+            $current = abs((float) $settlement->drc_adjustable_refund);
+            $stats['refund_total'] = round($stats['refund_total'] + $refundAmount, 2);
+            if (abs($current - $refundAmount) < 0.01) {
+                $stats['unchanged']++;
+                continue;
+            }
+
+            $stats['candidates']++;
+            if (count($stats['examples']) < 20) {
+                $stats['examples'][] = [
+                    'settlement_id' => $settlement->id,
+                    'order_id' => $settlement->channel_order_id,
+                    'old_refund' => $current,
+                    'new_refund' => $refundAmount,
+                ];
+            }
+
+            if (! $apply) {
+                continue;
+            }
+
+            try {
+                $raw['drc_adjustable_refund'] = $refundAmount;
+                $raw['tiktok_refund_backfill'] = [
+                    'source' => 'tiktok_finance_revenue_breakdown',
+                    'refund_amount' => $refundAmount,
+                    'backfilled_at' => now()->toIso8601String(),
+                ];
+                $settlement->drc_adjustable_refund = $this->nn($this->decimalValue($refundAmount));
+                $settlement->raw_json = $raw;
+                $settlement->data_checked_at = now();
+                $settlement->save();
+                $stats['updated']++;
+
+                try {
+                    $this->financeBackfill->syncOrderSettlement($settlement->fresh(['store.channel', 'order.store.channel']));
+                } catch (\Throwable $e) {
+                    $stats['errors']++;
+                    Log::warning('[TikTok Finance] Gagal memproyeksikan backfill refund ke Marketplace Finance', [
+                        'store_id' => $store->id,
+                        'order_id' => $settlement->channel_order_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $stats['errors']++;
+                Log::warning('[TikTok Finance] Gagal backfill refund', [
                     'store_id' => $store->id,
                     'order_id' => $settlement->channel_order_id,
                     'error' => $e->getMessage(),

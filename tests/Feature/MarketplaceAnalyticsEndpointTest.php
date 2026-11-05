@@ -8,6 +8,7 @@ use App\Models\ItemCategory;
 use App\Models\MarketplaceBooking;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
+use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -261,6 +262,72 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             'date_to' => '2026-09-30',
             'settlement' => 'unsettled',
         ]))->assertOk()->assertJsonPath('meta.total', 4);
+    }
+
+    public function test_tiktok_finance_refund_is_visible_without_marketplace_return_feed(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-TIKTOK-REFUND']);
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'TIKTOK-REFUND-TEST',
+            'name' => 'TikTok Refund Test',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'TT-REFUND-ANALYTICS-1',
+            'channel_order_id' => 'TT-REFUND-ANALYTICS-1',
+            'order_status' => 'COMPLETED',
+            'status' => 'completed',
+            'total_amount' => 100000,
+            'total_paid_customer' => 100000,
+            'subtotal_items' => 100000,
+            'order_date' => '2026-10-05 10:00:00',
+            'ordered_at' => '2026-10-05 10:00:00',
+            'raw_json' => [],
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'drc_adjustable_refund' => 70000,
+            'final_income' => 30000,
+            'settlement_time' => '2026-10-07 10:00:00',
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'sku_transactions' => [[
+                    'revenue_breakdown' => [
+                        'refund_subtotal_before_discount_amount' => '-70000',
+                    ],
+                ]],
+            ],
+        ]);
+
+        $query = http_build_query([
+            'store_id' => $store->id,
+            'platform' => 'tiktok',
+            'date_from' => '2026-10-01',
+            'date_to' => '2026-10-31',
+        ]);
+
+        $cash = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?'.$query.'&settlement=return_refund');
+        $cash->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('summary.cash_refund', 70000);
+
+        $returns = $this->actingAs($user)->getJson('/api/marketplace/analytics-return-orders?'.$query);
+        $returns->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.source', 'tiktok_finance')
+            ->assertJsonPath('data.0.amount', 70000);
+
+        $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?'.$query)
+            ->assertOk()
+            ->assertJsonPath('current.return_refund_amount', 70000);
     }
 
     public function test_cash_orders_exposes_shopee_warehouse_tab_for_kilat_booking(): void

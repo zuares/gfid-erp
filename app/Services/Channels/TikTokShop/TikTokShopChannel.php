@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 class TikTokShopChannel implements MarketplaceChannel
 {
     private const SEA_REGIONS = ['ID', 'SG', 'PH', 'VN', 'TH', 'MY'];
+    private const RETURN_REFUND_API_VERSION = '202602';
 
     // ─── Credential helpers ───────────────────────────────────────────────────
 
@@ -857,15 +858,16 @@ class TikTokShopChannel implements MarketplaceChannel
 
     /**
      * Ambil daftar retur dan refund dari TikTok Shop.
-     * Menggunakan endpoint resmi v202309 /return_refund/202309/returns/search
+     * Menggunakan endpoint resmi v202602 /return_refund/202602/returns/search
      * dan dinormalisasi agar kompatibel dengan modul retur & SyncMarketplaceReturns.
      */
-    public function getReturnList(Store $store, int $pageNo = 0, int $pageSize = 40, ?int $createTimeFrom = null, ?int $createTimeTo = null): array
+    public function getReturnList(Store $store, int $pageNo = 0, int $pageSize = 40, ?int $createTimeFrom = null, ?int $createTimeTo = null, string $pageToken = ''): array
     {
         $pageSize = max(1, min($pageSize, 100));
         $body = [
             'page_size' => $pageSize,
         ];
+        $params = trim($pageToken) !== '' ? ['page_token' => trim($pageToken)] : [];
 
         // Filter waktu jika disediakan (TikTok format: unix timestamp seconds)
         if ($createTimeFrom !== null && $createTimeTo !== null) {
@@ -873,7 +875,7 @@ class TikTokShopChannel implements MarketplaceChannel
             $body['create_time_to'] = $createTimeTo;
         }
 
-        $result = $this->post($store, '/return_refund/202309/returns/search', $body);
+        $result = $this->post($store, '/return_refund/'.self::RETURN_REFUND_API_VERSION.'/returns/search', $body, $params);
 
         // Tangani error izin/scope (105005) atau error API lainnya secara anggun
         if (! empty($result['error']) || ((int) ($result['code'] ?? 0) !== 0)) {
@@ -971,7 +973,7 @@ class TikTokShopChannel implements MarketplaceChannel
             return ['error' => 'return_sn_missing', 'message' => 'Return ID wajib diisi.'];
         }
 
-        $result = $this->get($store, '/return_refund/202309/returns/'.rawurlencode($returnSn));
+        $result = $this->get($store, '/return_refund/'.self::RETURN_REFUND_API_VERSION.'/returns/'.rawurlencode($returnSn));
 
         if (! empty($result['error']) || ((int) ($result['code'] ?? 0) !== 0)) {
             return [

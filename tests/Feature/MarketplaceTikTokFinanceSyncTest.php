@@ -1114,4 +1114,61 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
 
         $this->assertSame(33926.0, $settlement->totalDeductions());
     }
+
+    public function test_tiktok_refund_revenue_breakdown_is_saved_to_canonical_settlement_column(): void
+    {
+        config()->set('tiktok_shop.base_url', 'https://open-api.tiktokglobalshop.com');
+
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-REFUND-MAPPING',
+            'name' => 'TikTok Refund Mapping Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+            'credentials' => [
+                'app_key' => 'app-key-test',
+                'app_secret' => 'app-secret-test',
+                'access_token' => 'access-token-test',
+                'shop_cipher' => 'shop-cipher-test',
+            ],
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-REFUND-MAPPING-1',
+            'external_order_id' => 'TT-REFUND-MAPPING-1',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'subtotal_items' => 100000,
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+
+        Http::fake([
+            'https://open-api.tiktokglobalshop.com/finance/202501/orders/*/statement_transactions*' => Http::response([
+                'code' => 0,
+                'data' => [
+                    'order_id' => $order->channel_order_id,
+                    'currency' => 'IDR',
+                    'revenue_amount' => '0',
+                    'fee_and_tax_amount' => '0',
+                    'shipping_cost_amount' => '0',
+                    'settlement_amount' => '30000',
+                    'sku_transactions' => [[
+                        'revenue_breakdown' => [
+                            'refund_subtotal_before_discount_amount' => '-70000',
+                        ],
+                    ]],
+                ],
+            ]),
+        ]);
+
+        app(MarketplaceSyncService::class)->syncTikTokOrderFinance($store, $order);
+
+        $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame(70000.0, (float) $settlement->drc_adjustable_refund);
+        $this->assertSame(70000.0, (float) data_get($settlement->raw_json, 'drc_adjustable_refund'));
+    }
 }

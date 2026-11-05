@@ -113,7 +113,7 @@ class MarketplaceReturnsTest extends TestCase
         ]);
 
         Http::fake([
-            'https://open-api.tiktokglobalshop.com/return_refund/202309/returns/TTK-RETURN-001*' => Http::response([
+            'https://open-api.tiktokglobalshop.com/return_refund/202602/returns/TTK-RETURN-001*' => Http::response([
                 'code' => 0,
                 'data' => [
                     'return_id' => 'TTK-RETURN-001',

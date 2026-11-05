@@ -96,6 +96,58 @@ class MarketplaceOrderSettlement extends Model
     }
 
     /**
+     * Read the item-level TikTok Finance refund amount from a normalized
+     * statement payload. TikTok exposes the refund as a negative
+     * `refund_subtotal_before_discount_amount` inside each revenue breakdown;
+     * analytics stores deductions as positive amounts, so the sign is
+     * normalized here. Seller discount refunds are intentionally excluded:
+     * the gross-sales calculation uses the pre-discount subtotal as the
+     * reversed sales value and must use the same basis for the refund.
+     */
+    public static function tiktokRefundAmountFromPayload(array $raw): float
+    {
+        $transactions = $raw['sku_transactions'] ?? [];
+        $sources = is_array($transactions) && $transactions !== []
+            ? array_values(array_filter($transactions, 'is_array'))
+            : [$raw];
+        $total = 0.0;
+
+        foreach ($sources as $source) {
+            $breakdown = is_array($source['revenue_breakdown'] ?? null)
+                ? $source['revenue_breakdown']
+                : [];
+            $value = $breakdown['refund_subtotal_before_discount_amount']
+                ?? $source['refund_subtotal_before_discount_amount']
+                ?? $source['refund_total']
+                ?? $source['refund_amount']
+                ?? null;
+
+            if ($value !== null && $value !== '' && is_numeric($value)) {
+                $total += abs((float) $value);
+            }
+        }
+
+        if ($total <= 0) {
+            foreach (['seller_return_refund_amount', 'seller_return_refund', 'drc_adjustable_refund'] as $key) {
+                $value = $raw[$key] ?? null;
+                if ($value !== null && $value !== '' && is_numeric($value)) {
+                    $total = abs((float) $value);
+                    break;
+                }
+            }
+        }
+
+        return round($total, 2);
+    }
+
+    public function tiktokRefundAmount(): float
+    {
+        $raw = $this->raw_json;
+
+        return is_array($raw) ? self::tiktokRefundAmountFromPayload($raw) : 0.0;
+    }
+
+    /**
      * Build a categorized breakdown for marketplace settlement fees.
      *
      * @return array<int, array{label: string, amount: float, category: string, source?: string}>

@@ -35,6 +35,7 @@ class SyncMarketplaceReturns implements ShouldQueue
     public function handle(ChannelManager $manager): void
     {
         try {
+            $this->store->loadMissing('channel');
             $driver = $manager->driver($this->store);
             if (!method_exists($driver, 'getReturnList')) {
                 return;
@@ -70,11 +71,16 @@ class SyncMarketplaceReturns implements ShouldQueue
             foreach ($windows as [$tsFrom, $tsTo]) {
                 $pageNo   = 0;
                 $pageSize = 40;
+                $pageToken = '';
                 $hasMore  = true;
                 $guard    = 0;
 
                 while ($hasMore) {
-                    $result = $driver->getReturnList($this->store, $pageNo, $pageSize, $tsFrom, $tsTo);
+                    $channelCode = strtolower(trim((string) ($this->store->channel?->code ?? '')));
+                    $isTikTok = in_array($channelCode, ['tiktok', 'ttk', 'tkt', 'tt'], true);
+                    $result = $isTikTok
+                        ? $driver->getReturnList($this->store, 0, $pageSize, $tsFrom, $tsTo, $pageToken ?? '')
+                        : $driver->getReturnList($this->store, $pageNo, $pageSize, $tsFrom, $tsTo);
 
                     if (isset($result['error']) && !empty($result['error'])) {
                         Log::error("SyncMarketplaceReturns Error for Store {$this->store->id}: " . ($result['message'] ?? $result['error']));
@@ -83,6 +89,7 @@ class SyncMarketplaceReturns implements ShouldQueue
 
                     $returns = $result['response']['return'] ?? [];
                     $hasMore = $result['response']['more'] ?? false;
+                    $nextPageToken = trim((string) ($result['response']['next_cursor'] ?? ''));
 
                     foreach ($returns as $r) {
                         $return = $this->processReturn($r);
@@ -110,7 +117,14 @@ class SyncMarketplaceReturns implements ShouldQueue
                         }
                     }
 
-                    $pageNo += $pageSize;
+                    if ($isTikTok) {
+                        if ($nextPageToken === '' || $nextPageToken === ($pageToken ?? '')) {
+                            $hasMore = false;
+                        }
+                        $pageToken = $nextPageToken;
+                    } else {
+                        $pageNo += $pageSize;
+                    }
                     if (++$guard > 50) break; // safety net per jendela
                 }
             }

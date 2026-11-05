@@ -497,48 +497,55 @@ class MarketplaceAnalyticsSummaryService
             $base->whereRaw($this->isRevenueStatus());
         }
 
-        $rows = $base->select([
-            'ms.commission_fee',
-            'ms.service_fee',
-            'ms.transaction_fee',
-            'ms.affiliate_fee',
-            'ms.activity_fee',
-            'ms.actual_shipping_fee',
-            'ms.shipping_cost_amount',
-            'ms.shipping_fee_subsidy',
-            'ms.shipping_insurance_fee',
-            'ms.escrow_tax',
-            'ms.raw_json as settlement_raw_json',
-        ])->get();
+        // Fee totals are sourced from settlement rows. Keep the chunk key
+        // non-null because the cash bases intentionally use a left join for
+        // orders that have not settled yet.
+        $base->whereNotNull('ms.id');
 
         $totals = [];
-        foreach ($rows as $row) {
-            $settlementModel = new MarketplaceOrderSettlement();
-            $settlementModel->setRawAttributes([
-                'commission_fee' => $row->commission_fee,
-                'service_fee' => $row->service_fee,
-                'transaction_fee' => $row->transaction_fee,
-                'affiliate_fee' => $row->affiliate_fee,
-                'activity_fee' => $row->activity_fee,
-                'actual_shipping_fee' => $row->actual_shipping_fee ?? null,
-                'shipping_cost_amount' => $row->shipping_cost_amount ?? null,
-                'shipping_fee_subsidy' => $row->shipping_fee_subsidy ?? null,
-                'shipping_insurance_fee' => $row->shipping_insurance_fee,
-                'escrow_tax' => $row->escrow_tax,
-                'raw_json' => $row->settlement_raw_json,
-            ], true);
+        $base
+            ->select([
+                'ms.commission_fee',
+                'ms.service_fee',
+                'ms.transaction_fee',
+                'ms.affiliate_fee',
+                'ms.activity_fee',
+                'ms.actual_shipping_fee',
+                'ms.shipping_cost_amount',
+                'ms.shipping_fee_subsidy',
+                'ms.shipping_insurance_fee',
+                'ms.escrow_tax',
+                'ms.raw_json as settlement_raw_json',
+            ])
+            ->orderBy('ms.id')
+            ->lazy(250)
+            ->each(function ($row) use (&$totals): void {
+                    $settlementModel = new MarketplaceOrderSettlement();
+                    $settlementModel->setRawAttributes([
+                        'commission_fee' => $row->commission_fee,
+                        'service_fee' => $row->service_fee,
+                        'transaction_fee' => $row->transaction_fee,
+                        'affiliate_fee' => $row->affiliate_fee,
+                        'activity_fee' => $row->activity_fee,
+                        'actual_shipping_fee' => $row->actual_shipping_fee ?? null,
+                        'shipping_cost_amount' => $row->shipping_cost_amount ?? null,
+                        'shipping_fee_subsidy' => $row->shipping_fee_subsidy ?? null,
+                        'shipping_insurance_fee' => $row->shipping_insurance_fee,
+                        'escrow_tax' => $row->escrow_tax,
+                        'raw_json' => $row->settlement_raw_json,
+                    ], true);
 
-            foreach ($settlementModel->analyticsFeeBreakdown() as $item) {
-                $code = (string) ($item['code'] ?? 'other_fee');
-                $totals[$code] ??= [
-                    'code' => $code,
-                    'label' => (string) ($item['label'] ?? $code),
-                    'category' => (string) ($item['category'] ?? 'fee'),
-                    'amount' => 0.0,
-                ];
-                $totals[$code]['amount'] += (float) ($item['amount'] ?? 0);
-            }
-        }
+                    foreach ($settlementModel->analyticsFeeBreakdown() as $item) {
+                        $code = (string) ($item['code'] ?? 'other_fee');
+                        $totals[$code] ??= [
+                            'code' => $code,
+                            'label' => (string) ($item['label'] ?? $code),
+                            'category' => (string) ($item['category'] ?? 'fee'),
+                            'amount' => 0.0,
+                        ];
+                        $totals[$code]['amount'] += (float) ($item['amount'] ?? 0);
+                    }
+            });
 
         return collect($totals)
             ->map(function (array $item): array {
@@ -1076,6 +1083,64 @@ class MarketplaceAnalyticsSummaryService
                     'updated_at' => $row->update_time,
                     'source' => 'marketplace_returns',
                 ])->values();
+
+            // Finance statements can contain a refund adjustment even when
+            // the separate return feed has no row for the TikTok shop. Once
+            // the canonical settlement column is backfilled, expose that
+            // financial case in the same drawer as marketplace return rows.
+            $existingOrderKeys = $rows
+                ->map(fn (array $row): string => $row['store_id'].'|'.(string) ($row['order_sn'] ?? ''))
+                ->filter(fn (string $key): bool => ! str_ends_with($key, '|'))
+                ->flip();
+            $financeRows = DB::table('marketplace_orders as mo')
+                ->join('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+                ->join('stores as st', 'st.id', '=', 'mo.store_id')
+                ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
+                ->whereIn('mo.store_id', $filters['store_ids'])
+                ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
+                ->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+                ->whereBetween(DB::raw('COALESCE(ms.settlement_time, mo.ordered_at)'), [
+                    $filters['date_from'].' 00:00:00',
+                    $filters['date_to'].' 23:59:59',
+                ])
+                ->select([
+                    'mo.id as order_id',
+                    'mo.store_id',
+                    'st.name as store_name',
+                    'mo.channel_order_id',
+                    'mo.external_order_id',
+                    'mo.order_status',
+                    'mo.status',
+                    'mo.ordered_at',
+                    'ms.id as settlement_id',
+                    'ms.settlement_time',
+                    'ms.drc_adjustable_refund',
+                ])
+                ->orderByDesc('ms.settlement_time')
+                ->orderByDesc('mo.ordered_at')
+                ->limit(1000)
+                ->get()
+                ->filter(function ($row) use ($existingOrderKeys): bool {
+                    $key = $row->store_id.'|'.(string) ($row->channel_order_id ?: $row->external_order_id ?: '');
+
+                    return $key !== $row->store_id.'|' && ! $existingOrderKeys->has($key);
+                })
+                ->map(fn ($row): array => [
+                    'id' => -1 * (int) $row->settlement_id,
+                    'reference' => 'TT-REFUND-'.($row->channel_order_id ?: $row->external_order_id ?: $row->order_id),
+                    'order_sn' => (string) ($row->channel_order_id ?: $row->external_order_id ?: '-'),
+                    'store_id' => (int) $row->store_id,
+                    'store_name' => (string) ($row->store_name ?: 'Tanpa toko'),
+                    'status' => (string) ($row->order_status ?: $row->status ?: '—'),
+                    'kind' => 'refund',
+                    'reason' => 'TikTok Finance refund adjustment',
+                    'amount' => round(abs((float) $row->drc_adjustable_refund), 2),
+                    'tracking_number' => '',
+                    'event_time' => $row->settlement_time ?: $row->ordered_at,
+                    'updated_at' => $row->settlement_time ?: $row->ordered_at,
+                    'source' => 'tiktok_finance',
+                ]);
+            $rows = $rows->concat($financeRows)->values();
         } else {
             $returnRows = DB::table('marketplace_returns as mr')
                 ->join('stores as st', 'st.id', '=', 'mr.store_id')
@@ -1418,6 +1483,7 @@ class MarketplaceAnalyticsSummaryService
         $settledReturnOrders = 0;
         $unsettledReturnOrders = 0;
         $returnRefundAmount = 0.0;
+        $returnRefundCount = $returns->count();
         foreach ($returns->groupBy(function ($return): string {
             $orderKey = (string) ($return->order_sn ?? '');
 
@@ -1438,8 +1504,53 @@ class MarketplaceAnalyticsSummaryService
                 : (float) $returnRows->sum(fn ($row) => (float) ($row->amount_before_discount ?? 0));
         }
 
+        // TikTok Finance carries refund adjustments in the order statement,
+        // while the marketplace_returns feed may be unavailable or empty for
+        // a shop. Use the canonical settlement amount as a fallback so the
+        // analytics period still reports the financial refund.
+        $financeReturns = DB::table('marketplace_orders as mo')
+            ->join('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+            ->join('stores as st', 'st.id', '=', 'mo.store_id')
+            ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->whereIn('mo.store_id', $filters['store_ids'])
+            ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
+            ->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+            ->whereBetween(DB::raw('COALESCE(ms.settlement_time, mo.ordered_at)'), [
+                $filters['date_from'].' 00:00:00',
+                $filters['date_to'].' 23:59:59',
+            ])
+            ->select([
+                'mo.store_id',
+                'mo.channel_order_id',
+                'mo.external_order_id',
+                'ms.data_status as settlement_status',
+                'ms.drc_adjustable_refund as settlement_refund_amount',
+            ])
+            ->get();
+
+        foreach ($financeReturns as $financeReturn) {
+            $orderKey = trim((string) ($financeReturn->channel_order_id ?: $financeReturn->external_order_id ?: ''));
+            if ($orderKey === '') {
+                continue;
+            }
+
+            $key = $financeReturn->store_id.'|'.$orderKey;
+            if (isset($seenReturnOrders[$key])) {
+                continue;
+            }
+
+            $seenReturnOrders[$key] = true;
+            if ($financeReturn->settlement_status === MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE) {
+                $settledReturnOrders++;
+            } else {
+                $unsettledReturnOrders++;
+            }
+            $returnRefundCount++;
+            $returnRefundAmount += abs((float) $financeReturn->settlement_refund_amount);
+        }
+
         return [
-            'return_refund_count' => $returns->count(),
+            'return_refund_count' => $returnRefundCount,
             'return_refund_order_count' => count($seenReturnOrders),
             'return_refund_settled_order_count' => $settledReturnOrders,
             'return_refund_unsettled_order_count' => $unsettledReturnOrders,
@@ -2121,7 +2232,10 @@ class MarketplaceAnalyticsSummaryService
     {
         return 'EXISTS (SELECT 1 FROM marketplace_returns AS mr_status'
             .' WHERE mr_status.store_id = mo.store_id'
-            .' AND (mr_status.order_sn = mo.channel_order_id OR mr_status.order_sn = mo.external_order_id))';
+            .' AND (mr_status.order_sn = mo.channel_order_id OR mr_status.order_sn = mo.external_order_id))'
+            .' OR EXISTS (SELECT 1 FROM marketplace_order_settlements AS ms_refund'
+            .' WHERE ms_refund.order_id = mo.id'
+            .' AND ABS(COALESCE(ms_refund.drc_adjustable_refund, 0)) > 0)';
     }
 
     /**

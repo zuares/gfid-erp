@@ -691,7 +691,7 @@ class TikTokShopChannelTest extends TestCase
         ]);
 
         Http::fake([
-            'https://open-api.tiktokglobalshop.com/return_refund/202309/returns/search*' => Http::response([
+            'https://open-api.tiktokglobalshop.com/return_refund/202602/returns/search*' => Http::response([
                 'code' => 105005,
                 'message' => 'Access denied. You have no permission to call this API.',
             ]),
