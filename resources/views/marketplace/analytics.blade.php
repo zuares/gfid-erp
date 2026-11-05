@@ -1433,8 +1433,8 @@
         } catch (e) {
             console.error('Analytics summary load failed', e);
             summary = null;
-            $('storeBody').innerHTML = '<tr><td colspan="7"><div class="an-error">Tidak dapat memuat ringkasan analytics.</div></td></tr>';
-            $('overviewStoreLedgerBody').innerHTML = '<tr><td colspan="7"><div class="an-error">Tidak dapat memuat performa toko.</div></td></tr>';
+            $('storeBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Tidak dapat memuat ringkasan analytics.</div></td></tr>';
+            $('overviewStoreLedgerBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Tidak dapat memuat performa toko.</div></td></tr>';
             $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-error">Tidak dapat memuat data analytics.</div></td></tr>';
         } finally {
             $('anRefresh').disabled = false;

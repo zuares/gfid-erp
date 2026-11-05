@@ -34,7 +34,8 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertSee('Menunggu konfirmasi')
             ->assertSee('Dibatalkan')
             ->assertSee('Return / Refund')
-            ->assertSee('Adm fee aktual');
+            ->assertSee('Adm fee aktual')
+            ->assertSee('<th>Biaya iklan</th>', false);
 
         $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?date_from=2099-01-01&date_to=2099-01-31');
 
