@@ -514,6 +514,94 @@
         border-bottom: 1px solid #e2e8f0 !important;
     }
 
+    .bom-usage-panel {
+        margin-top: 14px !important;
+        overflow: hidden !important;
+        border: 1px solid color-mix(in srgb, var(--gf-color-accent, #13b8c4) 32%, var(--gf-color-line, #e4e7ec)) !important;
+        border-radius: var(--gf-radius-card, 16px) !important;
+        background: var(--gf-color-surface, #fff) !important;
+    }
+
+    .bom-usage-head {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 12px !important;
+        padding: 13px 15px !important;
+        background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 8%, var(--gf-color-surface, #fff)) !important;
+    }
+
+    .bom-usage-head h3 {
+        margin: 0 !important;
+        color: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 74%, var(--gf-color-content, #101828)) !important;
+        font-size: .82rem !important;
+        font-weight: 850 !important;
+    }
+
+    .bom-usage-head h3 span { margin-right: 4px !important; }
+    .bom-usage-head p { margin: 3px 0 0 !important; color: var(--gf-color-muted, #667085) !important; font-size: .68rem !important; font-weight: 650 !important; }
+    .bom-usage-count { flex: 0 0 auto !important; padding: 4px 8px !important; border-radius: 999px !important; color: var(--gf-color-accent, #13b8c4) !important; background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 12%, var(--gf-color-surface, #fff)) !important; font-size: .65rem !important; font-weight: 850 !important; }
+    .bom-usage-list { display: grid !important; }
+    .bom-usage-row { display: grid !important; grid-template-columns: minmax(190px, 1.15fr) minmax(115px, .7fr) minmax(300px, 1.65fr) !important; align-items: center !important; gap: 14px !important; padding: 12px 15px !important; border-top: 1px solid color-mix(in srgb, var(--gf-color-line, #e4e7ec) 78%, transparent) !important; }
+    .bom-usage-material { min-width: 0 !important; }
+    .bom-usage-material strong { display: block !important; overflow: hidden !important; color: var(--gf-color-content, #101828) !important; font-size: .76rem !important; font-weight: 850 !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+    .bom-usage-material span { display: block !important; overflow: hidden !important; margin-top: 3px !important; color: var(--gf-color-muted, #667085) !important; font-size: .68rem !important; font-weight: 650 !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+    .bom-usage-latest span { display: block !important; color: var(--gf-color-muted, #667085) !important; font-size: .62rem !important; font-weight: 750 !important; }
+    .bom-usage-latest strong { display: block !important; margin-top: 3px !important; color: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 70%, var(--gf-color-content, #101828)) !important; font-size: .8rem !important; font-weight: 900 !important; }
+    .bom-usage-latest small { color: var(--gf-color-muted, #667085) !important; font-size: .63rem !important; font-weight: 700 !important; }
+    .bom-usage-actions { display: flex !important; align-items: center !important; justify-content: flex-end !important; gap: 7px !important; flex-wrap: wrap !important; }
+    .bom-usage-waste { display: inline-flex !important; align-items: center !important; gap: 4px !important; min-height: 32px !important; padding: 4px 7px !important; border: 1px solid var(--gf-color-line, #e4e7ec) !important; border-radius: var(--gf-radius-control, 10px) !important; color: var(--gf-color-muted, #667085) !important; background: var(--gf-color-surface, #fff) !important; font-size: .66rem !important; font-weight: 750 !important; }
+    .bom-usage-waste input { width: 52px !important; min-height: 24px !important; padding: 2px 4px !important; border: 0 !important; border-bottom: 1px solid var(--gf-color-line, #e4e7ec) !important; border-radius: 0 !important; color: var(--gf-color-content, #101828) !important; background: transparent !important; text-align: right !important; font-size: .7rem !important; font-weight: 800 !important; }
+    .bom-usage-waste input:focus { outline: 2px solid color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 24%, transparent) !important; outline-offset: 1px !important; }
+    .bom-usage-waste b { color: var(--gf-color-muted, #667085) !important; font-size: .64rem !important; }
+    .bom-usage-detail { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 5px !important; min-height: 34px !important; padding: 7px 10px !important; border: 1px solid var(--gf-color-line, #e4e7ec) !important; border-radius: 999px !important; color: var(--gf-color-brand-strong, #4142bb) !important; background: var(--gf-color-surface, #fff) !important; font-size: .68rem !important; font-weight: 800 !important; }
+    .bom-usage-detail:hover { border-color: color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 34%, var(--gf-color-line, #e4e7ec)) !important; background: color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 7%, var(--gf-color-surface, #fff)) !important; }
+    .bom-usage-detail:focus-visible { outline: 3px solid color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 22%, transparent) !important; outline-offset: 2px !important; }
+
+    .bom-history-modal { position: fixed !important; inset: 0 !important; z-index: 1200 !important; display: none !important; align-items: center !important; justify-content: center !important; padding: 16px !important; }
+    .bom-history-modal.is-open { display: flex !important; }
+    .bom-history-backdrop { position: absolute !important; inset: 0 !important; background: rgba(16, 24, 40, .42) !important; backdrop-filter: blur(2px) !important; }
+    .bom-history-dialog { position: relative !important; width: min(560px, 100%) !important; max-height: min(680px, calc(100vh - 32px)) !important; overflow: auto !important; border: 1px solid var(--gf-color-line, #e4e7ec) !important; border-radius: var(--gf-radius-card, 16px) !important; background: var(--gf-color-surface, #fff) !important; box-shadow: var(--gf-shadow-lg, 0 24px 56px rgba(48,49,125,.14)) !important; }
+    .bom-history-dialog-head { display: flex !important; align-items: flex-start !important; justify-content: space-between !important; gap: 12px !important; padding: 17px 18px 13px !important; border-bottom: 1px solid var(--gf-color-line, #e4e7ec) !important; }
+    .bom-history-eyebrow { color: var(--gf-color-brand-strong, #4142bb) !important; font-size: .63rem !important; font-weight: 850 !important; letter-spacing: .08em !important; text-transform: uppercase !important; }
+    .bom-history-dialog h3 { margin: 4px 0 0 !important; color: var(--gf-color-content, #101828) !important; font-size: 1rem !important; font-weight: 850 !important; }
+    .bom-history-dialog-head p { margin: 4px 0 0 !important; color: var(--gf-color-muted, #667085) !important; font-size: .7rem !important; font-weight: 650 !important; }
+    .bom-history-close { display: inline-grid !important; flex: 0 0 32px !important; place-items: center !important; width: 32px !important; height: 32px !important; border: 1px solid var(--gf-color-line, #e4e7ec) !important; border-radius: 50% !important; color: var(--gf-color-muted, #667085) !important; background: var(--gf-color-surface, #fff) !important; }
+    .bom-history-close:hover { color: var(--gf-color-content, #101828) !important; background: var(--gf-color-surface-muted, #f2f4f7) !important; }
+    .bom-history-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 22%, transparent) !important; outline-offset: 2px !important; }
+    .bom-history-summary { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; margin: 15px 18px !important; padding: 11px 12px !important; border: 1px solid color-mix(in srgb, var(--gf-color-accent, #13b8c4) 24%, var(--gf-color-line, #e4e7ec)) !important; border-radius: var(--gf-radius-control, 10px) !important; background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 7%, var(--gf-color-surface, #fff)) !important; }
+    .bom-history-summary span { color: var(--gf-color-muted, #667085) !important; font-size: .68rem !important; font-weight: 750 !important; }
+    .bom-history-summary strong { color: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 70%, var(--gf-color-content, #101828)) !important; font-size: .86rem !important; font-weight: 900 !important; }
+    .bom-history-detail-label { margin: 0 18px 7px !important; color: var(--gf-color-muted, #667085) !important; font-size: .65rem !important; font-weight: 850 !important; letter-spacing: .06em !important; text-transform: uppercase !important; }
+    .bom-history-list { display: grid !important; gap: 7px !important; margin: 0 18px !important; padding: 0 !important; list-style: none !important; counter-reset: history-item !important; }
+    .bom-history-list li { display: grid !important; grid-template-columns: 24px minmax(0, 1fr) auto !important; align-items: center !important; gap: 9px !important; padding: 10px !important; border: 1px solid var(--gf-color-line, #e4e7ec) !important; border-radius: var(--gf-radius-control, 10px) !important; background: var(--gf-color-surface, #fff) !important; counter-increment: history-item !important; }
+    .bom-history-list li::before { content: counter(history-item) !important; display: inline-grid !important; place-items: center !important; width: 22px !important; height: 22px !important; border-radius: 7px !important; color: var(--gf-color-brand-strong, #4142bb) !important; background: color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 10%, var(--gf-color-surface, #fff)) !important; font-size: .65rem !important; font-weight: 900 !important; }
+    .bom-history-list li strong { color: var(--gf-color-content, #101828) !important; font-size: .72rem !important; font-weight: 850 !important; }
+    .bom-history-list li small { display: block !important; margin-top: 2px !important; color: var(--gf-color-muted, #667085) !important; font-size: .63rem !important; font-weight: 650 !important; }
+    .bom-history-list li > span { color: var(--gf-color-content, #101828) !important; font-size: .72rem !important; font-weight: 850 !important; font-variant-numeric: tabular-nums !important; }
+    .bom-history-empty { grid-template-columns: 1fr !important; color: var(--gf-color-muted, #667085) !important; font-size: .7rem !important; font-style: italic !important; }
+    .bom-history-empty::before { display: none !important; }
+    .bom-history-dialog-foot { display: flex !important; justify-content: flex-end !important; padding: 13px 18px 17px !important; }
+
+    @media (max-width: 920px) {
+        .bom-usage-row { grid-template-columns: minmax(180px, 1fr) minmax(110px, .7fr) !important; }
+        .bom-usage-actions { grid-column: 1 / -1 !important; justify-content: flex-start !important; }
+    }
+
+    @media (max-width: 520px) {
+        .bom-usage-head { align-items: flex-start !important; flex-direction: column !important; }
+        .bom-usage-row { grid-template-columns: 1fr !important; gap: 9px !important; }
+        .bom-usage-actions { align-items: stretch !important; display: grid !important; grid-template-columns: auto 1fr !important; }
+        .bom-usage-waste { justify-content: center !important; }
+        .bom-usage-detail,
+        .bom-usage-actions .btn-use-material { width: 100% !important; }
+        .bom-usage-actions .btn-use-material { grid-column: 1 / -1 !important; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .bom-history-dialog { scroll-behavior: auto !important; }
+    }
+
     .bom-form-head .subt { margin-top: 5px !important; }
 
     .bom-form-context {
@@ -766,64 +854,81 @@
 
       @if(!empty($usageByMaterial ?? []))
         {{-- ── RIWAYAT PEMAKAIAN KAIN (dari cutting job non-void) ── --}}
-        <div class="mt-3" style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:.85rem 1rem;">
-          <div style="font-weight:800;font-size:.8rem;color:#0f766e;margin-bottom:.15rem;">
-            🧵 Riwayat Pemakaian Kain — Cutting Job
+        <div class="bom-usage-panel" aria-labelledby="bom-usage-title">
+          <div class="bom-usage-head">
+            <div>
+              <h3 id="bom-usage-title"><span aria-hidden="true">🧵</span> Riwayat pemakaian kain</h3>
+              <p>Data aktual cutting · detail riwayat tersedia saat dibutuhkan.</p>
+            </div>
+            <span class="bom-usage-count">{{ count($usageByMaterial) }} material</span>
           </div>
-          <div class="small text-muted mb-2">Data aktual cutting · tambah sebagai bahan utama.</div>
-          <div class="table-responsive usage-history-wrap">
-            <table class="table table-sm align-middle mb-0 usage-history-table" style="font-size:.78rem;background:#fff;border-radius:8px;overflow:hidden;">
-              <thead>
-                <tr style="font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:#64748b;">
-                  <th>Material</th>
-                  <th class="text-end" style="width:130px;">Aktual Terakhir</th>
-                  <th style="width:240px;">Riwayat (3 terakhir)</th>
-                  <th style="width:190px;"></th>
-                </tr>
-              </thead>
-              <tbody>
-                @foreach($usageByMaterial as $umid => $u)
-                  <tr>
-                    <td>
-                      <span class="mono fw-bold">{{ $u['material_code'] ?? ('#'.$umid) }}</span>
-                      <div class="small text-muted">{{ $u['material_name'] ?? '' }}</div>
-                    </td>
-                    <td class="text-end mono fw-bold" style="color:#0f766e;">
-                      {{ number_format($u['kg_per_pcs'], 3, ',', '') }} <span class="text-muted fw-normal">/pcs</span>
-                    </td>
-                    <td class="text-muted" style="font-size:.72rem;line-height:1.5;">
-                      @foreach(($u['history'] ?? []) as $h)
-                        <div>{{ $h['job_code'] }} ({{ $h['date'] }}) · <span class="mono">{{ number_format($h['kg_per_pcs'], 3, ',', '') }}</span></div>
-                      @endforeach
-                    </td>
-                    @php
-                      $defaultScrap = (string) ($bom?->lines
-                          ?->firstWhere('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
-                          ?->scrap_pct ?? 0);
-                    @endphp
-                    <td class="text-end">
-                      <div class="d-inline-flex align-items-center gap-1 flex-wrap justify-content-end">
-                        <span style="font-size:.68rem;color:#64748b;">Waste</span>
-                        <input type="number" class="use-scrap-input mono" value="{{ $defaultScrap }}"
-                               min="0" max="100" step="0.1"
-                               style="width:58px;font-size:.72rem;padding:.15rem .3rem;border:1px solid #cbd5e1;border-radius:6px;text-align:right;">
-                        <span style="font-size:.68rem;color:#64748b;">%</span>
-                        <button type="button" class="btnx btn-use-material"
-                                data-mid="{{ $umid }}"
-                                data-code="{{ $u['material_code'] ?? '' }}"
-                                data-name="{{ $u['material_name'] ?? '' }}"
-                                data-kg="{{ $u['kg_per_pcs'] }}">
-                          Tambah sebagai bahan utama
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                @endforeach
-              </tbody>
-            </table>
+          <div class="bom-usage-list">
+            @foreach($usageByMaterial as $umid => $u)
+              @php
+                $defaultScrap = (string) ($bom?->lines
+                    ?->firstWhere('usage_stage', \App\Models\ItemBomLine::STAGE_MAIN_MATERIAL)
+                    ?->scrap_pct ?? 0);
+              @endphp
+              <article class="bom-usage-row">
+                <div class="bom-usage-material">
+                  <strong class="mono">{{ $u['material_code'] ?? ('#'.$umid) }}</strong>
+                  <span>{{ $u['material_name'] ?? '' }}</span>
+                </div>
+                <div class="bom-usage-latest">
+                  <span>Aktual terakhir</span>
+                  <strong class="mono">{{ number_format($u['kg_per_pcs'], 3, ',', '') }} <small>/pcs</small></strong>
+                </div>
+                <div class="bom-usage-actions">
+                  <label class="bom-usage-waste">
+                    <span>Waste</span>
+                    <input type="number" class="use-scrap-input mono" value="{{ $defaultScrap }}" min="0" max="100" step="0.1" aria-label="Waste {{ $u['material_code'] ?? ('#'.$umid) }}">
+                    <b>%</b>
+                  </label>
+                  <button type="button" class="bom-usage-detail" data-usage-detail
+                          data-code="{{ $u['material_code'] ?? ('#'.$umid) }}"
+                          data-name="{{ $u['material_name'] ?? '' }}"
+                          data-latest="{{ number_format($u['kg_per_pcs'], 3, ',', '') }}"
+                          data-history="{{ e(json_encode($u['history'] ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)) }}">
+                    <i class="bi bi-clock-history" aria-hidden="true"></i> Lihat detail
+                  </button>
+                  <button type="button" class="btnx btn-use-material"
+                          data-mid="{{ $umid }}"
+                          data-code="{{ $u['material_code'] ?? '' }}"
+                          data-name="{{ $u['material_name'] ?? '' }}"
+                          data-kg="{{ $u['kg_per_pcs'] }}">
+                    Tambah sebagai bahan utama
+                  </button>
+                </div>
+              </article>
+            @endforeach
           </div>
         </div>
       @endif
+
+      <div class="bom-history-modal" id="bom-history-modal" aria-hidden="true">
+        <div class="bom-history-backdrop" data-history-close></div>
+        <div class="bom-history-dialog" role="dialog" aria-modal="true" aria-labelledby="bom-history-modal-title" tabindex="-1">
+          <header class="bom-history-dialog-head">
+            <div>
+              <span class="bom-history-eyebrow">Riwayat cutting</span>
+              <h3 id="bom-history-modal-title">Detail pemakaian material</h3>
+              <p id="bom-history-modal-subtitle"></p>
+            </div>
+            <button type="button" class="bom-history-close" data-history-close aria-label="Tutup detail riwayat">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </header>
+          <div class="bom-history-summary">
+            <span>Aktual terakhir</span>
+            <strong id="bom-history-modal-latest">-</strong>
+          </div>
+          <div class="bom-history-detail-label">3 pemakaian terakhir</div>
+          <ol class="bom-history-list" id="bom-history-list"></ol>
+          <footer class="bom-history-dialog-foot">
+            <button type="button" class="btnx ghost" data-history-close>Tutup</button>
+          </footer>
+        </div>
+      </div>
 
       <div class="rowx bom-lines-toolbar">
         <label class="bom-active-toggle" for="bom-active-toggle">
@@ -1200,6 +1305,95 @@
     renderCostCells($(this).closest('tr.line'));
   });
 
+  // ── Detail riwayat cutting (single reusable modal) ──
+  const historyModal = document.getElementById('bom-history-modal');
+  const historyDialog = historyModal?.querySelector('.bom-history-dialog');
+  const historyTitle = document.getElementById('bom-history-modal-title');
+  const historySubtitle = document.getElementById('bom-history-modal-subtitle');
+  const historyLatest = document.getElementById('bom-history-modal-latest');
+  const historyList = document.getElementById('bom-history-list');
+  let historyLastFocus = null;
+  let previousBodyOverflow = '';
+
+  function formatHistoryQty(value){
+    const number = Number(value || 0);
+    return `${number.toFixed(3).replace('.', ',')} /pcs`;
+  }
+
+  function closeHistoryModal(){
+    if (!historyModal) return;
+    historyModal.classList.remove('is-open');
+    historyModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = previousBodyOverflow;
+    historyLastFocus?.focus();
+    historyLastFocus = null;
+  }
+
+  function openHistoryModal(button){
+    if (!historyModal || !historyList) return;
+
+    historyLastFocus = button;
+    historyTitle.textContent = button.dataset.code || 'Material';
+    historySubtitle.textContent = button.dataset.name || 'Detail pemakaian material';
+    historyLatest.textContent = `${button.dataset.latest || '-'} /pcs`;
+    historyList.innerHTML = '';
+
+    let history = [];
+    try {
+      history = JSON.parse(button.dataset.history || '[]');
+    } catch (error) {
+      history = [];
+    }
+
+    if (!history.length) {
+      const empty = document.createElement('li');
+      empty.className = 'bom-history-empty';
+      empty.textContent = 'Belum ada riwayat cutting lainnya.';
+      historyList.appendChild(empty);
+    } else {
+      history.forEach(function(item){
+        const row = document.createElement('li');
+        const detail = document.createElement('div');
+        const job = document.createElement('strong');
+        const date = document.createElement('small');
+        const qty = document.createElement('span');
+
+        job.textContent = item.job_code || 'Cutting Job';
+        date.textContent = item.date || '-';
+        qty.textContent = formatHistoryQty(item.kg_per_pcs);
+        detail.append(job, date);
+        row.append(detail, qty);
+        historyList.appendChild(row);
+      });
+    }
+
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    historyModal.classList.add('is-open');
+    historyModal.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(() => historyDialog?.querySelector('.bom-history-close')?.focus());
+  }
+
+  document.addEventListener('click', function(event){
+    const detailButton = event.target.closest('[data-usage-detail]');
+    if (detailButton) {
+      event.preventDefault();
+      openHistoryModal(detailButton);
+      return;
+    }
+
+    if (event.target.closest('[data-history-close]')) {
+      event.preventDefault();
+      closeHistoryModal();
+    }
+  });
+
+  document.addEventListener('keydown', function(event){
+    if (event.key === 'Escape' && historyModal?.classList.contains('is-open')) {
+      closeHistoryModal();
+    }
+  });
+
   // ── "Pakai sebagai bahan utama" dari panel riwayat pemakaian ──
   $(document).on('click', '.btn-use-material', function(){
     const mid  = parseInt(this.dataset.mid, 10);
@@ -1239,7 +1433,7 @@
     //    Scrap% diambil dari input di panel riwayat → di-set ke baris BOM,
     //    lalu qty = aktual / (1 + scrap%) sehingga qty×(1+scrap) = aktual.
     $target.find('select.usage-stage').val('main_material').trigger('change');
-    const scrap = Math.max(0, parseFloat($(this).closest('td').find('.use-scrap-input').val() || '0'));
+    const scrap = Math.max(0, parseFloat($(this).closest('.bom-usage-row').find('.use-scrap-input').val() || '0'));
     $target.find('input.scrap').val(scrap);
     $target.find('input.qty').val((kg / (1 + scrap / 100)).toFixed(3)).trigger('input');
 
