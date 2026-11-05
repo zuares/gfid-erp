@@ -1139,11 +1139,22 @@ class InventoryAdjustmentController extends Controller
             return response()->json($results);
         }
 
+        // Satu input boleh berisi beberapa kode/nama item yang dipisahkan spasi.
+        // Hasil dicari sebagai OR antar-term supaya "K001 K002" memuat kedua item.
+        $searchTerms = array_values(array_unique(array_filter(
+            preg_split('/\s+/', $q) ?: [],
+            static fn (string $term): bool => $term !== ''
+        )));
+
         $items = Item::query()
             ->with('role')
-            ->where(function ($sub) use ($q) {
-                $sub->where('code', 'like', '%'.$q.'%')
-                    ->orWhere('name', 'like', '%'.$q.'%');
+            ->where(function ($sub) use ($searchTerms) {
+                foreach ($searchTerms as $term) {
+                    $sub->orWhere(function ($termQuery) use ($term) {
+                        $termQuery->where('code', 'like', '%'.$term.'%')
+                            ->orWhere('name', 'like', '%'.$term.'%');
+                    });
+                }
             })
             ->orderBy('code')
             ->limit(50)

@@ -150,3 +150,37 @@ it('accepts multiple related items for a bulk inventory correction prefill', fun
         ['item_id' => $second->id, 'item_code' => 'BULK-ADJ-002', 'qty_change' => 4.0],
     ]);
 });
+
+it('searches multiple manual correction items when terms are separated by spaces', function () {
+    $warehouse = Warehouse::create([
+        'code' => 'WH-SEARCH',
+        'name' => 'Gudang Search',
+        'type' => 'finished_goods',
+        'active' => true,
+    ]);
+    $first = Item::create([
+        'code' => 'MULTI-ADJ-001',
+        'name' => 'Multi Search Item One',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'active' => true,
+    ]);
+    $second = Item::create([
+        'code' => 'MULTI-ADJ-002',
+        'name' => 'Multi Search Item Two',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'active' => true,
+    ]);
+
+    $request = Request::create('/inventory/adjustments/items', 'GET', [
+        'warehouse_id' => $warehouse->id,
+        'q' => 'MULTI-ADJ-001 MULTI-ADJ-002',
+    ]);
+
+    $response = app(InventoryAdjustmentController::class)->itemsForWarehouse($request);
+    $codes = collect($response->getData(true))->pluck('code')->all();
+
+    expect($codes)->toContain($first->code)
+        ->toContain($second->code);
+});

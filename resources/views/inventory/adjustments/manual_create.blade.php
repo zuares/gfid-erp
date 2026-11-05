@@ -518,9 +518,10 @@
                     <div class="adj-section-label">Cari Item</div>
                     <div class="row adj-form-row align-items-end">
                         <div class="col-12 col-lg-8">
-                            <label class="adj-field-label">Cari kode / nama / lot</label>
+                            <label class="adj-field-label">Cari kode / nama / lot (pisahkan dengan spasi)</label>
                             <input type="text" id="item-search" class="form-control form-control-sm"
-                                placeholder="Contoh: K001, kaos, LOT-01" value="{{ $prefillItemCode ?? '' }}" style="font-size:.82rem;">
+                                placeholder="Contoh: K001 K002 atau kaos" value="{{ $prefillItemCode ?? '' }}" style="font-size:.82rem;"
+                                aria-describedby="items-hint">
                         </div>
                         <div class="col-12 col-lg-2">
                             <label class="adj-field-label">&nbsp;</label>
@@ -715,6 +716,21 @@
             let warehouseItems = [];
             let searchTimer = null;
             let allowNativeSubmit = false;
+
+            function searchTerms(value) {
+                return [...new Set(
+                    String(value || '')
+                        .trim()
+                        .toLowerCase()
+                        .split(/\s+/)
+                        .filter(Boolean)
+                )];
+            }
+
+            function rowMatchesTerms(tr, terms) {
+                const searchKey = tr.dataset.searchKey || '';
+                return terms.some(term => searchKey.includes(term));
+            }
 
             function fmt(n) {
                 const x = parseFloat(n);
@@ -924,15 +940,12 @@
             }
 
             function applyFilter() {
-                const term = (itemSearch.value || '').trim().toLowerCase();
+                const terms = searchTerms(itemSearch.value);
                 const changedOnly = showChangedOnly.value === '1';
                 tbody.querySelectorAll('tr').forEach(tr => {
-                    const code = tr.dataset.code || '';
-                    const name = tr.dataset.name || '';
-                    const lotCode = tr.dataset.lotCode || '';
                     const changed = tr.dataset.changed === '1';
                     let ok = true;
-                    if (term) ok = (code.includes(term) || name.includes(term) || lotCode.includes(term));
+                    if (terms.length) ok = rowMatchesTerms(tr, terms);
                     if (ok && changedOnly) ok = changed;
                     tr.style.display = ok ? '' : 'none';
                 });
@@ -1053,15 +1066,12 @@
             }
 
             function focusItemByTerm(term) {
-                const needle = (term || '').trim().toLowerCase();
-                if (!needle) return false;
+                const terms = searchTerms(term);
+                if (!terms.length) return false;
                 const rows = Array.from(tbody.querySelectorAll('tr'));
-                const row = rows.find(tr => {
-                    const code = tr.dataset.code || '';
-                    const name = tr.dataset.name || '';
-                    const lotCode = tr.dataset.lotCode || '';
-                    return code.includes(needle) || name.includes(needle) || lotCode.includes(needle);
-                });
+                // Fokus ke item pertama yang diminta, tetapi semua term tetap
+                // ditampilkan oleh filter dan dimuat dari endpoint.
+                const row = terms.reduce((found, needle) => found || rows.find(tr => rowMatchesTerms(tr, [needle])), null);
                 if (!row) return false;
                 row.scrollIntoView({ block: 'center', behavior: 'smooth' });
                 flashRow(row);
@@ -1073,15 +1083,19 @@
             function fetchSearchItems(term, focusAfter = false) {
                 const warehouseId = warehouseSelect.value || '';
                 if (!warehouseId) { itemsHint.textContent = 'Pilih gudang dulu.'; return Promise.resolve([]); }
-                if (term.length < 2) { itemsHint.textContent = 'Ketik minimal 2 huruf.'; return Promise.resolve([]); }
+                const terms = searchTerms(term).filter(searchTerm => searchTerm.length >= 2);
+                if (!terms.length) { itemsHint.textContent = 'Ketik minimal 2 karakter per pencarian.'; return Promise.resolve([]); }
+                const query = terms.join(' ');
                 itemsHint.textContent = 'Mencari item…';
-                return fetch(itemsUrl + '?warehouse_id=' + encodeURIComponent(warehouseId) + '&q=' + encodeURIComponent(term))
+                return fetch(itemsUrl + '?warehouse_id=' + encodeURIComponent(warehouseId) + '&q=' + encodeURIComponent(query))
                     .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
                     .then(data => {
                         const state = snapshotInputs();
                         mergeItems(Array.isArray(data) ? data : []);
                         renderRows(); restoreInputs(state); applyFilter(); updateSummary();
-                        itemsHint.textContent = data.length ? 'Item ditemukan. Stok akhir bisa diubah langsung di tabel.' : 'Item tidak ditemukan.';
+                        itemsHint.textContent = data.length
+                            ? `${data.length} item ditemukan. Stok akhir bisa diubah langsung di tabel.`
+                            : 'Item tidak ditemukan.';
                         if (focusAfter && data.length) focusItemByTerm(term);
                         return data;
                     })
@@ -1235,11 +1249,9 @@
                     itemsHint.textContent = 'Ketik kode / nama item untuk mencari.';
                     return;
                 }
-                if (!focusItemByTerm(term)) {
-                    fetchSearchItems(term, true);
-                } else {
-                    itemsHint.textContent = 'Item ditemukan. Stok akhir bisa diubah langsung di tabel.';
-                }
+                // Selalu ambil ulang hasil saat Enter agar term kedua tetap
+                // dimuat walaupun term pertama sudah ada di tabel.
+                fetchSearchItems(term, true);
                 applyFilter();
             };
             itemSearch.addEventListener('keydown', (e) => {
