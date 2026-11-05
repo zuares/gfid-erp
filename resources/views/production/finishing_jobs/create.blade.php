@@ -333,8 +333,9 @@
     {{-- ── AUTO BOM PACKING ── --}}
     @php
         $ps         = $packingSupplies ?? collect();
-        $psShortage = $ps->where('has_shortage', true)->count();
-        $psTotal    = $ps->count();
+        $psMaterials = $ps->flatMap(fn ($group) => $group->materials ?? collect());
+        $psShortage = $psMaterials->where('has_shortage', true)->count();
+        $psTotal    = $psMaterials->count();
     @endphp
     @if($hasAnyWipAll)
     <div class="panel mb-2">
@@ -356,42 +357,40 @@
                     </span>
                 @endif
             </div>
-            @if($psShortage > 0 && Route::has('purchasing.material_shortages.index'))
-            <a href="{{ route('purchasing.material_shortages.index') }}"
-               class="btn btn-sm btn-warning" style="border-radius:999px;font-size:.75rem;font-weight:800;">
-                📋 Lihat Kekurangan Material
-            </a>
-            @endif
         </div>
         <div class="panel-b" style="padding-top:.5rem;padding-bottom:.5rem;">
-            <div style="display:grid;grid-template-columns:1fr 72px 72px 72px;gap:.25rem .5rem;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:.1rem .1rem .35rem;border-bottom:1px solid rgba(148,163,184,.15);">
-                <span>Material</span>
-                <span style="text-align:right;">Butuh</span>
-                <span style="text-align:right;">Stok RM</span>
-                <span style="text-align:right;">Status</span>
-            </div>
-            @foreach($ps as $sup)
-            <div style="display:grid;grid-template-columns:1fr 72px 72px 72px;gap:.2rem .5rem;padding:.35rem .1rem;border-bottom:1px solid rgba(148,163,184,.08);align-items:center;">
-                <div>
-                    <span style="font-weight:700;font-size:.8rem;">{{ $sup->name }}</span>
-                    <span style="color:var(--muted);font-size:.68rem;margin-left:.3rem;">[{{ $sup->code }}]</span>
+            @foreach($ps as $group)
+            <div style="border:1px solid rgba(148,163,184,.15);border-radius:10px;padding:.45rem .55rem;margin-bottom:.5rem;">
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">
+                    <div>
+                        <span style="font-weight:900;font-size:.8rem;">{{ $group->item_code }}</span>
+                        <span style="color:var(--muted);font-size:.7rem;margin-left:.3rem;">{{ $group->item_name }}</span>
+                    </div>
+                    <span style="color:var(--muted);font-size:.68rem;font-weight:800;">WIP {{ number_format($group->wip_qty, 0, ',', '.') }}</span>
                 </div>
-                <div style="text-align:right;font-size:.78rem;font-weight:700;">
-                    {{ number_format($sup->required_qty, 2, ',', '.') }}
-                    <span style="color:var(--muted);font-size:.65em;">{{ $sup->unit }}</span>
+                <div style="display:grid;grid-template-columns:1fr 72px 72px 110px;gap:.25rem .5rem;font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:.1rem .1rem .25rem;border-bottom:1px solid rgba(148,163,184,.15);">
+                    <span>Material terkait</span><span style="text-align:right;">Butuh</span><span style="text-align:right;">Stok RM</span><span style="text-align:right;">Status</span>
                 </div>
-                <div style="text-align:right;font-size:.78rem;font-weight:700;color:{{ $sup->stock_qty < $sup->required_qty ? '#b91c1c' : '#15803d' }};">
-                    {{ number_format($sup->stock_qty, 2, ',', '.') }}
+                @foreach($group->materials as $sup)
+                <div style="display:grid;grid-template-columns:1fr 72px 72px 110px;gap:.2rem .5rem;padding:.35rem .1rem;border-bottom:1px solid rgba(148,163,184,.08);align-items:center;">
+                    <div>
+                        <span style="font-weight:700;font-size:.78rem;">{{ $sup->name }}</span>
+                        <span style="color:var(--muted);font-size:.66rem;margin-left:.3rem;">[{{ $sup->code }}]</span>
+                    </div>
+                    <div style="text-align:right;font-size:.76rem;font-weight:700;">{{ number_format($sup->required_qty, 2, ',', '.') }} <span style="color:var(--muted);font-size:.65em;">{{ $sup->unit }}</span></div>
+                    <div style="text-align:right;font-size:.76rem;font-weight:700;color:{{ $sup->stock_qty < $sup->required_qty ? '#b91c1c' : '#15803d' }};">{{ number_format($sup->stock_qty, 2, ',', '.') }}</div>
+                    <div style="text-align:right;">
+                        @if($sup->has_shortage)
+                            <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
+                                <span style="background:rgba(220,38,38,.1);color:#b91c1c;border:1px solid rgba(220,38,38,.25);border-radius:6px;padding:.1rem .35rem;font-size:.62rem;font-weight:900;white-space:nowrap;">-{{ number_format($sup->shortage_qty, 2, ',', '.') }}</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger material-correction-trigger" style="border-radius:7px;font-size:.62rem;font-weight:900;padding:.18rem .35rem;" data-bs-toggle="modal" data-bs-target="#materialCorrectionModal" data-finishing-item-id="{{ $group->item_id }}" data-finishing-item-label="{{ $group->item_code }} — {{ $group->item_name }}" data-material-item-id="{{ $sup->id }}" data-material-label="{{ $sup->code }} — {{ $sup->name }}" data-qty="{{ $sup->shortage_qty }}" data-unit="{{ $sup->unit }}">Koreksi Material</button>
+                            </div>
+                        @else
+                            <span style="color:#15803d;font-size:.72rem;font-weight:900;">✓</span>
+                        @endif
+                    </div>
                 </div>
-                <div style="text-align:right;">
-                    @if($sup->has_shortage)
-                        <span style="background:rgba(220,38,38,.1);color:#b91c1c;border:1px solid rgba(220,38,38,.25);border-radius:6px;padding:.1rem .4rem;font-size:.65rem;font-weight:900;white-space:nowrap;">
-                            -{{ number_format($sup->shortage_qty, 2, ',', '.') }}
-                        </span>
-                    @else
-                        <span style="color:#15803d;font-size:.72rem;font-weight:900;">✓</span>
-                    @endif
-                </div>
+                @endforeach
             </div>
             @endforeach
             @if($psTotal === 0)
@@ -402,6 +401,34 @@
         </div>
     </div>
     @endif
+
+    <div class="modal fade" id="materialCorrectionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('production.finishing_material_corrections.store') }}">
+                    @csrf
+                    <input type="hidden" name="finishing_item_id" id="correction-finishing-item-id">
+                    <input type="hidden" name="material_item_id" id="correction-material-item-id">
+                    <div class="modal-header"><h5 class="modal-title">Koreksi Material</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        <div class="alert alert-light border py-2 mb-3" style="font-size:.78rem;"><div class="fw-bold" id="correction-finishing-label">-</div><div class="text-muted" id="correction-material-label">-</div></div>
+                        <label class="form-label form-label-sm">Jenis koreksi</label>
+                        <select class="form-select form-select-sm mb-3" name="action" required>
+                            <option value="stock">Koreksi Stok</option>
+                            <option value="bom">Koreksi BOM</option>
+                            <option value="purchase">Kebutuhan Pembelian</option>
+                        </select>
+                        <label class="form-label form-label-sm">Qty koreksi <span class="text-muted" id="correction-unit"></span></label>
+                        <input class="form-control form-control-sm mb-3" type="number" name="qty" id="correction-qty" min="0.001" step="0.001" required>
+                        <label class="form-label form-label-sm">Alasan <span class="text-danger">*</span></label>
+                        <textarea class="form-control form-control-sm" name="reason" rows="3" minlength="3" maxlength="2000" required placeholder="Jelaskan penyebab dan tindakan koreksi"></textarea>
+                        <div class="text-muted mt-2" style="font-size:.68rem;">Pembuat dan waktu koreksi dicatat otomatis untuk audit trail.</div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-sm btn-primary">Simpan Koreksi</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div class="panel">
         <form id="finishing-form" action="{{ route('production.finishing_jobs.store') }}" method="POST" novalidate>
@@ -1597,6 +1624,19 @@ document.addEventListener('DOMContentLoaded', () => {
     computeSubmitEnabled();
     updateOperatorRowCount();
     renderFinishingFinancialPreview();
+
+    // Material correction modal: the row itself supplies the related FG,
+    // material, and shortage qty so the correction cannot drift to another SKU.
+    document.querySelectorAll('.material-correction-trigger').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            document.getElementById('correction-finishing-item-id').value = trigger.dataset.finishingItemId || '';
+            document.getElementById('correction-material-item-id').value = trigger.dataset.materialItemId || '';
+            document.getElementById('correction-finishing-label').textContent = trigger.dataset.finishingItemLabel || '-';
+            document.getElementById('correction-material-label').textContent = trigger.dataset.materialLabel || '-';
+            document.getElementById('correction-qty').value = trigger.dataset.qty || '';
+            document.getElementById('correction-unit').textContent = trigger.dataset.unit ? `(${trigger.dataset.unit})` : '';
+        });
+    });
 });
 </script>
 @endpush

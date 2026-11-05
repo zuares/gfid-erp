@@ -10,6 +10,7 @@ use App\Models\FinishingJob;
 use App\Models\FinishingJobLine;
 use App\Models\Item;
 use App\Models\ItemBom;
+use App\Models\ItemBomLine;
 use App\Models\ItemCostSnapshot;
 use App\Models\Journal;
 use App\Models\Warehouse;
@@ -420,7 +421,9 @@ class FinishingJobController extends Controller
             ];
         })->filter(fn ($l) => (int) $l['total_wip'] > 0)->values()->all();
 
-        // 6) Packing supply status — kebutuhan kelengkapan packing vs stok RM
+        // 6) Packing supply status — kebutuhan kelengkapan packing vs stok RM.
+        // Keep the material rows grouped by finishing item so a correction can
+        // never accidentally target an unrelated SKU on the same page.
         $packingSupplies = collect();
         $rmWarehouseId = Warehouse::where('code', 'RM')->value('id');
         if ($rmWarehouseId && $itemIds->isNotEmpty()) {
@@ -442,7 +445,7 @@ class FinishingJobController extends Controller
                 ])
                 ->get();
 
-            $required = [];
+            $requiredByItem = [];
             foreach ($bomLines as $bom) {
                 $fgId = (int) $bom->fg_item_id;
                 $wip = (float) optional($wipByItem->get($fgId))->wip_sum;
@@ -451,37 +454,61 @@ class FinishingJobController extends Controller
                 }
                 $need = $wip * (float) $bom->bom_qty * (1 + ((float) $bom->scrap_pct / 100));
                 $matId = (int) $bom->mat_id;
-                $required[$matId] ??= [
+                $requiredByItem[$fgId] ??= [
+                    'item_id' => $fgId,
+                    'item_code' => strtoupper((string) optional($items->get($fgId))->code),
+                    'item_name' => optional($items->get($fgId))->name,
+                    'wip_qty' => $wip,
+                    'materials' => [],
+                ];
+                $requiredByItem[$fgId]['materials'][$matId] ??= [
                     'id' => $matId,
                     'code' => $bom->mat_code,
                     'name' => $bom->mat_name,
                     'unit' => $bom->mat_unit ?: 'pcs',
                     'required_qty' => 0.0,
                 ];
-                $required[$matId]['required_qty'] += $need;
+                $requiredByItem[$fgId]['materials'][$matId]['required_qty'] += $need;
             }
 
-            if (! empty($required)) {
+            $materialIds = collect($requiredByItem)
+                ->flatMap(fn ($row) => array_keys($row['materials']))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            if ($materialIds->isNotEmpty()) {
                 $rmStocks = DB::table('inventory_stocks')
                     ->where('warehouse_id', $rmWarehouseId)
-                    ->whereIn('item_id', array_keys($required))
+                    ->whereIn('item_id', $materialIds)
                     ->pluck('qty', 'item_id');
 
-                $packingSupplies = collect($required)->map(function ($row) use ($rmStocks) {
-                    $stock = (float) ($rmStocks[$row['id']] ?? 0);
-                    $shortage = max($row['required_qty'] - $stock, 0);
+                $packingSupplies = collect($requiredByItem)->map(function ($row) use ($rmStocks) {
+                    $materials = collect($row['materials'])->map(function ($material) use ($rmStocks) {
+                        $stock = (float) ($rmStocks[$material['id']] ?? 0);
+                        $shortage = max($material['required_qty'] - $stock, 0);
+
+                        return (object) [
+                            'id' => $material['id'],
+                            'code' => $material['code'],
+                            'name' => $material['name'],
+                            'unit' => $material['unit'],
+                            'required_qty' => round($material['required_qty'], 2),
+                            'stock_qty' => round($stock, 2),
+                            'shortage_qty' => round($shortage, 2),
+                            'has_shortage' => $shortage > 0.001,
+                        ];
+                    })->sortByDesc('has_shortage')->values();
 
                     return (object) [
-                        'id' => $row['id'],
-                        'code' => $row['code'],
-                        'name' => $row['name'],
-                        'unit' => $row['unit'],
-                        'required_qty' => round($row['required_qty'], 2),
-                        'stock_qty' => round($stock, 2),
-                        'shortage_qty' => round($shortage, 2),
-                        'has_shortage' => $shortage > 0.001,
+                        'item_id' => $row['item_id'],
+                        'item_code' => $row['item_code'],
+                        'item_name' => $row['item_name'],
+                        'wip_qty' => round($row['wip_qty'], 2),
+                        'materials' => $materials,
+                        'shortage_count' => $materials->where('has_shortage', true)->count(),
                     ];
-                })->sortByDesc('has_shortage')->values();
+                })->sortByDesc('shortage_count')->values();
             }
         }
 
@@ -1310,6 +1337,17 @@ class FinishingJobController extends Controller
 
         try {
             $this->postCreatedJob($job);
+        } catch (ValidationException $e) {
+            $response = back()
+                ->withInput()
+                ->withErrors($e->errors());
+
+            $shortages = $this->finishingMaterialShortageContext($job, $e->errors());
+            if ($shortages !== []) {
+                $response->with('finishing_material_shortages', $shortages);
+            }
+
+            return $response;
         } catch (\RuntimeException $e) {
             return back()->withErrors(['warehouse' => $e->getMessage()]);
         }
@@ -1371,6 +1409,96 @@ class FinishingJobController extends Controller
     private function assertFinishingLifecyclePermission(Request $request): void
     {
         abort_unless($request->user()?->isOwner(), 403, 'Hanya owner/developer yang boleh VOID atau UNPOST Finishing.');
+    }
+
+    /**
+     * Attach stable IDs and numeric qty to the human-readable shortage error
+     * so the show page can offer audited Purchase Request / stock correction
+     * actions without scraping IDs from the rendered text.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function finishingMaterialShortageContext(FinishingJob $job, array $errors): array
+    {
+        $messages = collect($errors['supplies'] ?? [])
+            ->flatMap(fn ($message) => preg_split('/\R+/', (string) $message) ?: [])
+            ->map(fn ($message) => trim((string) $message))
+            ->filter()
+            ->values();
+
+        if ($messages->isEmpty()) {
+            return [];
+        }
+
+        $finishingItems = $job->lines
+            ->map(fn ($line) => $line->item)
+            ->filter()
+            ->keyBy('id');
+
+        if ($finishingItems->isEmpty()) {
+            return [];
+        }
+
+        $boms = ItemBom::query()
+            ->whereIn('item_id', $finishingItems->keys()->all())
+            ->where('active', true)
+            ->with([
+                'item:id,code,name',
+                'lines' => fn ($query) => $query
+                    ->where('usage_stage', ItemBomLine::STAGE_PACKING_SUPPLY)
+                    ->where('is_optional', false)
+                    ->with('material:id,code,name,unit'),
+            ])
+            ->get();
+
+        $materialContextByCode = [];
+        foreach ($boms as $bom) {
+            foreach ($bom->lines as $line) {
+                $material = $line->material;
+                $materialCode = strtoupper(trim((string) ($material?->code ?? '')));
+                if ($materialCode === '' || isset($materialContextByCode[$materialCode])) {
+                    continue;
+                }
+
+                $materialContextByCode[$materialCode] = [
+                    'finishing_item_id' => (int) $bom->item_id,
+                    'finishing_item_label' => trim(($bom->item?->code ?? '').' — '.($bom->item?->name ?? '')),
+                    'material_item_id' => (int) $line->material_item_id,
+                    'material_code' => $materialCode,
+                    'material_label' => trim(($material->code ?? '').' — '.($material->name ?? '')),
+                    'unit' => (string) ($material->unit ?: $line->uom ?: 'pcs'),
+                ];
+            }
+        }
+
+        $shortages = [];
+        foreach ($messages as $message) {
+            if (! preg_match('/^•\s*(.*?)\s*:\s*butuh\s+(.+?),\s*stok RM\s+(.+?)\s*\(kurang\s+(.+?)\)$/u', $message, $matches)) {
+                continue;
+            }
+
+            $materialCode = strtoupper(trim($matches[1]));
+            $context = $materialContextByCode[$materialCode] ?? [];
+            $shortage = $this->parseIndonesianNumber($matches[4]);
+
+            $shortages[] = array_merge([
+                'item' => trim($matches[1]),
+                'need' => trim($matches[2]),
+                'available' => trim($matches[3]),
+                'shortage' => trim($matches[4]),
+                'qty' => $shortage,
+            ], $context);
+        }
+
+        return $shortages;
+    }
+
+    private function parseIndonesianNumber(string $value): float
+    {
+        $normalized = str_replace('.', '', trim($value));
+        $normalized = str_replace(',', '.', $normalized);
+
+        return max((float) $normalized, 0);
     }
 
     /**

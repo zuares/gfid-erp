@@ -5,14 +5,17 @@ namespace Tests\Feature\Production;
 use App\Models\Account;
 use App\Models\FinishingJob;
 use App\Models\FinishingJobLine;
+use App\Models\FinishingMaterialCorrection;
 use App\Models\FinishingRepair;
 use App\Models\FinishingRepairLine;
+use App\Models\InventoryAdjustment;
 use App\Models\InventoryMutation;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
 use App\Models\Journal;
+use App\Models\PurchaseRequest;
 use App\Models\StandaloneAccountingJournal;
 use App\Models\User;
 use App\Services\Accounting\JournalService;
@@ -27,6 +30,167 @@ use Tests\TestCase;
 class FinishingJobLifecycleTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_material_correction_creates_audited_purchase_request_for_related_item(): void
+    {
+        $fixture = $this->postedFixture();
+        $material = Item::create([
+            'code' => 'PACK-CORRECTION-TEST',
+            'name' => 'Packing correction test material',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_role' => 'production_supply',
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $fixture['item_id'],
+            'name' => 'Packing correction test BOM',
+            'active' => true,
+        ]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => 1,
+            'uom' => 'pcs',
+            'scrap_pct' => 0,
+            'is_optional' => false,
+            'sort_order' => 1,
+        ]);
+
+        $response = $this->actingAs($fixture['user'])->post(route('production.finishing_material_corrections.store'), [
+            'finishing_item_id' => $fixture['item_id'],
+            'material_item_id' => $material->id,
+            'action' => 'purchase',
+            'qty' => 3,
+            'reason' => 'Stok RM tidak cukup untuk finishing hari ini.',
+        ]);
+
+        $response->assertRedirect();
+        $correction = FinishingMaterialCorrection::query()->latest('id')->firstOrFail();
+        $purchaseRequest = PurchaseRequest::query()->findOrFail($correction->reference_id);
+
+        $this->assertSame('purchase', $correction->action);
+        $this->assertSame('open', $correction->status);
+        $this->assertSame($fixture['user']->id, $correction->created_by);
+        $this->assertSame('Stok RM tidak cukup untuk finishing hari ini.', $correction->reason);
+        $this->assertSame('draft', $purchaseRequest->status);
+        $this->assertDatabaseHas('purchase_request_lines', [
+            'purchase_request_id' => $purchaseRequest->id,
+            'item_id' => $material->id,
+            'qty' => 3,
+        ]);
+    }
+
+    public function test_material_correction_stock_creates_audited_draft_adjustment(): void
+    {
+        $fixture = $this->postedFixture();
+        $material = Item::create([
+            'code' => 'STOCK-CORRECTION-TEST',
+            'name' => 'Stock correction test material',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_role' => 'production_supply',
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+        $bom = ItemBom::create(['item_id' => $fixture['item_id'], 'name' => 'Stock correction BOM', 'active' => true]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => 1,
+            'uom' => 'pcs',
+            'scrap_pct' => 0,
+            'is_optional' => false,
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($fixture['user'])->post(route('production.finishing_material_corrections.store'), [
+            'finishing_item_id' => $fixture['item_id'],
+            'material_item_id' => $material->id,
+            'action' => 'stock',
+            'qty' => 2.5,
+            'reason' => 'Hasil hitung fisik berbeda dari saldo sistem.',
+        ])->assertRedirect();
+
+        $correction = FinishingMaterialCorrection::query()->latest('id')->firstOrFail();
+        $adjustment = InventoryAdjustment::query()->findOrFail($correction->reference_id);
+
+        $this->assertSame('stock', $correction->action);
+        $this->assertSame('draft', $adjustment->status);
+        $this->assertSame(FinishingMaterialCorrection::class, $adjustment->reference_type);
+        $this->assertDatabaseHas('inventory_adjustment_lines', [
+            'inventory_adjustment_id' => $adjustment->id,
+            'item_id' => $material->id,
+            'qty_change' => 2.5,
+            'direction' => 'in',
+        ]);
+    }
+
+    public function test_material_correction_bom_is_completed_when_bom_is_saved(): void
+    {
+        $fixture = $this->postedFixture();
+        DB::table('items')->where('id', $fixture['item_id'])->update([
+            'type' => 'finished_good',
+            'can_make' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'BOM-CORRECTION-TEST',
+            'name' => 'BOM correction test material',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_role' => 'production_supply',
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+        $bom = ItemBom::create(['item_id' => $fixture['item_id'], 'name' => 'BOM correction test', 'active' => true]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => 1,
+            'uom' => 'pcs',
+            'scrap_pct' => 0,
+            'is_optional' => false,
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($fixture['user'])->post(route('production.finishing_material_corrections.store'), [
+            'finishing_item_id' => $fixture['item_id'],
+            'material_item_id' => $material->id,
+            'action' => 'bom',
+            'reason' => 'Standar packing perlu dikoreksi sesuai pemakaian aktual.',
+        ])->assertRedirect(route('master.item_boms.edit', ['bom' => $bom, 'correction_id' => FinishingMaterialCorrection::query()->latest('id')->value('id')]));
+
+        $correction = FinishingMaterialCorrection::query()->latest('id')->firstOrFail();
+        $this->actingAs($fixture['user'])->put(route('master.item_boms.update', $bom), [
+            'name' => $bom->name,
+            'active' => 1,
+            'material_correction_id' => $correction->id,
+            'lines' => [[
+                'material_item_id' => $material->id,
+                'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                'qty' => 1.25,
+                'uom' => 'pcs',
+                'scrap_pct' => 0,
+                'is_optional' => 0,
+            ]],
+        ])->assertRedirect(route('master.item_boms.edit', $bom));
+
+        $this->assertDatabaseHas('finishing_material_corrections', [
+            'id' => $correction->id,
+            'status' => 'completed',
+            'reference_type' => ItemBom::class,
+            'reference_id' => $bom->id,
+        ]);
+        $this->assertDatabaseHas('item_bom_lines', [
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'qty' => 1.25,
+        ]);
+    }
 
     public function test_finishing_show_resolves_bundle_and_employee_operator(): void
     {

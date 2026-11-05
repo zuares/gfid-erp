@@ -77,7 +77,7 @@
 
   .stock-shortage-table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .stock-shortage-table{
-    width:100%; min-width:520px; border-collapse:separate; border-spacing:0;
+    width:100%; min-width:620px; border-collapse:separate; border-spacing:0;
     border:1px solid rgba(220,38,38,.22); border-radius:10px; overflow:hidden;
     background:rgba(255,255,255,.72); font-size:.78rem;
   }
@@ -91,6 +91,8 @@
   .stock-shortage-table tr:last-child td{ border-bottom:0; }
   .stock-shortage-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .stock-shortage-table .short{ color:#b91c1c; font-weight:900; }
+  .stock-shortage-actions{ display:flex; justify-content:flex-end; gap:.25rem; flex-wrap:wrap; }
+  .stock-shortage-actions .btn{ border-radius:7px; font-size:.68rem; font-weight:800; padding:.2rem .38rem; white-space:nowrap; }
   body[data-theme="dark"] .stock-shortage-table{ background:rgba(69,10,10,.22); border-color:rgba(248,113,113,.35); }
   body[data-theme="dark"] .stock-shortage-table th{ color:#fecaca; background:rgba(127,29,29,.38); }
   body[data-theme="dark"] .stock-shortage-table td{ color:#fee2e2; border-bottom-color:rgba(248,113,113,.2); }
@@ -165,13 +167,18 @@
     ->sortBy('code')
     ->values();
 
-  $supplyErrorMessages = collect($errors->get('supplies') ?: [])
+  $supplyMessages = collect($errors->get('supplies') ?: [])
+    ->map(fn($message) => (string) $message)
+    ->filter()
+    ->values();
+
+  $supplyErrorMessages = $supplyMessages
     ->flatMap(fn($message) => preg_split('/\R+/', (string) $message) ?: [])
     ->map(fn($message) => trim((string) $message))
     ->filter()
     ->values();
 
-  $stockShortages = $supplyErrorMessages
+  $parsedStockShortages = $supplyErrorMessages
     ->map(function ($message) {
       if (!preg_match('/^•\s*(.*?)\s*:\s*butuh\s+(.+?),\s*stok RM\s+(.+?)\s*\(kurang\s+(.+?)\)$/u', $message, $matches)) {
         return null;
@@ -187,8 +194,16 @@
     ->filter()
     ->values();
 
+  $shortageActions = collect(session('finishing_material_shortages', []))
+    ->filter(fn($row) => is_array($row) && !empty($row['material_item_id']))
+    ->values();
+
+  $stockShortages = $shortageActions->isNotEmpty()
+    ? $shortageActions
+    : $parsedStockShortages;
+
   $otherErrors = collect($errors->all())
-    ->reject(fn($message) => $supplyErrorMessages->contains($message))
+    ->reject(fn($message) => $supplyMessages->contains($message))
     ->values();
 @endphp
 
@@ -212,6 +227,9 @@
               <th class="text-end">Butuh</th>
               <th class="text-end">Stok RM</th>
               <th class="text-end">Kurang</th>
+              @if($shortageActions->isNotEmpty())
+                <th class="text-end">Aksi</th>
+              @endif
             </tr>
           </thead>
           <tbody>
@@ -221,6 +239,22 @@
                 <td class="num">{{ $shortage['need'] }}</td>
                 <td class="num">{{ $shortage['available'] }}</td>
                 <td class="num short">{{ $shortage['shortage'] }}</td>
+                @if(!empty($shortage['material_item_id']))
+                  <td>
+                    <div class="stock-shortage-actions">
+                      <button type="button" class="btn btn-sm btn-outline-primary js-finishing-shortage-action"
+                        data-shortage-index="{{ $loop->index }}" data-action="purchase">
+                        Purchase Request
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-danger js-finishing-shortage-action"
+                        data-shortage-index="{{ $loop->index }}" data-action="stock">
+                        Koreksi Persediaan
+                      </button>
+                    </div>
+                  </td>
+                @elseif($shortageActions->isNotEmpty())
+                  <td class="text-end text-muted">—</td>
+                @endif
               </tr>
             @endforeach
           </tbody>
@@ -592,6 +626,8 @@
       document.addEventListener('DOMContentLoaded', function () {
         const shortages = @json($stockShortages->values()->all());
         const fallback = document.getElementById('finishing-stock-shortage-fallback');
+        const correctionUrl = @json(route('production.finishing_material_corrections.store'));
+        const jobCode = @json($job->code);
 
         if (!window.Swal || !shortages.length) return;
 
@@ -601,12 +637,22 @@
           return element.innerHTML;
         };
 
-        const rows = shortages.map(function (row) {
+        const actionButtons = function (row, index) {
+          if (!row.material_item_id || !row.finishing_item_id || !row.qty) return '<span class="text-muted">—</span>';
+
+          return '<div class="stock-shortage-actions">'
+            + '<button type="button" class="btn btn-sm btn-outline-primary js-finishing-shortage-action" data-shortage-index="' + index + '" data-action="purchase">Purchase Request</button>'
+            + '<button type="button" class="btn btn-sm btn-outline-danger js-finishing-shortage-action" data-shortage-index="' + index + '" data-action="stock">Koreksi Persediaan</button>'
+            + '</div>';
+        };
+
+        const rows = shortages.map(function (row, index) {
           return '<tr>'
             + '<td><strong>' + escapeHtml(row.item) + '</strong></td>'
             + '<td class="num">' + escapeHtml(row.need) + '</td>'
             + '<td class="num">' + escapeHtml(row.available) + '</td>'
             + '<td class="num short">' + escapeHtml(row.shortage) + '</td>'
+            + '<td>' + actionButtons(row, index) + '</td>'
             + '</tr>';
         }).join('');
 
@@ -619,12 +665,91 @@
             + 'Posting Finishing ditolak. Lengkapi stok RM atau lakukan koreksi material.'</p>'
             + '<div class="stock-shortage-table-wrap">'
             + '<table class="stock-shortage-table" aria-label="Daftar kekurangan stok RM">'
-            + '<thead><tr><th>Item</th><th class="num">Butuh</th><th class="num">Stok RM</th><th class="num">Kurang</th></tr></thead>'
+            + '<thead><tr><th>Item</th><th class="num">Butuh</th><th class="num">Stok RM</th><th class="num">Kurang</th><th class="num">Aksi</th></tr></thead>'
             + '<tbody>' + rows + '</tbody></table></div>',
           confirmButtonText: 'Mengerti',
           confirmButtonColor: '#b91c1c',
           width: 'min(94vw, 680px)',
           customClass: { popup: 'gf-stock-shortage-alert' }
+        });
+
+        const submitCorrection = function (row, action, reason) {
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = correctionUrl;
+          form.style.display = 'none';
+
+          const fields = {
+            _token: document.querySelector('meta[name="csrf-token"]')?.content || '',
+            finishing_item_id: row.finishing_item_id,
+            material_item_id: row.material_item_id,
+            action: action,
+            qty: row.qty,
+            reason: reason,
+          };
+
+          Object.entries(fields).forEach(function ([name, value]) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value ?? '';
+            form.appendChild(input);
+          });
+
+          document.body.appendChild(form);
+          form.submit();
+        };
+
+        const openCorrection = function (row, action) {
+          const isPurchase = action === 'purchase';
+          const actionLabel = isPurchase ? 'Purchase Request' : 'Koreksi Persediaan';
+          const defaultReason = 'Stok RM kurang saat posting Finishing ' + jobCode + ' (' + row.item + ').';
+
+          window.Swal.fire({
+            icon: isPurchase ? 'info' : 'warning',
+            title: actionLabel,
+            html: '<div style="text-align:left;font-size:.84rem;color:#64748b;line-height:1.55">'
+              + '<div><strong>Material:</strong> ' + escapeHtml(row.material_label || row.item) + '</div>'
+              + '<div><strong>Qty:</strong> ' + escapeHtml(row.qty) + ' ' + escapeHtml(row.unit || '') + '</div>'
+              + '<label for="finishing-shortage-reason" style="display:block;margin-top:.75rem;color:#334155;font-weight:800">Alasan</label>'
+              + '<textarea id="finishing-shortage-reason" class="swal2-textarea" rows="3" placeholder="Jelaskan alasan koreksi"></textarea>'
+              + '</div>',
+            showCancelButton: true,
+            confirmButtonText: isPurchase ? 'Buat Purchase Request' : 'Buat Koreksi Persediaan',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: isPurchase ? '#2563eb' : '#b91c1c',
+            cancelButtonColor: '#64748b',
+            width: 'min(94vw, 520px)',
+            customClass: { popup: 'gf-stock-shortage-alert' },
+            didOpen: function () {
+              const reasonInput = document.getElementById('finishing-shortage-reason');
+              if (reasonInput) reasonInput.value = defaultReason;
+            },
+            preConfirm: function () {
+              const reasonInput = document.getElementById('finishing-shortage-reason');
+              const reason = (reasonInput?.value || '').trim();
+              if (reason.length < 3) {
+                window.Swal.showValidationMessage('Alasan koreksi wajib diisi.');
+                return false;
+              }
+              return reason;
+            }
+          }).then(function (result) {
+            if (result.isConfirmed) submitCorrection(row, action, result.value);
+          });
+        };
+
+        document.addEventListener('click', function (event) {
+          const button = event.target.closest('.js-finishing-shortage-action');
+          if (!button) return;
+
+          const index = Number(button.dataset.shortageIndex);
+          const row = shortages[index];
+          const action = button.dataset.action;
+          if (!row || !['purchase', 'stock'].includes(action)) return;
+
+          event.preventDefault();
+          openCorrection(row, action);
         });
       });
     </script>

@@ -4,6 +4,7 @@ use App\Http\Controllers\Inventory\InventoryAdjustmentController;
 use App\Http\Controllers\Production\BundleAssemblyController;
 use App\Http\Controllers\Production\CuttingJobController;
 use App\Http\Controllers\Production\FinishingJobController;
+use App\Http\Controllers\Production\FinishingMaterialCorrectionController;
 use App\Http\Controllers\Production\FinishingRepairController;
 use App\Http\Controllers\Production\PackingJobController;
 use App\Http\Controllers\Production\ProductionDashboardController;
@@ -258,6 +259,9 @@ Route::middleware(['web', 'auth', 'access:production'])
             ->name('finishing_jobs.force_post');
 
         Route::resource('finishing_jobs', FinishingJobController::class)->except(['destroy']);
+
+        Route::post('finishing-material-corrections', [FinishingMaterialCorrectionController::class, 'store'])
+            ->name('finishing_material_corrections.store');
 
         Route::post('finishing-repairs/{finishing_repair}/unpost', [FinishingRepairController::class, 'unpost'])
             ->name('finishing_repairs.unpost');
