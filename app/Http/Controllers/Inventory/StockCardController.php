@@ -14,6 +14,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StockCardController extends Controller
 {
+    private const STOCK_CARD_PAGE_SIZE = 50;
+
     protected array $adjustmentReasonCache = [];
 
     public function index(Request $request)
@@ -128,6 +130,7 @@ class StockCardController extends Controller
             // Ini saldo kumulatif dari seluruh mutasi yang sedang difilter,
             // jadi kolom "Stok Akhir" tetap muncul walau item belum dipilih.
             $calcRows = (clone $q)
+                ->toBase()
                 ->orderBy('date')
                 ->orderBy('created_at')
                 ->orderBy('id')
@@ -141,7 +144,9 @@ class StockCardController extends Controller
             }
 
             // KPI totals
-            $totalsRows = (clone $q)->get(['direction', 'qty_change', 'unit_cost', 'total_cost']);
+            $totalsRows = (clone $q)
+                ->toBase()
+                ->get(['direction', 'qty_change', 'unit_cost', 'total_cost']);
             $sumIn = (float) $totalsRows->sum(fn($m) => ($m->direction === 'in') ? abs((float) $m->qty_change) : 0);
             $sumOut = (float) $totalsRows->sum(fn($m) => ($m->direction === 'out') ? abs((float) $m->qty_change) : 0);
             $sumValue = (float) $totalsRows->sum(function ($m) {
@@ -162,7 +167,7 @@ class StockCardController extends Controller
             $mutations = $q
                 ->when($sortDir === 'asc', fn($qq) => $qq->orderBy('date')->orderBy('created_at')->orderBy('id'))
                 ->when($sortDir === 'desc', fn($qq) => $qq->orderByDesc('date')->orderByDesc('created_at')->orderByDesc('id'))
-                ->paginate(100)
+                ->paginate(self::STOCK_CARD_PAGE_SIZE)
                 ->withQueryString();
 
             foreach ($mutations as $m) {
@@ -270,6 +275,7 @@ class StockCardController extends Controller
 
             $openingValue = (float) (clone $baseQuery)
                 ->whereDate('date', '<', $fromDate)
+                ->toBase()
                 ->get()
                 ->sum(function ($m) {
                     $qtyAbs = abs((float) $m->qty_change);
@@ -293,8 +299,9 @@ class StockCardController extends Controller
 
         // calc running ASC
         $calcRows = (clone $mutationsQuery)
+            ->toBase()
             ->orderBy('date')->orderBy('created_at')->orderBy('id')
-            ->get();
+            ->get(['id', 'qty_change', 'direction', 'unit_cost', 'total_cost']);
 
         $runningQty = $openingQty;
         $runningValue = $openingValue;
@@ -324,10 +331,16 @@ class StockCardController extends Controller
             ];
         }
 
+        // KPI tetap memakai seluruh transaksi terfilter, sedangkan UI hanya
+        // merender satu halaman agar tabel tetap ringan.
+        $sumIn = (float) $calcRows->sum(fn($m) => ($m->direction === 'in') ? abs((float) $m->qty_change) : 0);
+        $sumOut = (float) $calcRows->sum(fn($m) => ($m->direction === 'out') ? abs((float) $m->qty_change) : 0);
+
         $mutations = (clone $mutationsQuery)
             ->when($sortDir === 'asc', fn($qq) => $qq->orderBy('date')->orderBy('created_at')->orderBy('id'))
             ->when($sortDir === 'desc', fn($qq) => $qq->orderByDesc('date')->orderByDesc('created_at')->orderByDesc('id'))
-            ->get();
+            ->paginate(self::STOCK_CARD_PAGE_SIZE)
+            ->withQueryString();
 
         foreach ($mutations as $m) {
             $m->running_qty = $runningById[$m->id]['qty'] ?? null;
@@ -339,10 +352,6 @@ class StockCardController extends Controller
             $m->source_label = $sourceMeta['label'];
             $m->source_detail = $sourceMeta['detail'];
         }
-
-        // KPI item-mode totals
-        $sumIn = (float) $mutations->sum(fn($m) => ($m->direction === 'in') ? abs((float) $m->qty_change) : 0);
-        $sumOut = (float) $mutations->sum(fn($m) => ($m->direction === 'out') ? abs((float) $m->qty_change) : 0);
 
         return $respond([
             'warehouses' => $warehouses,

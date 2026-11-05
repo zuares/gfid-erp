@@ -17,44 +17,52 @@
 <div class="summary-grid mb-3" id="sc_kpi_strip">
     @if ($itemId)
         <div class="summary-card summary-card--soft">
-            <div class="summary-label">Stok Awal</div>
+            <div class="summary-card-head"><div class="summary-label">Stok awal</div><span class="summary-icon"><i class="bi bi-boxes"></i></span></div>
             <div class="summary-value mono {{ abs((float) $openingQty) < 0.000001 ? 'summary-value--zero' : '' }}">{{ $fmtBalance($openingQty) }}</div>
+            <div class="summary-sub">Sebelum periode</div>
         </div>
 
         <div class="summary-card summary-card--in">
-            <div class="summary-label">Masuk</div>
+            <div class="summary-card-head"><div class="summary-label">Masuk</div><span class="summary-icon"><i class="bi bi-arrow-down-left"></i></span></div>
             <div class="summary-value mono">{{ $fmtMove($sumIn) }}</div>
+            <div class="summary-sub">Total IN</div>
         </div>
 
         <div class="summary-card summary-card--out">
-            <div class="summary-label">Keluar</div>
+            <div class="summary-card-head"><div class="summary-label">Keluar</div><span class="summary-icon"><i class="bi bi-arrow-up-right"></i></span></div>
             <div class="summary-value mono">{{ $fmtMove($sumOut) }}</div>
+            <div class="summary-sub">Total OUT</div>
         </div>
 
         <div class="summary-card summary-card--final">
-            <div class="summary-label">Stok Akhir</div>
+            <div class="summary-card-head"><div class="summary-label">Stok akhir</div><span class="summary-icon"><i class="bi bi-check2-circle"></i></span></div>
             <div class="summary-value mono {{ abs((float) $closingQty) < 0.000001 ? 'summary-value--zero' : '' }}">{{ $fmtBalance($closingQty) }}</div>
+            <div class="summary-sub">Saldo berjalan</div>
         </div>
 
     @else
         <div class="summary-card summary-card--soft">
-            <div class="summary-label">Transaksi</div>
+            <div class="summary-card-head"><div class="summary-label">Transaksi</div><span class="summary-icon"><i class="bi bi-list-check"></i></span></div>
             <div class="summary-value mono">{{ $rows->count() }}</div>
+            <div class="summary-sub">Pada halaman ini</div>
         </div>
 
         <div class="summary-card summary-card--in">
-            <div class="summary-label">Masuk</div>
+            <div class="summary-card-head"><div class="summary-label">Masuk</div><span class="summary-icon"><i class="bi bi-arrow-down-left"></i></span></div>
             <div class="summary-value mono">{{ $fmtMove($sumIn) }}</div>
+            <div class="summary-sub">Total IN</div>
         </div>
 
         <div class="summary-card summary-card--out">
-            <div class="summary-label">Keluar</div>
+            <div class="summary-card-head"><div class="summary-label">Keluar</div><span class="summary-icon"><i class="bi bi-arrow-up-right"></i></span></div>
             <div class="summary-value mono">{{ $fmtMove($sumOut) }}</div>
+            <div class="summary-sub">Total OUT</div>
         </div>
 
         <div class="summary-card summary-card--final">
-            <div class="summary-label">Net</div>
+            <div class="summary-card-head"><div class="summary-label">Net</div><span class="summary-icon"><i class="bi bi-activity"></i></span></div>
             <div class="summary-value mono {{ abs($netQty) < 0.000001 ? 'summary-value--zero' : '' }}">{{ abs($netQty) < 0.000001 ? '0' : ($netQty >= 0 ? '+' : '') . number_format($netQty, 2, ',', '.') }}</div>
+            <div class="summary-sub">Masuk dikurangi keluar</div>
         </div>
     @endif
 </div>
