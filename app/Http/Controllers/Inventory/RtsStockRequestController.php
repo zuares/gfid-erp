@@ -166,12 +166,40 @@ class RtsStockRequestController extends Controller
         // ✅ selalu dokumen baru
         $prefillDate = $date;
         $prefillLines = [];
-        
-        if ($request->has('item_id') && $request->has('qty')) {
-            $prefillLines[] = [
-                'item_id' => $request->item_id,
-                'qty_request' => (float) $request->qty,
-            ];
+
+        $validFinishedGoodIds = $finishedGoodsItems
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->flip();
+        $bulkPrefill = json_decode((string) $request->query('prefill', ''), true);
+
+        if (is_array($bulkPrefill)) {
+            foreach (array_slice($bulkPrefill, 0, 100) as $line) {
+                $itemId = (int) ($line['item_id'] ?? 0);
+                $qty = (float) ($line['qty_request'] ?? $line['qty'] ?? 0);
+
+                if ($itemId <= 0 || $qty <= 0 || ! $validFinishedGoodIds->has($itemId)) {
+                    continue;
+                }
+
+                $prefillLines[$itemId] = [
+                    'item_id' => $itemId,
+                    'qty_request' => $qty,
+                ];
+            }
+            $prefillLines = array_values($prefillLines);
+        }
+
+        if ($prefillLines === [] && $request->has('item_id') && $request->has('qty')) {
+            $itemId = (int) $request->input('item_id');
+            $qty = (float) $request->input('qty');
+
+            if ($itemId > 0 && $qty > 0 && $validFinishedGoodIds->has($itemId)) {
+                $prefillLines[] = [
+                    'item_id' => $itemId,
+                    'qty_request' => $qty,
+                ];
+            }
         }
 
         return view('inventory.rts_stock_requests.create', compact(

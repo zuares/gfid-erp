@@ -465,13 +465,53 @@ class InventoryAdjustmentController extends Controller
             ->orderBy('code')
             ->get();
 
-        $prefillWarehouseId = request()->integer('warehouse_id') ?: null;
-        $prefillItemId = request()->integer('item_id') ?: null;
-        $prefillItemCode = trim((string) request()->query('item_code', ''));
-        if ($prefillItemId && $prefillItemCode === '') {
+        $prefillWarehouseId = $request->integer('warehouse_id') ?: null;
+        $prefillItemId = $request->integer('item_id') ?: null;
+        $prefillItemCode = trim((string) $request->query('item_code', ''));
+        $prefillQtyChange = max(0, (float) $request->query('qty_change', 0));
+        $prefillByItemId = [];
+        $bulkPrefill = json_decode((string) $request->query('prefill', ''), true);
+
+        if (is_array($bulkPrefill)) {
+            foreach (array_slice($bulkPrefill, 0, 100) as $line) {
+                $itemId = (int) ($line['item_id'] ?? 0);
+                $qtyChange = max(0, (float) ($line['qty_change'] ?? $line['qty'] ?? 0));
+
+                if ($itemId > 0 && $qtyChange > 0) {
+                    $prefillByItemId[$itemId] = $qtyChange;
+                }
+            }
+        }
+
+        if ($prefillByItemId === [] && $prefillItemId && $prefillQtyChange > 0) {
+            $prefillByItemId[$prefillItemId] = $prefillQtyChange;
+        }
+
+        $prefillCodes = $prefillByItemId === []
+            ? collect()
+            : Item::query()
+                ->whereIn('id', array_keys($prefillByItemId))
+                ->pluck('code', 'id');
+        $prefillLines = [];
+        foreach ($prefillByItemId as $itemId => $qtyChange) {
+            if (! $prefillCodes->has($itemId)) {
+                continue;
+            }
+
+            $prefillLines[] = [
+                'item_id' => (int) $itemId,
+                'item_code' => (string) $prefillCodes->get($itemId),
+                'qty_change' => $qtyChange,
+            ];
+        }
+
+        if ($prefillLines !== []) {
+            $prefillItemId = $prefillLines[0]['item_id'];
+            $prefillItemCode = $prefillLines[0]['item_code'];
+            $prefillQtyChange = $prefillLines[0]['qty_change'];
+        } elseif ($prefillItemId && $prefillItemCode === '') {
             $prefillItemCode = (string) (Item::query()->whereKey($prefillItemId)->value('code') ?? '');
         }
-        $prefillQtyChange = max(0, (float) request()->query('qty_change', 0));
 
         return view('inventory.adjustments.manual_create', compact(
             'warehouses',
@@ -481,6 +521,7 @@ class InventoryAdjustmentController extends Controller
             'prefillItemId',
             'prefillItemCode',
             'prefillQtyChange',
+            'prefillLines',
         ));
     }
 

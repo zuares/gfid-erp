@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Inventory\RtsStockRequestController;
 use App\Models\Item;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 
 uses(RefreshDatabase::class);
 
@@ -83,4 +85,47 @@ it('prefills the related item and shortage quantity when opened from a stock sho
         ->assertSee('qty_request', false)
         ->assertSee((string) $item->id, false)
         ->assertSee('TTB-RJK-XXL');
+});
+
+it('accepts multiple related items for a bulk stock request prefill', function () {
+    Warehouse::create([
+        'code' => 'WH-PRD',
+        'name' => 'Production Warehouse',
+        'type' => 'internal',
+        'active' => true,
+    ]);
+
+    Warehouse::create([
+        'code' => 'WH-RTS',
+        'name' => 'RTS Warehouse',
+        'type' => 'internal',
+        'active' => true,
+    ]);
+
+    $first = Item::create([
+        'code' => 'BULK-RTS-001',
+        'name' => 'Bulk RTS Item One',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'active' => true,
+    ]);
+    $second = Item::create([
+        'code' => 'BULK-RTS-002',
+        'name' => 'Bulk RTS Item Two',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'active' => true,
+    ]);
+
+    $view = app(RtsStockRequestController::class)->create(Request::create('/rts/stock-requests/create', 'GET', [
+        'prefill' => json_encode([
+            ['item_id' => $first->id, 'qty_request' => 2],
+            ['item_id' => $second->id, 'qty_request' => 3],
+        ]),
+    ]));
+
+    expect($view->getData()['prefillLines'])->toBe([
+        ['item_id' => $first->id, 'qty_request' => 2.0],
+        ['item_id' => $second->id, 'qty_request' => 3.0],
+    ]);
 });

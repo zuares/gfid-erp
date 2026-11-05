@@ -707,6 +707,7 @@
             const prefillItemId = @json($prefillItemId ?? null);
             const prefillItemCode = @json($prefillItemCode ?? '');
             const prefillQtyChange = Number(@json($prefillQtyChange ?? 0));
+            const prefillLines = @json($prefillLines ?? []);
 
             const itemsUrl = @json(route('inventory.adjustments.items_for_warehouse', [], false));
             const quickItemUrl = @json(route('inventory.adjustments.items.quick_store', [], false));
@@ -877,17 +878,19 @@
                 updateSummary();
             }
 
-            function applyPrefillAdjustment() {
-                if (!prefillItemId || !prefillQtyChange) return;
+            function applyPrefillAdjustment(line = {}) {
+                const itemId = line.item_id || prefillItemId;
+                const qtyChange = Number(line.qty_change ?? prefillQtyChange);
+                if (!itemId || !qtyChange) return;
                 const row = Array.from(tbody.querySelectorAll('tr')).find(tr =>
-                    String(tr.querySelector('.row-item-id')?.value || '') === String(prefillItemId)
+                    String(tr.querySelector('.row-item-id')?.value || '') === String(itemId)
                 );
                 if (!row) return;
 
                 const physicalInput = row.querySelector('.physical-input');
                 const onHand = parseFloat(row.querySelector('.on-hand')?.dataset.onHand || '0') || 0;
                 if (physicalInput) {
-                    physicalInput.value = fmt(onHand + prefillQtyChange);
+                    physicalInput.value = fmt(onHand + qtyChange);
                     recalcRow(row);
                 }
                 const notesInput = row.querySelector('.notes-input');
@@ -897,6 +900,27 @@
                 applyFilter();
                 updateSummary();
                 flashRow(row);
+            }
+
+            function applyPrefillAdjustments() {
+                const lines = Array.isArray(prefillLines) && prefillLines.length
+                    ? prefillLines
+                    : (prefillItemId && prefillQtyChange
+                        ? [{ item_id: prefillItemId, item_code: prefillItemCode, qty_change: prefillQtyChange }]
+                        : []);
+
+                return lines.reduce((chain, line) => chain.then(() => {
+                    const term = String(line.item_code || '').trim();
+                    if (!term) {
+                        applyPrefillAdjustment(line);
+                        return null;
+                    }
+
+                    return fetchSearchItems(term, true).then(() => applyPrefillAdjustment(line));
+                }), Promise.resolve()).then(() => {
+                    applyFilter();
+                    updateSummary();
+                });
             }
 
             function applyFilter() {
@@ -1245,8 +1269,8 @@
             setWorkflowReady(!!warehouseSelect.value);
             if (warehouseSelect.value) {
                 const initialLoad = loadItemsForWarehouse(warehouseSelect.value);
-                if (prefillItemCode) {
-                    Promise.resolve(initialLoad).then(() => fetchSearchItems(prefillItemCode, true)).then(applyPrefillAdjustment);
+                if (prefillLines.length || prefillItemCode) {
+                    Promise.resolve(initialLoad).then(applyPrefillAdjustments);
                 }
             } else {
                 loadItemsForWarehouse(null);
@@ -1256,8 +1280,8 @@
                 warehouseSelect.value = String(prefillWarehouseId);
                 setWorkflowReady(true);
                 const initialLoad = loadItemsForWarehouse(prefillWarehouseId);
-                if (prefillItemCode) {
-                    Promise.resolve(initialLoad).then(() => fetchSearchItems(prefillItemCode, true)).then(applyPrefillAdjustment);
+                if (prefillLines.length || prefillItemCode) {
+                    Promise.resolve(initialLoad).then(applyPrefillAdjustments);
                 }
             }
         })();

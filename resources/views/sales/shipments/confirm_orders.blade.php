@@ -114,6 +114,7 @@ body[data-theme="dark"] .sd-order-item-review{background:rgba(245,158,11,.09);bo
 .sd-stock-warning{margin-bottom:.65rem;border:1px solid rgba(220,38,38,.24);border-radius:8px;background:rgba(254,242,242,.72);overflow:hidden}
 .sd-stock-head{padding:.65rem .75rem;border-bottom:1px solid rgba(220,38,38,.16);color:#991b1b;font-size:.8rem;font-weight:900}
 .sd-stock-table-wrap{overflow:auto}.sd-stock-table{width:100%;border-collapse:collapse}.sd-stock-table th,.sd-stock-table td{padding:.5rem .65rem;border-bottom:1px solid rgba(220,38,38,.12);font-size:.78rem}.sd-stock-table th{text-align:left;color:#991b1b;font-size:.68rem;text-transform:uppercase;letter-spacing:.02em;background:rgba(254,226,226,.45)}.sd-stock-table td{color:#475569}.sd-stock-table tr:last-child td{border-bottom:0}.sd-stock-table .sd-stock-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}.sd-stock-table .sd-stock-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.sd-stock-table .sd-stock-short{color:#dc2626;font-weight:900}.sd-stock-actions{display:flex;justify-content:flex-end;gap:.28rem;flex-wrap:wrap;min-width:240px}.sd-stock-action{display:inline-flex;align-items:center;gap:.25rem;border:1px solid rgba(148,163,184,.35);border-radius:7px;padding:.22rem .4rem;background:#fff;color:#475569;font-size:.68rem;font-weight:800;text-decoration:none;white-space:nowrap}.sd-stock-action:hover,.sd-stock-action:focus-visible{border-color:#94a3b8;background:#f8fafc;color:#1e293b;text-decoration:none}.sd-stock-action--adjust{border-color:#fed7aa;background:#fff7ed;color:#9a3412}.sd-stock-action--adjust:hover,.sd-stock-action--adjust:focus-visible{border-color:#fdba74;background:#ffedd5;color:#7c2d12}
+.sd-stock-select{width:38px;text-align:center!important}.sd-stock-select input{width:16px;height:16px;accent-color:#dc2626}.sd-stock-bulk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;padding:.55rem .75rem;border-bottom:1px solid rgba(220,38,38,.14);background:rgba(255,255,255,.8)}.sd-stock-bulk-toolbar[hidden]{display:none}.sd-stock-bulk-meta{color:#7f1d1d;font-size:.76rem;font-weight:800}.sd-stock-bulk-actions{display:flex;gap:.3rem;flex-wrap:wrap}.sd-stock-bulk-action{border:1px solid rgba(148,163,184,.4);border-radius:7px;padding:.28rem .5rem;background:#fff;color:#475569;font-size:.7rem;font-weight:800;cursor:pointer}.sd-stock-bulk-action:hover,.sd-stock-bulk-action:focus-visible{border-color:#94a3b8;background:#f8fafc}.sd-stock-bulk-action--adjust{border-color:#fed7aa;background:#fff7ed;color:#9a3412}
 @media(max-width:860px){
   .sd-wrap{padding:.5rem .5rem 1.5rem}.sd-topbar{padding:.5rem}.sd-code{flex:1;min-width:150px;font-size:1.02rem}.sd-head{padding:.65rem .7rem}.sd-body{padding:.65rem .7rem}.sd-order{grid-template-columns:1fr;align-items:flex-start;gap:.4rem}
 }
@@ -1201,10 +1202,22 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
     @if(!empty($stockInsufficient))
         <div class="sd-stock-warning" role="alert">
             <div class="sd-stock-head">Stok WH-RTS belum cukup untuk shipment ini</div>
+            <div class="sd-stock-bulk-toolbar" data-stock-bulk-toolbar hidden>
+                <div class="sd-stock-bulk-meta"><span data-stock-bulk-count>0</span> SKU dipilih</div>
+                <div class="sd-stock-bulk-actions">
+                    <button type="button" class="sd-stock-bulk-action sd-stock-bulk-action--adjust" data-stock-bulk-action="adjust">
+                        <i class="bi bi-sliders2-vertical" aria-hidden="true"></i> Koreksi persediaan terpilih
+                    </button>
+                    <button type="button" class="sd-stock-bulk-action" data-stock-bulk-action="request">
+                        <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Buat permintaan stok terpilih
+                    </button>
+                </div>
+            </div>
             <div class="sd-stock-table-wrap">
                 <table class="sd-stock-table">
                     <thead>
                         <tr>
+                            <th class="sd-stock-select"><input type="checkbox" data-stock-select-all aria-label="Pilih semua SKU stok kurang"></th>
                             <th>SKU</th>
                             <th>Item</th>
                             <th class="sd-stock-number">Stok</th>
@@ -1232,6 +1245,9 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                 ]));
                             @endphp
                             <tr>
+                                <td class="sd-stock-select">
+                                    <input type="checkbox" data-stock-select data-item-id="{{ $stockItemId }}" data-qty="{{ $stockShort }}" aria-label="Pilih {{ $stockCode }}" @disabled($stockItemId <= 0 || $stockShort <= 0)>
+                                </td>
                                 <td class="sd-stock-code">{{ $stockError['code'] ?? '-' }}</td>
                                 <td>{{ $stockError['name'] ?? '-' }}</td>
                                 <td class="sd-stock-number">{{ number_format((int) ($stockError['stock'] ?? 0), 0, ',', '.') }}</td>
@@ -2192,6 +2208,75 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
             syncButton.classList.add('is-loading');
             syncButton.setAttribute('aria-busy', 'true');
             syncButton.innerHTML = '<span class="sd-sync-spinner" aria-hidden="true"></span><span>Menyinkronkan...</span>';
+        });
+    });
+
+    var stockBulkToolbar = document.querySelector('[data-stock-bulk-toolbar]');
+    var stockBulkCount = document.querySelector('[data-stock-bulk-count]');
+    var stockSelectAll = document.querySelector('[data-stock-select-all]');
+    var stockSelectors = Array.from(document.querySelectorAll('[data-stock-select]'));
+    var stockRequestCreateUrl = @json(route('rts.stock-requests.create'));
+    var stockAdjustmentCreateUrl = @json(route('inventory.adjustments.manual.create'));
+    var stockBulkWarehouseId = @json($stockWarehouseId ?? null);
+
+    function selectedStockShortages() {
+        return stockSelectors
+            .filter(function(input) { return input.checked && !input.disabled; })
+            .map(function(input) {
+                return {
+                    item_id: Number(input.dataset.itemId || 0),
+                    qty: Number(input.dataset.qty || 0),
+                };
+            })
+            .filter(function(line) { return line.item_id > 0 && line.qty > 0; });
+    }
+
+    function syncStockBulkSelection() {
+        var selected = selectedStockShortages();
+        var available = stockSelectors.filter(function(input) { return !input.disabled; });
+        if (stockBulkToolbar) stockBulkToolbar.hidden = selected.length === 0;
+        if (stockBulkCount) stockBulkCount.textContent = String(selected.length);
+        if (stockSelectAll) {
+            stockSelectAll.checked = available.length > 0 && selected.length === available.length;
+            stockSelectAll.indeterminate = selected.length > 0 && selected.length < available.length;
+        }
+    }
+
+    stockSelectors.forEach(function(input) {
+        input.addEventListener('change', syncStockBulkSelection);
+    });
+
+    stockSelectAll?.addEventListener('change', function() {
+        stockSelectors.forEach(function(input) {
+            if (!input.disabled) input.checked = stockSelectAll.checked;
+        });
+        syncStockBulkSelection();
+    });
+
+    document.querySelectorAll('[data-stock-bulk-action]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            var selected = selectedStockShortages();
+            if (!selected.length) return;
+
+            var action = button.dataset.stockBulkAction;
+            var targetUrl = action === 'adjust' ? stockAdjustmentCreateUrl : stockRequestCreateUrl;
+            var target = new URL(targetUrl, window.location.origin);
+            var prefill = selected.map(function(line) {
+                return action === 'adjust'
+                    ? { item_id: line.item_id, qty_change: line.qty }
+                    : { item_id: line.item_id, qty_request: line.qty };
+            });
+
+            if (action === 'adjust') {
+                if (!stockBulkWarehouseId) {
+                    window.alert('Gudang stok shipment belum tersedia untuk koreksi persediaan.');
+                    return;
+                }
+                target.searchParams.set('warehouse_id', String(stockBulkWarehouseId));
+            }
+
+            target.searchParams.set('prefill', JSON.stringify(prefill));
+            window.location.assign(target.toString());
         });
     });
 
