@@ -382,9 +382,12 @@
           @php
             $errorBag = $errors ?? null;
             $hasValidationErrors = $errorBag instanceof \Illuminate\Support\ViewErrorBag ? $errorBag->any() : false;
+            $hideGlobalFinishingSupplyErrors = request()->routeIs('production.finishing_jobs.show')
+              && $errorBag instanceof \Illuminate\Support\ViewErrorBag
+              && !empty($errorBag->get('supplies'));
           @endphp
 
-          @if ($hasValidationErrors)
+          @if ($hasValidationErrors && !$hideGlobalFinishingSupplyErrors)
             <div class="alert alert-danger mb-3">
               <strong>Terjadi error:</strong>
               <ul class="mb-0">

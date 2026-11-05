@@ -74,6 +74,29 @@
   }
   .table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .table-scroll table{ min-width:760px; }
+
+  .stock-shortage-table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .stock-shortage-table{
+    width:100%; min-width:520px; border-collapse:separate; border-spacing:0;
+    border:1px solid rgba(220,38,38,.22); border-radius:10px; overflow:hidden;
+    background:rgba(255,255,255,.72); font-size:.78rem;
+  }
+  .stock-shortage-table th,
+  .stock-shortage-table td{ padding:.48rem .58rem; border-bottom:1px solid rgba(220,38,38,.12); }
+  .stock-shortage-table th{
+    color:#991b1b; background:rgba(254,226,226,.82); font-size:.68rem;
+    text-transform:uppercase; letter-spacing:.06em; white-space:nowrap;
+  }
+  .stock-shortage-table td{ color:#450a0a; }
+  .stock-shortage-table tr:last-child td{ border-bottom:0; }
+  .stock-shortage-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .stock-shortage-table .short{ color:#b91c1c; font-weight:900; }
+  body[data-theme="dark"] .stock-shortage-table{ background:rgba(69,10,10,.22); border-color:rgba(248,113,113,.35); }
+  body[data-theme="dark"] .stock-shortage-table th{ color:#fecaca; background:rgba(127,29,29,.38); }
+  body[data-theme="dark"] .stock-shortage-table td{ color:#fee2e2; border-bottom-color:rgba(248,113,113,.2); }
+
+  .swal2-popup.gf-stock-shortage-alert{ border-radius:16px !important; }
+  .swal2-popup.gf-stock-shortage-alert .swal2-html-container{ margin:.25rem 0 .75rem !important; }
 </style>
 @endpush
 
@@ -141,6 +164,32 @@
     })
     ->sortBy('code')
     ->values();
+
+  $supplyErrorMessages = collect($errors->get('supplies') ?: [])
+    ->flatMap(fn($message) => preg_split('/\R+/', (string) $message) ?: [])
+    ->map(fn($message) => trim((string) $message))
+    ->filter()
+    ->values();
+
+  $stockShortages = $supplyErrorMessages
+    ->map(function ($message) {
+      if (!preg_match('/^•\s*(.*?)\s*:\s*butuh\s+(.+?),\s*stok RM\s+(.+?)\s*\(kurang\s+(.+?)\)$/u', $message, $matches)) {
+        return null;
+      }
+
+      return [
+        'item' => trim($matches[1]),
+        'need' => trim($matches[2]),
+        'available' => trim($matches[3]),
+        'shortage' => trim($matches[4]),
+      ];
+    })
+    ->filter()
+    ->values();
+
+  $otherErrors = collect($errors->all())
+    ->reject(fn($message) => $supplyErrorMessages->contains($message))
+    ->values();
 @endphp
 
 <div class="page-wrap">
@@ -151,11 +200,40 @@
   @if(session('error'))
     <div class="alert alert-danger py-2">{{ session('error') }}</div>
   @endif
-  @if ($errors->any())
-    <div class="alert alert-danger">
+  @if ($stockShortages->isNotEmpty())
+    <div id="finishing-stock-shortage-fallback" class="alert alert-danger" role="alert">
+      <div class="fw-bold mb-1">Stok RM tidak cukup untuk kelengkapan finishing.</div>
+      <div class="small mb-2">Posting ditolak. Lengkapi stok RM atau lakukan koreksi material.</div>
+      <div class="stock-shortage-table-wrap">
+        <table class="stock-shortage-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th class="text-end">Butuh</th>
+              <th class="text-end">Stok RM</th>
+              <th class="text-end">Kurang</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach($stockShortages as $shortage)
+              <tr>
+                <td class="mono fw-bold">{{ $shortage['item'] }}</td>
+                <td class="num">{{ $shortage['need'] }}</td>
+                <td class="num">{{ $shortage['available'] }}</td>
+                <td class="num short">{{ $shortage['shortage'] }}</td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+    </div>
+  @endif
+
+  @if ($otherErrors->isNotEmpty())
+    <div class="alert alert-danger" role="alert">
       <div class="fw-bold mb-1">Terjadi error:</div>
       <ul class="mb-0">
-        @foreach($errors->all() as $err)
+        @foreach($otherErrors as $err)
           <li>{!! nl2br(e($err)) !!}</li>
         @endforeach
       </ul>
@@ -507,3 +585,48 @@
   @endif
 </div>
 @endsection
+
+@if ($stockShortages->isNotEmpty())
+  @push('scripts')
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const shortages = @json($stockShortages->values()->all());
+        const fallback = document.getElementById('finishing-stock-shortage-fallback');
+
+        if (!window.Swal || !shortages.length) return;
+
+        const escapeHtml = function (value) {
+          const element = document.createElement('span');
+          element.textContent = String(value ?? '—');
+          return element.innerHTML;
+        };
+
+        const rows = shortages.map(function (row) {
+          return '<tr>'
+            + '<td><strong>' + escapeHtml(row.item) + '</strong></td>'
+            + '<td class="num">' + escapeHtml(row.need) + '</td>'
+            + '<td class="num">' + escapeHtml(row.available) + '</td>'
+            + '<td class="num short">' + escapeHtml(row.shortage) + '</td>'
+            + '</tr>';
+        }).join('');
+
+        if (fallback) fallback.hidden = true;
+
+        window.Swal.fire({
+          icon: 'error',
+          title: 'Stok RM belum cukup',
+          html: '<p style="margin:0 0 .7rem;text-align:left;color:#64748b;font-size:.84rem">'
+            + 'Posting Finishing ditolak. Lengkapi stok RM atau lakukan koreksi material.'</p>'
+            + '<div class="stock-shortage-table-wrap">'
+            + '<table class="stock-shortage-table" aria-label="Daftar kekurangan stok RM">'
+            + '<thead><tr><th>Item</th><th class="num">Butuh</th><th class="num">Stok RM</th><th class="num">Kurang</th></tr></thead>'
+            + '<tbody>' + rows + '</tbody></table></div>',
+          confirmButtonText: 'Mengerti',
+          confirmButtonColor: '#b91c1c',
+          width: 'min(94vw, 680px)',
+          customClass: { popup: 'gf-stock-shortage-alert' }
+        });
+      });
+    </script>
+  @endpush
+@endif
