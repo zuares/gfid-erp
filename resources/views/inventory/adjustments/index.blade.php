@@ -254,7 +254,9 @@
                         @endforeach
                     </select>
                 </form>
-                <a href="{{ route('inventory.adjustments.manual.create') }}" class="btn btn-sm btn-adj-primary btn-pill">+ Manual</a>
+                @if (in_array(strtolower((string) auth()->user()?->role), ['owner', 'admin'], true))
+                    <a href="{{ route('inventory.adjustments.manual.create') }}" class="btn btn-sm btn-adj-primary btn-pill">+ Manual</a>
+                @endif
             </div>
         </div>
     </div>

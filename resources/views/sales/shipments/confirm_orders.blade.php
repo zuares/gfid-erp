@@ -1226,7 +1226,10 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                     'qty_change' => $stockShort > 0 ? $stockShort : null,
                                 ]));
                                 $purchaseOrderUrl = route('purchasing.purchase_orders.index', ['q' => $stockCode]);
-                                $stockRequestUrl = route('rts.stock-requests.index', ['search' => $stockCode]);
+                                $stockRequestUrl = route('rts.stock-requests.create', array_filter([
+                                    'item_id' => $stockItemId ?: null,
+                                    'qty' => $stockShort > 0 ? $stockShort : null,
+                                ]));
                             @endphp
                             <tr>
                                 <td class="sd-stock-code">{{ $stockError['code'] ?? '-' }}</td>
@@ -1242,8 +1245,8 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                                         <a href="{{ $purchaseOrderUrl }}" class="sd-stock-action" title="Cari PO untuk {{ $stockCode }}">
                                             <i class="bi bi-receipt" aria-hidden="true"></i><span>Cek PO</span>
                                         </a>
-                                        <a href="{{ $stockRequestUrl }}" class="sd-stock-action" title="Cari permintaan stok {{ $stockCode }}">
-                                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i><span>Cek permintaan</span>
+                                        <a href="{{ $stockRequestUrl }}" class="sd-stock-action" title="Buat permintaan stok {{ $stockCode }}">
+                                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i><span>Buat permintaan</span>
                                         </a>
                                     </div>
                                 </td>

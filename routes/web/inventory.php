@@ -145,11 +145,17 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
         Route::prefix('adjustments')->name('adjustments.')->group(function () {
             Route::get('/', [InventoryAdjustmentController::class, 'index'])->name('index');
 
-            Route::get('/manual/create', [InventoryAdjustmentController::class, 'createManual'])->name('manual.create');
-            Route::post('/manual', [InventoryAdjustmentController::class, 'storeManual'])->name('manual.store');
+            Route::get('/manual/create', [InventoryAdjustmentController::class, 'createManual'])
+                ->middleware('role:owner,admin')
+                ->name('manual.create');
+            Route::post('/manual', [InventoryAdjustmentController::class, 'storeManual'])
+                ->middleware('role:owner,admin')
+                ->name('manual.store');
 
             Route::get('/items', [InventoryAdjustmentController::class, 'itemsForWarehouse'])->name('items_for_warehouse');
-            Route::post('/items', [InventoryAdjustmentController::class, 'storeQuickItem'])->name('items.quick_store');
+            Route::post('/items', [InventoryAdjustmentController::class, 'storeQuickItem'])
+                ->middleware('role:owner,admin')
+                ->name('items.quick_store');
 
             Route::get('/{inventoryAdjustment}', [InventoryAdjustmentController::class, 'show'])->name('show');
             Route::post('/{inventoryAdjustment}/post', [InventoryAdjustmentController::class, 'post'])->name('post');

@@ -14,6 +14,7 @@ use App\Models\ItemCostSnapshot;
 use App\Models\ItemRole;
 use App\Models\Lot;
 use App\Models\StockOpname;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Accounting\JournalService;
 use App\Services\Accounting\StandaloneInventoryAdjustmentPostingService;
@@ -24,6 +25,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class InventoryAdjustmentController extends Controller
@@ -448,8 +450,10 @@ class InventoryAdjustmentController extends Controller
      * Form Adjustment Manual
      * View: inventory.adjustments.manual_create
      */
-    public function createManual(): View
+    public function createManual(Request $request): View
     {
+        $this->ensureManualAdjustmentAccess($request);
+
         $warehouses = Warehouse::orderBy('code')->get();
         $itemCategories = ItemCategory::query()
             ->where('active', true)
@@ -483,11 +487,13 @@ class InventoryAdjustmentController extends Controller
     /**
      * Simpan Adjustment Manual.
      *
-     * Owner   -> status APPROVED + eksekusi stok langsung (mutasi + total_cost)
-     * NonOwner-> status PENDING  + belum eksekusi stok
+     * Owner -> draft yang dapat difinalisasi sendiri dari halaman detail.
+     * Admin -> pending yang wajib difinalisasi Owner; stok belum berubah.
      */
     public function storeManual(Request $request, InventoryService $inventory): RedirectResponse
     {
+        $this->ensureManualAdjustmentAccess($request);
+
         $rules = [
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'date' => ['required', 'date'],
@@ -517,14 +523,19 @@ class InventoryAdjustmentController extends Controller
         }
 
         $userId = $request->user()?->id;
-        $adjustment = DB::transaction(function () use ($validated, $userId) {
+        $isOwner = strtolower((string) ($request->user()?->role ?? '')) === 'owner';
+        $adjustmentStatus = $isOwner
+            ? InventoryAdjustment::STATUS_DRAFT
+            : InventoryAdjustment::STATUS_PENDING;
+
+        $adjustment = DB::transaction(function () use ($validated, $userId, $adjustmentStatus) {
             $adjustment = new InventoryAdjustment;
             $adjustment->code = $this->generateCodeForDate($validated['date']);
             $adjustment->warehouse_id = (int) $validated['warehouse_id'];
             $adjustment->date = $validated['date'];
             $adjustment->reason = 'Adjustment Manual Draft';
             $adjustment->notes = $validated['notes'] ?? null;
-            $adjustment->status = InventoryAdjustment::STATUS_DRAFT;
+            $adjustment->status = $adjustmentStatus;
             $adjustment->created_by = $userId;
 
             $adjustment->save();
@@ -554,14 +565,20 @@ class InventoryAdjustmentController extends Controller
             return $adjustment;
         });
 
+        if (! $isOwner) {
+            $this->forgetOwnerNotificationCaches();
+        }
+
         return redirect()
             ->route('inventory.adjustments.show', ['inventoryAdjustment' => $adjustment->getKey()])
             ->with('status', 'success')
-            ->with('message', 'Draft adjustment berhasil disimpan.');
+            ->with('message', $isOwner
+                ? 'Draft adjustment berhasil disimpan.'
+                : 'Koreksi persediaan berhasil dikirim dan menunggu finalisasi Owner.');
     }
 
     /**
-     * APPROVE dokumen Adjustment (khusus Owner/Admin).
+     * APPROVE dokumen Adjustment (khusus Owner).
      */
     public function approve(Request $request, InventoryAdjustment $inventoryAdjustment, InventoryService $inventory): RedirectResponse
     {
@@ -571,13 +588,11 @@ class InventoryAdjustmentController extends Controller
             abort(403, 'Harus login untuk approve adjustment.');
         }
 
-        $role = $user->role ?? null;
+        $role = strtolower((string) ($user->role ?? ''));
         $isOwner = $role === 'owner';
-        $isAdmin = $role === 'admin';
 
-        // Hanya Owner & Admin yang boleh approve
-        if (! $isOwner && ! $isAdmin) {
-            abort(403, 'Hanya Owner atau Admin yang boleh approve adjustment.');
+        if (! $isOwner) {
+            abort(403, 'Finalisasi koreksi persediaan hanya boleh dilakukan oleh Owner.');
         }
 
         $fromStockOpname = $inventoryAdjustment->source_type === StockOpname::class;
@@ -1230,7 +1245,7 @@ class InventoryAdjustmentController extends Controller
     public function post(InventoryAdjustment $inventoryAdjustment): RedirectResponse
     {
         $user = auth()->user();
-        abort_unless($user && in_array($user->role ?? null, ['owner', 'admin'], true), 403);
+        abort_unless($user && strtolower((string) ($user->role ?? '')) === 'owner', 403);
 
         $adjustmentId = (int) $inventoryAdjustment->getKey();
         if ($adjustmentId <= 0) {
@@ -1345,6 +1360,25 @@ class InventoryAdjustmentController extends Controller
         return redirect("/inventory/adjustments/{$adjustmentId}")
             ->with('status', 'success')
             ->with('message', 'Draft adjustment berhasil diposting dan stok sudah dikoreksi.');
+    }
+
+    protected function ensureManualAdjustmentAccess(Request $request): void
+    {
+        $role = strtolower((string) ($request->user()?->role ?? ''));
+
+        abort_unless(
+            in_array($role, ['owner', 'admin'], true),
+            403,
+            'Koreksi persediaan manual hanya dapat dibuat oleh Admin atau Owner.'
+        );
+    }
+
+    protected function forgetOwnerNotificationCaches(): void
+    {
+        User::query()
+            ->where('role', 'owner')
+            ->pluck('id')
+            ->each(fn ($ownerId) => Cache::forget('navbar_notif_owner_v5_'.(int) $ownerId));
     }
 
     public function cuttingOverproductionCreate(Request $request): View

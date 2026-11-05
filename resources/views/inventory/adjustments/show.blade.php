@@ -428,9 +428,10 @@
             }
         }
 
-        $canApprove = $isOwnerAdmin && method_exists($adjustment, 'canApprove') && $adjustment->canApprove();
+        $isOwner = $user && strtolower((string) ($user->role ?? '')) === 'owner';
+        $canApprove = $isOwner && method_exists($adjustment, 'canApprove') && $adjustment->canApprove();
         $canVoid = $isOwnerAdmin && in_array($adjustment->status, [InventoryAdjustment::STATUS_DRAFT, InventoryAdjustment::STATUS_PENDING], true);
-        $canPostDraft = $isOwnerAdmin && $adjustment->status === InventoryAdjustment::STATUS_DRAFT;
+        $canPostDraft = $isOwner && $adjustment->status === InventoryAdjustment::STATUS_DRAFT;
         $showReasonBlock = (bool) $adjustment->reason && !in_array($adjustment->reason, ['Adjustment Manual Draft', 'Draft Adjustment Manual'], true);
 
         $summary = $summary ?? [
@@ -547,9 +548,9 @@
 
                             @if ($canApprove)
                                 <form action="{{ route('inventory.adjustments.approve', $adjustment) }}" method="POST"
-                                    onsubmit="return confirm('Approve adjustment ini? Stok akan dikoreksi sesuai baris di bawah.');">
+                                    onsubmit="return confirm('Finalisasi koreksi persediaan ini? Stok akan dikoreksi sesuai baris di bawah.');">
                                     @csrf
-                                    <button class="btn btn-sm btn-success btn-pill">Approve</button>
+                                    <button class="btn btn-sm btn-success btn-pill">Finalisasi &amp; Koreksi Stok</button>
                                 </form>
                             @endif
 
@@ -566,7 +567,7 @@
                             @if ($adjustment->status === InventoryAdjustment::STATUS_DRAFT)
                                 Simpan dulu sebagai draft, lalu post dari halaman detail saat sudah siap.
                             @elseif ($adjustment->status === InventoryAdjustment::STATUS_PENDING)
-                                Menunggu approval Owner atau Admin.
+                                Menunggu finalisasi Owner.
                             @elseif ($adjustment->status === InventoryAdjustment::STATUS_APPROVED)
                                 Sudah diposting dan tercatat di kartu stok.
                             @else

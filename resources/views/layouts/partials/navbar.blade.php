@@ -14,7 +14,7 @@ $navPendingItems = [];
 
 if ($navShowBell) {
     $navCacheKey = 'navbar_notif_owner_v5_' . (int) $navUser->id;
-    $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () {
+    $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () use ($navIsOwner) {
         $todayStart = today()->startOfDay();
         $todayEnd   = today()->endOfDay();
 
@@ -39,6 +39,16 @@ if ($navShowBell) {
                 ->latest('id')
                 ->limit(10)
                 ->get()
+            : collect();
+
+        $inventoryAdjustmentRequests = $navIsOwner && Schema::hasTable('inventory_adjustments')
+            ? \App\Models\InventoryAdjustment::query()
+                ->with(['warehouse:id,code', 'creator:id,name'])
+                ->where('status', \App\Models\InventoryAdjustment::STATUS_PENDING)
+                ->whereNull('approved_by')
+                ->latest('id')
+                ->limit(10)
+                ->get(['id', 'code', 'warehouse_id', 'created_by'])
             : collect();
 
         // ── CRM Storefront notifications ──────────────────────────────────────
@@ -77,6 +87,7 @@ if ($navShowBell) {
             'grn_drafts'     => $grnDrafts,
             'cutting_qc_owner_reviews' => $cuttingQcOwnerReviews,
             'shipment_deletion_requests' => $shipmentDeletionRequests,
+            'inventory_adjustment_requests' => $inventoryAdjustmentRequests,
             'crm_aging'      => $crmAgingCount,
             'crm_new_orders' => $crmNewOrders,
             'crm_prospects'  => $crmProspects,
@@ -95,6 +106,16 @@ if ($navShowBell) {
                 'sub'   => 'Menunggu approval hapus · '.($deletionRequest->requestedBy?->name ?: 'Admin'),
                 'url'   => route('sales.shipments.deletion_requests.index'),
                 'icon'  => '🗑️',
+            ];
+        }
+        foreach (($navPending['inventory_adjustment_requests'] ?? collect()) as $adjustment) {
+            $navPendingItems[] = [
+                'type'  => 'inventory_adjustment_request',
+                'label' => $adjustment->code ?? 'Koreksi persediaan #'.$adjustment->id,
+                'sub'   => 'Menunggu finalisasi Owner · '.($adjustment->warehouse?->code ?? 'Gudang')
+                    .' · '.($adjustment->creator?->name ?? 'Admin'),
+                'url'   => route('inventory.adjustments.show', $adjustment),
+                'icon'  => '🧮',
             ];
         }
         foreach (($navPending['grn_drafts'] ?? collect()) as $grn) {

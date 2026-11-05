@@ -191,9 +191,11 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Koreksi stok')
             ->assertSee('Cek PO')
-            ->assertSee('Cek permintaan')
+            ->assertSee('Buat permintaan')
             ->assertSee('/inventory/adjustments/manual/create?warehouse_id=', false)
-            ->assertSee('item_code='.$item->code, false);
+            ->assertSee('item_code='.$item->code, false)
+            ->assertSee('/rts/stock-requests/create?item_id='.$item->id, false)
+            ->assertSee('qty=1', false);
     }
 
     public function test_item_first_confirmation_shows_mapping_error_when_item_is_unassigned(): void

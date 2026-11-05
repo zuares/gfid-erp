@@ -432,6 +432,7 @@
     @php
         $user = auth()->user();
         $isOwner = $user && ($user->role ?? null) === 'owner';
+        $submitLabel = $isOwner ? 'Simpan Draft' : 'Kirim ke Owner';
     @endphp
 
     {{-- TOPBAR --}}
@@ -477,11 +478,11 @@
             <div class="adj-workflow-meta">
                 <span class="adj-workflow-step">Langkah berikutnya</span>
                 <span class="adj-workflow-selected" id="selected-warehouse-label">-</span>
-                <div class="adj-workflow-desc">Isi tanggal, catatan, lalu atur stok akhir di tabel. Simpan draft dari sini, tanpa scroll jauh ke bawah.</div>
+                <div class="adj-workflow-desc">Isi tanggal, catatan, lalu atur stok akhir di tabel. {{ $isOwner ? 'Simpan sebagai draft.' : 'Kirim untuk finalisasi Owner; stok belum berubah.' }}</div>
             </div>
             <div class="adj-workflow-actions">
                 <button type="button" class="btn btn-sm btn-adj-outline" id="clear-all">Reset Semua</button>
-                <button type="submit" class="btn btn-sm btn-adj-primary">Simpan Draft</button>
+                <button type="submit" class="btn btn-sm btn-adj-primary">{{ $submitLabel }}</button>
             </div>
         </div>
 
@@ -631,12 +632,12 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content" style="border-radius:10px;border:1px solid var(--adj-border);box-shadow:none;">
                 <div class="modal-header py-2" style="border-bottom-color:rgba(148,163,184,.18);">
-                    <h6 class="modal-title mb-0" style="font-weight:800;font-size:.92rem;">Konfirmasi Simpan Draft</h6>
+                    <h6 class="modal-title mb-0" style="font-weight:800;font-size:.92rem;">Konfirmasi {{ $isOwner ? 'Simpan Draft' : 'Kirim ke Owner' }}</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" style="font-size:.84rem;">
                     <div class="alert alert-warning py-2 px-3 mb-3" style="border-radius:8px;">
-                        Pastikan data berikut sudah benar sebelum draft disimpan.
+                        Pastikan data berikut sudah benar sebelum {{ $isOwner ? 'draft disimpan' : 'koreksi dikirim ke Owner' }}.
                     </div>
                     <div class="d-grid gap-2">
                         <div class="d-flex justify-content-between gap-3">
@@ -663,7 +664,7 @@
                 </div>
                 <div class="modal-footer py-2" style="border-top-color:rgba(148,163,184,.18);">
                     <button type="button" class="btn btn-sm btn-adj-outline" data-bs-dismiss="modal">Cek lagi</button>
-                    <button type="button" class="btn btn-sm btn-adj-primary" id="confirm-save-draft">Ya, simpan</button>
+                    <button type="button" class="btn btn-sm btn-adj-primary" id="confirm-save-draft">Ya, {{ $isOwner ? 'simpan draft' : 'kirim ke Owner' }}</button>
                 </div>
             </div>
         </div>
