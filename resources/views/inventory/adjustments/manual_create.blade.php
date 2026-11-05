@@ -425,6 +425,459 @@
             width:100%;
         }
     }
+
+    /* ── GFID design-system alignment ───────────────────────── */
+    .adj-page{
+        --adj-brand:var(--gf-color-brand,#5b5ce2);
+        --adj-brand-strong:var(--gf-color-brand-strong,#4142bb);
+        --adj-accent:var(--gf-color-accent,#13b8c4);
+        --adj-ink:var(--gf-color-content,var(--text,#101828));
+        --adj-muted:var(--gf-color-muted,var(--muted,#667085));
+        --adj-surface:var(--gf-color-surface,var(--card,#fff));
+        --adj-surface-muted:var(--gf-color-surface-muted,var(--card-soft,#f2f4f7));
+        --adj-line:var(--gf-color-line,var(--line,#e4e7ec));
+        --adj-success:var(--gf-color-success,#14945a);
+        --adj-danger:var(--gf-color-danger,#d6455d);
+        --adj-radius-card:var(--gf-radius-card,16px);
+        --adj-radius-control:var(--gf-radius-control,10px);
+        --adj-shadow:var(--gf-shadow-sm,0 1px 2px rgba(16,24,40,.04),0 4px 12px rgba(16,24,40,.04));
+        color:var(--adj-ink);
+    }
+
+    .adj-page .adj-topbar{
+        position:relative;
+        top:auto;
+        z-index:1;
+        align-items:flex-start;
+        margin:0 0 .8rem;
+        padding:1.25rem 1.35rem;
+        border:1px solid color-mix(in srgb,var(--adj-brand) 18%,var(--adj-line) 82%);
+        border-radius:24px;
+        background:linear-gradient(120deg,
+            color-mix(in srgb,var(--adj-brand) 9%,var(--adj-surface) 91%) 0%,
+            var(--adj-surface) 52%,
+            color-mix(in srgb,var(--adj-accent) 8%,var(--adj-surface) 92%) 100%);
+        box-shadow:var(--gf-shadow-lg,var(--adj-shadow));
+        overflow:hidden;
+    }
+    .adj-page .adj-topbar::after{
+        content:'';
+        position:absolute;
+        width:180px;
+        height:180px;
+        right:-55px;
+        top:-82px;
+        border-radius:50%;
+        background:color-mix(in srgb,var(--adj-brand) 12%,transparent);
+        pointer-events:none;
+    }
+    .adj-topbar-copy{ position:relative; z-index:1; min-width:0; }
+    .adj-eyebrow{
+        display:inline-flex;
+        align-items:center;
+        gap:.35rem;
+        margin-bottom:.35rem;
+        color:var(--adj-brand);
+        font-size:.64rem;
+        font-weight:850;
+        letter-spacing:.1em;
+        text-transform:uppercase;
+    }
+    .adj-eyebrow i{ font-size:.78rem; }
+    .adj-page .adj-topbar-title{
+        display:block;
+        margin:0;
+        color:var(--adj-ink);
+        font-size:clamp(1.3rem,2.2vw,1.8rem);
+        font-weight:820;
+        letter-spacing:-.045em;
+        line-height:1.08;
+    }
+    .adj-topbar-description{
+        max-width:620px;
+        margin:.45rem 0 0;
+        color:var(--adj-muted);
+        font-size:.78rem;
+        line-height:1.5;
+    }
+    .adj-topbar-actions{
+        position:relative;
+        z-index:1;
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        gap:.5rem;
+        flex-wrap:wrap;
+    }
+    .adj-page .adj-badge{
+        min-height:26px;
+        padding:.28rem .58rem;
+        border-radius:999px;
+        color:var(--adj-muted);
+        background:color-mix(in srgb,var(--adj-surface) 78%,var(--adj-surface-muted) 22%);
+        border-color:var(--adj-line);
+        font-size:.64rem;
+        font-weight:750;
+    }
+    .adj-page .adj-badge::before{ background:var(--adj-muted); }
+    .adj-page .adj-badge.is-owner{
+        color:var(--adj-brand-strong);
+        border-color:color-mix(in srgb,var(--adj-brand) 24%,var(--adj-line) 76%);
+        background:color-mix(in srgb,var(--adj-brand) 10%,var(--adj-surface) 90%);
+    }
+    .adj-page .adj-badge.is-owner::before{ background:var(--adj-brand); }
+    .adj-page .btn-adj-outline,
+    .adj-page .btn-adj-primary{
+        min-height:36px;
+        padding:.45rem .72rem!important;
+        border-radius:var(--adj-radius-control)!important;
+        font-size:.72rem!important;
+        font-weight:750!important;
+        transition:color .18s ease,background .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease;
+    }
+    .adj-page .btn-adj-outline{
+        color:var(--adj-muted)!important;
+        background:color-mix(in srgb,var(--adj-surface) 86%,var(--adj-surface-muted) 14%)!important;
+        border-color:var(--adj-line)!important;
+    }
+    .adj-page .btn-adj-outline:hover{
+        color:var(--adj-brand-strong)!important;
+        background:var(--adj-surface)!important;
+        border-color:color-mix(in srgb,var(--adj-brand) 35%,var(--adj-line) 65%)!important;
+        transform:translateY(-1px);
+    }
+    .adj-page .btn-adj-primary{
+        color:#fff!important;
+        background:var(--adj-brand)!important;
+        border-color:var(--adj-brand)!important;
+        box-shadow:0 7px 14px color-mix(in srgb,var(--adj-brand) 22%,transparent)!important;
+    }
+    .adj-page .btn-adj-primary:hover{
+        color:#fff!important;
+        background:var(--adj-brand-strong)!important;
+        border-color:var(--adj-brand-strong)!important;
+        transform:translateY(-1px);
+    }
+    .adj-page .btn-adj-outline:focus-visible,
+    .adj-page .btn-adj-primary:focus-visible,
+    .adj-page .qty-stepper-btn:focus-visible{
+        outline:3px solid color-mix(in srgb,var(--adj-brand) 28%,transparent);
+        outline-offset:2px;
+    }
+    .adj-page .btn-adj-outline > *,
+    .adj-page .btn-adj-primary > *{ color:inherit; }
+
+    .adj-page .adj-card{
+        border:1px solid var(--adj-line);
+        border-radius:var(--adj-radius-card);
+        background:var(--adj-surface);
+        box-shadow:var(--adj-shadow);
+        margin-top:0!important;
+    }
+    .adj-page #workflow-sections > .adj-card{ margin-top:.75rem!important; }
+    .adj-page .adj-card-body{ padding:1rem 1.1rem; }
+    .adj-page .adj-table-card-body{ padding:.75rem .8rem .85rem; }
+    .adj-page .adj-section-label{
+        margin-bottom:.72rem;
+        color:var(--adj-brand);
+        font-size:.63rem;
+        font-weight:850;
+        letter-spacing:.1em;
+    }
+    .adj-page .adj-section-label::after{ background:var(--adj-line); }
+    .adj-page .adj-field-label{
+        margin-bottom:.3rem;
+        color:var(--adj-muted);
+        font-size:.68rem;
+        font-weight:750;
+    }
+    .adj-page .form-control-sm,
+    .adj-page .form-select-sm{
+        min-height:38px;
+        border:1px solid var(--adj-line);
+        border-radius:var(--adj-radius-control);
+        background:color-mix(in srgb,var(--adj-surface) 94%,var(--adj-surface-muted) 6%);
+        color:var(--adj-ink);
+        font-size:.76rem;
+        transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+    }
+    .adj-page .form-control-sm:focus,
+    .adj-page .form-select-sm:focus{
+        border-color:var(--adj-brand);
+        box-shadow:0 0 0 3px color-mix(in srgb,var(--adj-brand) 12%,transparent)!important;
+        background:var(--adj-surface);
+    }
+    .adj-page .adj-gate-title{ color:var(--adj-ink); font-size:1.08rem; letter-spacing:-.025em; }
+    .adj-page .adj-gate-note,
+    .adj-page .adj-gate-hint,
+    .adj-page .adj-search-hint,
+    .adj-page .adj-footer-hint{ color:var(--adj-muted); }
+    .adj-page .adj-gate-note{ font-size:.78rem; }
+    .adj-page .adj-gate-hint{ font-size:.7rem; }
+    .adj-page .adj-info-hint{ margin-top:0; }
+    .adj-page .adj-gate-note,
+    .adj-page .adj-workflow-desc,
+    .adj-page .adj-info-hint,
+    .adj-page .adj-section-subtitle{ display:none; }
+
+    .adj-page .adj-workflow-bar{
+        top:calc(var(--app-navbar-offset,58px) + .55rem);
+        margin-top:0;
+        padding:.78rem .9rem;
+        border:1px solid color-mix(in srgb,var(--adj-brand) 18%,var(--adj-line) 82%);
+        border-radius:var(--adj-radius-card);
+        background:linear-gradient(90deg,
+            color-mix(in srgb,var(--adj-brand) 8%,var(--adj-surface) 92%),
+            color-mix(in srgb,var(--adj-accent) 7%,var(--adj-surface) 93%));
+        box-shadow:var(--adj-shadow);
+        backdrop-filter:blur(16px);
+    }
+    .adj-workflow-leading{ display:flex; align-items:center; gap:.65rem; min-width:0; }
+    .adj-workflow-icon{
+        display:grid;
+        width:34px;
+        height:34px;
+        flex:0 0 auto;
+        place-items:center;
+        border-radius:12px;
+        color:#fff;
+        background:linear-gradient(145deg,var(--adj-brand),var(--adj-accent));
+        box-shadow:0 8px 16px color-mix(in srgb,var(--adj-brand) 22%,transparent);
+    }
+    .adj-page .adj-workflow-step{ color:var(--adj-brand-strong); font-size:.63rem; font-weight:850; }
+    .adj-page .adj-workflow-selected{ color:var(--adj-ink); font-size:.9rem; }
+    .adj-page .adj-workflow-desc{ color:var(--adj-muted); font-size:.72rem; }
+
+    .adj-search-control{ position:relative; display:flex; align-items:center; }
+    .adj-search-control > i{ position:absolute; left:.72rem; z-index:1; color:#98a2b3; font-size:.78rem; pointer-events:none; }
+    .adj-search-control > input{ padding-left:2.1rem!important; }
+    .adj-page .adj-search-hint{ margin-top:.55rem; font-size:.68rem; line-height:1.4; }
+    .adj-page .adj-search-hint::before{ content:'⌁'; margin-right:.3rem; color:var(--adj-brand); font-weight:900; }
+
+    .adj-section-heading{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.55rem; }
+    .adj-section-heading .adj-section-label{ margin:0; }
+    .adj-section-subtitle{ margin-top:.16rem; color:var(--adj-muted); font-size:.68rem; }
+    .adj-section-heading .form-select-sm{ width:132px; min-height:34px; }
+    .adj-page .adj-table-scroll{ max-height:calc(100vh - 330px); border:1px solid var(--adj-line); border-radius:12px; }
+    .adj-page .adj-table{ font-size:.75rem; }
+    .adj-page .adj-table thead th{
+        background:var(--adj-surface-muted);
+        color:var(--adj-muted);
+        border-bottom-color:var(--adj-line);
+        font-size:.59rem;
+        font-weight:850;
+        letter-spacing:.07em;
+    }
+    .adj-page .adj-table tbody td{ padding:.62rem .58rem; border-top-color:var(--adj-line); }
+    .adj-page .adj-table tbody tr:hover{ background:color-mix(in srgb,var(--adj-brand) 4%,var(--adj-surface) 96%); }
+    .adj-page .adj-row-focus{ outline:2px solid color-mix(in srgb,var(--adj-brand) 28%,transparent); background:color-mix(in srgb,var(--adj-brand) 6%,var(--adj-surface) 94%); }
+    .adj-page .adj-item-code{ color:var(--adj-ink); font-weight:800; }
+    .adj-page .adj-item-name{ color:var(--adj-muted); }
+    .adj-page .item-badge{ color:var(--adj-success); border-color:color-mix(in srgb,var(--adj-success) 24%,var(--adj-line) 76%); background:color-mix(in srgb,var(--adj-success) 8%,var(--adj-surface) 92%); }
+    .adj-page .qty-stepper-input{ width:104px; }
+    .adj-page .qty-stepper-btn{
+        width:28px;
+        min-height:17px;
+        border-color:var(--adj-line);
+        border-radius:8px;
+        color:var(--adj-brand-strong);
+        background:var(--adj-surface);
+    }
+    .adj-page .qty-stepper-btn:hover{ color:var(--adj-brand-strong); background:color-mix(in srgb,var(--adj-brand) 8%,var(--adj-surface) 92%); }
+    .adj-page .diff-plus{ color:var(--adj-success); font-weight:800; }
+    .adj-page .diff-minus{ color:var(--adj-danger); font-weight:800; }
+    .adj-page .adj-divider{ background:var(--adj-line); margin:.8rem 0 .65rem; }
+    .adj-page .adj-footer{
+        align-items:flex-end;
+        padding-top:.8rem;
+    }
+    .adj-footer-meta{ min-width:0; flex:1 1 auto; }
+    .adj-footer-actions{
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        gap:.5rem;
+        margin-left:auto;
+    }
+    .adj-page .adj-footer-actions .btn{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:.35rem;
+        min-height:40px;
+        border-radius:var(--adj-radius-control)!important;
+        font-weight:750!important;
+        white-space:nowrap;
+    }
+    .adj-page .adj-footer-actions .btn-adj-outline{
+        background:color-mix(in srgb,var(--adj-surface) 86%,var(--adj-surface-muted) 14%)!important;
+        border-color:var(--adj-line)!important;
+        color:var(--adj-muted)!important;
+        text-decoration:none!important;
+    }
+    .adj-page .adj-footer-actions .btn-adj-outline:hover{
+        color:var(--adj-brand-strong)!important;
+        background:var(--adj-surface)!important;
+        border-color:color-mix(in srgb,var(--adj-brand) 35%,var(--adj-line) 65%)!important;
+    }
+    .adj-page .adj-footer-actions .btn-adj-outline:focus-visible,
+    .adj-page .adj-footer-actions .btn-adj-primary:focus-visible{
+        outline:3px solid color-mix(in srgb,var(--adj-brand) 28%,transparent);
+        outline-offset:2px;
+    }
+    .adj-page .adj-footer-hint{ color:var(--adj-ink); font-weight:800; }
+    .adj-empty-row td{ padding:0!important; border-top:0!important; }
+    .adj-page .adj-empty{ display:grid; place-items:center; min-height:160px; padding:1rem; color:var(--adj-muted); text-align:center; }
+    .adj-empty-icon{ display:grid; width:36px; height:36px; place-items:center; margin-bottom:.45rem; border-radius:12px; color:var(--adj-brand); background:color-mix(in srgb,var(--adj-brand) 10%,var(--adj-surface) 90%); }
+    .adj-empty strong{ color:var(--adj-ink); font-size:.78rem; }
+    .adj-empty span{ max-width:300px; margin-top:.2rem; font-size:.68rem; line-height:1.45; }
+
+    .adj-page .modal-content{ border:1px solid var(--adj-line)!important; border-radius:var(--adj-radius-card)!important; background:var(--adj-surface); color:var(--adj-ink); box-shadow:var(--gf-shadow-lg,var(--adj-shadow))!important; }
+    .adj-page .modal-header,.adj-page .modal-footer{ border-color:var(--adj-line)!important; }
+    .adj-page .modal-title{ color:var(--adj-ink); font-size:.9rem; font-weight:800; }
+    .adj-page .modal-body{ font-size:.78rem; }
+    .adj-page .modal-body .alert{ border:1px solid color-mix(in srgb,#b7791f 22%,var(--adj-line) 78%); border-radius:var(--adj-radius-control); color:#8a5b12; background:#fffaeb; }
+    .adj-page .modal-body strong{ color:var(--adj-ink); }
+
+    @media(max-width:768px){
+        .adj-page .adj-topbar{
+            margin-bottom:.6rem;
+            padding:.85rem 1rem;
+            border-radius:18px;
+        }
+        .adj-page .adj-topbar-description,
+        .adj-page .adj-gate-title,
+        .adj-page .adj-gate-note,
+        .adj-page .adj-workflow-desc,
+        .adj-page .adj-info-hint,
+        .adj-page .adj-section-subtitle{
+            display:none;
+        }
+        .adj-page .adj-topbar-title{ font-size:1.3rem; }
+        .adj-page .adj-topbar-actions{ width:100%; justify-content:flex-start; }
+        .adj-page .adj-topbar-actions .btn{ flex:1 1 auto; }
+        .adj-page .adj-card-body{ padding:.8rem; }
+        .adj-page #workflow-sections > .adj-card{ margin-top:.6rem!important; }
+        .adj-page .adj-gate-copy{ min-width:0; max-width:none; }
+        .adj-page .adj-gate-hint{ margin-top:.35rem; }
+        .adj-workflow-leading{
+            flex:1 1 auto;
+            align-items:center;
+        }
+        .adj-page .adj-workflow-bar{
+            flex-direction:row!important;
+            align-items:center!important;
+            top:calc(var(--app-navbar-offset,58px) + .35rem);
+            padding:.6rem .7rem;
+            gap:.55rem;
+        }
+        .adj-page .adj-workflow-icon,
+        .adj-page .adj-workflow-step{ display:none; }
+        .adj-page .adj-workflow-selected{
+            margin-top:0;
+            overflow:hidden;
+            font-size:.76rem;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+        }
+        .adj-page .adj-workflow-actions{
+            width:auto;
+            display:flex;
+            flex-wrap:nowrap;
+            gap:.45rem;
+        }
+        .adj-page .adj-workflow-actions .btn{
+            min-width:0;
+            width:auto;
+            min-height:40px;
+            padding:.35rem .5rem!important;
+            font-size:.67rem!important;
+            white-space:nowrap;
+        }
+        .adj-section-heading{ align-items:flex-start; flex-direction:column; }
+        .adj-section-heading .form-select-sm{ width:100%; }
+        .adj-page .adj-table-scroll{ border:0; overflow:visible; }
+        .adj-page .adj-table tbody tr{
+            display:grid;
+            grid-template-columns:minmax(0,1fr) minmax(132px,.82fr);
+            gap:.55rem .7rem;
+            padding:.8rem;
+            border:1px solid var(--adj-line);
+            box-shadow:var(--adj-shadow);
+            background:var(--adj-surface);
+        }
+        .adj-page .adj-table tbody td{
+            display:block;
+            width:auto;
+            padding:0;
+            border:0;
+        }
+        .adj-page .adj-table tbody td.adj-index-cell{ display:none; }
+        .adj-page .adj-table tbody td:nth-child(2){ grid-column:1 / -1; }
+        .adj-page .adj-table tbody td.adj-on-hand-cell{
+            display:block;
+            grid-column:1;
+            text-align:left!important;
+        }
+        .adj-page .adj-table tbody td:nth-child(4){ grid-column:2; }
+        .adj-page .adj-table tbody td.adj-diff-cell{
+            display:block;
+            grid-column:1;
+            text-align:left!important;
+        }
+        .adj-page .adj-table tbody td.adj-notes-cell{ grid-column:1 / -1; }
+        .adj-page .adj-table tbody td.adj-on-hand-cell::before,
+        .adj-page .adj-table tbody td.adj-diff-cell::before,
+        .adj-page .adj-table tbody td.adj-notes-cell::before{
+            display:block;
+            margin-bottom:.22rem;
+            color:var(--adj-muted);
+            font-size:.6rem;
+            font-weight:850;
+            letter-spacing:.06em;
+            line-height:1.2;
+            text-transform:uppercase;
+        }
+        .adj-page .adj-table tbody td.adj-on-hand-cell::before{ content:'Stok saat ini'; }
+        .adj-page .adj-table tbody td.adj-diff-cell::before{ content:'Selisih'; }
+        .adj-page .adj-table tbody td.adj-notes-cell::before{ content:'Alasan perubahan'; }
+        .adj-page .adj-item-main{ flex-direction:row; align-items:flex-start; }
+        .adj-page .adj-item-meta{ display:flex; }
+        .adj-page .adj-item-name{ font-size:.72rem; }
+        .adj-page .qty-stepper{ width:100%; }
+        .adj-page .qty-stepper-input,
+        .adj-page .adj-notes-cell .notes-input{
+            min-height:44px;
+        }
+        .adj-page .qty-stepper-btn{
+            width:40px;
+            height:40px;
+            min-height:40px;
+        }
+        .adj-page .adj-footer{
+            align-items:stretch;
+            gap:.6rem;
+        }
+        .adj-footer-meta{ display:flex; justify-content:flex-end; }
+        .adj-footer-actions{
+            width:100%;
+            display:grid;
+            grid-template-columns:1fr 1fr 1.35fr;
+            gap:.45rem;
+            margin-left:0;
+        }
+        .adj-page .adj-footer-actions .btn{
+            width:100%;
+            min-width:0;
+            min-height:44px;
+            padding:.35rem .45rem!important;
+            font-size:.68rem!important;
+        }
+        .adj-page .modal-footer .btn{ min-height:44px; }
+    }
+    @media(prefers-reduced-motion:reduce){
+        .adj-page *, .adj-page *::before, .adj-page *::after{ scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; }
+    }
 </style>
 @endpush
 
@@ -435,21 +888,27 @@
         $submitLabel = $isOwner ? 'Simpan Draft' : 'Kirim ke Owner';
     @endphp
 
-    {{-- TOPBAR --}}
-    <div class="adj-topbar">
-        <span class="adj-topbar-title">Adjustment Manual</span>
-        <span class="adj-badge {{ $isOwner ? 'is-owner' : '' }}">
-            {{ $isOwner ? 'Langsung koreksi stok' : 'Menunggu Owner' }}
-        </span>
-        <span class="adj-topbar-spacer"></span>
-        <a href="{{ route('inventory.adjustments.index') }}" class="btn-adj-outline">Daftar Adjustment</a>
-    </div>
+    <div class="adj-page">
+        {{-- PAGE HEADER --}}
+        <header class="adj-topbar">
+            <div class="adj-topbar-copy">
+                <span class="adj-eyebrow"><i class="bi bi-box-seam" aria-hidden="true"></i>Persediaan · Koreksi stok</span>
+                <h1 class="adj-topbar-title">Adjustment manual</h1>
+                <p class="adj-topbar-description">Atur stok akhir untuk satu atau beberapa item, lalu simpan sebagai draft atau kirim ke Owner untuk finalisasi.</p>
+            </div>
+            <div class="adj-topbar-actions">
+                <span class="adj-badge {{ $isOwner ? 'is-owner' : '' }}">
+                    <i class="bi {{ $isOwner ? 'bi-lightning-charge' : 'bi-shield-check' }}" aria-hidden="true"></i>
+                    {{ $isOwner ? 'Langsung koreksi stok' : 'Menunggu Owner' }}
+                </span>
+            </div>
+        </header>
 
     <form method="POST" action="{{ route('inventory.adjustments.manual.store') }}" id="adj-form">
         @csrf
 
         {{-- STEP 1: Gudang --}}
-        <div class="adj-card" style="margin-top:.65rem;">
+        <div class="adj-card">
             <div class="adj-card-body">
                 <div class="adj-gate">
                     <div class="adj-gate-copy">
@@ -460,7 +919,7 @@
                         </div>
                     </div>
                     <div class="adj-gate-field">
-                        <label class="adj-field-label">Gudang</label>
+                        <label class="adj-field-label" for="warehouse_id">Gudang</label>
                         <select name="warehouse_id" id="warehouse_id" class="form-select form-select-sm" required>
                             <option value="">Pilih gudang…</option>
                             @foreach ($warehouses as $wh)
@@ -475,36 +934,35 @@
         </div>
 
         <div class="adj-workflow-bar" id="workflow-bar">
-            <div class="adj-workflow-meta">
-                <span class="adj-workflow-step">Langkah berikutnya</span>
-                <span class="adj-workflow-selected" id="selected-warehouse-label">-</span>
-                <div class="adj-workflow-desc">Isi tanggal, catatan, lalu atur stok akhir di tabel. {{ $isOwner ? 'Simpan sebagai draft.' : 'Kirim untuk finalisasi Owner; stok belum berubah.' }}</div>
-            </div>
-            <div class="adj-workflow-actions">
-                <button type="button" class="btn btn-sm btn-adj-outline" id="clear-all">Reset Semua</button>
-                <button type="submit" class="btn btn-sm btn-adj-primary">{{ $submitLabel }}</button>
+            <div class="adj-workflow-leading">
+                <span class="adj-workflow-icon" aria-hidden="true"><i class="bi bi-check2-circle"></i></span>
+                <div class="adj-workflow-meta">
+                    <span class="adj-workflow-step">Gudang siap · langkah berikutnya</span>
+                    <span class="adj-workflow-selected" id="selected-warehouse-label">-</span>
+                    <div class="adj-workflow-desc">Isi tanggal, catatan, lalu atur stok akhir di tabel. {{ $isOwner ? 'Simpan sebagai draft.' : 'Kirim untuk finalisasi Owner; stok belum berubah.' }}</div>
+                </div>
             </div>
         </div>
 
         <div id="workflow-sections" class="d-none">
             {{-- STEP 2: Informasi Adjustment --}}
-            <div class="adj-card" style="margin-top:.5rem;">
+            <div class="adj-card">
                 <div class="adj-card-body">
                     <div class="adj-section-label">Informasi Adjustment</div>
                     <div class="row adj-form-row">
                         <div class="col-6 col-lg-2">
-                            <label class="adj-field-label">Tanggal</label>
-                            <input type="date" class="form-control form-control-sm" name="date" value="{{ old('date', now()->toDateString()) }}" required>
+                            <label class="adj-field-label" for="adjustment-date">Tanggal</label>
+                            <input type="date" id="adjustment-date" class="form-control form-control-sm" name="date" value="{{ old('date', now()->toDateString()) }}" required>
                             @error('date') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-12 col-lg-5">
-                            <label class="adj-field-label">Catatan</label>
-                            <input type="text" name="notes" class="form-control form-control-sm" placeholder="Opsional" value="{{ old('notes') }}">
+                            <label class="adj-field-label" for="adjustment-notes">Catatan</label>
+                            <input type="text" id="adjustment-notes" name="notes" class="form-control form-control-sm" placeholder="Opsional" value="{{ old('notes') }}">
                             @error('notes') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-12 col-lg-5">
                             <label class="adj-field-label">&nbsp;</label>
-                            <div class="adj-search-hint" style="margin-top:0;">
+                            <div class="adj-search-hint adj-info-hint">
                                 Tanggal dipakai sebagai tanggal mutasi stok saat draft dipost.
                             </div>
                         </div>
@@ -513,40 +971,44 @@
             </div>
 
             {{-- STEP 3: Cari Item --}}
-            <div class="adj-card is-sticky-step" style="margin-top:.5rem;">
+            <div class="adj-card is-sticky-step">
                 <div class="adj-card-body">
                     <div class="adj-section-label">Cari Item</div>
                     <div class="row adj-form-row align-items-end">
                         <div class="col-12 col-lg-8">
-                            <label class="adj-field-label">Cari kode / nama / lot (pisahkan dengan spasi)</label>
-                            <input type="text" id="item-search" class="form-control form-control-sm"
-                                placeholder="Contoh: K001 K002 atau kaos" value="{{ $prefillItemCode ?? '' }}" style="font-size:.82rem;"
-                                aria-describedby="items-hint">
+                            <label class="adj-field-label" for="item-search">Cari kode / nama / lot (pisahkan dengan spasi)</label>
+                            <div class="adj-search-control">
+                                <i class="bi bi-search" aria-hidden="true"></i>
+                                <input type="search" id="item-search" class="form-control form-control-sm"
+                                    placeholder="Contoh: K001 K002 atau kaos" value="{{ $prefillItemCode ?? '' }}"
+                                    autocomplete="off" spellcheck="false" aria-describedby="items-hint">
+                            </div>
                         </div>
                         <div class="col-12 col-lg-2">
                             <label class="adj-field-label">&nbsp;</label>
-                            <button type="button" class="btn btn-sm btn-adj-primary w-100" id="search-item-btn">Cari</button>
+                            <button type="button" class="btn btn-sm btn-adj-primary w-100" id="search-item-btn"><i class="bi bi-search" aria-hidden="true"></i>Cari</button>
                         </div>
                         <div class="col-12 col-lg-2">
                             <label class="adj-field-label">&nbsp;</label>
-                            <button type="button" class="btn btn-sm btn-adj-outline w-100" data-bs-toggle="modal" data-bs-target="#quickItemModal">Item Baru</button>
+                            <button type="button" class="btn btn-sm btn-adj-outline w-100" data-bs-toggle="modal" data-bs-target="#quickItemModal"><i class="bi bi-plus-lg" aria-hidden="true"></i>Item baru</button>
                         </div>
                     </div>
-                    <div class="adj-search-hint" id="items-hint">Pilih gudang dulu. Setelah itu cari item untuk menyorot baris di tabel.</div>
+                    <div class="adj-search-hint" id="items-hint" role="status" aria-live="polite">Pilih gudang dulu. Setelah itu cari item untuk menyorot baris di tabel.</div>
                 </div>
             </div>
 
             {{-- STEP 4: Tabel --}}
-            <div class="adj-card" style="margin-top:.5rem;">
-                <div class="adj-card-body" style="padding:.5rem .6rem .6rem;">
-                    <div class="d-flex justify-content-between align-items-center" style="margin-bottom:.4rem;">
-                        <div class="adj-section-label" style="margin:0;">Daftar Item</div>
-                        <div class="d-flex gap-2 align-items-center">
-                            <select id="show_changed_only" class="form-select form-select-sm" style="width:120px;font-size:.76rem;height:28px;">
-                                <option value="0">Semua item</option>
-                                <option value="1">Ada selisih</option>
-                            </select>
+            <div class="adj-card">
+                <div class="adj-card-body adj-table-card-body">
+                    <div class="adj-section-heading">
+                        <div>
+                            <div class="adj-section-label">Daftar item</div>
+                            <div class="adj-section-subtitle">Masukkan stok akhir. Sistem menghitung selisih otomatis.</div>
                         </div>
+                        <select id="show_changed_only" class="form-select form-select-sm" aria-label="Filter daftar item">
+                            <option value="0">Semua item</option>
+                            <option value="1">Ada selisih</option>
+                        </select>
                     </div>
 
                     <div class="adj-table-scroll">
@@ -571,8 +1033,20 @@
                     <div class="adj-form-error d-none" id="form-error"></div>
 
                     <div class="adj-footer">
-                        <span class="adj-footer-hint">Isi alasan di kolom per baris yang berubah. Gunakan panah atas/bawah di stok akhir untuk cepat tambah atau kurangi qty.</span>
-                        <span class="adj-footer-hint" id="summary-change">Selisih: 0.00</span>
+                        <div class="adj-footer-meta">
+                            <span class="adj-footer-hint" id="summary-change">Selisih: 0.00</span>
+                        </div>
+                        <div class="adj-footer-actions" aria-label="Aksi adjustment">
+                            <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-sm btn-adj-outline">
+                                <i class="bi bi-x-lg" aria-hidden="true"></i>Batal
+                            </a>
+                            <button type="button" class="btn btn-sm btn-adj-outline" id="clear-all">
+                                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset semua
+                            </button>
+                            <button type="submit" class="btn btn-sm btn-adj-primary">
+                                <i class="bi bi-check2" aria-hidden="true"></i>{{ $submitLabel }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -580,29 +1054,29 @@
     </form>
 
     {{-- MODAL: Item Baru --}}
-    <div class="modal fade" id="quickItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade adj-modal" id="quickItemModal" tabindex="-1" aria-labelledby="quickItemModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" style="border-radius:8px;border:1px solid var(--adj-border);box-shadow:none;">
-                <div class="modal-header py-2" style="border-bottom-color:rgba(148,163,184,.18);">
-                    <h6 class="modal-title mb-0" style="font-weight:700;font-size:.88rem;">Item Baru</h6>
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h2 class="modal-title mb-0" id="quickItemModalTitle">Item baru</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row adj-form-row">
                         <div class="col-5">
-                            <label class="adj-field-label">Kode</label>
+                            <label class="adj-field-label" for="quick-item-code">Kode</label>
                             <input type="text" id="quick-item-code" class="form-control form-control-sm text-mono" autocomplete="off">
                         </div>
                         <div class="col-7">
-                            <label class="adj-field-label">Nama</label>
+                            <label class="adj-field-label" for="quick-item-name">Nama</label>
                             <input type="text" id="quick-item-name" class="form-control form-control-sm" autocomplete="off">
                         </div>
                         <div class="col-4">
-                            <label class="adj-field-label">Satuan</label>
+                            <label class="adj-field-label" for="quick-item-unit">Satuan</label>
                             <input type="text" id="quick-item-unit" class="form-control form-control-sm" value="pcs" autocomplete="off">
                         </div>
                         <div class="col-8">
-                            <label class="adj-field-label">Role</label>
+                            <label class="adj-field-label" for="quick-item-role">Role</label>
                             <select id="quick-item-role" class="form-select form-select-sm">
                                 @foreach (($itemRoles ?? collect()) as $role)
                                     <option value="{{ $role->id }}" @selected($role->code === 'RM')>{{ $role->code }} — {{ $role->name }}</option>
@@ -610,7 +1084,7 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="adj-field-label">Kategori</label>
+                            <label class="adj-field-label" for="quick-item-category">Kategori</label>
                             <select id="quick-item-category" class="form-select form-select-sm">
                                 <option value="">Tanpa kategori</option>
                                 @foreach (($itemCategories ?? collect()) as $category)
@@ -621,7 +1095,7 @@
                     </div>
                     <div class="text-danger small mt-2 d-none" id="quick-item-error"></div>
                 </div>
-                <div class="modal-footer py-2" style="border-top-color:rgba(148,163,184,.18);">
+                <div class="modal-footer py-2">
                     <button type="button" class="btn btn-sm btn-adj-outline" data-bs-dismiss="modal">Batal</button>
                     <button type="button" class="btn btn-sm btn-adj-primary" id="quick-item-save">Buat & Tambah</button>
                 </div>
@@ -629,15 +1103,15 @@
         </div>
     </div>
 
-    <div class="modal fade" id="confirmSaveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade adj-modal" id="confirmSaveModal" tabindex="-1" aria-labelledby="confirmSaveModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" style="border-radius:10px;border:1px solid var(--adj-border);box-shadow:none;">
-                <div class="modal-header py-2" style="border-bottom-color:rgba(148,163,184,.18);">
-                    <h6 class="modal-title mb-0" style="font-weight:800;font-size:.92rem;">Konfirmasi {{ $isOwner ? 'Simpan Draft' : 'Kirim ke Owner' }}</h6>
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h2 class="modal-title mb-0" id="confirmSaveModalTitle">Konfirmasi {{ $isOwner ? 'simpan draft' : 'kirim ke Owner' }}</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body" style="font-size:.84rem;">
-                    <div class="alert alert-warning py-2 px-3 mb-3" style="border-radius:8px;">
+                <div class="modal-body">
+                    <div class="alert alert-warning py-2 px-3 mb-3">
                         Pastikan data berikut sudah benar sebelum {{ $isOwner ? 'draft disimpan' : 'koreksi dikirim ke Owner' }}.
                     </div>
                     <div class="d-grid gap-2">
@@ -663,12 +1137,13 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer py-2" style="border-top-color:rgba(148,163,184,.18);">
+                <div class="modal-footer py-2">
                     <button type="button" class="btn btn-sm btn-adj-outline" data-bs-dismiss="modal">Cek lagi</button>
                     <button type="button" class="btn btn-sm btn-adj-primary" id="confirm-save-draft">Ya, {{ $isOwner ? 'simpan draft' : 'kirim ke Owner' }}</button>
                 </div>
             </div>
         </div>
+    </div>
     </div>
 @endsection
 
@@ -776,7 +1251,7 @@
                 tr.dataset.notInWarehouse = item.not_in_warehouse ? '1' : '0';
 
                 tr.innerHTML = `
-            <td class="text-muted small mobile-hide">${idx + 1}</td>
+            <td class="adj-index-cell text-muted small mobile-hide">${idx + 1}</td>
             <td>
                 <div class="adj-row-main">
                     <div class="adj-item-main">
@@ -797,7 +1272,7 @@
                 <input type="hidden" class="row-item-id" value="${item.id}">
                 <input type="hidden" class="row-lot-id" value="${lotId}">
             </td>
-            <td class="text-end mobile-hide text-mono">
+            <td class="adj-on-hand-cell text-end mobile-hide text-mono">
                 <span class="on-hand desktop-only" data-on-hand="${onHand}">${fmt(onHand)}</span>
             </td>
             <td class="text-end">
@@ -814,10 +1289,10 @@
                 </div>
                 <input type="hidden" class="qty-change-input" value="">
             </td>
-            <td class="text-end mobile-hide text-mono">
+            <td class="adj-diff-cell text-end mobile-hide text-mono">
                 <span class="diff-display">0.00</span>
             </td>
-            <td class="mobile-hide">
+            <td class="adj-notes-cell">
                 <input type="text" class="form-control form-control-sm notes-input" style="font-size:.76rem;" placeholder="Alasan baris">
             </td>
         `;
@@ -889,6 +1364,21 @@
 
             function renderRows() {
                 tbody.innerHTML = '';
+                if (!warehouseItems.length) {
+                    tbody.innerHTML = `
+                        <tr class="adj-empty-row">
+                            <td colspan="6">
+                                <div class="adj-empty">
+                                    <div class="adj-empty-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></div>
+                                    <strong>Belum ada item di daftar</strong>
+                                    <span>Cari kode atau nama item untuk menambahkannya ke koreksi stok.</span>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    updateSummary();
+                    return;
+                }
                 warehouseItems.forEach((item, idx) => { tbody.appendChild(buildRow(item, idx)); });
                 applyFilter();
                 updateSummary();
@@ -1172,8 +1662,10 @@
                 let firstInvalidRow = null;
                 tbody.querySelectorAll('tr').forEach(tr => {
                     tr.querySelectorAll('[data-named="1"]').forEach(el => el.remove());
+                    const qtyChangeInput = tr.querySelector('.qty-change-input');
+                    if (!qtyChangeInput) return;
                     const changed = tr.dataset.changed === '1';
-                    const qtyChange = parseFloat(tr.querySelector('.qty-change-input').value || '0');
+                    const qtyChange = parseFloat(qtyChangeInput.value || '0');
                     if (!changed || isNaN(qtyChange) || Math.abs(qtyChange) < 0.000001) return;
                     const itemId = tr.querySelector('.row-item-id').value;
                     const lotId = tr.querySelector('.row-lot-id')?.value || '';
@@ -1214,6 +1706,7 @@
                 tbody.querySelectorAll('tr').forEach(tr => {
                     const inp = tr.querySelector('.physical-input');
                     const notes = tr.querySelector('.notes-input');
+                    if (!inp || !notes) return;
                     inp.value = ''; notes.value = ''; recalcRow(tr);
                 });
                 applyFilter(); updateSummary();
