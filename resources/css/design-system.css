@@ -178,6 +178,35 @@
 .ds-control input[aria-invalid="true"] { border-color: var(--gf-color-danger); }
 .ds-hint { color: #98a2b3; font-size: .63rem; }
 .ds-hint i { margin-right: .25rem; color: var(--gf-color-brand); }
+.ds-select-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem .65rem; }
+.ds-select-field { display: grid; align-content: start; gap: .32rem; min-width: 0; }
+.ds-select-field > label { color: #475467; font-size: .68rem; font-weight: 750; }
+.ds-select-field > label span { color: var(--gf-color-danger); }
+.ds-select-control { position: relative; display: flex; align-items: center; min-width: 0; min-height: 40px; border: 1px solid #d0d5dd; border-radius: 10px; background: #fff; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+.ds-select-control:focus-within { border-color: var(--gf-color-brand); box-shadow: 0 0 0 3px rgba(91, 92, 226, .12); }
+.ds-select-leading-icon { flex: 0 0 auto; margin-left: .7rem; color: #98a2b3; font-size: .75rem; pointer-events: none; }
+.ds-select-control select { flex: 1; min-width: 0; min-height: 38px; padding: .55rem 2rem .55rem .48rem; border: 0; border-radius: 9px; color: #344054; outline: 0; background: transparent; font: inherit; font-size: .73rem; appearance: none; cursor: pointer; }
+.ds-select-control select:disabled { color: #98a2b3; cursor: not-allowed; }
+.ds-select-chevron { position: absolute; right: .7rem; color: #98a2b3; font-size: .65rem; pointer-events: none; }
+.ds-select-field.is-disabled .ds-select-control { border-color: #e4e7ec; background: #f8fafc; }
+.ds-select-field.is-error .ds-select-control { border-color: var(--gf-color-danger); }
+.ds-select-field.is-error .ds-select-control:focus-within { box-shadow: 0 0 0 3px rgba(214, 69, 93, .12); }
+.ds-select-hint, .ds-select-error { display: block; font-size: .6rem; line-height: 1.35; }
+.ds-select-hint { color: #98a2b3; }
+.ds-select-hint i, .ds-select-error i { margin-right: .2rem; }
+.ds-select-hint i { color: var(--gf-color-brand); }
+.ds-select-error { color: var(--gf-color-danger); font-weight: 650; }
+.ds-select-anatomy { display: grid; gap: .45rem; }
+.ds-select-anatomy > div { display: grid; grid-template-columns: 27px minmax(0, 1fr) auto; gap: .55rem; align-items: center; padding: .52rem .55rem; border: 1px solid #eef0f3; border-radius: 10px; background: #fcfcfd; }
+.ds-select-anatomy-icon { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 8px; color: var(--gf-color-brand); background: #eeefff; font-size: .72rem; }
+.ds-select-anatomy strong, .ds-select-anatomy small { display: block; }
+.ds-select-anatomy strong { color: var(--gf-color-content); font-size: .66rem; }
+.ds-select-anatomy small { margin-top: .12rem; color: #98a2b3; font-size: .59rem; line-height: 1.35; }
+.ds-select-anatomy code, .ds-select-contract code { color: var(--gf-color-brand-strong); font-size: .58rem; white-space: nowrap; }
+.ds-select-contract { display: grid; gap: .45rem; }
+.ds-select-contract > div { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: .65rem; align-items: baseline; padding-bottom: .5rem; border-bottom: 1px solid #f0f1f3; }
+.ds-select-contract > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.ds-select-contract span { color: var(--gf-color-muted); font-size: .62rem; line-height: 1.35; }
 .ds-search-component { min-width: 0; }
 .ds-search-control { position: relative; display: flex; align-items: center; }
 .ds-search-leading-icon { position: absolute; left: .72rem; z-index: 1; color: #98a2b3; font-size: .78rem; pointer-events: none; }
@@ -523,6 +552,13 @@
 .ds-shell.is-dark-preview .ds-search-control input, .ds-shell.is-dark-preview .ds-search-result, .ds-shell.is-dark-preview .ds-search-empty { border-color: #334155; color: #e5e7eb; background: #0f172a; }
 .ds-shell.is-dark-preview .ds-search-result strong, .ds-shell.is-dark-preview .ds-search-empty strong, .ds-shell.is-dark-preview .ds-search-meta strong { color: #f8fafc; }
 .ds-shell.is-dark-preview .ds-search-contract > div { border-color: #263149; }
+.ds-shell.is-dark-preview .ds-select-control { border-color: #334155; background: #0f172a; }
+.ds-shell.is-dark-preview .ds-select-control select { color: #e5e7eb; }
+.ds-shell.is-dark-preview .ds-select-field > label { color: #aab4c5; }
+.ds-shell.is-dark-preview .ds-select-field.is-disabled .ds-select-control { border-color: #334155; background: #111827; }
+.ds-shell.is-dark-preview .ds-select-anatomy > div, .ds-shell.is-dark-preview .ds-select-contract > div { border-color: #334155; background: #0f172a; }
+.ds-shell.is-dark-preview .ds-select-anatomy strong { color: #f8fafc; }
+.ds-shell.is-dark-preview .ds-select-anatomy small, .ds-shell.is-dark-preview .ds-select-contract span, .ds-shell.is-dark-preview .ds-select-hint { color: #aab4c5; }
 .ds-shell.is-dark-preview .ds-tab-system { border-color: #334155; background: #0f172a; }
 .ds-shell.is-dark-preview .ds-tab-system.is-subtabs { border-color: #263149; background: transparent; }
 .ds-shell.is-dark-preview .ds-tab-system-button.is-active { color: #e0e7ff; background: #1f2937; }
@@ -574,6 +610,7 @@
     .ds-tab-hierarchy-row { grid-template-columns: 27px minmax(0,1fr); }
     .ds-tab-hierarchy-row code { grid-column: 2; }
     .ds-flatpickr-grid { grid-template-columns: 1fr; }
+    .ds-select-grid { grid-template-columns: 1fr; }
     .ds-flatpickr-feedback { align-items: flex-start; flex-direction: column; gap: .2rem; }
     .ds-flatpickr-feedback strong { text-align: left; }
     .ds-period-popover { position: fixed; top: 1rem; right: 1rem; bottom: 1rem; left: 1rem; width: auto; overflow: auto; }
@@ -594,6 +631,9 @@
     .ds-token-row { align-items: flex-start; flex-direction: column; gap: .2rem; }
     .ds-token-row span { text-align: left; }
     .ds-field-catalog { grid-template-columns: 1fr; }
+    .ds-select-anatomy > div { grid-template-columns: 27px minmax(0, 1fr); }
+    .ds-select-anatomy code { grid-column: 2; }
+    .ds-select-contract > div { grid-template-columns: 1fr; gap: .15rem; }
     .ds-contract-grid { grid-template-columns: 1fr; }
     .ds-crud-header { grid-template-columns: 34px 1fr 30px; gap: .55rem; padding-inline: .9rem; }
     .ds-crud-header-icon { width: 34px; height: 34px; border-radius: 10px; }

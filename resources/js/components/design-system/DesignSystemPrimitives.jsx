@@ -117,6 +117,44 @@ export function SearchInput({ id, label = 'Cari', placeholder = 'Cari…', value
     );
 }
 
+export function SelectField({ id, label, value = '', onChange, options = [], placeholder, hint, error, required = false, disabled = false, icon = 'bi-list-ul' }) {
+    const generatedId = useId();
+    const selectId = id || `ds-select-${generatedId.replace(/:/g, '')}`;
+    const hintId = hint ? `${selectId}-hint` : undefined;
+    const errorId = error ? `${selectId}-error` : undefined;
+    const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+
+    return (
+        <div className={`ds-select-field ${error ? 'is-error' : ''} ${disabled ? 'is-disabled' : ''}`.trim()}>
+            <label htmlFor={selectId}>{label}{required && <span aria-hidden="true"> *</span>}</label>
+            <div className="ds-select-control">
+                <i className={`bi ${icon} ds-select-leading-icon`} aria-hidden="true" />
+                <select
+                    id={selectId}
+                    value={value}
+                    onChange={onChange}
+                    required={required}
+                    disabled={disabled}
+                    aria-invalid={error ? 'true' : undefined}
+                    aria-describedby={describedBy}
+                >
+                    {placeholder && <option value="">{placeholder}</option>}
+                    {options.map((option) => option.options ? (
+                        <optgroup label={option.label} key={option.label}>
+                            {option.options.map((nestedOption) => <option value={nestedOption.value} disabled={nestedOption.disabled} key={nestedOption.value}>{nestedOption.label}</option>)}
+                        </optgroup>
+                    ) : (
+                        <option value={option.value} disabled={option.disabled} key={option.value}>{option.label}</option>
+                    ))}
+                </select>
+                <i className="bi bi-chevron-down ds-select-chevron" aria-hidden="true" />
+            </div>
+            {hint && <span className="ds-select-hint" id={hintId}><i className="bi bi-info-circle" aria-hidden="true" /> {hint}</span>}
+            {error && <span className="ds-select-error" id={errorId} role="alert"><i className="bi bi-exclamation-circle" aria-hidden="true" /> {error}</span>}
+        </div>
+    );
+}
+
 export function FlatpickrField({
     id,
     label,

@@ -14,6 +14,7 @@ export const componentNavItems = [
     { id: 'component-kpi-comparison', parent: 'components', label: 'KPI comparison', icon: 'bi-graph-up-arrow', keywords: ['kpi', 'metric', 'net orders', 'comparison', 'dod', 'mom'] },
     { id: 'component-feedback', parent: 'components', label: 'Feedback', icon: 'bi-chat-square-text', keywords: ['alert', 'toast', 'feedback', 'notification'] },
     { id: 'component-form-controls', parent: 'components', label: 'Form controls', icon: 'bi-input-cursor-text', keywords: ['input', 'select', 'form', 'validation', 'error'] },
+    { id: 'component-select-options', parent: 'components', label: 'Select options', icon: 'bi-menu-button-wide', keywords: ['select', 'option', 'dropdown', 'group', 'placeholder', 'disabled'] },
     { id: 'component-search-input', parent: 'components', label: 'Search input', icon: 'bi-search', keywords: ['search', 'filter', 'input', 'clear', 'select all'] },
     { id: 'component-tabs-subtabs', parent: 'components', label: 'Tabs & subtabs', icon: 'bi-layout-three-columns', keywords: ['tabs', 'subtabs', 'navigation', 'hierarchy', 'keyboard'] },
     { id: 'component-flatpickr', parent: 'components', label: 'Flatpickr fields', icon: 'bi-calendar3', keywords: ['flatpickr', 'date', 'range', 'datetime', 'calendar', 'input', 'field'] },

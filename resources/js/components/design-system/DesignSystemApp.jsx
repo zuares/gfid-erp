@@ -3,7 +3,7 @@ import DesignSystemSidebar from './DesignSystemSidebar';
 import CrudModal, { crudFieldCatalog, selectAllOnFocus, selectAllOnMouseDown } from './CrudModal';
 import DataTable from './DataTable';
 import { colorTokens, componentNavItems, kpis, layoutTemplates, navItems } from './designSystemConfig';
-import { Alert, Badge, Button, ComparisonKpi, FlatpickrField, LayoutPreview, Panel, PeriodPicker, SearchInput, SectionHeader, Tabs, TokenSwatch } from './DesignSystemPrimitives';
+import { Alert, Badge, Button, ComparisonKpi, FlatpickrField, LayoutPreview, Panel, PeriodPicker, SearchInput, SectionHeader, SelectField, Tabs, TokenSwatch } from './DesignSystemPrimitives';
 
 const tabItems = [
     { id: 'summary', label: 'Summary', content: 'Summary menyajikan angka penting tanpa mengalihkan fokus pengguna.' },
@@ -128,6 +128,7 @@ export default function DesignSystemApp() {
     const [activeProductTab, setActiveProductTab] = useState('overview');
     const [activeProductSubtab, setActiveProductSubtab] = useState('summary');
     const [flatpickrValues, setFlatpickrValues] = useState({});
+    const [selectValues, setSelectValues] = useState({ status: '', warehouse: '', direction: '', source: 'purchase', sort: 'desc' });
 
     useEffect(() => {
         const sections = [...navItems, ...componentNavItems].map(({ id }) => document.getElementById(id)).filter(Boolean);
@@ -206,6 +207,10 @@ export default function DesignSystemApp() {
 
     const handleFlatpickrChange = (fieldId) => (_selectedDates, dateString) => {
         setFlatpickrValues((current) => ({ ...current, [fieldId]: dateString }));
+    };
+
+    const handleSelectChange = (fieldId) => (event) => {
+        setSelectValues((current) => ({ ...current, [fieldId]: event.target.value }));
     };
 
     return (
@@ -321,6 +326,86 @@ export default function DesignSystemApp() {
                             <div className="ds-form-actions"><Button size="sm" onClick={validateWorkspace}>Save example</Button><Button size="sm" variant="ghost" icon="bi-window-stack" onClick={() => openCrudModal('create')}>Open CRUD modal</Button></div>
                             {workspaceError && <p className="ds-form-error" role="alert">{workspaceError}</p>}
                         </Panel>
+                        <Panel id="component-select-options" title="Select options" meta="SelectField">
+                            <p className="ds-pattern-intro">Pola select native yang dipakai hari ini di filter Stock Card: gudang, arah mutasi, sumber, urutan, dan state validasi. Semua contoh bisa dipakai ulang dengan kontrak yang sama.</p>
+                            <div className="ds-select-grid">
+                                <SelectField
+                                    id="ds-select-status"
+                                    label="Status"
+                                    placeholder="Pilih status"
+                                    value={selectValues.status}
+                                    onChange={handleSelectChange('status')}
+                                    options={[
+                                        { value: 'active', label: 'Aktif' },
+                                        { value: 'draft', label: 'Draft' },
+                                        { value: 'archived', label: 'Diarsipkan' },
+                                    ]}
+                                    required
+                                    hint="Placeholder tetap tersedia sampai pengguna memilih nilai."
+                                    icon="bi-check2-circle"
+                                />
+                                <SelectField
+                                    id="ds-select-warehouse"
+                                    label="Gudang"
+                                    placeholder="Semua gudang"
+                                    value={selectValues.warehouse}
+                                    onChange={handleSelectChange('warehouse')}
+                                    options={[{ value: 'jakarta', label: 'Gudang Jakarta' }, { value: 'bandung', label: 'Gudang Bandung' }, { value: 'surabaya', label: 'Gudang Surabaya' }]}
+                                    hint="Filter opsional boleh menggunakan placeholder 'Semua'."
+                                    icon="bi-building"
+                                />
+                                <SelectField
+                                    id="ds-select-direction"
+                                    label="Arah mutasi"
+                                    placeholder="Semua arah"
+                                    value={selectValues.direction}
+                                    onChange={handleSelectChange('direction')}
+                                    options={[{ value: 'in', label: 'Masuk (IN)' }, { value: 'out', label: 'Keluar (OUT)' }]}
+                                    hint="Gunakan value pendek dan stabil untuk query atau API."
+                                    icon="bi-arrow-left-right"
+                                />
+                                <SelectField
+                                    id="ds-select-source"
+                                    label="Sumber mutasi"
+                                    value={selectValues.source}
+                                    onChange={handleSelectChange('source')}
+                                    options={[
+                                        { label: 'Operations', options: [{ value: 'marketplace', label: 'Marketplace' }, { value: 'production', label: 'Production' }] },
+                                        { label: 'Back office', options: [{ value: 'purchase', label: 'Purchase' }, { value: 'adjustment', label: 'Adjustment' }] },
+                                    ]}
+                                    hint="Gunakan optgroup saat sumber mutasi punya kategori yang jelas."
+                                    icon="bi-diagram-3"
+                                />
+                                <SelectField
+                                    id="ds-select-sort"
+                                    label="Urutan"
+                                    value={selectValues.sort}
+                                    onChange={handleSelectChange('sort')}
+                                    options={[{ value: 'desc', label: 'Terbaru' }, { value: 'asc', label: 'Terlama' }]}
+                                    hint="Default value dipakai saat urutan paling umum sudah diketahui."
+                                    icon="bi-sort-down"
+                                />
+                                <SelectField
+                                    id="ds-select-disabled"
+                                    label="Warehouse"
+                                    value=""
+                                    placeholder="Tidak tersedia"
+                                    options={[{ value: 'jakarta', label: 'Jakarta' }, { value: 'bandung', label: 'Bandung' }]}
+                                    disabled
+                                    hint="State disabled hanya untuk pilihan yang memang tidak bisa diubah."
+                                    icon="bi-building"
+                                />
+                                <SelectField
+                                    id="ds-select-error"
+                                    label="Sort order"
+                                    value=""
+                                    placeholder="Pilih urutan"
+                                    options={[{ value: 'newest', label: 'Terbaru' }, { value: 'oldest', label: 'Terlama' }]}
+                                    error="Urutan wajib dipilih sebelum melanjutkan."
+                                    icon="bi-sort-down"
+                                />
+                            </div>
+                        </Panel>
                         <Panel id="component-navigation" title="Navigation" meta="Tabs / Segmented">
                             <div className="ds-tabs" role="tablist" aria-label="Component navigation example">
                                 {tabItems.map((tab) => (
@@ -328,6 +413,25 @@ export default function DesignSystemApp() {
                                 ))}
                             </div>
                             {tabItems.map((tab) => activeTab === tab.id && <div className="ds-tab-panel is-active" role="tabpanel" id={`panel-${tab.id}`} aria-labelledby={`tab-${tab.id}`} key={tab.id}>{tab.content}</div>)}
+                        </Panel>
+                    </div>
+                    <div className="ds-grid ds-grid-2 ds-space-top">
+                        <Panel title="Select option anatomy" meta="states / options">
+                            <div className="ds-select-anatomy">
+                                <div><span className="ds-select-anatomy-icon"><i className="bi bi-tag" aria-hidden="true" /></span><span><strong>Label & required</strong><small>Jelaskan konteks field sebelum pengguna membuka menu.</small></span><code>label</code></div>
+                                <div><span className="ds-select-anatomy-icon"><i className="bi bi-list-check" aria-hidden="true" /></span><span><strong>Option value</strong><small>Label boleh berubah, value harus stabil untuk API.</small></span><code>value</code></div>
+                                <div><span className="ds-select-anatomy-icon"><i className="bi bi-folder2-open" aria-hidden="true" /></span><span><strong>Option group</strong><small>Kelompokkan pilihan panjang tanpa membuat menu sulit dipindai.</small></span><code>optgroup</code></div>
+                                <div><span className="ds-select-anatomy-icon"><i className="bi bi-shield-check" aria-hidden="true" /></span><span><strong>Feedback state</strong><small>Hint, disabled, dan error harus tetap terbaca tanpa mengandalkan warna.</small></span><code>aria-invalid</code></div>
+                            </div>
+                        </Panel>
+                        <Panel title="SelectField contract" meta="props / implementation">
+                            <div className="ds-select-contract">
+                                <div><code>options</code><span>Array {`{ value, label, disabled? }`} atau grouped options.</span></div>
+                                <div><code>value</code><span>Controlled value agar filter dan form tetap sinkron.</span></div>
+                                <div><code>placeholder</code><span>Option kosong untuk pilihan yang belum ditentukan.</span></div>
+                                <div><code>required / error</code><span>State validasi dengan label dan feedback yang terhubung.</span></div>
+                                <div><code>disabled</code><span>Nonaktifkan hanya saat perubahan memang tidak tersedia.</span></div>
+                            </div>
                         </Panel>
                     </div>
                     <div className="ds-grid ds-grid-2 ds-space-top">
