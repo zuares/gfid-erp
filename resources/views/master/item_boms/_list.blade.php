@@ -14,11 +14,14 @@
         <table class="bom-table">
             <caption class="visually-hidden">Daftar BOM SKU</caption>
             <thead>
-                <tr><th class="bom-index">No.</th><th>SKU / Item</th><th>Struktur BOM</th><th>Status</th><th class="text-end">Aksi</th></tr>
+                <tr><th class="bom-index">No.</th><th>SKU / Item</th><th>Struktur BOM</th><th>COGS total / pcs</th><th>Status</th><th class="text-end">Aksi</th></tr>
             </thead>
             <tbody>
                 @foreach($boms as $i => $b)
-                    @php $ub = $bomUsageBadges[$b->id] ?? null; @endphp
+                    @php
+                        $ub = $bomUsageBadges[$b->id] ?? null;
+                        $cogs = $bomCogs[$b->id] ?? null;
+                    @endphp
                     <tr>
                         <td class="bom-index">{{ ($boms->currentPage() - 1) * $boms->perPage() + $i + 1 }}</td>
                         <td>
@@ -30,6 +33,10 @@
                             <div class="bom-structure"><strong>{{ (int) $b->main_material_lines_count }}</strong> utama <span class="text-muted">·</span> <strong>{{ (int) $b->sewing_supply_lines_count }}</strong> jahit <span class="text-muted">·</span> <strong>{{ (int) $b->packing_supply_lines_count }}</strong> packing</div>
                             <div class="bom-structure-meta">{{ (int) $b->lines_count }} komponen total</div>
                             @if($ub)<div class="bom-actual">Aktual <span class="bom-actual-value">{{ number_format($ub['kg_per_pcs'], 3, ',', '') }}/pcs</span> · {{ $ub['job_code'] }} @if($ub['status'] === 'over')<span class="bom-usage-over">· melebihi standar</span>@elseif($ub['status'] === 'under')<span class="bom-usage-under">· lebih hemat</span>@elseif($ub['status'] === 'ok')<span>· sesuai standar</span>@endif</div>@endif
+                        </td>
+                        <td>
+                            <div class="bom-cogs-value">Rp {{ number_format((float) ($cogs['total'] ?? 0), 0, ',', '.') }}</div>
+                            <div class="bom-cogs-meta">Material Rp {{ number_format((float) ($cogs['material_total'] ?? 0), 0, ',', '.') }} · Upah Rp {{ number_format((float) ($cogs['production_wage_total'] ?? 0), 0, ',', '.') }}</div>
                         </td>
                         <td><span class="bom-status {{ $b->active ? 'bom-status-active' : 'bom-status-inactive' }}">{{ $b->active ? 'Aktif' : 'Nonaktif' }}</span></td>
                         <td>
@@ -49,7 +56,10 @@
 
     <div class="bom-mobile-list">
         @foreach($boms as $b)
-            @php $ub = $bomUsageBadges[$b->id] ?? null; @endphp
+            @php
+                $ub = $bomUsageBadges[$b->id] ?? null;
+                $cogs = $bomCogs[$b->id] ?? null;
+            @endphp
             <article class="bom-mobile-card">
                 <div class="bom-mobile-head">
                     <div>
@@ -60,6 +70,7 @@
                     <span class="bom-status {{ $b->active ? 'bom-status-active' : 'bom-status-inactive' }}">{{ $b->active ? 'Aktif' : 'Nonaktif' }}</span>
                 </div>
                 <div class="bom-mobile-structure"><span><strong>{{ (int) $b->main_material_lines_count }}</strong> utama</span><span><strong>{{ (int) $b->sewing_supply_lines_count }}</strong> jahit</span><span><strong>{{ (int) $b->packing_supply_lines_count }}</strong> packing</span><span><strong>{{ (int) $b->lines_count }}</strong> total</span></div>
+                <div class="bom-mobile-cogs"><span>COGS total / pcs</span><strong>Rp {{ number_format((float) ($cogs['total'] ?? 0), 0, ',', '.') }}</strong><small>Material Rp {{ number_format((float) ($cogs['material_total'] ?? 0), 0, ',', '.') }} · Upah Rp {{ number_format((float) ($cogs['production_wage_total'] ?? 0), 0, ',', '.') }}</small></div>
                 @if($ub)<div class="bom-actual">Aktual <span class="bom-actual-value">{{ number_format($ub['kg_per_pcs'], 3, ',', '') }}/pcs</span> · {{ $ub['job_code'] }} @if($ub['status'] === 'over')<span class="bom-usage-over">· melebihi standar</span>@elseif($ub['status'] === 'under')<span class="bom-usage-under">· lebih hemat</span>@elseif($ub['status'] === 'ok')<span>· sesuai standar</span>@endif</div>@endif
                 <div class="bom-mobile-actions">
                     <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-btn bom-btn-primary"><i class="bi bi-pencil" aria-hidden="true"></i>Edit BOM</a>

@@ -82,6 +82,8 @@
     .bom-structure { color: var(--bom-ink); line-height: 1.45; }
     .bom-structure strong { font-weight: 850; }
     .bom-structure-meta { margin-top: .22rem; color: var(--bom-muted); font-size: .67rem; }
+    .bom-cogs-value { color: var(--bom-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .78rem; font-weight: 850; white-space: nowrap; }
+    .bom-cogs-meta { margin-top: .22rem; color: var(--bom-muted); font-size: .64rem; line-height: 1.4; }
     .bom-actual { margin-top: .35rem; color: var(--bom-muted); font-size: .66rem; line-height: 1.45; }
     .bom-actual-value { color: var(--bom-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 800; }
     .bom-usage-over { color: var(--bom-danger); font-weight: 750; }
@@ -101,6 +103,10 @@
     .bom-mobile-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; }
     .bom-mobile-structure { display: flex; flex-wrap: wrap; gap: .35rem .65rem; margin-top: .75rem; padding-top: .65rem; border-top: 1px solid color-mix(in srgb, var(--bom-line) 72%, transparent); color: var(--bom-muted); font-size: .68rem; }
     .bom-mobile-structure strong { color: var(--bom-ink); }
+    .bom-mobile-cogs { display: grid; grid-template-columns: auto 1fr; gap: .25rem .5rem; align-items: baseline; margin-top: .7rem; padding-top: .65rem; border-top: 1px solid color-mix(in srgb, var(--bom-line) 72%, transparent); }
+    .bom-mobile-cogs span { color: var(--bom-muted); font-size: .68rem; }
+    .bom-mobile-cogs strong { color: var(--bom-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8rem; text-align: right; }
+    .bom-mobile-cogs small { grid-column: 1 / -1; color: var(--bom-muted); font-size: .64rem; text-align: right; }
     .bom-mobile-actions { display: grid; grid-template-columns: 1fr 42px; gap: .45rem; margin-top: .8rem; }
     .bom-mobile-actions .bom-btn { width: 100%; min-height: 44px; }
     .bom-empty { padding: 2.8rem 1.25rem; text-align: center; }

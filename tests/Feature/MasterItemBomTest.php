@@ -266,6 +266,52 @@ class MasterItemBomTest extends TestCase
             ->assertJsonFragment(['id' => $finishedGood->id]);
     }
 
+    public function test_bom_index_shows_total_cogs_per_finished_good(): void
+    {
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-COGS-001',
+            'name' => 'Produk COGS BOM Test',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'MAT-BOM-COGS-001',
+            'name' => 'Material COGS BOM Test',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pack',
+            'purchase_conversion_factor' => 10,
+            'hpp' => 12500,
+            'base_unit_cost' => 12500,
+            'type' => 'material',
+            'default_allocation' => 'hpp',
+            'active' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'BOM COGS Test',
+            'active' => true,
+        ]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => '2',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.index', ['q' => $finishedGood->code]))
+            ->assertOk()
+            ->assertSee('COGS total / pcs')
+            ->assertSee('Rp 25.000')
+            ->assertSee('Material Rp 25.000 · Upah Rp 0');
+    }
+
     public function test_bom_api_returns_filtered_results_and_pagination_metadata(): void
     {
         $category = ItemCategory::create([

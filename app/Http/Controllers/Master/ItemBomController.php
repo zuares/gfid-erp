@@ -21,14 +21,14 @@ class ItemBomController extends Controller
     private const PAGINATE = 20;
     private const BULK_UPDATE_CHUNK_SIZE = 100;
 
-    public function index(Request $request)
+    public function index(Request $request, ItemBomCostService $bomCostService)
     {
-        return view('master.item_boms.index', $this->indexData($request));
+        return view('master.item_boms.index', $this->indexData($request, $bomCostService));
     }
 
-    public function apiIndex(Request $request)
+    public function apiIndex(Request $request, ItemBomCostService $bomCostService)
     {
-        $data = $this->indexData($request);
+        $data = $this->indexData($request, $bomCostService);
 
         return response()->json([
             'html' => view('master.item_boms._list', $data)->render(),
@@ -51,7 +51,7 @@ class ItemBomController extends Controller
         ]);
     }
 
-    private function indexData(Request $request): array
+    private function indexData(Request $request, ItemBomCostService $bomCostService): array
     {
         $q = mb_substr(trim((string) $request->query('q', '')), 0, 100);
         $like = $this->likePattern($q);
@@ -109,6 +109,16 @@ class ItemBomController extends Controller
         $boms = (clone $bomQuery)
             ->paginate(self::PAGINATE)
             ->withQueryString();
+
+        $bomCogs = [];
+        foreach ($boms as $bom) {
+            $estimate = $bomCostService->estimate($bom);
+            $bomCogs[(int) $bom->id] = [
+                'total' => (float) $estimate['total'],
+                'material_total' => (float) $estimate['material_total'],
+                'production_wage_total' => (float) $estimate['production_wage_total'],
+            ];
+        }
 
         $itemCategories = ItemCategory::query()
             ->whereHas('items', fn ($item) => $item
@@ -182,7 +192,7 @@ class ItemBomController extends Controller
 
         return compact(
             'boms', 'q', 'status', 'structure', 'categoryId', 'itemCategories', 'selectedCategory',
-            'hasFilters', 'bomUsageBadges', 'bomSummary'
+            'hasFilters', 'bomUsageBadges', 'bomSummary', 'bomCogs'
         );
     }
 
