@@ -236,6 +236,29 @@ if ($navShowBell) {
         padding-inline: .85rem;
     }
 
+    /* Semua kontrol navbar tetap menempel ke sisi kanan, termasuk saat
+       brand mengambil ruang lebih besar di viewport kecil. */
+    .app-navbar .navbar-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: .5rem;
+        flex: 0 0 auto;
+        min-width: 0;
+        margin-inline-start: auto;
+    }
+
+    /* Bell menjadi action paling kanan pada mobile dan desktop. */
+    .app-navbar .navbar-actions > #notifWrapper {
+        order: 5;
+        position: relative;
+    }
+
+    .app-navbar .navbar-actions > .theme-toggle-btn { order: 1; }
+    .app-navbar .navbar-actions > .mobile-logout-btn { order: 2; }
+    .app-navbar .navbar-actions > .mobile-menu-btn { order: 3; }
+    .app-navbar .navbar-actions > .desktop-nav { order: 4; }
+
     /* BRAND */
     .app-navbar .navbar-brand {
         display: flex;
@@ -430,8 +453,10 @@ if ($navShowBell) {
     .notif-dropdown {
         position: absolute;
         top: calc(100% + 6px);
-        right: 0;
-        min-width: 260px;
+        inset-inline-end: 0;
+        inset-inline-start: auto;
+        width: min(360px, calc(100vw - 24px));
+        min-width: min(260px, calc(100vw - 24px));
         max-width: min(360px, calc(100vw - 24px));
         background: var(--card);
         border: 1px solid var(--line);
@@ -598,6 +623,10 @@ if ($navShowBell) {
             justify-content: flex-end;
         }
 
+        .app-navbar .navbar-actions {
+            gap: .65rem;
+        }
+
         .app-navbar .desktop-nav {
             display: flex;
             align-items: center;
@@ -644,11 +673,11 @@ if ($navShowBell) {
         </a>
 
         {{-- RIGHT: mobile cluster (theme + logout + hamburger) + desktop nav --}}
-        <div class="d-flex align-items-center gap-2">
+        <div class="navbar-actions">
 
             {{-- NOTIFICATION BELL (owner + admin) --}}
             @if ($navShowBell)
-            <div style="position:relative;" id="notifWrapper">
+            <div class="notif-wrapper" id="notifWrapper">
                 <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Notifikasi">
                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -666,7 +695,7 @@ if ($navShowBell) {
                             <span class="notif-header-count" id="notifHeaderCount" @if ($navPendingCount === 0) hidden @endif>{{ $navPendingCount }}</span>
                         </span>
                         <button type="button" class="notif-mark-all" id="notifMarkAll" @if ($navPendingCount === 0) hidden @endif>
-                            Sudah baca semua
+                            Sudah dilakukan tindakan semua
                         </button>
                     </div>
                     <div class="notif-list" id="notifList">
@@ -831,13 +860,6 @@ if ($navShowBell) {
                 }
             }
 
-            function markNotificationAsRead(key) {
-                if (!key) return;
-                readKeys.add(key);
-                persistReadKeys();
-                updateNotificationState();
-            }
-
             updateNotificationState();
 
             notifBellBtn.addEventListener('click', function(e) {
@@ -850,10 +872,10 @@ if ($navShowBell) {
                     notifDropdown.classList.remove('open');
                 }
             });
-            // Item yang dibuka langsung dianggap sudah dibaca.
+            // Membuka item hanya menuju halaman terkait; item tetap dihitung
+            // sampai tindakan diselesaikan atau semua ditandai selesai.
             notifItems.forEach(function(a) {
                 a.addEventListener('click', function() {
-                    markNotificationAsRead(a.dataset.notifKey);
                     notifDropdown.classList.remove('open');
                 });
             });
