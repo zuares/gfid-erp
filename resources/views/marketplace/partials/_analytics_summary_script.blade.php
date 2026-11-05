@@ -4,8 +4,10 @@
     }
     function fillStores() {
         const current = selectedStore() || String(initialStore || '');
+        const platform = selectedPlatform();
         const unique = new Map(stores
-            .filter(store => store && store.id)
+            .filter(store => store && store.id && store.is_active !== false)
+            .filter(store => !platform || String(store.channel?.code || '').toLowerCase() === platform)
             .map(store => [String(store.id), store.name || `Toko #${store.id}`]));
         $('anStore').innerHTML = '<option value="">Semua toko</option>' + [...unique.entries()]
             .sort((a,b) => a[1].localeCompare(b[1]))

@@ -138,9 +138,18 @@ class MarketplaceController extends Controller
         );
     }
 
-    public function stores(): JsonResponse
+    public function stores(Request $request): JsonResponse
     {
-        $stores = Store::with(['channel', 'defaultWarehouse'])->latest()->get()->map(fn (Store $store) => [
+        $filters = $request->validate([
+            'active_only' => ['nullable', 'boolean'],
+            'platform' => ['nullable', 'in:shopee,tiktok'],
+        ]);
+        $stores = Store::with(['channel', 'defaultWarehouse'])
+            ->when((bool) ($filters['active_only'] ?? false), fn ($query) => $query->where('is_active', true))
+            ->when($filters['platform'] ?? null, fn ($query, $platform) => $query->whereHas('channel', fn ($channel) => $channel->whereRaw('LOWER(code) = ?', [$platform])))
+            ->latest()
+            ->get()
+            ->map(fn (Store $store) => [
             'id' => $store->id,
             'channel_id' => $store->channel_id,
             'code' => $store->code,

@@ -23,6 +23,7 @@ class MarketplaceAnalyticsController extends Controller
             'date_from' => $request->query('date_from', $monthFrom),
             'date_to' => $request->query('date_to', $today),
             'store_id' => $request->query('store_id'),
+            'platform' => $request->query('platform'),
             'compare_mode' => $request->query('compare_mode', 'prev_month'),
         ];
 
@@ -51,6 +52,7 @@ class MarketplaceAnalyticsController extends Controller
     {
         $filters = $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'platform' => ['nullable', 'in:shopee,tiktok'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
         ]);
@@ -65,6 +67,7 @@ class MarketplaceAnalyticsController extends Controller
             'group_by' => ['nullable', 'in:product,category'],
             'metric' => ['nullable', 'in:retention_pct,active_customers,orders,qty_sold,revenue,gross_profit,gross_margin_pct,net_profit'],
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'platform' => ['nullable', 'in:shopee,tiktok'],
             'marketplace' => ['nullable', 'string', 'max:100'],
             'category' => ['nullable', 'string', 'max:150'],
             'product' => ['nullable', 'string', 'max:190'],
@@ -80,6 +83,7 @@ class MarketplaceAnalyticsController extends Controller
     {
         $filters = $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'platform' => ['nullable', 'in:shopee,tiktok'],
             'marketplace' => ['nullable', 'string', 'max:100'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
@@ -92,6 +96,7 @@ class MarketplaceAnalyticsController extends Controller
     {
         $filters = $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'platform' => ['nullable', 'in:shopee,tiktok'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'page' => ['nullable', 'integer', 'min:1'],
@@ -111,6 +116,7 @@ class MarketplaceAnalyticsController extends Controller
     {
         $filters = $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'platform' => ['nullable', 'in:shopee,tiktok'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'page' => ['nullable', 'integer', 'min:1'],
@@ -130,6 +136,7 @@ class MarketplaceAnalyticsController extends Controller
     {
         return $request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
+            'platform' => ['nullable', 'in:shopee,tiktok'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'compare_mode' => ['nullable', 'in:prev_period,prev_month,prev_quarter,prev_year'],
@@ -140,6 +147,7 @@ class MarketplaceAnalyticsController extends Controller
     {
         return 'marketplace:analytics:'.$scope.':'.sha1(implode('|', [
             (string) ($filters['store_id'] ?? 'all'),
+            (string) ($filters['platform'] ?? 'all'),
             Carbon::parse($filters['date_from'])->toDateString(),
             Carbon::parse($filters['date_to'])->toDateString(),
             (string) ($filters['compare_mode'] ?? 'prev_month'),

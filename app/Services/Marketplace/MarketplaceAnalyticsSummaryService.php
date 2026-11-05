@@ -199,6 +199,7 @@ class MarketplaceAnalyticsSummaryService
         $limit = max(1, min(200, $limit));
         $items = $this->profitReport->report([
             'store_id' => $filters['store_id'],
+            'store_ids' => $filters['store_ids'],
             'date_basis' => 'ordered_at',
             'date_from' => $filters['date_from'],
             'date_to' => $filters['date_to'],
@@ -650,7 +651,7 @@ class MarketplaceAnalyticsSummaryService
                 $filters['date_from'].' 00:00:00',
                 $filters['date_to'].' 23:59:59',
             ])
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId))
+            ->whereIn('mo.store_id', $filters['store_ids'])
             ->selectRaw("SUM({$hppExpression}) AS hpp_total")
             ->selectRaw("SUM(CASE WHEN ms.data_status = ? THEN {$hppExpression} ELSE 0 END) AS hpp_settled", [MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE])
             ->selectRaw("SUM(CASE WHEN UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, '')) IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED') THEN {$hppExpression} ELSE 0 END) AS hpp_shipped")
@@ -680,7 +681,7 @@ class MarketplaceAnalyticsSummaryService
                 $filters['date_from'].' 00:00:00',
                 $filters['date_to'].' 23:59:59',
             ])
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId))
+            ->whereIn('mo.store_id', $filters['store_ids'])
             ->whereNotExists(function ($query) {
                 $query->selectRaw('1')
                     ->from('marketplace_order_items as oi')
@@ -780,7 +781,7 @@ class MarketplaceAnalyticsSummaryService
                 Carbon::parse($filters['date_from'])->startOfDay()->timestamp,
                 Carbon::parse($filters['date_to'])->endOfDay()->timestamp,
             ])
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mr.store_id', $storeId))
+            ->whereIn('mr.store_id', $filters['store_ids'])
             ->select([
                 'mr.id as return_id',
                 'mr.store_id',
@@ -944,7 +945,7 @@ class MarketplaceAnalyticsSummaryService
             $rows = DB::table('marketplace_returns as mr')
                 ->join('stores as st', 'st.id', '=', 'mr.store_id')
                 ->whereBetween('mr.create_time', [$fromTimestamp, $toTimestamp])
-                ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mr.store_id', $storeId))
+                ->whereIn('mr.store_id', $filters['store_ids'])
                 ->select([
                     'mr.id',
                     'mr.store_id',
@@ -982,7 +983,7 @@ class MarketplaceAnalyticsSummaryService
             $returnRows = DB::table('marketplace_returns as mr')
                 ->join('stores as st', 'st.id', '=', 'mr.store_id')
                 ->whereBetween('mr.create_time', [$fromTimestamp, $toTimestamp])
-                ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mr.store_id', $storeId))
+                ->whereIn('mr.store_id', $filters['store_ids'])
                 ->where(function ($query) {
                     $query->whereIn('mr.reason_text_code', ['RTS', 'FAILED_DELIVERY', 'DELIVERY_FAILED', 'RETURN_TO_SELLER'])
                         ->orWhereIn('mr.return_solution', ['RTS', 'RETURN_TO_SELLER'])
@@ -1025,7 +1026,7 @@ class MarketplaceAnalyticsSummaryService
             $orderRows = DB::table('marketplace_orders as mo')
                 ->join('stores as st', 'st.id', '=', 'mo.store_id')
                 ->whereBetween('mo.ordered_at', [$filters['date_from'].' 00:00:00', $filters['date_to'].' 23:59:59'])
-                ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId))
+                ->whereIn('mo.store_id', $filters['store_ids'])
                 ->where(function ($query) use ($status) {
                     $query->whereRaw("{$status} IN ('FAILED_DELIVERY', 'DELIVERY_FAILED', 'RETURN_TO_SELLER', 'RETURNED_TO_SELLER', 'UNDELIVERED')")
                         ->orWhere(function ($nested) use ($status) {
@@ -1105,8 +1106,25 @@ class MarketplaceAnalyticsSummaryService
             [$from, $to] = [$to, $from];
         }
 
+        $storeId = ! empty($filters['store_id']) ? (int) $filters['store_id'] : null;
+        $platform = strtolower(trim((string) ($filters['platform'] ?? '')));
+        $platform = in_array($platform, ['shopee', 'tiktok'], true) ? $platform : null;
+        $storeScope = DB::table('stores as analytics_scope_store')
+            ->when($platform, function ($query) use ($platform) {
+                $query->join('channels as analytics_scope_channel', 'analytics_scope_channel.id', '=', 'analytics_scope_store.channel_id')
+                    ->whereRaw('LOWER(analytics_scope_channel.code) = ?', [$platform]);
+            })
+            ->where('analytics_scope_store.is_active', true)
+            ->when($storeId, fn ($query) => $query->where('analytics_scope_store.id', $storeId))
+            ->pluck('analytics_scope_store.id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
         return [
-            'store_id' => ! empty($filters['store_id']) ? (int) $filters['store_id'] : null,
+            'store_id' => $storeId,
+            'platform' => $platform,
+            'store_ids' => $storeScope,
             'date_from' => $from,
             'date_to' => $to,
             'compare_mode' => in_array($filters['compare_mode'] ?? 'prev_month', ['prev_period', 'prev_month', 'prev_quarter', 'prev_year'], true)
@@ -1167,7 +1185,7 @@ class MarketplaceAnalyticsSummaryService
                 $filters['date_from'].' 00:00:00',
                 $filters['date_to'].' 23:59:59',
             ])
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('fmo.store_id', $storeId))
+            ->whereIn('fmo.store_id', $filters['store_ids'])
             ->groupBy('oi.marketplace_order_id');
 
         $query = DB::table('marketplace_orders as mo')
@@ -1263,7 +1281,7 @@ class MarketplaceAnalyticsSummaryService
         $toTimestamp = Carbon::parse($filters['date_to'])->endOfDay()->timestamp;
         $returns = DB::table('marketplace_returns')
             ->whereBetween('create_time', [$fromTimestamp, $toTimestamp])
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('store_id', $storeId))
+            ->whereIn('store_id', $filters['store_ids'])
             ->select(['id', 'store_id', 'order_sn', 'amount_before_discount'])
             ->get();
 
@@ -1276,6 +1294,7 @@ class MarketplaceAnalyticsSummaryService
                     $query->whereIn('mo.channel_order_id', $orderKeys->all())
                         ->orWhereIn('mo.external_order_id', $orderKeys->all());
                 })
+                ->whereIn('mo.store_id', $filters['store_ids'])
                 ->select([
                     'mo.id',
                     'mo.store_id',
@@ -1442,7 +1461,7 @@ class MarketplaceAnalyticsSummaryService
                 $filters['date_from'].' 00:00:00',
                 $filters['date_to'].' 23:59:59',
             ])
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mo.store_id', $storeId));
+            ->whereIn('mo.store_id', $filters['store_ids']);
 
         $local = (clone $base)
             ->join('marketplace_order_items as oi', 'oi.marketplace_order_id', '=', 'mo.id')
@@ -1499,7 +1518,7 @@ class MarketplaceAnalyticsSummaryService
                 Carbon::parse($filters['date_from'])->startOfDay()->timestamp,
                 Carbon::parse($filters['date_to'])->endOfDay()->timestamp,
             ])
-            ->when($filters['store_id'], fn ($query, $storeId) => $query->where('mr.store_id', $storeId))
+            ->whereIn('mr.store_id', $filters['store_ids'])
             ->sum(DB::raw('CASE WHEN ri.return_item_quantity > 0 THEN ri.return_item_quantity ELSE 0 END'));
 
         return [
@@ -1855,7 +1874,7 @@ class MarketplaceAnalyticsSummaryService
     {
         $apiRows = DB::table('marketplace_ads_dailies')
             ->whereBetween('date', [$filters['date_from'], $filters['date_to']])
-            ->when($filters['store_id'], fn ($q, $storeId) => $q->where('store_id', $storeId))
+            ->whereIn('store_id', $filters['store_ids'])
             ->selectRaw('store_id, date, COALESCE(SUM(spend), 0) AS spend')
             ->groupBy('store_id', 'date')
             ->get();
@@ -1864,7 +1883,7 @@ class MarketplaceAnalyticsSummaryService
         if (Schema::hasTable('marketplace_imported_ad_spends')) {
             $importedRows = DB::table('marketplace_imported_ad_spends')
                 ->whereBetween('date', [$filters['date_from'], $filters['date_to']])
-                ->when($filters['store_id'], fn ($q, $storeId) => $q->where('store_id', $storeId))
+                ->whereIn('store_id', $filters['store_ids'])
                 ->selectRaw('store_id, date, COALESCE(SUM(spend), 0) AS spend')
                 ->groupBy('store_id', 'date')
                 ->get();
@@ -1942,7 +1961,7 @@ class MarketplaceAnalyticsSummaryService
                 $filters['date_from'].' 00:00:00',
                 $filters['date_to'].' 23:59:59',
             ])
-            ->when($filters['store_id'], fn ($q, $storeId) => $q->where("{$alias}.store_id", $storeId));
+            ->whereIn("{$alias}.store_id", $filters['store_ids']);
     }
 
     private function aggregateSelect(bool $includeStore = true): string

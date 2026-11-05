@@ -357,6 +357,7 @@ class MarketplaceCohortService
         $query = DB::table('marketplace_orders as mo')
             ->join('stores as st', 'st.id', '=', 'mo.store_id')
             ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->where('st.is_active', true)
             ->whereRaw("{$status} NOT IN ({$excludedStatuses})")
             ->whereNotExists(function (Builder $builder) {
                 $builder->selectRaw('1')
@@ -368,6 +369,9 @@ class MarketplaceCohortService
                     });
             })
             ->when($filters['store_id'], fn (Builder $builder, $storeId) => $builder->where('mo.store_id', $storeId))
+            ->when($filters['platform'], function (Builder $builder, string $platform) {
+                $builder->whereRaw('LOWER(ch.code) = ?', [$platform]);
+            })
             ->when($filters['marketplace'], function (Builder $builder, string $marketplace) {
                 $builder->where(function (Builder $nested) use ($marketplace) {
                     $nested->where('ch.code', 'like', '%' . $marketplace . '%')
@@ -501,6 +505,9 @@ class MarketplaceCohortService
             'group_by' => ($mode === 'product' && ($filters['group_by'] ?? null) === 'category') ? 'category' : 'product',
             'metric' => $metric,
             'store_id' => ! empty($filters['store_id']) ? (int) $filters['store_id'] : null,
+            'platform' => in_array(strtolower(trim((string) ($filters['platform'] ?? ''))), ['shopee', 'tiktok'], true)
+                ? strtolower(trim((string) $filters['platform']))
+                : null,
             'marketplace' => trim((string) ($filters['marketplace'] ?? '')) ?: null,
             'category' => trim((string) ($filters['category'] ?? '')) ?: null,
             'product' => trim((string) ($filters['product'] ?? '')) ?: null,

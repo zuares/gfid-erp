@@ -55,6 +55,7 @@
         if (!settlements.length) return;
         const results = await Promise.allSettled(settlements.map(async settlement => {
             const params = new URLSearchParams({ date_from: from(), date_to: to(), settlement, page: '1', per_page: '10', _ts: Date.now().toString() });
+            if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
             return [settlement, await api('/api/marketplace/analytics-cash-orders?' + params.toString(), { cache: 'no-store' })];
         }));
@@ -148,6 +149,7 @@
         $('cashOrdersNext').disabled = true;
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to(), settlement: cashSettlement, page: String(cashPage), per_page: '50', _ts: Date.now().toString() });
+            if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
             cashPayload = await api('/api/marketplace/analytics-cash-orders?' + params.toString(), { cache: 'no-store' });
             renderCashOrders();
@@ -233,6 +235,7 @@
         $('returnOrdersNext').disabled = true;
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to(), type: returnType, page: String(returnPage), per_page: '50', _ts: Date.now().toString() });
+            if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
             returnPayload = await api('/api/marketplace/analytics-return-orders?' + params.toString(), { cache: 'no-store' });
             renderReturnOrders();

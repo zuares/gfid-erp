@@ -182,6 +182,64 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(7500.0, (float) $storeRow['admin_fee_actual']);
     }
 
+    public function test_order_eligible_completed_and_cancelled_counts_are_scoped_to_active_platform_stores(): void
+    {
+        $shopee = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $activeShopee = Store::create([
+            'channel_id' => $shopee->id,
+            'code' => 'ACTIVE-SHOPEE',
+            'name' => 'Active Shopee',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $activeTiktok = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'ACTIVE-TIKTOK',
+            'name' => 'Active TikTok',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $inactiveShopee = Store::create([
+            'channel_id' => $shopee->id,
+            'code' => 'INACTIVE-SHOPEE',
+            'name' => 'Inactive Shopee',
+            'status' => 'inactive',
+            'is_active' => false,
+        ]);
+
+        foreach ([$activeShopee, $activeTiktok, $inactiveShopee] as $store) {
+            $this->order($store, 'READY_TO_SHIP', 100000);
+            $this->order($store, 'COMPLETED', 200000);
+            $this->order($store, 'CANCELLED', 300000);
+        }
+
+        $service = app(MarketplaceAnalyticsSummaryService::class);
+        $baseFilters = [
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ];
+
+        $shopeeSummary = $service->summary($baseFilters + ['platform' => 'shopee']);
+        $this->assertSame(2, $shopeeSummary['current']['order_total']);
+        $this->assertSame(1, $shopeeSummary['current']['completed_count']);
+        $this->assertSame(1, $shopeeSummary['current']['cancelled_count']);
+        $this->assertSame(['Active Shopee'], collect($shopeeSummary['stores'])->pluck('store_name')->all());
+
+        $tiktokSummary = $service->summary($baseFilters + ['platform' => 'tiktok']);
+        $this->assertSame(2, $tiktokSummary['current']['order_total']);
+        $this->assertSame(1, $tiktokSummary['current']['completed_count']);
+        $this->assertSame(1, $tiktokSummary['current']['cancelled_count']);
+        $this->assertSame(['Active TikTok'], collect($tiktokSummary['stores'])->pluck('store_name')->all());
+
+        $allSummary = $service->summary($baseFilters);
+        $this->assertSame(4, $allSummary['current']['order_total']);
+        $this->assertSame(2, $allSummary['current']['completed_count']);
+        $this->assertSame(2, $allSummary['current']['cancelled_count']);
+        $this->assertNotContains('Inactive Shopee', collect($allSummary['stores'])->pluck('store_name')->all());
+    }
+
     private function order(Store $store, string $status, float $amount): MarketplaceOrder
     {
         return MarketplaceOrder::create([

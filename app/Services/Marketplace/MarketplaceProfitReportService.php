@@ -196,8 +196,14 @@ class MarketplaceProfitReportService
 
     private function normalizeFilters(array $filters): array
     {
+        $storeId = ! empty($filters['store_id']) ? (int) $filters['store_id'] : null;
+        $storeIds = array_key_exists('store_ids', $filters)
+            ? array_values(array_unique(array_map('intval', (array) $filters['store_ids'])))
+            : ($storeId ? [$storeId] : null);
+
         return [
-            'store_id' => ! empty($filters['store_id']) ? (int) $filters['store_id'] : null,
+            'store_id' => $storeId,
+            'store_ids' => $storeIds,
             'report_scope' => ($filters['report_scope'] ?? 'final') === 'include_shipped'
                 ? 'include_shipped'
                 : 'final',
@@ -213,7 +219,7 @@ class MarketplaceProfitReportService
     private function filteredOrders(array $filters, array $settlementSource = ['active' => false, 'orders' => []]): Builder
     {
         $query = MarketplaceOrder::query()
-            ->when($filters['store_id'], fn (Builder $builder, $storeId) => $builder->where('store_id', $storeId))
+            ->when($filters['store_ids'] !== null, fn (Builder $builder) => $builder->whereIn('store_id', $filters['store_ids']))
             // Keep the same regular-order boundary as /marketplace/orders;
             // kilat/booking-only orders are reported in their own module.
             ->where(function (Builder $builder) {
@@ -406,12 +412,12 @@ class MarketplaceProfitReportService
         $hasMappedSource = MarketplaceFinanceSettlement::query()
             ->where('status', SettlementStatus::RECEIVED->value)
             ->whereHas('allocations')
-            ->when($filters['store_id'], fn (Builder $query, $storeId) => $query->where('store_id', $storeId))
+            ->when($filters['store_ids'] !== null, fn (Builder $query) => $query->whereIn('store_id', $filters['store_ids']))
             ->exists();
 
         $financeSettlements = MarketplaceFinanceSettlement::query()
             ->where('status', SettlementStatus::RECEIVED->value)
-            ->when($filters['store_id'], fn (Builder $query, $storeId) => $query->where('store_id', $storeId))
+            ->when($filters['store_ids'] !== null, fn (Builder $query) => $query->whereIn('store_id', $filters['store_ids']))
             ->when($filters['date_from'], fn (Builder $query, $date) => $query->whereDate('settlement_date', '>=', $date))
             ->when($filters['date_to'], fn (Builder $query, $date) => $query->whereDate('settlement_date', '<=', $date))
             ->whereNotNull('settlement_date')
@@ -435,14 +441,14 @@ class MarketplaceProfitReportService
         $hasLegacyMappedSource = MarketplacePayout::query()
             ->where('status', 'posted')
             ->whereNotNull('source_payload')
-            ->when($filters['store_id'], fn (Builder $query, $storeId) => $query->where('store_id', $storeId))
+            ->when($filters['store_ids'] !== null, fn (Builder $query) => $query->whereIn('store_id', $filters['store_ids']))
             ->get(['id', 'store_id', 'source_payload'])
             ->contains(fn (MarketplacePayout $payout) => $this->allocationRows($payout->source_payload) !== []);
         $hasMappedSource = $hasMappedSource || $hasLegacyMappedSource;
 
         $legacyPayouts = MarketplacePayout::query()
             ->where('status', 'posted')
-            ->when($filters['store_id'], fn (Builder $query, $storeId) => $query->where('store_id', $storeId))
+            ->when($filters['store_ids'] !== null, fn (Builder $query) => $query->whereIn('store_id', $filters['store_ids']))
             ->when($filters['date_from'], fn (Builder $query, $date) => $query->where(function (Builder $nested) use ($date) {
                 $nested->whereDate('transaction_created_at', '>=', $date)
                     ->orWhere(function (Builder $fallback) use ($date) {

@@ -53,6 +53,55 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
         }
     }
 
+    public function test_store_filter_returns_active_stores_and_scopes_them_by_platform(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-STORES']);
+        $shopee = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        Store::create([
+            'channel_id' => $shopee->id,
+            'code' => 'ACTIVE-SHOPEE',
+            'name' => 'Active Shopee',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'ACTIVE-TIKTOK',
+            'name' => 'Active TikTok',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        Store::create([
+            'channel_id' => $shopee->id,
+            'code' => 'INACTIVE-SHOPEE',
+            'name' => 'Inactive Shopee',
+            'status' => 'inactive',
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/marketplace/stores?active_only=1')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Active Shopee'])
+            ->assertJsonFragment(['name' => 'Active TikTok'])
+            ->assertJsonMissing(['name' => 'Inactive Shopee']);
+
+        $this->actingAs($user)
+            ->getJson('/api/marketplace/stores?active_only=1&platform=shopee')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Active Shopee'])
+            ->assertJsonMissing(['name' => 'Active TikTok'])
+            ->assertJsonMissing(['name' => 'Inactive Shopee']);
+
+        $this->actingAs($user)
+            ->getJson('/api/marketplace/stores?active_only=1&platform=tiktok')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Active TikTok'])
+            ->assertJsonMissing(['name' => 'Active Shopee'])
+            ->assertJsonMissing(['name' => 'Inactive Shopee']);
+    }
+
     public function test_cohort_endpoint_keeps_customer_retention_across_months(): void
     {
         $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-COHORT']);

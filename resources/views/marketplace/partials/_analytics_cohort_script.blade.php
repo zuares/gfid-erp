@@ -36,9 +36,10 @@
         select.value = current;
     }
     async function loadCohortOptions(force = false) {
-        const key = [from(), to(), selectedStore(), $('anCohortMarketplace').value].join('|');
+        const key = [from(), to(), selectedPlatform(), selectedStore(), $('anCohortMarketplace').value].join('|');
         if (!force && cohortOptionsKey === key) return;
         const params = new URLSearchParams({ date_from: from(), date_to: to(), _ts: Date.now().toString() });
+        if (selectedPlatform()) params.set('platform', selectedPlatform());
         if (selectedStore()) params.set('store_id', selectedStore());
         if ($('anCohortMarketplace').value) params.set('marketplace', $('anCohortMarketplace').value);
         try {
@@ -65,6 +66,7 @@
     const cohortParams = () => {
         const mode = $('anCohortMode').value;
         const params = new URLSearchParams({ date_from: from(), date_to: to(), mode, metric: $('anCohortMetric').value, _ts: Date.now().toString() });
+        if (selectedPlatform()) params.set('platform', selectedPlatform());
         if (selectedStore()) params.set('store_id', selectedStore());
         if (mode === 'product') params.set('group_by', $('anCohortGroupBy').value || 'category');
         [['marketplace','anCohortMarketplace'],['category','anCohortCategory'],['product','anCohortProduct'],['sku','anCohortSku']].forEach(([key, id]) => {

@@ -1028,6 +1028,7 @@
             </div>
         </div>
         <div class="an-hero-controls">
+            <div class="an-field"><label for="anPlatform">Platform</label><select id="anPlatform" aria-label="Filter platform"><option value="" @selected(empty($filters['platform']))>Semua platform</option><option value="shopee" @selected(($filters['platform'] ?? '') === 'shopee')>Shopee</option><option value="tiktok" @selected(($filters['platform'] ?? '') === 'tiktok')>TikTok Shop</option></select></div>
             <div class="an-field"><label for="anStore">Filter toko</label><select id="anStore" aria-label="Filter toko"><option value="">Semua toko</option></select></div>
             <div class="an-field"><label for="anDateRange">Periode</label><input type="text" id="anDateRange" autocomplete="off" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"></div>
             <div class="an-field"><label for="anCompare">Bandingkan</label><select id="anCompare"><option value="prev_period" @selected(($filters['compare_mode'] ?? '') === 'prev_period')>Periode lalu</option><option value="prev_month" @selected(($filters['compare_mode'] ?? 'prev_month') === 'prev_month')>Tanggal sama bulan lalu</option><option value="prev_quarter" @selected(($filters['compare_mode'] ?? '') === 'prev_quarter')>Tanggal sama 3 bulan lalu</option><option value="prev_year" @selected(($filters['compare_mode'] ?? '') === 'prev_year')>Tanggal sama tahun lalu</option></select></div>
@@ -1115,10 +1116,12 @@
         return `${values.year}-${values.month}-${values.day}`;
     };
     const dateKey = o => dateInAppTimezone(o.ordered_at || o.created_at);
+    const selectedPlatform = () => $('anPlatform').value;
     const selectedStore = () => $('anStore').value;
     const productPageUrl = @json(route('marketplace.products'));
     const productUrl = product => `${productPageUrl}?search=${encodeURIComponent(product.sku || product.product_name || '')}`;
     const initialStore = @json($filters['store_id'] ?? '');
+    const initialPlatform = @json($filters['platform'] ?? '');
     const compareParam = new URLSearchParams(location.search).get('compare_mode');
     if (['prev_period','prev_month','prev_quarter','prev_year'].includes(compareParam)) $('anCompare').value = compareParam;
     const inRange = o => { const d = dateKey(o); return !d || (d >= from() && d <= to()); };
@@ -1360,8 +1363,9 @@
     };
     async function loadStores() {
         if (storesLoaded) return stores;
-        stores = await api('/api/marketplace/stores').catch(() => []);
+        stores = await api('/api/marketplace/stores?active_only=1').catch(() => []);
         storesLoaded = true;
+        $('anPlatform').value = initialPlatform || selectedPlatform();
         fillStores();
         return stores;
     }
@@ -1371,6 +1375,7 @@
         $('bestProductBody').innerHTML = '<tr><td colspan="10"><div class="an-empty">Memuat detail produk…</div></td></tr>';
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to() });
+            if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
             params.set('_ts', Date.now().toString());
             const result = await api('/api/marketplace/analytics-products?' + params.toString(), { cache: 'no-store' });
@@ -1404,6 +1409,7 @@
         orders = [];
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to(), compare_mode: $('anCompare').value, _ts: Date.now().toString() });
+            if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
             try {
                 const kpiPayload = await api('/api/marketplace/analytics-kpis?' + params.toString(), { cache: 'no-store' });
@@ -1428,7 +1434,7 @@
             console.error('Analytics summary load failed', e);
             summary = null;
             $('storeBody').innerHTML = '<tr><td colspan="7"><div class="an-error">Tidak dapat memuat ringkasan analytics.</div></td></tr>';
-            $('overviewStoreLedgerBody').innerHTML = '<tr><td colspan="4"><div class="an-error">Tidak dapat memuat performa toko.</div></td></tr>';
+            $('overviewStoreLedgerBody').innerHTML = '<tr><td colspan="7"><div class="an-error">Tidak dapat memuat performa toko.</div></td></tr>';
             $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-error">Tidak dapat memuat data analytics.</div></td></tr>';
         } finally {
             $('anRefresh').disabled = false;
@@ -1452,8 +1458,8 @@
         if (button.dataset.anTab === 'products') loadProducts();
         if (button.dataset.anTab === 'cohort') loadCohort();
     }));
-    const syncUrl = () => { const params = new URLSearchParams({date_from:from(),date_to:to(),compare_mode:$('anCompare').value}); if (selectedStore()) params.set('store_id', selectedStore()); const activeTab = document.querySelector('[data-an-tab].active')?.dataset.anTab; if (activeTab) params.set('view', activeTab); history.replaceState(null,'',location.pathname+'?'+params.toString()); };
-    $('anRefresh').addEventListener('click',load); $('anStore').addEventListener('change',()=>{syncUrl();load();}); $('anCompare').addEventListener('change',()=>{syncUrl();load();});
+    const syncUrl = () => { const params = new URLSearchParams({date_from:from(),date_to:to(),compare_mode:$('anCompare').value}); if (selectedPlatform()) params.set('platform', selectedPlatform()); if (selectedStore()) params.set('store_id', selectedStore()); const activeTab = document.querySelector('[data-an-tab].active')?.dataset.anTab; if (activeTab) params.set('view', activeTab); history.replaceState(null,'',location.pathname+'?'+params.toString()); };
+    $('anRefresh').addEventListener('click',load); $('anPlatform').addEventListener('change',()=>{ $('anStore').value = ''; fillStores(); syncUrl(); load(); }); $('anStore').addEventListener('change',()=>{syncUrl();load();}); $('anCompare').addEventListener('change',()=>{syncUrl();load();});
     const focusPulse = card => {
         if (!card) return;
         selectedPulseMetric = card?.dataset?.pulseMetric || null;
@@ -1544,6 +1550,7 @@
             }
         },
     });
+    $('anPlatform').value = initialPlatform || '';
     $('anStore').value = initialStore || '';
     const initialParams = new URLSearchParams(location.search);
     const initialView = initialParams.get('view') || initialParams.get('tab');
