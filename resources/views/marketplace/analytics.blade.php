@@ -375,6 +375,16 @@
     .an-modal-stat-value { color:var(--text,#0f172a); font-size:.78rem; font-weight:850; margin-top:.2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .an-modal-stat-note { display:block; margin-top:.16rem; color:var(--dsh-muted); font-size:.55rem; font-weight:700; }
     .an-modal-body { min-height:130px; overflow:auto; padding:.25rem .85rem .65rem; }
+    .an-revenue-workspace { margin-top:.8rem; }
+    .an-revenue-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:.8rem .85rem; border:1px solid var(--dsh-border); border-radius:14px 14px 0 0; background:linear-gradient(180deg,#fbfdff 0%,var(--card,#fff) 100%); }
+    .an-revenue-head-meta { display:inline-flex; align-items:center; gap:.3rem; flex:0 0 auto; color:var(--dsh-muted); font-size:.62rem; font-weight:750; white-space:nowrap; }
+    .an-revenue-head-meta i { color:#2563eb; }
+    .an-revenue-panel { overflow:hidden; border:1px solid var(--dsh-border); border-top:0; border-radius:0 0 14px 14px; background:var(--card,#fff); box-shadow:0 10px 22px rgba(15,23,42,.05); }
+    .an-revenue-panel .an-modal-tabs { border-bottom-color:var(--dsh-border); }
+    .an-revenue-panel .an-modal-body { min-height:180px; max-height:none; overflow:visible; }
+    .an-revenue-panel .an-modal-foot { background:var(--hero-bg,#f8fafc); }
+    body[data-theme="dark"] .an-revenue-head { background:linear-gradient(180deg,#1e293b 0%,var(--card,#1e293b) 100%); }
+    @media (max-width:760px) { .an-revenue-head { flex-direction:column; gap:.35rem; } .an-revenue-head-meta { white-space:normal; } }
     .an-modal-fee-breakdown { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem .65rem; margin:.45rem 0 .7rem; padding:.65rem .7rem; border:1px solid var(--dsh-border); border-radius:10px; background:var(--hero-bg,#f8fafc); }
     .an-modal-fee-breakdown div { display:flex; align-items:center; justify-content:space-between; gap:.5rem; color:var(--dsh-muted); font-size:.64rem; font-weight:700; }
     .an-modal-fee-breakdown strong { color:var(--text,#0f172a); font-weight:850; }
@@ -1042,6 +1052,7 @@
             <nav class="an-tabs" id="analyticsTabs" role="tablist" aria-label="Navigasi analytics">
                 <button class="an-tab active" type="button" data-an-tab="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2 me-1"></i>Ikhtisar</button>
                 <button class="an-tab" type="button" data-an-tab="sales" role="tab" aria-selected="false"><i class="bi bi-graph-up-arrow me-1"></i>Penjualan</button>
+                <button class="an-tab" type="button" data-an-tab="revenue" role="tab" aria-selected="false"><i class="bi bi-cash-stack me-1"></i>Omzet, Pencairan &amp; Fee</button>
                 <button class="an-tab" type="button" data-an-tab="operations" role="tab" aria-selected="false"><i class="bi bi-activity me-1"></i>Operasional</button>
                 <button class="an-tab" type="button" data-an-tab="stores" role="tab" aria-selected="false"><i class="bi bi-shop me-1"></i>Toko &amp; Biaya</button>
                 <button class="an-tab" type="button" data-an-tab="products" role="tab" aria-selected="false"><i class="bi bi-box-seam me-1"></i>Produk</button>
@@ -1050,6 +1061,7 @@
           </div>
         @include('marketplace.partials._analytics_summary')
         @include('marketplace.partials._analytics_sales')
+        @include('marketplace.partials._analytics_revenue')
         @include('marketplace.partials._analytics_stores')
         @include('marketplace.partials._analytics_products')
         @include('marketplace.partials._analytics_cohort')
@@ -1388,6 +1400,8 @@
     }
     async function load() {
         const cashModalWasOpen = $('cashOrdersModal').classList.contains('is-open');
+        const revenueTabWasActive = document.querySelector('[data-an-tab="revenue"]')?.classList.contains('active');
+        if (revenueTabWasActive) cashFocus = 'combined';
         if (!cashModalWasOpen) closeCashOrders();
         closeReturnOrders();
         cashPage = 1;
@@ -1396,7 +1410,7 @@
         cashTabSummaryToken++;
         returnPage = 1;
         returnPayload = null;
-        if (cashModalWasOpen) {
+        if (cashModalWasOpen || revenueTabWasActive) {
             loadCashOrders();
             loadCashTabSummaries();
         }
@@ -1457,6 +1471,12 @@
         activateTab(button.dataset.anTab);
         if (button.dataset.anTab === 'products') loadProducts();
         if (button.dataset.anTab === 'cohort') loadCohort();
+        if (button.dataset.anTab === 'revenue') {
+            const needsReload = cashFocus !== 'combined' || !cashPayload;
+            cashFocus = 'combined';
+            if (needsReload && !cashLoading) { cashPage = 1; cashPayload = null; loadCashOrders(); }
+            loadCashTabSummaries();
+        }
     }));
     const syncUrl = () => { const params = new URLSearchParams({date_from:from(),date_to:to(),compare_mode:$('anCompare').value}); if (selectedPlatform()) params.set('platform', selectedPlatform()); if (selectedStore()) params.set('store_id', selectedStore()); const activeTab = document.querySelector('[data-an-tab].active')?.dataset.anTab; if (activeTab) params.set('view', activeTab); history.replaceState(null,'',location.pathname+'?'+params.toString()); };
     $('anRefresh').addEventListener('click',load); $('anPlatform').addEventListener('change',()=>{ $('anStore').value = ''; fillStores(); syncUrl(); load(); }); $('anStore').addEventListener('change',()=>{syncUrl();load();}); $('anCompare').addEventListener('change',()=>{syncUrl();load();});
@@ -1489,10 +1509,21 @@
         cashPayload = null;
         loadCashOrders();
     }));
+    document.querySelectorAll('[data-revenue-settlement]').forEach(button => button.addEventListener('click', () => {
+        const needsReload = cashFocus !== 'combined' || cashSettlement !== button.dataset.revenueSettlement || !cashPayload;
+        cashFocus = 'combined';
+        if (!needsReload) return;
+        setCashSettlementTab(button.dataset.revenueSettlement);
+        cashPage = 1;
+        cashPayload = null;
+        loadCashOrders();
+    }));
     document.querySelectorAll('[data-cash-close]').forEach(element => element.addEventListener('click', closeCashOrders));
     document.querySelectorAll('[data-return-close]').forEach(element => element.addEventListener('click', closeReturnOrders));
     $('cashOrdersPrev').addEventListener('click', () => { if (cashPage > 1) { cashPage -= 1; loadCashOrders(); } });
     $('cashOrdersNext').addEventListener('click', () => { const lastPage = Number(cashPayload?.meta?.last_page || 1); if (cashPage < lastPage) { cashPage += 1; loadCashOrders(); } });
+    $('revenueOrdersPrev').addEventListener('click', () => { if (cashPage > 1) { cashPage -= 1; loadCashOrders(); } });
+    $('revenueOrdersNext').addEventListener('click', () => { const lastPage = Number(cashPayload?.meta?.last_page || 1); if (cashPage < lastPage) { cashPage += 1; loadCashOrders(); } });
     $('returnOrdersPrev').addEventListener('click', () => { if (returnPage > 1) { returnPage -= 1; loadReturnOrders(); } });
     $('returnOrdersNext').addEventListener('click', () => { const lastPage = Number(returnPayload?.meta?.last_page || 1); if (returnPage < lastPage) { returnPage += 1; loadReturnOrders(); } });
     document.querySelectorAll('[data-return-type]').forEach(button => button.addEventListener('click', () => {
@@ -1554,8 +1585,12 @@
     $('anStore').value = initialStore || '';
     const initialParams = new URLSearchParams(location.search);
     const initialView = initialParams.get('view') || initialParams.get('tab');
-    const normalizedInitialView = initialView === 'summary' ? 'overview' : initialView;
-    if (['overview', 'sales', 'operations', 'stores', 'products', 'cohort'].includes(normalizedInitialView)) activateTab(normalizedInitialView);
+    const normalizedInitialView = initialView === 'summary' ? 'overview' : (initialView === 'fees' ? 'revenue' : initialView);
+    if (normalizedInitialView === 'revenue') {
+        cashFocus = 'combined';
+        cashSettlement = 'all';
+    }
+    if (['overview', 'sales', 'revenue', 'operations', 'stores', 'products', 'cohort'].includes(normalizedInitialView)) activateTab(normalizedInitialView);
     load();
     if (normalizedInitialView === 'products') loadProducts();
 })();

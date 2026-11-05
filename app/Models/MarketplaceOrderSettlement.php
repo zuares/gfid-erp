@@ -102,7 +102,8 @@ class MarketplaceOrderSettlement extends Model
      */
     public function marketplaceFeeBreakdown(): array
     {
-        $raw = is_array($this->raw_json) ? $this->raw_json : [];
+        $rawValue = $this->getRawOriginal('raw_json');
+        $raw = is_array($rawValue) ? $rawValue : (is_array($this->raw_json) ? $this->raw_json : []);
         $rows = [];
         $seen = [];
         $usedKeys = [];
@@ -342,6 +343,162 @@ class MarketplaceOrderSettlement extends Model
             $label = 'Biaya Tambahan (' . $key . ')';
             $push($label, $amount, $category, $key);
         }
+
+        return $rows;
+    }
+
+    /**
+     * Canonical fee mapping used by Marketplace Analytics.
+     *
+     * The legacy columns intentionally remain untouched because Shopee and
+     * TikTok do not expose the same fee contract. This view-level mapping
+     * reads the raw settlement snapshot and presents comparable categories
+     * without counting aggregate TikTok fields together with their children.
+     *
+     * @return array<int, array{code:string, label:string, amount:float, category:string, source?:string}>
+     */
+    public function analyticsFeeBreakdown(): array
+    {
+        $rawValue = $this->getRawOriginal('raw_json');
+        $raw = is_array($rawValue) ? $rawValue : (is_array($this->raw_json) ? $this->raw_json : []);
+        $rows = [];
+        $seen = [];
+        $amountOf = static function (mixed $value): float {
+            if ($value === null || $value === '' || ! is_numeric($value)) {
+                return 0.0;
+            }
+
+            return abs((float) $value);
+        };
+        $push = static function (array &$rows, array &$seen, string $code, string $label, mixed $value, string $category, ?string $source = null) use ($amountOf): void {
+            $amount = $amountOf($value);
+            if ($amount <= 0) {
+                return;
+            }
+
+            $signature = $code.'|'.($source ?? '').'|'.number_format($amount, 2, '.', '');
+            if (isset($seen[$signature])) {
+                return;
+            }
+
+            $seen[$signature] = true;
+            $row = [
+                'code' => $code,
+                'label' => $label,
+                'amount' => round($amount, 2),
+                'category' => $category,
+            ];
+            if ($source) {
+                $row['source'] = $source;
+            }
+            $rows[] = $row;
+        };
+
+        $isTikTok = is_array($raw['tiktok_fee_breakdown'] ?? null)
+            || is_array($raw['sku_transactions'] ?? null)
+            || str_contains(strtolower((string) ($raw['source'] ?? '')), 'tiktok');
+
+        if ($isTikTok) {
+            $fees = data_get($raw, 'tiktok_fee_breakdown.fees', []);
+            $feeRows = is_array($fees) ? $fees : [];
+
+            foreach ($feeRows as $key => $value) {
+                $key = strtolower((string) $key);
+                if ($key === 'affiliate_commission_amount_before_pit') {
+                    continue;
+                }
+
+                if (str_contains($key, 'gmv_max') || str_contains($key, 'ad_fee') || str_contains($key, 'coupon_fee')) {
+                    $push($rows, $seen, 'ad_fee', 'Biaya Ads / GMV Max', $value, 'fee', 'tiktok_fee_breakdown.fees.'.$key);
+                    continue;
+                }
+                if (str_contains($key, 'affiliate')) {
+                    $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi', $value, 'fee', 'tiktok_fee_breakdown.fees.'.$key);
+                    continue;
+                }
+                if (str_contains($key, 'dynamic')) {
+                    $push($rows, $seen, 'dynamic_commission', 'Komisi Dinamis', $value, 'fee', 'tiktok_fee_breakdown.fees.'.$key);
+                    continue;
+                }
+                if ($key === 'vn_fix_infrastructure_fee' || str_contains($key, 'processing') || str_contains($key, 'transaction')) {
+                    $push($rows, $seen, 'order_processing_fee', 'Biaya Pemrosesan Pesanan', $value, 'fee', 'tiktok_fee_breakdown.fees.'.$key);
+                    continue;
+                }
+                if (str_contains($key, 'service') || str_contains($key, 'growth') || str_contains($key, 'program')) {
+                    $label = str_contains($key, 'voucher_xtra')
+                        ? 'Program Voucher XTRA'
+                        : (str_contains($key, 'growth') ? 'Program Growth Xtra' : 'Biaya Program / Layanan');
+                    $push($rows, $seen, 'program_service_fee', $label, $value, 'fee', 'tiktok_fee_breakdown.fees.'.$key);
+                    continue;
+                }
+                if (str_contains($key, 'platform') || str_contains($key, 'commission')) {
+                    $push($rows, $seen, 'platform_commission', 'Komisi Platform', $value, 'fee', 'tiktok_fee_breakdown.fees.'.$key);
+                    continue;
+                }
+
+                $push($rows, $seen, 'other_fee', 'Biaya Marketplace Lainnya', $value, 'fee', 'tiktok_fee_breakdown.fees.'.$key);
+            }
+
+            foreach ((array) data_get($raw, 'tiktok_fee_breakdown.taxes', []) as $key => $value) {
+                $push($rows, $seen, 'tax', 'Pajak', $value, 'tax', 'tiktok_fee_breakdown.taxes.'.(string) $key);
+            }
+
+            $push($rows, $seen, 'shipping_cost', 'Biaya Layanan Logistik', $raw['shipping_cost_amount'] ?? null, 'shipping', 'shipping_cost_amount');
+            $push($rows, $seen, 'shipping_subsidy', 'Subsidi / Potongan Ongkir', data_get($raw, 'tiktok_shipping_breakdown.shipping_fee_discount_amount'), 'shipping', 'tiktok_shipping_breakdown.shipping_fee_discount_amount');
+
+            if ($rows === []) {
+                $push($rows, $seen, 'platform_commission', 'Komisi Platform', $this->commission_fee, 'fee', 'commission_fee');
+            }
+
+            return $rows;
+        }
+
+        $push($rows, $seen, 'platform_commission', 'Biaya Administrasi / Komisi Platform', $this->commission_fee, 'fee', 'commission_fee');
+
+        $processing = $raw['seller_order_processing_fee'] ?? null;
+        $sellerTransaction = $raw['seller_transaction_fee'] ?? null;
+        if ($processing !== null || $sellerTransaction !== null) {
+            $push($rows, $seen, 'order_processing_fee', 'Biaya Proses Pesanan', $processing, 'fee', 'seller_order_processing_fee');
+            $push($rows, $seen, 'transaction_fee', 'Biaya Transaksi', $sellerTransaction, 'fee', 'seller_transaction_fee');
+        } else {
+            $push($rows, $seen, 'order_processing_fee', 'Biaya Proses Pesanan', $this->transaction_fee, 'fee', 'transaction_fee');
+        }
+
+        $serviceDetails = [];
+        $collectService = static function (mixed $value, string $source) use (&$collectService, &$serviceDetails): void {
+            if (! is_array($value)) {
+                return;
+            }
+
+            $amount = $value['fee_amount'] ?? $value['service_fee_amount'] ?? $value['amount'] ?? $value['value'] ?? null;
+            if ($amount !== null && $amount !== '' && is_numeric($amount)) {
+                $label = (string) ($value['rule_display_name'] ?? $value['fee_name'] ?? $value['program_name'] ?? $value['name'] ?? 'Biaya Layanan');
+                $serviceDetails[] = [$label, $amount, $source];
+                return;
+            }
+
+            foreach ($value as $nested) {
+                $collectService($nested, $source);
+            }
+        };
+        foreach (['net_service_fee_info_list', 'final_seller_service_fee_list', 'seller_service_fee_list', 'service_fee_info_list', 'service_fee_breakdown'] as $key) {
+            $collectService($raw[$key] ?? null, $key);
+        }
+        if ($serviceDetails !== []) {
+            foreach ($serviceDetails as [$label, $amount, $source]) {
+                $push($rows, $seen, 'program_service_fee', $label, $amount, 'fee', $source);
+            }
+        } else {
+            $push($rows, $seen, 'program_service_fee', 'Biaya Layanan / Program', $this->service_fee, 'fee', 'service_fee');
+        }
+
+        $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi / AMS', $this->affiliate_fee, 'fee', 'affiliate_fee');
+        $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi / AMS', $this->activity_fee, 'fee', 'activity_fee');
+        $push($rows, $seen, 'shipping_cost', 'Biaya Kirim ke Jasa Kirim', $this->actual_shipping_fee ?: $this->shipping_cost_amount, 'shipping', 'actual_shipping_fee');
+        $push($rows, $seen, 'shipping_subsidy', 'Subsidi / Potongan Ongkir', $this->shipping_fee_subsidy, 'shipping', 'shipping_fee_subsidy');
+        $push($rows, $seen, 'insurance_fee', 'Premi / Asuransi', $this->shipping_insurance_fee, 'fee', 'shipping_insurance_fee');
+        $push($rows, $seen, 'tax', 'Pajak', $this->escrow_tax, 'tax', 'escrow_tax');
+        $push($rows, $seen, 'other_fee', 'Premi', $raw['premi'] ?? null, 'fee', 'premi');
 
         return $rows;
     }

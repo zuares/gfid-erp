@@ -2,6 +2,7 @@
 
 namespace App\Services\Marketplace;
 
+use App\Models\MarketplaceOrderSettlement;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -387,6 +388,9 @@ class MarketplaceAnalyticsSummaryService
                 'ms.transaction_fee',
                 'ms.affiliate_fee',
                 'ms.activity_fee',
+                'ms.actual_shipping_fee',
+                'ms.shipping_cost_amount',
+                'ms.shipping_fee_subsidy',
                 'ms.shipping_insurance_fee',
                 'ms.escrow_tax',
                 DB::raw($this->returnRefundExistsSql().' AS has_return_refund'),
@@ -406,6 +410,20 @@ class MarketplaceAnalyticsSummaryService
             $marketplaceFees = $marketplaceFee($row);
             $affiliateFees = $affiliateFee($row);
             $statusGroup = $this->cashOrderStatusGroup($row);
+            $settlement = new MarketplaceOrderSettlement();
+            $settlement->setRawAttributes([
+                'commission_fee' => $row->commission_fee,
+                'service_fee' => $row->service_fee,
+                'transaction_fee' => $row->transaction_fee,
+                'affiliate_fee' => $row->affiliate_fee,
+                'activity_fee' => $row->activity_fee,
+                'actual_shipping_fee' => $row->actual_shipping_fee ?? null,
+                'shipping_cost_amount' => $row->shipping_cost_amount ?? null,
+                'shipping_fee_subsidy' => $row->shipping_fee_subsidy ?? null,
+                'shipping_insurance_fee' => $row->shipping_insurance_fee,
+                'escrow_tax' => $row->escrow_tax,
+                'raw_json' => $row->settlement_raw_json,
+            ], true);
             $buyerPayment = collect([
                 $row->buyer_payment_amount ?? null,
                 $row->total_amount ?? null,
@@ -439,6 +457,7 @@ class MarketplaceAnalyticsSummaryService
                 'activity_fee' => round((float) ($row->activity_fee ?? 0), 2),
                 'refund' => round((float) ($row->drc_adjustable_refund ?? 0), 2),
                 'total_fees' => round($marketplaceFees + $affiliateFees, 2),
+                'fee_breakdown' => $settlement->analyticsFeeBreakdown(),
             ];
         })->values()->all();
 
@@ -451,7 +470,85 @@ class MarketplaceAnalyticsSummaryService
                 'total' => $paginator->total(),
             ],
             'summary' => $this->cashAggregate($filters, $settlement, true),
+            'canonical_fee_totals' => $perPage >= 50
+                ? $this->canonicalFeeTotals($filters, $settlement)
+                : [],
         ];
+    }
+
+    /**
+     * Aggregate the canonical mapping for the active revenue table. This is
+     * intentionally limited to the full-size revenue request; the eight small
+     * tab-summary requests do not need to repeat the raw JSON scan.
+     */
+    private function canonicalFeeTotals(array $filters, string $settlement): array
+    {
+        $base = match ($settlement) {
+            'all' => $this->allCashBase($filters),
+            'unsettled' => $this->unsettledOrdersBase($filters),
+            'shipped' => $this->cashStatusBase($filters, 'shipped'),
+            'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
+            'confirm' => $this->cashStatusBase($filters, 'confirm'),
+            'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
+            'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
+            default => $this->cashBase($filters),
+        };
+        if (in_array($settlement, ['all', 'cancelled'], true)) {
+            $base->whereRaw($this->isRevenueStatus());
+        }
+
+        $rows = $base->select([
+            'ms.commission_fee',
+            'ms.service_fee',
+            'ms.transaction_fee',
+            'ms.affiliate_fee',
+            'ms.activity_fee',
+            'ms.actual_shipping_fee',
+            'ms.shipping_cost_amount',
+            'ms.shipping_fee_subsidy',
+            'ms.shipping_insurance_fee',
+            'ms.escrow_tax',
+            'ms.raw_json as settlement_raw_json',
+        ])->get();
+
+        $totals = [];
+        foreach ($rows as $row) {
+            $settlementModel = new MarketplaceOrderSettlement();
+            $settlementModel->setRawAttributes([
+                'commission_fee' => $row->commission_fee,
+                'service_fee' => $row->service_fee,
+                'transaction_fee' => $row->transaction_fee,
+                'affiliate_fee' => $row->affiliate_fee,
+                'activity_fee' => $row->activity_fee,
+                'actual_shipping_fee' => $row->actual_shipping_fee ?? null,
+                'shipping_cost_amount' => $row->shipping_cost_amount ?? null,
+                'shipping_fee_subsidy' => $row->shipping_fee_subsidy ?? null,
+                'shipping_insurance_fee' => $row->shipping_insurance_fee,
+                'escrow_tax' => $row->escrow_tax,
+                'raw_json' => $row->settlement_raw_json,
+            ], true);
+
+            foreach ($settlementModel->analyticsFeeBreakdown() as $item) {
+                $code = (string) ($item['code'] ?? 'other_fee');
+                $totals[$code] ??= [
+                    'code' => $code,
+                    'label' => (string) ($item['label'] ?? $code),
+                    'category' => (string) ($item['category'] ?? 'fee'),
+                    'amount' => 0.0,
+                ];
+                $totals[$code]['amount'] += (float) ($item['amount'] ?? 0);
+            }
+        }
+
+        return collect($totals)
+            ->map(function (array $item): array {
+                $item['amount'] = round((float) $item['amount'], 2);
+                return $item;
+            })
+            ->filter(fn (array $item): bool => $item['amount'] > 0)
+            ->sortByDesc('amount')
+            ->values()
+            ->all();
     }
 
     private function cashOrderGrossSales($row): float
