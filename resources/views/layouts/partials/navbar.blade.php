@@ -102,6 +102,7 @@ if ($navShowBell) {
                 : 'Item '.($deletionRequest->line?->item?->code ?: $deletionRequest->target_label);
             $navPendingItems[] = [
                 'type'  => 'shipment_deletion_request',
+                'read_key' => 'shipment_deletion_request:'.$deletionRequest->id,
                 'label' => $targetLabel,
                 'sub'   => 'Menunggu approval hapus · '.($deletionRequest->requestedBy?->name ?: 'Admin'),
                 'url'   => route('sales.shipments.deletion_requests.index'),
@@ -111,6 +112,7 @@ if ($navShowBell) {
         foreach (($navPending['inventory_adjustment_requests'] ?? collect()) as $adjustment) {
             $navPendingItems[] = [
                 'type'  => 'inventory_adjustment_request',
+                'read_key' => 'inventory_adjustment_request:'.$adjustment->id,
                 'label' => $adjustment->code ?? 'Koreksi persediaan #'.$adjustment->id,
                 'sub'   => 'Menunggu finalisasi Owner · '.($adjustment->warehouse?->code ?? 'Gudang')
                     .' · '.($adjustment->creator?->name ?? 'Admin'),
@@ -121,6 +123,7 @@ if ($navShowBell) {
         foreach (($navPending['grn_drafts'] ?? collect()) as $grn) {
             $navPendingItems[] = [
                 'type'  => 'grn',
+                'read_key' => 'grn:'.$grn->id,
                 'label' => $grn->code ?? 'GRN #' . $grn->id,
                 'sub'   => 'Belum di-post',
                 'url'   => route('purchasing.purchase_receipts.show', $grn->id),
@@ -130,6 +133,7 @@ if ($navShowBell) {
         foreach (($navPending['cutting_qc_owner_reviews'] ?? collect()) as $cuttingJob) {
             $navPendingItems[] = [
                 'type'  => 'cutting_qc_owner_review',
+                'read_key' => 'cutting_qc_owner_review:'.$cuttingJob->id,
                 'label' => $cuttingJob->code ?? 'Cutting Job #'.$cuttingJob->id,
                 'sub'   => 'Auto BOM kurang stok lot — koreksi persediaan',
                 'url'   => route('production.qc.cutting.edit', $cuttingJob->id),
@@ -142,6 +146,7 @@ if ($navShowBell) {
     if (($navPending['crm_aging'] ?? 0) > 0) {
         $navPendingItems[] = [
             'type'  => 'crm_aging',
+            'read_key' => 'crm_aging:'.today()->toDateString().':'.$navPending['crm_aging'],
             'label' => $navPending['crm_aging'] . ' order pending >24 jam',
             'sub'   => 'Segera konfirmasi ke customer',
             'url'   => route('admin.crm.orders'),
@@ -151,6 +156,7 @@ if ($navShowBell) {
     if (($navPending['crm_new_orders'] ?? 0) > 0) {
         $navPendingItems[] = [
             'type'  => 'crm_new_orders',
+            'read_key' => 'crm_new_orders:'.today()->toDateString().':'.$navPending['crm_new_orders'],
             'label' => $navPending['crm_new_orders'] . ' order baru hari ini',
             'sub'   => 'Menunggu konfirmasi pembayaran',
             'url'   => route('admin.crm.orders'),
@@ -160,6 +166,7 @@ if ($navShowBell) {
     if (($navPending['crm_prospects'] ?? 0) > 0) {
         $navPendingItems[] = [
             'type'  => 'crm_prospects',
+            'read_key' => 'crm_prospects:'.today()->toDateString().':'.$navPending['crm_prospects'],
             'label' => $navPending['crm_prospects'] . ' prospect baru hari ini',
             'sub'   => 'Add to cart tapi belum checkout',
             'url'   => route('admin.crm.prospects'),
@@ -425,6 +432,7 @@ if ($navShowBell) {
         top: calc(100% + 6px);
         right: 0;
         min-width: 260px;
+        max-width: min(360px, calc(100vw - 24px));
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: 10px;
@@ -436,12 +444,56 @@ if ($navShowBell) {
     .notif-dropdown.open { display: block; }
     .notif-dropdown-header {
         padding: .55rem .85rem;
-        font-size: .78rem;
-        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .65rem;
         color: var(--muted);
         border-bottom: 1px solid var(--line);
+    }
+    .notif-dropdown-title {
+        min-width: 0;
+        font-size: .78rem;
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: .04em;
+    }
+    .notif-header-count {
+        display: inline-block;
+        min-width: 16px;
+        margin-left: .3rem;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: #ef4444;
+        color: #fff;
+        font-size: 10px;
+        line-height: 16px;
+        text-align: center;
+        vertical-align: 1px;
+    }
+    .notif-mark-all {
+        flex: 0 0 auto;
+        border: 0;
+        padding: .2rem 0;
+        background: transparent;
+        color: var(--accent);
+        font: inherit;
+        font-size: .72rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-transform: none;
+        white-space: nowrap;
+    }
+    .notif-mark-all:hover { text-decoration: underline; }
+    .notif-mark-all:focus-visible {
+        outline: 2px solid var(--navbar-cyan);
+        outline-offset: 2px;
+        border-radius: 3px;
+    }
+    .notif-list {
+        max-height: min(420px, calc(100vh - 140px));
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
     .notif-item {
         display: flex;
@@ -456,6 +508,7 @@ if ($navShowBell) {
     }
     .notif-item:last-child { border-bottom: 0; }
     .notif-item:hover { background: color-mix(in srgb, var(--accent-soft) 50%, var(--card) 50%); }
+    .notif-item.is-read { display: none; }
     .notif-item-icon { font-size: 1.1rem; flex-shrink: 0; }
     .notif-item-label { flex: 1; }
     .notif-item-count {
@@ -602,20 +655,24 @@ if ($navShowBell) {
                         <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                     </svg>
                     @if ($navPendingCount > 0)
-                        <span class="notif-badge">{{ $navPendingCount > 99 ? '99+' : $navPendingCount }}</span>
+                        <span class="notif-badge" id="notifBellBadge">{{ $navPendingCount > 99 ? '99+' : $navPendingCount }}</span>
                     @endif
                 </button>
 
                 <div class="notif-dropdown" id="notifDropdown">
                     <div class="notif-dropdown-header">
-                        Perlu Tindakan
-                        @if ($navPendingCount > 0)
-                            <span style="float:right;background:#ef4444;color:#fff;border-radius:999px;padding:0 7px;font-size:10px;font-weight:700;line-height:16px;">{{ $navPendingCount }}</span>
-                        @endif
+                        <span class="notif-dropdown-title">
+                            Perlu Tindakan
+                            <span class="notif-header-count" id="notifHeaderCount" @if ($navPendingCount === 0) hidden @endif>{{ $navPendingCount }}</span>
+                        </span>
+                        <button type="button" class="notif-mark-all" id="notifMarkAll" @if ($navPendingCount === 0) hidden @endif>
+                            Sudah baca semua
+                        </button>
                     </div>
+                    <div class="notif-list" id="notifList">
                     @if (count($navPendingItems) > 0)
                         @foreach ($navPendingItems as $item)
-                            <a href="{{ $item['url'] }}" class="notif-item">
+                            <a href="{{ $item['url'] }}" class="notif-item" data-notif-key="{{ $item['read_key'] }}">
                                 <span class="notif-item-icon">{{ $item['icon'] }}</span>
                                 <span class="notif-item-label">
                                     <span style="display:block;font-weight:600;font-size:.83rem;">{{ $item['label'] }}</span>
@@ -624,9 +681,9 @@ if ($navShowBell) {
                                 <svg style="width:14px;height:14px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
                             </a>
                         @endforeach
-                    @else
-                        <div class="notif-empty">Semua beres ✓</div>
                     @endif
+                        <div class="notif-empty" id="notifEmpty" @if (count($navPendingItems) > 0) hidden @endif>Semua beres ✓</div>
+                    </div>
                 </div>
             </div>
             @endif
@@ -718,6 +775,71 @@ if ($navShowBell) {
         const notifBellBtn  = document.getElementById('notifBellBtn');
         const notifDropdown = document.getElementById('notifDropdown');
         if (notifBellBtn && notifDropdown) {
+            const notifItems = Array.from(notifDropdown.querySelectorAll('.notif-item[data-notif-key]'));
+            const notifHeaderCount = document.getElementById('notifHeaderCount');
+            const notifBellBadge = document.getElementById('notifBellBadge');
+            const notifMarkAll = document.getElementById('notifMarkAll');
+            const notifEmpty = document.getElementById('notifEmpty');
+            const notifReadStorageKey = @json('gfid:navbar-notif-read:v1:'.(int) ($navUser?->id ?? 0));
+
+            let readKeys = new Set();
+            try {
+                const storedKeys = JSON.parse(window.localStorage.getItem(notifReadStorageKey) || '[]');
+                if (Array.isArray(storedKeys)) {
+                    const currentKeys = new Set(notifItems.map(function(item) {
+                        return item.dataset.notifKey;
+                    }));
+                    readKeys = new Set(storedKeys.filter(function(key) {
+                        return currentKeys.has(key);
+                    }));
+                }
+            } catch (error) {
+                // Browser storage can be disabled; notifications remain usable for this session.
+            }
+
+            function persistReadKeys() {
+                try {
+                    window.localStorage.setItem(notifReadStorageKey, JSON.stringify(Array.from(readKeys)));
+                } catch (error) {
+                    // Ignore storage failures so the notification menu still works.
+                }
+            }
+
+            function updateNotificationState() {
+                let visibleCount = 0;
+                notifItems.forEach(function(item) {
+                    const isRead = readKeys.has(item.dataset.notifKey);
+                    item.classList.toggle('is-read', isRead);
+                    if (!isRead) {
+                        visibleCount += 1;
+                    }
+                });
+
+                if (notifHeaderCount) {
+                    notifHeaderCount.textContent = visibleCount;
+                    notifHeaderCount.hidden = visibleCount === 0;
+                }
+                if (notifBellBadge) {
+                    notifBellBadge.textContent = visibleCount > 99 ? '99+' : visibleCount;
+                    notifBellBadge.hidden = visibleCount === 0;
+                }
+                if (notifMarkAll) {
+                    notifMarkAll.hidden = visibleCount === 0;
+                }
+                if (notifEmpty) {
+                    notifEmpty.hidden = visibleCount > 0;
+                }
+            }
+
+            function markNotificationAsRead(key) {
+                if (!key) return;
+                readKeys.add(key);
+                persistReadKeys();
+                updateNotificationState();
+            }
+
+            updateNotificationState();
+
             notifBellBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 notifDropdown.classList.toggle('open');
@@ -728,12 +850,23 @@ if ($navShowBell) {
                     notifDropdown.classList.remove('open');
                 }
             });
-            // Tutup kalau klik item di dalam (navigasi)
-            notifDropdown.querySelectorAll('.notif-item').forEach(function(a) {
+            // Item yang dibuka langsung dianggap sudah dibaca.
+            notifItems.forEach(function(a) {
                 a.addEventListener('click', function() {
+                    markNotificationAsRead(a.dataset.notifKey);
                     notifDropdown.classList.remove('open');
                 });
             });
+
+            if (notifMarkAll) {
+                notifMarkAll.addEventListener('click', function() {
+                    notifItems.forEach(function(item) {
+                        readKeys.add(item.dataset.notifKey);
+                    });
+                    persistReadKeys();
+                    updateNotificationState();
+                });
+            }
         }
     });
 </script>
