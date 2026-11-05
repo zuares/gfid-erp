@@ -576,8 +576,8 @@ class MasterItemBomTest extends TestCase
         $this->actingAs($this->owner)
             ->get(route('master.item_boms.bulk_update_form'))
             ->assertOk()
-            ->assertSee('name="all_categories"', false)
-            ->assertSee('name="item_category_ids[]"', false)
+            ->assertSee('<select id="bulk-category" class="bom-bulk-category-select" name="item_category_ids[]" multiple', false)
+            ->assertSee('value="all"', false)
             ->assertSee($finishedGoodCategory->name)
             ->assertDontSee($materialCategory->name);
     }

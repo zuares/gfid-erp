@@ -239,16 +239,27 @@ class ItemBomController extends Controller
     public function bulkUpdate(Request $request)
     {
         $legacyCategoryId = $request->input('item_category_id');
+        $rawCategoryIds = $request->input('item_category_ids', []);
+        if (! is_array($rawCategoryIds)) {
+            $rawCategoryIds = [$rawCategoryIds];
+        }
         $hasCategoryArray = $request->has('item_category_ids');
+        $selectAllOption = collect($rawCategoryIds)->contains(fn ($id) => (string) $id === 'all');
         $applyAll = $request->boolean('all_categories')
+            || $selectAllOption
             || (! $hasCategoryArray && blank($legacyCategoryId));
 
         if (! $hasCategoryArray && filled($legacyCategoryId)) {
-            $request->merge(['item_category_ids' => [$legacyCategoryId]]);
+            $rawCategoryIds = [$legacyCategoryId];
+        }
+
+        if ($selectAllOption) {
+            $rawCategoryIds = [];
         }
 
         $request->merge([
             'all_categories' => $applyAll,
+            'item_category_ids' => $rawCategoryIds,
             'qty' => $this->normalizeDecimal($request->input('qty')),
             'scrap_pct' => $this->normalizeDecimal($request->input('scrap_pct', self::DEFAULT_WASTE_PCT)),
         ]);
