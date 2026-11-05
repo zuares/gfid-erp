@@ -129,6 +129,53 @@ class FinishingJobLifecycleTest extends TestCase
         ]);
     }
 
+    public function test_admin_cannot_create_stock_correction_and_must_contact_owner(): void
+    {
+        $fixture = $this->postedFixture();
+        $admin = User::factory()->create([
+            'employee_code' => 'USR-FIN-ADMIN',
+            'role' => 'admin',
+            'is_developer' => false,
+        ]);
+        $material = Item::create([
+            'code' => 'STOCK-CORRECTION-ADMIN-TEST',
+            'name' => 'Admin stock correction test material',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'item_role' => 'production_supply',
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+        $bom = ItemBom::create(['item_id' => $fixture['item_id'], 'name' => 'Admin correction BOM', 'active' => true]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => 1,
+            'uom' => 'pcs',
+            'scrap_pct' => 0,
+            'is_optional' => false,
+            'sort_order' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('production.finishing_material_corrections.store'), [
+            'finishing_item_id' => $fixture['item_id'],
+            'material_item_id' => $material->id,
+            'action' => 'stock',
+            'qty' => 1,
+            'reason' => 'Koreksi stok dari admin.',
+        ]);
+
+        $response->assertRedirect()->assertSessionHasErrors('action');
+        $this->assertDatabaseMissing('finishing_material_corrections', [
+            'material_item_id' => $material->id,
+            'action' => 'stock',
+        ]);
+        $this->assertSame(0, InventoryAdjustment::query()
+            ->where('reference_type', FinishingMaterialCorrection::class)
+            ->count());
+    }
+
     public function test_material_correction_bom_is_completed_when_bom_is_saved(): void
     {
         $fixture = $this->postedFixture();

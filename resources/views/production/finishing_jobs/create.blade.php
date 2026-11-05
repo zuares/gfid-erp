@@ -318,6 +318,7 @@
 
     $wipUnitCostByItemId = $wipUnitCostByItemId ?? [];
     $finishingSupplyUnitCostByItemId = $finishingSupplyUnitCostByItemId ?? [];
+    $canCorrectStock = auth()->user()?->isOwner() ?? false;
 @endphp
 
     <div class="panel mb-2">
@@ -414,7 +415,11 @@
                         <div class="alert alert-light border py-2 mb-3" style="font-size:.78rem;"><div class="fw-bold" id="correction-finishing-label">-</div><div class="text-muted" id="correction-material-label">-</div></div>
                         <label class="form-label form-label-sm">Jenis koreksi</label>
                         <select class="form-select form-select-sm mb-3" name="action" required>
-                            <option value="stock">Koreksi Stok</option>
+                            @if($canCorrectStock)
+                                <option value="stock">Koreksi Persediaan</option>
+                            @else
+                                <option value="owner_contact" disabled>Koreksi Persediaan — Hubungi Owner</option>
+                            @endif
                             <option value="bom">Koreksi BOM</option>
                             <option value="purchase">Kebutuhan Pembelian</option>
                         </select>

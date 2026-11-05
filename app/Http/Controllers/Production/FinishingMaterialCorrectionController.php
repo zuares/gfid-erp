@@ -31,6 +31,12 @@ class FinishingMaterialCorrectionController extends Controller
             'reason.min' => 'Alasan koreksi minimal 3 karakter.',
         ]);
 
+        if ($data['action'] === 'stock' && ! $request->user()?->isOwner()) {
+            return back()
+                ->withErrors(['action' => 'Koreksi persediaan hanya dapat dilakukan oleh Owner. Silakan hubungi Owner.'])
+                ->withInput();
+        }
+
         $finishingItem = Item::query()->findOrFail((int) $data['finishing_item_id']);
         $materialItem = Item::query()->findOrFail((int) $data['material_item_id']);
         $bom = ItemBom::query()

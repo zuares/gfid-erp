@@ -246,10 +246,17 @@
                         data-shortage-index="{{ $loop->index }}" data-action="purchase">
                         Purchase Request
                       </button>
-                      <button type="button" class="btn btn-sm btn-outline-danger js-finishing-shortage-action"
-                        data-shortage-index="{{ $loop->index }}" data-action="stock">
-                        Koreksi Persediaan
-                      </button>
+                      @if($isOwner)
+                        <button type="button" class="btn btn-sm btn-outline-danger js-finishing-shortage-action"
+                          data-shortage-index="{{ $loop->index }}" data-action="stock">
+                          Koreksi Persediaan
+                        </button>
+                      @else
+                        <button type="button" class="btn btn-sm btn-outline-warning js-finishing-shortage-action"
+                          data-shortage-index="{{ $loop->index }}" data-action="owner">
+                          Hubungi Owner
+                        </button>
+                      @endif
                     </div>
                   </td>
                 @elseif($shortageActions->isNotEmpty())
@@ -628,6 +635,7 @@
         const fallback = document.getElementById('finishing-stock-shortage-fallback');
         const correctionUrl = @json(route('production.finishing_material_corrections.store'));
         const jobCode = @json($job->code);
+        const canCorrectStock = @json($isOwner);
 
         if (!window.Swal || !shortages.length) return;
 
@@ -640,9 +648,13 @@
         const actionButtons = function (row, index) {
           if (!row.material_item_id || !row.finishing_item_id || !row.qty) return '<span class="text-muted">—</span>';
 
+          const stockAction = canCorrectStock
+            ? '<button type="button" class="btn btn-sm btn-outline-danger js-finishing-shortage-action" data-shortage-index="' + index + '" data-action="stock">Koreksi Persediaan</button>'
+            : '<button type="button" class="btn btn-sm btn-outline-warning js-finishing-shortage-action" data-shortage-index="' + index + '" data-action="owner">Hubungi Owner</button>';
+
           return '<div class="stock-shortage-actions">'
             + '<button type="button" class="btn btn-sm btn-outline-primary js-finishing-shortage-action" data-shortage-index="' + index + '" data-action="purchase">Purchase Request</button>'
-            + '<button type="button" class="btn btn-sm btn-outline-danger js-finishing-shortage-action" data-shortage-index="' + index + '" data-action="stock">Koreksi Persediaan</button>'
+            + stockAction
             + '</div>';
         };
 
@@ -739,6 +751,18 @@
           });
         };
 
+        const openOwnerNotice = function () {
+          window.Swal.fire({
+            icon: 'info',
+            title: 'Perlu persetujuan Owner',
+            text: 'Koreksi persediaan hanya dapat dilakukan oleh Owner. Silakan hubungi Owner untuk menambah saldo stok RM.',
+            confirmButtonText: 'Mengerti',
+            confirmButtonColor: '#334155',
+            width: 'min(94vw, 440px)',
+            customClass: { popup: 'gf-stock-shortage-alert' }
+          });
+        };
+
         document.addEventListener('click', function (event) {
           const button = event.target.closest('.js-finishing-shortage-action');
           if (!button) return;
@@ -746,9 +770,13 @@
           const index = Number(button.dataset.shortageIndex);
           const row = shortages[index];
           const action = button.dataset.action;
-          if (!row || !['purchase', 'stock'].includes(action)) return;
+          if (!row || !['purchase', 'stock', 'owner'].includes(action)) return;
 
           event.preventDefault();
+          if (action === 'owner') {
+            openOwnerNotice();
+            return;
+          }
           openCorrection(row, action);
         });
       });
