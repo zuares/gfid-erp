@@ -175,6 +175,56 @@
     }
     .sum-pill .val{ display:block; margin-top:.12rem; }
 
+    .packing-material-row{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) 92px 92px 108px;
+        gap:.45rem .65rem;
+        width:100%;
+        border:0;
+        border-bottom:1px solid rgba(148,163,184,.08);
+        padding:.5rem .1rem;
+        color:inherit;
+        background:transparent;
+        text-align:left;
+        align-items:center;
+        cursor:pointer;
+        transition:background-color .15s ease, transform .15s ease;
+    }
+    .packing-material-row:last-child{ border-bottom:0; }
+    .packing-material-row:hover,
+    .packing-material-row:focus-visible{
+        background:rgba(37,99,235,.06);
+        outline:none;
+    }
+    .packing-material-row:focus-visible{ box-shadow:inset 0 0 0 2px rgba(37,99,235,.35); border-radius:8px; }
+    .packing-material-row .packing-material-name{ min-width:0; }
+    .packing-material-row .packing-material-code{
+        color:var(--muted); font-size:.66rem; margin-left:.3rem;
+    }
+    .packing-material-row .packing-number{
+        text-align:right; font-size:.76rem; font-weight:700; white-space:nowrap;
+    }
+    .packing-status{
+        justify-self:end; display:inline-flex; align-items:center; justify-content:center;
+        min-width:72px; border-radius:999px; padding:.18rem .45rem;
+        font-size:.64rem; font-weight:900; white-space:nowrap;
+    }
+    .packing-status.is-ready{ color:#15803d; background:rgba(22,163,74,.1); border:1px solid rgba(22,163,74,.25); }
+    .packing-status.is-short{ color:#b91c1c; background:rgba(220,38,38,.1); border:1px solid rgba(220,38,38,.25); }
+    .packing-detail-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.65rem; }
+    .packing-detail-cell{ border:1px solid rgba(148,163,184,.18); border-radius:10px; padding:.55rem .65rem; }
+    .packing-detail-cell .label{ display:block; color:var(--muted); font-size:.64rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
+    .packing-detail-cell .value{ display:block; margin-top:.15rem; font-weight:900; font-size:.84rem; }
+    @media(max-width:575.98px){
+        .packing-material-row{ grid-template-columns:minmax(0,1fr) auto; gap:.22rem .5rem; }
+        .packing-material-row .packing-number{ text-align:right; }
+        .packing-material-row .packing-status{ grid-column:2; grid-row:1 / span 2; }
+        .packing-material-row .packing-material-name{ grid-column:1; grid-row:1; }
+        .packing-material-row .packing-required{ grid-column:1; grid-row:2; text-align:left; }
+        .packing-material-row .packing-stock{ grid-column:1; grid-row:3; text-align:left; }
+        .packing-detail-grid{ grid-template-columns:1fr; }
+    }
+
     /* accordion — override Bootstrap supaya mirip cardx */
     .accordion-item.all-item {
         border: 1px solid rgba(148,163,184,.18) !important;
@@ -319,6 +369,8 @@
     $wipUnitCostByItemId = $wipUnitCostByItemId ?? [];
     $finishingSupplyUnitCostByItemId = $finishingSupplyUnitCostByItemId ?? [];
     $canCorrectStock = auth()->user()?->isOwner() ?? false;
+    $canViewAutoBomPacking = auth()->user()?->isOwner()
+        || strtolower((string) (auth()->user()?->role ?? '')) === 'admin';
 @endphp
 
     <div class="panel mb-2">
@@ -338,7 +390,7 @@
         $psShortage = $psMaterials->where('has_shortage', true)->count();
         $psTotal    = $psMaterials->count();
     @endphp
-    @if($hasAnyWipAll)
+    @if($hasAnyWipAll && $canViewAutoBomPacking)
     <div class="panel mb-2">
         <div class="panel-h d-flex align-items-center justify-content-between gap-2 flex-wrap">
             <div class="d-flex align-items-center gap-2">
@@ -373,24 +425,28 @@
                     <span>Material terkait</span><span style="text-align:right;">Butuh</span><span style="text-align:right;">Stok RM</span><span style="text-align:right;">Status</span>
                 </div>
                 @foreach($group->materials as $sup)
-                <div style="display:grid;grid-template-columns:1fr 72px 72px 110px;gap:.2rem .5rem;padding:.35rem .1rem;border-bottom:1px solid rgba(148,163,184,.08);align-items:center;">
-                    <div>
+                <button type="button" class="packing-material-row packing-material-trigger"
+                        data-bs-toggle="modal" data-bs-target="#packingMaterialDetailModal"
+                        data-finishing-item-label="{{ $group->item_code }} — {{ $group->item_name }}"
+                        data-material-label="{{ $sup->code }} — {{ $sup->name }}"
+                        data-required="{{ number_format($sup->required_qty, 2, ',', '.') }} {{ $sup->unit }}"
+                        data-stock="{{ number_format($sup->stock_qty, 2, ',', '.') }} {{ $sup->unit }}"
+                        data-shortage="{{ $sup->has_shortage ? number_format($sup->shortage_qty, 2, ',', '.') . ' ' . $sup->unit : '' }}"
+                        data-status="{{ $sup->has_shortage ? 'Kurang' : 'Siap' }}"
+                        data-status-detail="{{ $sup->has_shortage ? 'Kurang ' . number_format($sup->shortage_qty, 2, ',', '.') . ' ' . $sup->unit : 'Stok mencukupi saat Finishing di-POST.' }}"
+                        data-finishing-item-id="{{ $group->item_id }}"
+                        data-material-item-id="{{ $sup->id }}"
+                        data-qty="{{ $sup->shortage_qty }}"
+                        data-unit="{{ $sup->unit }}"
+                        aria-label="Detail {{ $sup->code }} — {{ $sup->name }}">
+                    <span class="packing-material-name">
                         <span style="font-weight:700;font-size:.78rem;">{{ $sup->name }}</span>
-                        <span style="color:var(--muted);font-size:.66rem;margin-left:.3rem;">[{{ $sup->code }}]</span>
-                    </div>
-                    <div style="text-align:right;font-size:.76rem;font-weight:700;">{{ number_format($sup->required_qty, 2, ',', '.') }} <span style="color:var(--muted);font-size:.65em;">{{ $sup->unit }}</span></div>
-                    <div style="text-align:right;font-size:.76rem;font-weight:700;color:{{ $sup->stock_qty < $sup->required_qty ? '#b91c1c' : '#15803d' }};">{{ number_format($sup->stock_qty, 2, ',', '.') }}</div>
-                    <div style="text-align:right;">
-                        @if($sup->has_shortage)
-                            <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
-                                <span style="background:rgba(220,38,38,.1);color:#b91c1c;border:1px solid rgba(220,38,38,.25);border-radius:6px;padding:.1rem .35rem;font-size:.62rem;font-weight:900;white-space:nowrap;">-{{ number_format($sup->shortage_qty, 2, ',', '.') }}</span>
-                                <button type="button" class="btn btn-sm btn-outline-danger material-correction-trigger" style="border-radius:7px;font-size:.62rem;font-weight:900;padding:.18rem .35rem;" data-bs-toggle="modal" data-bs-target="#materialCorrectionModal" data-finishing-item-id="{{ $group->item_id }}" data-finishing-item-label="{{ $group->item_code }} — {{ $group->item_name }}" data-material-item-id="{{ $sup->id }}" data-material-label="{{ $sup->code }} — {{ $sup->name }}" data-qty="{{ $sup->shortage_qty }}" data-unit="{{ $sup->unit }}">Koreksi Material</button>
-                            </div>
-                        @else
-                            <span style="color:#15803d;font-size:.72rem;font-weight:900;">✓</span>
-                        @endif
-                    </div>
-                </div>
+                        <span class="packing-material-code">[{{ $sup->code }}]</span>
+                    </span>
+                    <span class="packing-number packing-required">{{ number_format($sup->required_qty, 2, ',', '.') }} <span style="color:var(--muted);font-size:.65em;">{{ $sup->unit }}</span></span>
+                    <span class="packing-number packing-stock" style="color:{{ $sup->stock_qty < $sup->required_qty ? '#b91c1c' : '#15803d' }};">{{ number_format($sup->stock_qty, 2, ',', '.') }} <span style="color:var(--muted);font-size:.65em;">{{ $sup->unit }}</span></span>
+                    <span class="packing-status {{ $sup->has_shortage ? 'is-short' : 'is-ready' }}">{{ $sup->has_shortage ? 'Kurang' : '✓ Siap' }}</span>
+                </button>
                 @endforeach
             </div>
             @endforeach
@@ -402,6 +458,37 @@
         </div>
     </div>
     @endif
+
+    <div class="modal fade" id="packingMaterialDetailModal" tabindex="-1" aria-labelledby="packingMaterialDetailTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="packingMaterialDetailTitle">Detail Material Packing</h5>
+                        <div class="text-muted" style="font-size:.72rem;" id="packing-detail-finishing">-</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="packing-detail-cell mb-3">
+                        <span class="label">Material</span>
+                        <span class="value" id="packing-detail-material">-</span>
+                    </div>
+                    <div class="packing-detail-grid">
+                        <div class="packing-detail-cell"><span class="label">Butuh</span><span class="value" id="packing-detail-required">-</span></div>
+                        <div class="packing-detail-cell"><span class="label">Stok RM</span><span class="value" id="packing-detail-stock">-</span></div>
+                        <div class="packing-detail-cell"><span class="label">Status</span><span class="value" id="packing-detail-status">-</span></div>
+                        <div class="packing-detail-cell"><span class="label">Keterangan</span><span class="value" id="packing-detail-status-detail">-</span></div>
+                    </div>
+                    <div class="alert alert-light border mt-3 mb-0" style="font-size:.75rem;">RM dipotong saat Finishing di-POST untuk Qty OK.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-danger material-correction-from-detail" data-bs-toggle="modal" data-bs-target="#materialCorrectionModal" style="display:none;">Koreksi Material</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="materialCorrectionModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -1630,17 +1717,50 @@ document.addEventListener('DOMContentLoaded', () => {
     updateOperatorRowCount();
     renderFinishingFinancialPreview();
 
-    // Material correction modal: the row itself supplies the related FG,
-    // material, and shortage qty so the correction cannot drift to another SKU.
-    document.querySelectorAll('.material-correction-trigger').forEach((trigger) => {
+    const fillMaterialCorrection = (trigger) => {
+        document.getElementById('correction-finishing-item-id').value = trigger.dataset.finishingItemId || '';
+        document.getElementById('correction-material-item-id').value = trigger.dataset.materialItemId || '';
+        document.getElementById('correction-finishing-label').textContent = trigger.dataset.finishingItemLabel || '-';
+        document.getElementById('correction-material-label').textContent = trigger.dataset.materialLabel || '-';
+        document.getElementById('correction-qty').value = trigger.dataset.qty || '';
+        document.getElementById('correction-unit').textContent = trigger.dataset.unit ? `(${trigger.dataset.unit})` : '';
+    };
+
+    // Material row opens a detail modal. The correction action is deliberately
+    // kept inside that modal so one row remains uncluttered.
+    const packingDetailModal = document.getElementById('packingMaterialDetailModal');
+    const packingCorrectionFromDetail = document.querySelector('.material-correction-from-detail');
+    document.querySelectorAll('.packing-material-trigger').forEach((trigger) => {
         trigger.addEventListener('click', () => {
-            document.getElementById('correction-finishing-item-id').value = trigger.dataset.finishingItemId || '';
-            document.getElementById('correction-material-item-id').value = trigger.dataset.materialItemId || '';
-            document.getElementById('correction-finishing-label').textContent = trigger.dataset.finishingItemLabel || '-';
-            document.getElementById('correction-material-label').textContent = trigger.dataset.materialLabel || '-';
-            document.getElementById('correction-qty').value = trigger.dataset.qty || '';
-            document.getElementById('correction-unit').textContent = trigger.dataset.unit ? `(${trigger.dataset.unit})` : '';
+            document.getElementById('packing-detail-finishing').textContent = trigger.dataset.finishingItemLabel || '-';
+            document.getElementById('packing-detail-material').textContent = trigger.dataset.materialLabel || '-';
+            document.getElementById('packing-detail-required').textContent = trigger.dataset.required || '-';
+            document.getElementById('packing-detail-stock').textContent = trigger.dataset.stock || '-';
+            document.getElementById('packing-detail-status').textContent = trigger.dataset.status || '-';
+            document.getElementById('packing-detail-status-detail').textContent = trigger.dataset.statusDetail || '-';
+
+            if (packingCorrectionFromDetail) {
+                packingCorrectionFromDetail.style.display = trigger.dataset.shortage ? '' : 'none';
+                Object.assign(packingCorrectionFromDetail.dataset, {
+                    finishingItemId: trigger.dataset.finishingItemId || '',
+                    finishingItemLabel: trigger.dataset.finishingItemLabel || '',
+                    materialItemId: trigger.dataset.materialItemId || '',
+                    materialLabel: trigger.dataset.materialLabel || '',
+                    qty: trigger.dataset.qty || '',
+                    unit: trigger.dataset.unit || '',
+                });
+            }
         });
+    });
+
+    document.querySelectorAll('.material-correction-trigger').forEach((trigger) => {
+        trigger.addEventListener('click', () => fillMaterialCorrection(trigger));
+    });
+    packingCorrectionFromDetail?.addEventListener('click', () => {
+        fillMaterialCorrection(packingCorrectionFromDetail);
+        if (packingDetailModal && typeof bootstrap !== 'undefined') {
+            bootstrap.Modal.getInstance(packingDetailModal)?.hide();
+        }
     });
 });
 </script>
