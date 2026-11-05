@@ -357,7 +357,13 @@ class MasterItemBomTest extends TestCase
             ->assertSee('Harga beli terakhir')
             ->assertSee('data-price-value="80000"', false)
             ->assertSee('/pack')
+            ->assertSee('OPP-BOM-LAST-PRICE-001')
+            ->assertSee('templateSelection')
+            ->assertDontSee('OPP-BOM-LAST-PRICE-001 — Plastik OPP Harga Terakhir')
             ->assertSee('Lihat HPP')
+            ->assertSee('id="bom-active-toggle"', false)
+            ->assertDontSee('SKU Finished Goods')
+            ->assertDontSee('Nama BOM')
             ->assertDontSee('Rincian estimasi HPP BOM')
             ->assertDontSee('Harga / stok');
 
@@ -367,6 +373,9 @@ class MasterItemBomTest extends TestCase
             ->assertSee('Rincian estimasi HPP BOM')
             ->assertSee('Bahan baku utama')
             ->assertSee('Kelengkapan packing')
+            ->assertSee('Harga beli terakhir')
+            ->assertSee('Rp 80.000')
+            ->assertSee('/pack')
             ->assertSee('Cutting')
             ->assertSee('Sewing')
             ->assertSee('Finishing')

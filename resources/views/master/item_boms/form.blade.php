@@ -9,19 +9,19 @@
     /* GF BOM UI FINAL - selaras Master Items */
     .gf-category-page,
     .page-wrap {
-        max-width: 1280px !important;
+        max-width: var(--gf-content-max, 1280px) !important;
         width: 100% !important;
         margin: 0 auto !important;
-        padding: 1rem 1.1rem 4rem !important;
-        color: #0f172a !important;
+        padding: 1rem var(--gf-content-gutter, 1.1rem) 4rem !important;
+        color: var(--gf-color-content, #101828) !important;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
     }
 
     .cardx {
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 18px !important;
-        background: #ffffff !important;
-        box-shadow: 0 16px 42px rgba(15, 23, 42, .07) !important;
+        border: 1px solid var(--gf-color-line, #e4e7ec) !important;
+        border-radius: var(--gf-radius-card, 16px) !important;
+        background: var(--gf-color-surface, #ffffff) !important;
+        box-shadow: var(--gf-shadow-lg, 0 16px 42px rgba(15, 23, 42, .07)) !important;
         padding: 16px !important;
         overflow: hidden !important;
     }
@@ -30,10 +30,10 @@
     .gf-bom-form {
         margin-bottom: 14px !important;
         padding: 18px !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 18px !important;
-        background: #ffffff !important;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, .05) !important;
+        border: 1px solid var(--gf-color-line, #e4e7ec) !important;
+        border-radius: var(--gf-radius-card, 16px) !important;
+        background: var(--gf-color-surface, #ffffff) !important;
+        box-shadow: var(--gf-shadow-sm, 0 10px 28px rgba(15, 23, 42, .05)) !important;
     }
 
     .cardx.sub {
@@ -53,7 +53,7 @@
     }
 
     .h1 {
-        color: #0f172a !important;
+        color: var(--gf-color-content, #101828) !important;
         font-size: 1.34rem !important;
         font-weight: 950 !important;
         letter-spacing: -.05em !important;
@@ -63,7 +63,7 @@
 
     .subt,
     .small {
-        color: #64748b !important;
+        color: var(--gf-color-muted, #667085) !important;
         font-size: .82rem !important;
         font-weight: 650 !important;
         line-height: 1.45 !important;
@@ -76,7 +76,7 @@
 
     .hr {
         height: 1px !important;
-        background: #e2e8f0 !important;
+        background: var(--gf-color-line, #e4e7ec) !important;
         border: 0 !important;
         margin: 14px 0 !important;
     }
@@ -84,7 +84,7 @@
     .lbl {
         font-size: .72rem !important;
         font-weight: 900 !important;
-        color: #334155 !important;
+        color: var(--gf-color-content, #101828) !important;
         margin-bottom: 5px !important;
         text-transform: uppercase !important;
         letter-spacing: .045em !important;
@@ -99,13 +99,13 @@
     .inp,
     .form-control,
     .form-select {
-        border-radius: 14px !important;
-        border: 1px solid #e2e8f0 !important;
+        border-radius: var(--gf-radius-control, 10px) !important;
+        border: 1px solid var(--gf-color-line, #e4e7ec) !important;
         min-height: 38px !important;
-        color: #0f172a !important;
+        color: var(--gf-color-content, #101828) !important;
         font-size: .84rem !important;
         font-weight: 650 !important;
-        background: #ffffff !important;
+        background: var(--gf-color-surface, #ffffff) !important;
         box-shadow: none !important;
     }
 
@@ -131,30 +131,59 @@
 
     .btnx {
         padding: 8px 13px !important;
-        border: 1px solid #cbd5e1 !important;
-        background: rgba(255,255,255,.78) !important;
-        color: #475569 !important;
+        border: 1px solid var(--gf-color-line, #e4e7ec) !important;
+        background: color-mix(in srgb, var(--gf-color-surface, #fff) 86%, transparent) !important;
+        color: var(--gf-color-muted, #667085) !important;
     }
 
     .btnx:hover {
-        background: #f8fafc !important;
-        color: #0f172a !important;
-        box-shadow: 0 10px 22px rgba(15, 23, 42, .08) !important;
+        background: var(--gf-color-surface-muted, #f2f4f7) !important;
+        color: var(--gf-color-content, #101828) !important;
+        box-shadow: var(--gf-shadow-sm, 0 10px 22px rgba(15, 23, 42, .08)) !important;
+    }
+
+    .btnx > *,
+    .btn > * {
+        color: inherit !important;
+    }
+
+    .btnx:focus-visible,
+    .btn:focus-visible,
+    .inp:focus-visible,
+    .form-control:focus-visible,
+    .form-select:focus-visible,
+    .select2-container--default.select2-container--focus .select2-selection--single {
+        outline: 3px solid color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 24%, transparent) !important;
+        outline-offset: 2px !important;
+    }
+
+    .btnx:disabled,
+    .btn:disabled {
+        cursor: not-allowed !important;
+        opacity: .58 !important;
+        box-shadow: none !important;
     }
 
     .btnx.primary,
     .btnx.success,
     .btn-primary {
         color: #ffffff !important;
-        background: linear-gradient(135deg, #0f172a, #334155) !important;
+        background: var(--gf-color-brand, #5b5ce2) !important;
         border-color: transparent !important;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, .12) !important;
+        box-shadow: var(--gf-shadow-sm, 0 12px 24px rgba(15, 23, 42, .12)) !important;
+    }
+
+    .btnx.primary:hover,
+    .btnx.success:hover,
+    .btn-primary:hover {
+        background: var(--gf-color-brand-strong, #4142bb) !important;
+        color: #ffffff !important;
     }
 
     .btnx.ghost {
-        background: #ffffff !important;
-        color: #64748b !important;
-        border-color: #e2e8f0 !important;
+        background: var(--gf-color-surface, #ffffff) !important;
+        color: var(--gf-color-muted, #667085) !important;
+        border-color: var(--gf-color-line, #e4e7ec) !important;
     }
 
     .btnx.danger,
@@ -487,6 +516,73 @@
 
     .bom-form-head .subt { margin-top: 5px !important; }
 
+    .bom-form-context {
+        display: inline-flex !important;
+        align-items: center !important;
+        margin-left: 6px !important;
+        padding: 3px 8px !important;
+        border: 1px solid color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 24%, var(--gf-color-line, #e4e7ec)) !important;
+        border-radius: 999px !important;
+        background: color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 8%, var(--gf-color-surface, #fff)) !important;
+        color: var(--gf-color-brand-strong, #4142bb) !important;
+        font-size: .72rem !important;
+        font-weight: 800 !important;
+        vertical-align: middle !important;
+    }
+
+    .bom-lines-toolbar {
+        justify-content: flex-end !important;
+        align-items: center !important;
+        gap: 8px !important;
+        margin-top: 12px !important;
+    }
+
+    .bom-active-toggle {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 7px !important;
+        min-height: 34px !important;
+        padding: 6px 10px !important;
+        border: 1px solid color-mix(in srgb, var(--gf-color-success, #14945a) 30%, var(--gf-color-line, #e4e7ec)) !important;
+        border-radius: 999px !important;
+        background: color-mix(in srgb, var(--gf-color-success, #14945a) 7%, var(--gf-color-surface, #fff)) !important;
+        color: var(--gf-color-success, #14945a) !important;
+        cursor: pointer !important;
+        font-size: .76rem !important;
+        font-weight: 850 !important;
+        line-height: 1 !important;
+        user-select: none !important;
+    }
+
+    .bom-active-toggle input {
+        width: 16px !important;
+        height: 16px !important;
+        margin: 0 !important;
+        accent-color: var(--gf-color-success, #14945a) !important;
+    }
+
+    .bom-active-toggle:focus-within {
+        outline: 3px solid color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 22%, transparent) !important;
+        outline-offset: 2px !important;
+    }
+
+    @media (max-width: 768px) {
+        .bom-form-context {
+            display: table !important;
+            margin: 6px 0 0 !important;
+        }
+
+        .bom-lines-toolbar {
+            justify-content: stretch !important;
+            flex-wrap: wrap !important;
+        }
+
+        .bom-lines-toolbar .btnx,
+        .bom-lines-toolbar .bom-active-toggle {
+            flex: 1 1 auto !important;
+        }
+    }
+
     .bom-overview {
         display: grid !important;
         grid-template-columns: minmax(0, .95fr) minmax(0, 1.35fr) !important;
@@ -609,6 +705,9 @@
         <div class="h1">{{ $isEdit ? 'Edit BOM' : 'Buat BOM' }}</div>
         <div class="subt">
           {{ $isEdit ? ($bom->item->code . ' — ' . $bom->item->name) : 'Tentukan komponen dan kebutuhan material produksi.' }}
+          @if($isEdit && $bom->name)
+            <span class="bom-form-context">{{ $bom->name }}</span>
+          @endif
         </div>
       </div>
       <div class="rowx">
@@ -628,14 +727,13 @@
       </div>
     @endif
 
-    <div class="bom-overview {{ $isEdit && $bomEstimate ? 'has-estimate' : '' }}">
+    @if(!$isEdit)
+    <div class="bom-overview">
       <div class="bom-identity">
         <div class="grid">
           <div>
             <div class="lbl">SKU Finished Goods</div>
-            @if($isEdit)
-              <input class="inp mono" value="{{ $bom->item->code }} — {{ $bom->item->name }}" disabled>
-            @elseif($prefilledItem)
+            @if($prefilledItem)
               <input type="hidden" name="item_id" value="{{ $prefilledItem->id }}">
               <input class="inp mono" value="{{ $prefilledItem->code }} — {{ $prefilledItem->name }}" disabled>
             @else
@@ -646,17 +744,15 @@
           <div>
             <div class="lbl">Nama BOM</div>
             <input class="inp" name="name" value="{{ old('name', $bom->name ?? '') }}" placeholder="Misal: BOM C5BLK">
-            <div class="rowx" style="margin-top:10px">
-              <label class="rowx" style="gap:8px">
-                <input type="checkbox" name="active" value="1" {{ old('active', $bom->active ?? 1) ? 'checked' : '' }}>
-                <span class="lbl" style="margin:0">Aktif</span>
-              </label>
-            </div>
           </div>
         </div>
       </div>
 
     </div>
+    @else
+      {{-- Nama BOM tetap dikirim saat edit, tetapi tidak lagi mengambil ruang di form utama. --}}
+      <input type="hidden" name="name" value="{{ old('name', $bom->name ?? '') }}">
+    @endif
 
     <div style="height:12px"></div>
 
@@ -729,7 +825,11 @@
         </div>
       @endif
 
-      <div class="rowx" style="justify-content:flex-end;margin-top:12px">
+      <div class="rowx bom-lines-toolbar">
+        <label class="bom-active-toggle" for="bom-active-toggle">
+          <input id="bom-active-toggle" type="checkbox" name="active" value="1" {{ old('active', $bom->active ?? 1) ? 'checked' : '' }}>
+          <span>Aktif</span>
+        </label>
         <button type="button" class="btnx primary" id="btn-add"><i class="bi bi-plus-lg"></i> Tambah Baris</button>
         <button type="button" class="btnx" id="btn-default-waste">Waste default 0%</button>
       </div>
@@ -769,7 +869,13 @@
                 <td>
                   <select class="mat" name="lines[{{ $i }}][material_item_id]" style="width:100%">
                     @if(!empty($mid))
-                      <option value="{{ $mid }}" selected>{{ $mtext ?: 'Material terpilih' }}</option>
+                      @php
+                        $mcode = data_get($r, 'material_code');
+                        if (!$mcode && $mtext) {
+                            $mcode = trim((string) preg_split('/\s+—\s+/u', (string) $mtext, 2)[0]);
+                        }
+                      @endphp
+                      <option value="{{ $mid }}" selected>{{ $mcode ?: ($mtext ?: 'Material terpilih') }}</option>
                     @endif
                   </select>
                 </td>
@@ -887,6 +993,11 @@
   function initMaterialSelect($select){
     $select.select2({
       placeholder: 'Cari bahan / accessories...',
+      // Nilai yang sudah dipilih cukup menampilkan kode; hasil pencarian
+      // tetap memakai text dari API (kode + nama) agar proses mencari tidak berubah.
+      templateSelection: function(data){
+        return data.code || data.text || '';
+      },
       allowClear: true,
       ajax: {
         url: ajaxUrl,

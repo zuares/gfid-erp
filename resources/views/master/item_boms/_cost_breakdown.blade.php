@@ -27,6 +27,7 @@
                     <th>Kelompok</th>
                     <th>Komponen / proses</th>
                     <th class="text-end">Qty</th>
+                    <th class="text-end">Harga beli terakhir</th>
                     <th class="text-end">Biaya</th>
                 </tr>
             </thead>
@@ -40,19 +41,27 @@
                             <td class="bom-cost-group">{{ $stageLabel }}</td>
                             <td class="bom-cost-component">{{ $component['code'] ?: '-' }} — {{ $component['name'] ?: 'Komponen' }}</td>
                             <td class="text-end">{{ number_format((float) ($component['qty_with_scrap'] ?? 0), 3, ',', '.') }} {{ $component['uom'] }}</td>
+                            <td class="text-end bom-cost-purchase">
+                                @if((float) ($component['last_purchase_price'] ?? 0) > 0)
+                                    Rp {{ number_format((float) $component['last_purchase_price'], 0, ',', '.') }}
+                                    <small>/{{ $component['purchase_unit'] ?: 'pcs' }}</small>
+                                @else
+                                    -
+                                @endif
+                            </td>
                             <td class="text-end bom-cost-amount">Rp {{ number_format((float) ($component['estimated_cost'] ?? 0), 0, ',', '.') }}</td>
                         </tr>
                     @empty
                         <tr>
                             <td class="bom-cost-group">{{ $stageLabel }}</td>
-                            <td class="bom-cost-muted">Belum ada komponen yang dihitung</td>
+                            <td class="bom-cost-muted" colspan="2">Belum ada komponen yang dihitung</td>
                             <td class="text-end">-</td>
                             <td class="text-end">Rp 0</td>
                         </tr>
                     @endforelse
                 @endforeach
                 <tr class="bom-cost-subtotal">
-                    <td colspan="3">Subtotal bahan &amp; perlengkapan</td>
+                    <td colspan="4">Subtotal bahan &amp; perlengkapan</td>
                     <td class="text-end">Rp {{ number_format((float) $bomEstimate['material_total'], 0, ',', '.') }}</td>
                 </tr>
                 @foreach(($bomEstimate['production_wage']['processes'] ?? []) as $process)
@@ -63,19 +72,20 @@
                             <small class="bom-cost-source">{{ $process['source_label'] }}</small>
                         </td>
                         <td class="text-end">per 1 {{ $bomEstimate['item_unit'] }}</td>
+                        <td class="text-end bom-cost-purchase">-</td>
                         <td class="text-end bom-cost-amount">
                             {{ (float) ($process['rate'] ?? 0) > 0 ? 'Rp '.number_format((float) $process['rate'], 0, ',', '.') : '-' }}
                         </td>
                     </tr>
                 @endforeach
                 <tr class="bom-cost-subtotal">
-                    <td colspan="3">Subtotal upah produksi</td>
+                    <td colspan="4">Subtotal upah produksi</td>
                     <td class="text-end">Rp {{ number_format((float) $bomEstimate['production_wage_total'], 0, ',', '.') }}</td>
                 </tr>
             </tbody>
             <tfoot>
                 <tr class="bom-cost-grand-total">
-                    <td colspan="3">Total HPP BOM</td>
+                    <td colspan="4">Total HPP BOM</td>
                     <td class="text-end">Rp {{ number_format((float) $bomEstimate['total'], 0, ',', '.') }}</td>
                 </tr>
             </tfoot>

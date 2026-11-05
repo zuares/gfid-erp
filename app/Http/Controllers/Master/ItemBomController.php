@@ -449,6 +449,7 @@ class ItemBomController extends Controller
                 return [
                     'id' => $l->id,
                     'material_item_id' => (int) $l->material_item_id,
+                    'material_code' => $l->material?->code,
                     'material_text' => $text !== '—' ? $text : null,
                     'usage_stage' => $l->usage_stage ?: ItemBomLine::STAGE_MAIN_MATERIAL,
                     'qty' => (string) $l->qty, // keep as string
