@@ -11,6 +11,33 @@ class SewingReturnIntegrityTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_sewing_return_forces_wip_fin_when_legacy_destination_flag_is_disabled(): void
+    {
+        $fixture = $this->fixture(qty: 5, stock: 5);
+        config(['accounting.sewing_return_to_wip_fin' => false]);
+
+        $response = $this->actingAs($fixture['user'])
+            ->post(route('production.sewing.returns.store'), $this->payload($fixture, [
+                ['sewing_pickup_line_id' => $fixture['lineId'], 'qty_ok' => 2, 'qty_reject' => 0],
+            ]));
+
+        $response->assertRedirect()->assertSessionDoesntHaveErrors();
+
+        $returnId = (int) DB::table('sewing_returns')->value('id');
+        $this->assertSame(
+            $fixture['warehouses']['WIP-FIN'],
+            (int) DB::table('sewing_returns')->where('id', $returnId)->value('destination_warehouse_id')
+        );
+        $this->assertSame(2.0, (float) DB::table('inventory_stocks')
+            ->where('warehouse_id', $fixture['warehouses']['WIP-FIN'])
+            ->where('item_id', $fixture['itemId'])
+            ->value('qty'));
+        $this->assertSame(0.0, (float) DB::table('inventory_stocks')
+            ->where('warehouse_id', $fixture['warehouses']['WH-RTS'])
+            ->where('item_id', $fixture['itemId'])
+            ->value('qty'));
+    }
+
     public function test_duplicate_pickup_line_rows_are_rejected(): void
     {
         $fixture = $this->fixture(qty: 5, stock: 10);

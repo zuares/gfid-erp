@@ -323,17 +323,18 @@ class SewingReturnController extends Controller
             ->whereIn('code', ['WIP-SEW', 'WH-SEWING'])
             ->first();
 
-        // Sewing Return normal diarahkan ke WIP-FIN agar bisa dilanjutkan ke
-        // Finishing. Gate QC tetap tersedia sebagai opsi konfigurasi, tetapi
-        // bukan lagi pemicu otomatis hanya karena route QC terdaftar.
+        // Sewing Return normal selalu diarahkan ke WIP-FIN agar bisa
+        // dilanjutkan ke Finishing. Jangan gunakan flag legacy
+        // sewing_return_to_wip_fin di sini: jika env production lama bernilai
+        // false, hasil setor bisa salah masuk WH-PRD dan hilang dari antrean
+        // Finishing.
         $canChooseDestination = false;
 
         // ambil gudang tujuan pasca jahit
         $wipFinWarehouse = Warehouse::query()->where('code', 'WIP-FIN')->first();
-        $useWipFinDestination = (bool) config('accounting.sewing_return_to_wip_fin', true)
-            && $wipFinWarehouse;
+        $useWipFinDestination = (bool) $wipFinWarehouse;
         $destinationWarehouses = Warehouse::query()
-            ->whereIn('code', $useWipFinDestination ? ['WIP-FIN'] : ['WH-PRD'])
+            ->whereIn('code', $useWipFinDestination ? ['WIP-FIN'] : [])
             ->get(['id', 'code', 'name']);
 
         $defaultDestWarehouseId = (int) optional($destinationWarehouses->first())->id;
@@ -1228,27 +1229,19 @@ class SewingReturnController extends Controller
                 $sewingQcFlowActive = (bool) config('accounting.sewing_return_requires_qc', false)
                     && Route::has('production.qc.sewing.edit')
                     && $wipFinWarehouse;
-                $useWipFinDestination = (bool) config('accounting.sewing_return_to_wip_fin', true)
-                    && $wipFinWarehouse;
+                // Tujuan normal dikunci ke WIP-FIN. Flag legacy tidak boleh
+                // mengarahkan transaksi baru ke WH-PRD.
+                $useWipFinDestination = (bool) $wipFinWarehouse;
 
                 if (! $wipFinWarehouse && $sewingQcFlowActive) {
                     throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang WIP-FIN belum ada.']);
                 }
 
-                if ($useWipFinDestination) {
-                    $destWarehouse = $wipFinWarehouse;
-                } else {
-                    $destWarehouse = Warehouse::query()->where('code', 'WH-PRD')->first();
-
-                    if (! $destWarehouse) {
-                        throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang WH-PRD belum ada.']);
-                    }
-
-                    $requestedDestId = (int) $validated['destination_warehouse_id'];
-                    if ($requestedDestId !== (int) $destWarehouse->id) {
-                        throw ValidationException::withMessages(['destination_warehouse_id' => 'Sewing Return hanya boleh masuk ke WH-PRD.']);
-                    }
+                if (! $useWipFinDestination) {
+                    throw ValidationException::withMessages(['destination_warehouse_id' => 'Gudang WIP-FIN belum ada. Sewing Return tidak dapat diposting.']);
                 }
+
+                $destWarehouse = $wipFinWarehouse;
 
                 $rejectWarehouse = Warehouse::query()->where('code', 'REJ-SEW')->first();
 

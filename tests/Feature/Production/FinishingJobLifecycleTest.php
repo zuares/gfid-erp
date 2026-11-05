@@ -276,6 +276,50 @@ class FinishingJobLifecycleTest extends TestCase
         $response->assertDontSee('FIN-LIFECYCLE-TEST');
     }
 
+    public function test_finishing_create_keeps_new_return_after_older_active_job(): void
+    {
+        config(['inventory.readiness_source' => 'cache']);
+        $fixture = $this->postedFixture();
+
+        DB::table('sewing_return_lines')
+            ->where('id', $fixture['return_line_id'])
+            ->update(['finished_qty' => 0]);
+        DB::table('cutting_job_bundles')
+            ->where('id', $fixture['bundle_id'])
+            ->update([
+                'wip_warehouse_id' => $fixture['warehouses']['WIP-FIN'],
+                'wip_qty' => 2,
+            ]);
+
+        $newReturnId = (int) DB::table('sewing_returns')->insertGetId([
+            'code' => 'SRT-FIN-LIFECYCLE-NEW',
+            'date' => '2026-10-28',
+            'warehouse_id' => $fixture['warehouses']['WIP-FIN'],
+            'destination_warehouse_id' => $fixture['warehouses']['WIP-FIN'],
+            'operator_id' => $fixture['employee_id'],
+            'status' => 'posted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('sewing_return_lines')->insert([
+            'sewing_return_id' => $newReturnId,
+            'sewing_pickup_line_id' => DB::table('sewing_pickup_lines')
+                ->where('cutting_job_bundle_id', $fixture['bundle_id'])
+                ->value('id'),
+            'qty_ok' => 1,
+            'qty_reject' => 0,
+            'finished_qty' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($fixture['user'])
+            ->get(route('production.finishing_jobs.create'));
+
+        $response->assertOk();
+        $response->assertSee('FIN-LIFECYCLE-TEST');
+    }
+
     public function test_finishing_packing_bom_is_consumed_once_and_marks_line_applied(): void
     {
         $fixture = $this->postedFixture();
@@ -821,6 +865,7 @@ class FinishingJobLifecycleTest extends TestCase
             'code' => 'SRT-FIN-LIFECYCLE',
             'date' => '2026-10-27',
             'warehouse_id' => $warehouses['WIP-FIN'],
+            'destination_warehouse_id' => $warehouses['WIP-FIN'],
             'operator_id' => $employeeId,
             'status' => 'posted',
             'created_at' => now(),
@@ -886,6 +931,7 @@ class FinishingJobLifecycleTest extends TestCase
             'line' => $line,
             'bundle_id' => $bundleId,
             'return_line_id' => $returnLineId,
+            'employee_id' => $employeeId,
             'item_id' => $itemId,
             'warehouses' => $warehouses,
         ];
