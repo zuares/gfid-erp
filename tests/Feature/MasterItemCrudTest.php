@@ -129,6 +129,34 @@ class MasterItemCrudTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_admin_can_read_item_meta_for_purchase_unit_conversion(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'employee_code' => 'ITEM-ADMIN-META',
+        ]);
+
+        $item = Item::create([
+            'code' => 'ADMIN-PACK-META',
+            'name' => 'Plastik Pack Admin',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pack',
+            'purchase_conversion_factor' => 500,
+            'item_role' => 'shipping_supply',
+            'type' => 'material',
+            'active' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson(route('master.items.meta', ['item_id' => $item->id]))
+            ->assertOk()
+            ->assertJsonPath('purchase_unit', 'pack')
+            ->assertJsonPath('stock_unit', 'pcs')
+            ->assertJsonPath('purchase_conversion_factor', 500)
+            ->assertJsonPath('force_purchase_unit', true);
+    }
+
     public function test_admin_sidebar_shows_master_item_and_hides_restricted_menus(): void
     {
         $admin = User::factory()->create([

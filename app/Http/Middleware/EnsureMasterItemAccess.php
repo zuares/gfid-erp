@@ -25,6 +25,9 @@ class EnsureMasterItemAccess
                     'master.items.show',
                     'master.items.edit',
                     'master.items.update',
+                    // Dipakai oleh form PO untuk mengambil satuan beli dan
+                    // faktor konversi item. Endpoint ini read-only.
+                    'master.items.meta',
                 ], true),
                 403,
                 'Role admin hanya memiliki akses lihat pada Master Items.'
