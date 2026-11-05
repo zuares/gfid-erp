@@ -373,7 +373,7 @@ class MasterItemBomTest extends TestCase
             ->assertSee('Rincian estimasi HPP BOM')
             ->assertSee('Bahan baku utama')
             ->assertSee('Kelengkapan packing')
-            ->assertSee('Harga beli terakhir')
+            ->assertSee('Harga terakhir beli')
             ->assertSee('Rp 80.000')
             ->assertSee('/pack')
             ->assertSee('Cutting')

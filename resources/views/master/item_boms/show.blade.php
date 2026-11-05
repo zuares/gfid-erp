@@ -33,20 +33,57 @@
     .bom-cost-total-badge { min-width:170px; padding:.65rem .75rem; border:1px solid color-mix(in srgb,var(--gf-color-brand) 20%,var(--gf-color-line)); border-radius:var(--gf-radius-control,10px); background:color-mix(in srgb,var(--gf-color-brand) 7%,var(--gf-color-surface)); text-align:right; }
     .bom-cost-total-badge span { display:block; color:var(--gf-color-muted); font-size:.61rem; font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
     .bom-cost-total-badge strong { display:block; margin-top:.2rem; color:var(--gf-color-brand-strong); font-size:1.08rem; font-weight:900; font-variant-numeric:tabular-nums; }
-    .bom-cost-breakdown .table-responsive { overflow-x:auto; border:1px solid var(--gf-color-line); border-radius:var(--gf-radius-control,10px); scrollbar-color:color-mix(in srgb,var(--gf-color-brand) 32%,var(--gf-color-line)) var(--gf-color-surface-muted); }
-    .bom-cost-breakdown-table { min-width:720px; margin:0; color:var(--gf-color-content); font-size:.76rem; }
-    .bom-cost-breakdown-table th { position:sticky; top:0; z-index:1; padding:.7rem .75rem; color:var(--gf-color-muted); background:var(--gf-color-surface-muted); border:0; box-shadow:0 1px 0 var(--gf-color-line); font-size:.62rem; font-weight:800; letter-spacing:.055em; text-transform:uppercase; white-space:nowrap; }
-    .bom-cost-breakdown-table td { padding:.62rem .75rem; border-top:1px solid color-mix(in srgb,var(--gf-color-line) 75%,transparent); }
-    .bom-cost-breakdown-table tbody tr:hover td { background:color-mix(in srgb,var(--gf-color-brand) 3%,var(--gf-color-surface)); }
-    .bom-cost-group { color:var(--gf-color-muted); font-weight:800; white-space:nowrap; }
-    .bom-cost-component { color:var(--gf-color-content); font-weight:700; }
-    .bom-cost-source { display:block; margin-top:.15rem; color:var(--gf-color-muted); font-size:.65rem; font-weight:650; }
-    .bom-cost-muted { color:var(--gf-color-muted); font-style:italic; }
-    .bom-cost-amount { color:var(--gf-color-content); font-weight:850; white-space:nowrap; font-variant-numeric:tabular-nums; }
-    .bom-cost-purchase { color:var(--gf-color-muted); font-weight:750; white-space:nowrap; font-variant-numeric:tabular-nums; }
-    .bom-cost-purchase small { display:block; margin-top:.12rem; color:var(--gf-color-muted); font-size:.64rem; font-weight:650; }
-    .bom-cost-subtotal td { border-top:1px solid var(--gf-color-line); color:var(--gf-color-content); font-weight:850; }
-    .bom-cost-grand-total td { border-top:2px solid var(--gf-color-brand); color:var(--gf-color-brand-strong); font-size:.92rem; font-weight:900; }
+    .bom-cost-section-heading { display:flex; align-items:center; gap:.7rem; }
+    .bom-cost-section-heading h3 { margin:0; color:var(--gf-color-content); font-size:.9rem; font-weight:850; letter-spacing:-.025em; }
+    .bom-cost-section-heading p { margin:.18rem 0 0; color:var(--gf-color-muted); font-size:.69rem; font-weight:650; }
+    .bom-cost-section-number { display:inline-grid; flex:0 0 28px; place-items:center; width:28px; height:28px; border-radius:9px; color:#fff; background:var(--gf-color-brand); font-size:.72rem; font-weight:900; }
+    .bom-cost-section-number.is-wage { background:var(--gf-color-accent); }
+    .bom-cost-groups { display:grid; gap:.75rem; }
+    .bom-cost-group-card { overflow:hidden; border:1px solid var(--gf-color-line); border-radius:var(--gf-radius-control,10px); background:var(--gf-color-surface); }
+    .bom-cost-group-head { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.85rem .95rem; border-bottom:1px solid var(--gf-color-line); background:var(--gf-color-surface-muted); }
+    .bom-cost-group-title-wrap { display:flex; align-items:center; min-width:0; gap:.65rem; }
+    .bom-cost-group-icon { display:inline-grid; flex:0 0 32px; place-items:center; width:32px; height:32px; border-radius:10px; font-size:.9rem; }
+    .bom-cost-group-card-material .bom-cost-group-icon { color:var(--gf-color-brand-strong); background:color-mix(in srgb,var(--gf-color-brand) 12%,var(--gf-color-surface)); }
+    .bom-cost-group-card-sewing .bom-cost-group-icon { color:var(--gf-color-accent); background:color-mix(in srgb,var(--gf-color-accent) 12%,var(--gf-color-surface)); }
+    .bom-cost-group-card-packing .bom-cost-group-icon { color:var(--gf-color-success); background:color-mix(in srgb,var(--gf-color-success) 12%,var(--gf-color-surface)); }
+    .bom-cost-group-title-wrap h3 { margin:0; color:var(--gf-color-content); font-size:.8rem; font-weight:850; }
+    .bom-cost-group-title-wrap p { margin:.14rem 0 0; color:var(--gf-color-muted); font-size:.66rem; line-height:1.35; }
+    .bom-cost-group-total { flex:0 0 auto; text-align:right; }
+    .bom-cost-group-total span { display:block; color:var(--gf-color-muted); font-size:.62rem; font-weight:750; }
+    .bom-cost-group-total strong { display:block; margin-top:.1rem; color:var(--gf-color-content); font-size:.83rem; font-weight:900; font-variant-numeric:tabular-nums; }
+    .bom-cost-component-list { display:grid; }
+    .bom-cost-component-row { display:grid; grid-template-columns:minmax(190px,1.7fr) minmax(95px,.65fr) minmax(145px,1fr) minmax(120px,.8fr); align-items:center; gap:1rem; padding:.8rem .95rem; border-top:1px solid color-mix(in srgb,var(--gf-color-line) 76%,transparent); }
+    .bom-cost-component-row:first-child { border-top:0; }
+    .bom-cost-component-row:hover { background:color-mix(in srgb,var(--gf-color-brand) 3%,var(--gf-color-surface)); }
+    .bom-cost-component-identity { min-width:0; }
+    .bom-cost-component-identity strong { display:block; overflow:hidden; color:var(--gf-color-content); font-size:.77rem; font-weight:850; text-overflow:ellipsis; white-space:nowrap; }
+    .bom-cost-component-identity span { display:block; overflow:hidden; margin-top:.18rem; color:var(--gf-color-muted); font-size:.68rem; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
+    .bom-cost-component-identity em { display:inline-flex; margin-top:.28rem; padding:.14rem .38rem; border-radius:999px; color:var(--gf-color-brand-strong); background:color-mix(in srgb,var(--gf-color-brand) 10%,var(--gf-color-surface)); font-size:.58rem; font-style:normal; font-weight:800; }
+    .bom-cost-metric { min-width:0; }
+    .bom-cost-metric > span { display:block; color:var(--gf-color-muted); font-size:.61rem; font-weight:750; }
+    .bom-cost-metric > strong { display:inline-block; margin-top:.18rem; color:var(--gf-color-content); font-size:.76rem; font-weight:850; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .bom-cost-metric > strong small { color:var(--gf-color-muted); font-size:.63rem; font-weight:700; }
+    .bom-cost-metric > small { display:block; margin-top:.12rem; color:var(--gf-color-muted); font-size:.62rem; font-weight:650; }
+    .bom-cost-metric .is-empty { color:var(--gf-color-muted); font-size:.7rem; font-weight:700; }
+    .bom-cost-line-total { text-align:right; }
+    .bom-cost-line-total > strong { color:var(--gf-color-brand-strong); font-size:.82rem; }
+    .bom-cost-empty { display:flex; align-items:center; gap:.5rem; padding:.85rem .95rem; color:var(--gf-color-muted); font-size:.7rem; font-style:italic; }
+    .bom-cost-empty i { color:var(--gf-color-brand); font-size:.85rem; }
+    .bom-cost-summary-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:.8rem; padding:.75rem .95rem; border:1px solid var(--gf-color-line); border-radius:var(--gf-radius-control,10px); color:var(--gf-color-content); background:var(--gf-color-surface-muted); font-size:.76rem; font-weight:850; }
+    .bom-cost-summary-row strong { color:var(--gf-color-content); font-size:.86rem; font-variant-numeric:tabular-nums; }
+    .bom-cost-wage-card { margin-top:1.2rem; overflow:hidden; border:1px solid var(--gf-color-line); border-radius:var(--gf-radius-control,10px); background:var(--gf-color-surface); }
+    .bom-cost-wage-card > .bom-cost-section-heading { justify-content:flex-start; padding:.85rem .95rem; border-bottom:1px solid var(--gf-color-line); background:var(--gf-color-surface-muted); }
+    .bom-cost-wage-total { margin-left:auto; color:var(--gf-color-content); font-size:.86rem; font-variant-numeric:tabular-nums; }
+    .bom-cost-wage-total span { display:block; margin-bottom:.12rem; color:var(--gf-color-muted); font-size:.6rem; font-weight:750; letter-spacing:.02em; text-transform:uppercase; }
+    .bom-cost-wage-list { display:grid; }
+    .bom-cost-wage-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.7rem .95rem; border-top:1px solid color-mix(in srgb,var(--gf-color-line) 76%,transparent); }
+    .bom-cost-wage-row:first-child { border-top:0; }
+    .bom-cost-wage-row > div { display:grid; gap:.14rem; }
+    .bom-cost-wage-row strong { color:var(--gf-color-content); font-size:.74rem; font-weight:800; }
+    .bom-cost-wage-row small { color:var(--gf-color-muted); font-size:.64rem; font-weight:650; }
+    .bom-cost-wage-row > span { color:var(--gf-color-content); font-size:.76rem; font-weight:850; font-variant-numeric:tabular-nums; }
+    .bom-cost-grand-total { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:1.2rem; padding:1rem .95rem; border-top:2px solid var(--gf-color-brand); color:var(--gf-color-brand-strong); font-size:.9rem; font-weight:900; }
+    .bom-cost-grand-total strong { font-size:1.05rem; font-variant-numeric:tabular-nums; }
     @media (prefers-reduced-motion: reduce) { .bom-show-btn { transition:none; } .bom-show-btn:hover { transform:none; } }
     @media (max-width: 760px) {
         .bom-show-head { flex-direction:column; }
@@ -55,8 +92,19 @@
         .bom-show-meta { grid-template-columns:repeat(2,minmax(0,1fr)); }
         .bom-cost-breakdown-head { flex-direction:column; }
         .bom-cost-total-badge { width:100%; text-align:left; }
+        .bom-cost-component-row { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
+        .bom-cost-component-identity { grid-column:1 / -1; }
+        .bom-cost-line-total { text-align:left; }
     }
-    @media (max-width: 440px) { .bom-show-meta { grid-template-columns:1fr; } .bom-show-btn { flex-basis:100%; } }
+    @media (max-width: 440px) {
+        .bom-show-meta { grid-template-columns:1fr; }
+        .bom-show-btn { flex-basis:100%; }
+        .bom-cost-group-head { align-items:flex-start; flex-direction:column; }
+        .bom-cost-group-total { width:100%; text-align:left; }
+        .bom-cost-summary-row,
+        .bom-cost-grand-total { align-items:flex-start; flex-direction:column; }
+        .bom-cost-wage-total { margin-left:0; }
+    }
 </style>
 @endpush
 
