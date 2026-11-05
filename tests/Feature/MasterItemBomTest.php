@@ -576,10 +576,38 @@ class MasterItemBomTest extends TestCase
         $this->actingAs($this->owner)
             ->get(route('master.item_boms.bulk_update_form'))
             ->assertOk()
-            ->assertSee('<select id="bulk-category" class="bom-bulk-category-select" name="item_category_ids[]" multiple', false)
-            ->assertSee('value="all"', false)
+            ->assertSee('data-category-picker', false)
+            ->assertSee('data-category-value="all"', false)
+            ->assertSee('data-category-checkbox', false)
+            ->assertSee('Pilih kategori satu per satu.')
+            ->assertDontSee('Ctrl/Cmd')
             ->assertSee($finishedGoodCategory->name)
             ->assertDontSee($materialCategory->name);
+    }
+
+    public function test_bulk_update_requires_an_explicit_category_selection(): void
+    {
+        $component = Item::create([
+            'code' => 'RIB-BOM-BULK-NO-CATEGORY',
+            'name' => 'Komponen Tanpa Kategori Target',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'type' => 'material',
+            'active' => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->from(route('master.item_boms.bulk_update_form'))
+            ->post(route('master.item_boms.bulk_update'), [
+                'all_categories' => '0',
+                'material_item_id' => $component->id,
+                'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                'qty' => '1',
+                'scrap_pct' => '0',
+                'is_optional' => '0',
+            ])
+            ->assertRedirect(route('master.item_boms.bulk_update_form'))
+            ->assertSessionHasErrors('item_category_ids');
     }
 
     public function test_bulk_update_all_targets_finished_good_boms_only(): void

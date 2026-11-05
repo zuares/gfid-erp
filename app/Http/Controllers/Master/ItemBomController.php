@@ -244,10 +244,11 @@ class ItemBomController extends Controller
             $rawCategoryIds = [$rawCategoryIds];
         }
         $hasCategoryArray = $request->has('item_category_ids');
+        $hasAllFlag = $request->has('all_categories');
         $selectAllOption = collect($rawCategoryIds)->contains(fn ($id) => (string) $id === 'all');
         $applyAll = $request->boolean('all_categories')
             || $selectAllOption
-            || (! $hasCategoryArray && blank($legacyCategoryId));
+            || (! $hasCategoryArray && ! $hasAllFlag && blank($legacyCategoryId));
 
         if (! $hasCategoryArray && filled($legacyCategoryId)) {
             $rawCategoryIds = [$legacyCategoryId];
