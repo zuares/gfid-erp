@@ -823,6 +823,19 @@ class MasterItemBomTest extends TestCase
             'active' => true,
         ]);
 
+        $this->actingAs($this->owner)
+            ->getJson(route('master.item_boms.ajax_items', [
+                'type' => 'material',
+                'q' => $material->code,
+            ]))
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $material->id,
+                'unit' => 'pcs',
+                'stock_unit' => 'pcs',
+                'purchase_unit' => 'pack',
+            ]);
+
         $response = $this->actingAs($this->owner)
             ->post(route('master.item_boms.store'), [
                 'item_id' => $finishedGood->id,

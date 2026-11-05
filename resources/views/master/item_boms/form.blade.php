@@ -461,7 +461,7 @@
         .table-bom tbody td:nth-child(2)::before { content: 'Komponen'; }
         .table-bom tbody td:nth-child(3)::before { content: 'Kelompok'; }
         .table-bom tbody td:nth-child(4)::before { content: 'Qty'; }
-        .table-bom tbody td:nth-child(5)::before { content: 'UOM'; }
+        .table-bom tbody td:nth-child(5)::before { content: 'Satuan unit'; }
         .table-bom tbody td:nth-child(6)::before { content: 'Waste'; }
         .table-bom tbody td:nth-child(7)::before { content: 'Optional'; }
         .table-bom tbody td:nth-child(8)::before { content: 'Harga / satuan stok'; }
@@ -617,6 +617,9 @@
   <form method="post" action="{{ $action }}" class="cardx gf-bom-form" id="bom-form">
     @csrf
     @if($isEdit) @method('PUT') @endif
+    @if(!empty($materialCorrectionId))
+      <input type="hidden" name="material_correction_id" value="{{ $materialCorrectionId }}">
+    @endif
 
     <div class="bom-form-head">
       <div>
@@ -790,7 +793,7 @@
               <th style="min-width:280px">Komponen (bahan / accessories)</th>
               <th style="width:100px">Kelompok</th>
               <th style="width:100px">Qty (raw)</th>
-              <th style="width:82px">UOM</th>
+              <th style="width:100px">Satuan unit</th>
               <th style="width:92px">Waste (%)</th>
               <th style="width:88px">Optional</th>
               <th style="width:130px">Harga / stok</th>
@@ -841,7 +844,10 @@
                   <input class="inp mono uom"
                          name="lines[{{ $i }}][uom]"
                          value="{{ (string) data_get($r,'uom','pcs') }}"
-                         placeholder="pcs">
+                         placeholder="Dari satuan unit master"
+                         readonly
+                         aria-readonly="true"
+                         title="Satuan BOM mengikuti stock unit Master Item">
                 </td>
                 <td>
                   <input class="inp mono scrap"
@@ -946,13 +952,13 @@
       width: 'resolve'
     });
 
-    // auto set UOM from ajaxItems() -> unit
+    // auto set BOM unit from ajaxItems() -> stock_unit
     $select.on('select2:select', function(e){
       const data = e.params.data || {};
       const $row = $(this).closest('tr.line');
-      const unit = data.unit || '';
+      const unit = data.stock_unit || data.unit || '';
       const $uom = $row.find('input.uom');
-      if (unit && $uom.length && (!$uom.val() || $uom.val().trim() === 'pcs')) {
+      if (unit && $uom.length) {
         $uom.val(unit);
       }
       if (typeof renderCostCells === 'function') renderCostCells($row);
@@ -993,7 +999,7 @@
 	        <td><select class="mat" name="lines[${i}][material_item_id]" style="width:100%"></select></td>
             <td><select class="inp mono usage-stage" name="lines[${i}][usage_stage]">${usageHtml}</select></td>
         <td><input class="inp mono qty" inputmode="decimal" data-max-decimals="3" name="lines[${i}][qty]" placeholder="0,000"><div class="bom-usage-hint" style="font-size:.68rem;line-height:1.45;margin-top:3px;"></div></td>
-        <td><input class="inp mono uom" name="lines[${i}][uom]" value="pcs" placeholder="pcs"></td>
+        <td><input class="inp mono uom" name="lines[${i}][uom]" value="" placeholder="Dari satuan unit master" readonly aria-readonly="true" title="Satuan BOM mengikuti stock unit Master Item"></td>
         <td><input class="inp mono scrap" type="number" inputmode="decimal" min="0" max="100" step="0.1" name="lines[${i}][scrap_pct]" value="0" placeholder="0"></td>
         <td>
           <select class="inp mono" name="lines[${i}][is_optional]">

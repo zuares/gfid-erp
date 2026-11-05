@@ -163,8 +163,8 @@
                     <input id="bulk-qty" type="number" name="qty" step="0.00000001" min="0.0001" value="{{ old('qty') }}" placeholder="Contoh: 1 atau 0,5" required>
                 </div>
                 <div class="bom-bulk-field">
-                    <label for="bulk-uom">Satuan</label>
-                    <input id="bulk-uom" type="text" name="uom" maxlength="20" value="{{ old('uom') }}" placeholder="Otomatis dari master" readonly aria-readonly="true">
+                    <label for="bulk-uom">Satuan per unit</label>
+                    <input id="bulk-uom" type="text" name="uom" maxlength="20" value="{{ old('uom') }}" placeholder="Dari satuan unit master" readonly aria-readonly="true" title="Satuan BOM mengikuti stock unit master item">
                 </div>
                 <div class="bom-bulk-field">
                     <label for="bulk-scrap">Waste (%) <span class="bom-bulk-required">Wajib</span></label>
@@ -358,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selected.hidden = false;
                 search.value = '';
                 results.replaceChildren();
-                uom.value = item.unit || '';
+                uom.value = item.stock_unit || item.unit || '';
             });
             results.appendChild(button);
         });
