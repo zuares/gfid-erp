@@ -55,6 +55,9 @@ return [
     // Finishing. Gate QC tetap tersedia sebagai opsi konfigurasi.
     'sewing_return_requires_qc' => env('PRODUCTION_SEWING_RETURN_REQUIRES_QC', false),
     'sewing_return_to_wip_fin' => env('PRODUCTION_SEWING_RETURN_TO_WIP_FIN', true),
+    // Jangan bypass kontrol supply pada transaksi produksi kecuali memang
+    // diaktifkan eksplisit untuk environment testing.
+    'sewing_return_allow_developer_supply_bypass' => env('PRODUCTION_SEWING_RETURN_ALLOW_DEVELOPER_SUPPLY_BYPASS', false),
 
     // Pilot mirror produksi Finishing. Default OFF sampai readiness dan pilot
     // Finishing disetujui secara terpisah.

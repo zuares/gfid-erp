@@ -752,9 +752,13 @@ class SewingReturnController extends Controller
             return;
         }
 
-        // Developer mode: bypass supply validation HANYA saat real save (bukan dry run)
-        // Saat dry run, validasi tetap jalan agar hasil dry run realistis
-        if (auth()->check() && auth()->user()->isDeveloper() && ! request()->boolean('dry_run')) {
+        // Developer bypass hanya boleh aktif bila secara eksplisit diaktifkan
+        // melalui konfigurasi. Default-nya tetap memaksa kontrol supply agar
+        // role developer tidak dapat membuat stok produksi tanpa material.
+        if ((bool) config('accounting.sewing_return_allow_developer_supply_bypass', false)
+            && auth()->check()
+            && auth()->user()->isDeveloper()
+            && ! request()->boolean('dry_run')) {
             return;
         }
 
@@ -799,7 +803,8 @@ class SewingReturnController extends Controller
             $returnedRj = (float) ($pickupLine->qty_returned_reject ?? 0);
             $directPick = (float) ($pickupLine->qty_direct_picked ?? 0);
             $progressAdj = (float) ($pickupLine->qty_progress_adjusted ?? 0);
-            $alreadyProcessed = $returnedOk + $returnedRj + $directPick + $progressAdj;
+            $closed = (float) ($pickupLine->qty_closed ?? 0);
+            $alreadyProcessed = $returnedOk + $returnedRj + $directPick + $progressAdj + $closed;
 
             $coveredPcs = (int) floor(max($minRatio, 0) * $qtyBundle + 0.00001);
             $maxAllowed = max($coveredPcs - $alreadyProcessed, 0);
@@ -897,12 +902,18 @@ class SewingReturnController extends Controller
                 continue;
             } // supply lengkap, tidak dibatasi
 
-            // Hitung remaining bundle (sebelum submission ini)
+            // Hitung sisa coverage material (bukan rasio terhadap sisa bundle).
+            // Contoh: bundle 10, coverage 50%, sudah setor 4 pcs =>
+            // coverage total hanya 5 pcs, sehingga sisa yang boleh disetor 1 pcs.
             $bundleQty = (float) ($pickupLine?->qty_bundle ?? 0);
             $returnedOk = (float) ($pickupLine?->qty_returned_ok ?? 0);
             $returnedRj = (float) ($pickupLine?->qty_returned_reject ?? 0);
-            $remaining = max($bundleQty - $returnedOk - $returnedRj, 0);
-            $maxAllowed = (int) floor($minRatio * $remaining + 0.00001);
+            $directPick = (float) ($pickupLine?->qty_direct_picked ?? 0);
+            $progressAdj = (float) ($pickupLine?->qty_progress_adjusted ?? 0);
+            $closed = (float) ($pickupLine?->qty_closed ?? 0);
+            $alreadyProcessed = $returnedOk + $returnedRj + $directPick + $progressAdj + $closed;
+            $coveredPcs = (int) floor(max($minRatio, 0) * $bundleQty + 0.00001);
+            $maxAllowed = max($coveredPcs - $alreadyProcessed, 0);
 
             $shortLabels = ($supplyLines[$pickupId] ?? collect())
                 ->filter(fn ($l) => (float) $l->issued_qty + 0.000001 < (float) $l->required_qty)
@@ -1266,6 +1277,18 @@ class SewingReturnController extends Controller
                     throw ValidationException::withMessages(['results' => 'Minimal isi 1 baris setoran.']);
                 }
 
+                $duplicateLineIds = $rawResults
+                    ->groupBy('sewing_pickup_line_id')
+                    ->filter(fn ($rows) => $rows->count() > 1)
+                    ->keys()
+                    ->values();
+
+                if ($duplicateLineIds->isNotEmpty()) {
+                    throw ValidationException::withMessages([
+                        'results' => 'Pickup line tidak boleh dikirim lebih dari satu kali dalam satu Sewing Return.',
+                    ]);
+                }
+
                 // lock pickup lines
                 $lineIds = $rawResults->pluck('sewing_pickup_line_id')->unique()->values()->all();
 
@@ -1327,6 +1350,16 @@ class SewingReturnController extends Controller
                     ->lockForUpdate()
                     ->get()
                     ->keyBy('id');
+
+                if ($pickupsMap->count() !== count($touchedPickupIds)) {
+                    throw ValidationException::withMessages(['results' => 'Ada pickup yang tidak valid / sudah void.']);
+                }
+
+                if ($pickupsMap->contains(fn ($pickup) => (int) $pickup->operator_id !== $operatorId)) {
+                    throw ValidationException::withMessages([
+                        'operator_id' => 'Operator Sewing Return harus sama dengan operator pada Sewing Pickup.',
+                    ]);
+                }
 
                 // touched bundles
                 $bundleIds = $pickupLines->pluck('cutting_job_bundle_id')
@@ -2029,25 +2062,59 @@ class SewingReturnController extends Controller
                     ->with('success', 'Sewing Return berhasil di-VOID.');
             }
 
+            // Pada flow QC, Sewing Return belum memindahkan stok. VOID cukup
+            // membalik counter pickup dan membatalkan antrian QC; jangan
+            // mencoba menarik stok dari gudang tujuan yang masih kosong.
+            if ((string) ($return->status ?? '') === 'pending_qc') {
+                $this->voidPendingQcReturn($return, $lines, $validated);
+
+                return redirect()
+                    ->route('production.sewing.returns.show', $return)
+                    ->with('success', 'Sewing Return pending QC berhasil di-VOID tanpa reversal stok.');
+            }
+
             $wipSewWarehouse = Warehouse::query()->whereIn('code', ['WIP-SEW', 'WH-SEWING'])->first();
             if (! $wipSewWarehouse) {
                 throw ValidationException::withMessages(['reason' => 'Gudang WIP-SEW / WH-SEWING belum ada.']);
             }
 
             // Gunakan gudang tujuan yang tersimpan pada Sewing Return. Untuk
-            // alur direct-post, tujuan normal adalah WIP-FIN; fallback ke
-            // WH-PRD hanya untuk return lama yang belum menyimpan tujuan.
+            // return lama yang belum menyimpan tujuan, infer dari mutasi IN
+            // yang dibuat oleh return tersebut. Jangan memilih gudang pertama
+            // secara arbitrer karena reversal bisa masuk ke lokasi yang salah.
             $destWarehouse = Warehouse::query()
                 ->whereIn('code', ['WIP-FIN', 'WH-RTS', 'WH-PRD'])
                 ->where('active', true)
                 ->whereKey((int) ($return->destination_warehouse_id ?? 0))
-                ->first()
-                ?? Warehouse::query()
-                    ->whereIn('code', ['WH-PRD', 'WH-RTS'])
-                    ->where('active', true)
-                    ->first();
+                ->first();
+
+            if (! $destWarehouse && ! $return->destination_warehouse_id) {
+                $inferredDestinationIds = DB::table('inventory_mutations')
+                    ->where('source_id', $return->id)
+                    ->where('qty_change', '>', 0)
+                    ->whereIn('source_type', ['sewing_return_ok', 'sewing_qc_in', 'sewing_reject_rework_ok'])
+                    ->distinct()
+                    ->pluck('warehouse_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values();
+
+                if ($inferredDestinationIds->count() === 1) {
+                    $destWarehouse = Warehouse::query()
+                        ->whereIn('code', ['WIP-FIN', 'WH-RTS', 'WH-PRD'])
+                        ->where('active', true)
+                        ->whereKey($inferredDestinationIds->first())
+                        ->first();
+                } elseif ($inferredDestinationIds->count() > 1) {
+                    throw ValidationException::withMessages([
+                        'reason' => 'Tujuan legacy Sewing Return ambigu; reversal dibatalkan agar tidak salah gudang.',
+                    ]);
+                }
+            }
+
             if (! $destWarehouse) {
-                throw ValidationException::withMessages(['reason' => 'Gudang tujuan SR tidak ditemukan (WIP-FIN / WH-PRD / WH-RTS).']);
+                throw ValidationException::withMessages([
+                    'reason' => 'Gudang tujuan Sewing Return tidak tersimpan dan tidak dapat diinfer dari mutasi. Periksa transaksi sebelum VOID.',
+                ]);
             }
 
             $rejectWarehouse = Warehouse::query()->where('code', 'REJ-SEW')->first();
@@ -2114,8 +2181,11 @@ class SewingReturnController extends Controller
                 $itemId = (int) $pl->finished_item_id;
                 $bundleId = (int) $pl->cutting_job_bundle_id;
 
-                $qtyOk = (int) round((float) ($line->qty_ok ?? 0));
-                $qtyRj = (int) round((float) ($line->qty_reject ?? 0));
+                // Qty return disimpan sebagai decimal. Jangan membulatkan ke
+                // integer karena reversal inventory dan counter pickup harus
+                // persis sama dengan transaksi asal.
+                $qtyOk = (float) ($line->qty_ok ?? 0);
+                $qtyRj = (float) ($line->qty_reject ?? 0);
                 $isRejectReworkLine = in_array((string) ($line->source_type ?? ''), ['reject_sewing_rework', 'finishing_sewing_rework'], true);
 
                 // Setor ulang reject tidak menambah counter pickup awal, jadi saat void juga tidak menguranginya.
@@ -2274,5 +2344,81 @@ class SewingReturnController extends Controller
         $this->standaloneProductionPosting->voidSewingReturn($returnId);
 
         return $response;
+    }
+
+    private function voidPendingQcReturn(SewingReturn $return, $lines, array $validated): void
+    {
+        $pickupLineIds = $lines->pluck('sewing_pickup_line_id')->filter()->unique()->values()->all();
+        $pickupLines = SewingPickupLine::query()
+            ->whereIn('id', $pickupLineIds)
+            ->whereNull('voided_at')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        if ($pickupLines->count() !== count($pickupLineIds)) {
+            throw ValidationException::withMessages(['reason' => 'Ada pickup line yang tidak valid / sudah void.']);
+        }
+
+        foreach ($lines as $line) {
+            $pickupLine = $pickupLines->get((int) $line->sewing_pickup_line_id);
+            if (! $pickupLine || in_array((string) ($line->source_type ?? ''), ['reject_sewing_rework', 'finishing_sewing_rework'], true)) {
+                continue;
+            }
+
+            $pickupLine->qty_returned_ok = max(
+                (float) ($pickupLine->qty_returned_ok ?? 0) - (float) ($line->qty_ok ?? 0),
+                0
+            );
+            $pickupLine->qty_returned_reject = max(
+                (float) ($pickupLine->qty_returned_reject ?? 0) - (float) ($line->qty_reject ?? 0),
+                0
+            );
+            $pickupLine->save();
+        }
+
+        $touchedPickupIds = $pickupLines->pluck('sewing_pickup_id')->filter()->unique()->values()->all();
+        $pickupsMap = SewingPickup::query()
+            ->whereIn('id', $touchedPickupIds)
+            ->whereNull('voided_at')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        if ($pickupsMap->count() !== count($touchedPickupIds)) {
+            throw ValidationException::withMessages(['reason' => 'Ada pickup yang tidak valid / sudah void.']);
+        }
+
+        foreach ($touchedPickupIds as $pickupId) {
+            $pickup = $pickupsMap->get((int) $pickupId);
+            if (! $pickup || ! $pickup->isFillable('status')) {
+                continue;
+            }
+
+            $activeLines = SewingPickupLine::query()
+                ->where('sewing_pickup_id', $pickupId)
+                ->whereNull('voided_at')
+                ->get();
+            $pickup->setRelation('lines', $activeLines);
+            $pickup->status = $pickup->recalcStatus();
+            $pickup->save();
+        }
+
+        QcResult::query()
+            ->where('stage', QcResult::STAGE_SEWING)
+            ->where('sewing_job_id', $return->id)
+            ->update(['status' => 'void']);
+
+        $return->voided_at = now();
+        if ($return->isFillable('voided_by_user_id')) {
+            $return->voided_by_user_id = auth()->id();
+        }
+        if ($return->isFillable('void_reason')) {
+            $return->void_reason = trim((string) ($validated['reason'] ?? '')) ?: null;
+        }
+        if ($return->isFillable('status')) {
+            $return->status = 'void';
+        }
+        $return->save();
     }
 }
