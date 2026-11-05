@@ -621,14 +621,13 @@
     .adj-page .adj-section-subtitle{ display:none; }
 
     .adj-page .adj-workflow-bar{
+        position:static;
         top:calc(var(--app-navbar-offset,58px) + .55rem);
-        margin-top:0;
+        margin-top:.75rem;
         padding:.78rem .9rem;
         border:1px solid color-mix(in srgb,var(--adj-brand) 18%,var(--adj-line) 82%);
         border-radius:var(--adj-radius-card);
-        background:linear-gradient(90deg,
-            color-mix(in srgb,var(--adj-brand) 8%,var(--adj-surface) 92%),
-            color-mix(in srgb,var(--adj-accent) 7%,var(--adj-surface) 93%));
+        background:var(--adj-surface);
         box-shadow:var(--adj-shadow);
         backdrop-filter:blur(16px);
     }
@@ -647,6 +646,7 @@
     .adj-page .adj-workflow-step{ color:var(--adj-brand-strong); font-size:.63rem; font-weight:850; }
     .adj-page .adj-workflow-selected{ color:var(--adj-ink); font-size:.9rem; }
     .adj-page .adj-workflow-desc{ color:var(--adj-muted); font-size:.72rem; }
+    .adj-page .adj-workflow-bar .adj-workflow-actions{ display:none; }
 
     .adj-search-control{ position:relative; display:flex; align-items:center; }
     .adj-search-control > i{ position:absolute; left:.72rem; z-index:1; color:#98a2b3; font-size:.78rem; pointer-events:none; }
@@ -688,8 +688,18 @@
     .adj-page .diff-minus{ color:var(--adj-danger); font-weight:800; }
     .adj-page .adj-divider{ background:var(--adj-line); margin:.8rem 0 .65rem; }
     .adj-page .adj-footer{
-        align-items:flex-end;
-        padding-top:.8rem;
+        position:sticky;
+        bottom:0;
+        z-index:285;
+        align-items:center;
+        justify-content:space-between;
+        gap:.75rem;
+        margin-top:.75rem;
+        padding:.75rem .8rem;
+        border:1px solid var(--adj-line);
+        border-radius:var(--adj-radius-control);
+        background:var(--adj-surface);
+        box-shadow:0 -8px 20px rgba(16,24,40,.08);
     }
     .adj-footer-meta{ min-width:0; flex:1 1 auto; }
     .adj-footer-actions{
@@ -697,7 +707,7 @@
         align-items:center;
         justify-content:flex-end;
         gap:.5rem;
-        margin-left:auto;
+        flex-wrap:nowrap;
     }
     .adj-page .adj-footer-actions .btn{
         display:inline-flex;
@@ -720,12 +730,12 @@
         background:var(--adj-surface)!important;
         border-color:color-mix(in srgb,var(--adj-brand) 35%,var(--adj-line) 65%)!important;
     }
-    .adj-page .adj-footer-actions .btn-adj-outline:focus-visible,
-    .adj-page .adj-footer-actions .btn-adj-primary:focus-visible{
+    .adj-page .adj-footer-actions .btn:focus-visible{
         outline:3px solid color-mix(in srgb,var(--adj-brand) 28%,transparent);
         outline-offset:2px;
     }
     .adj-page .adj-footer-hint{ color:var(--adj-ink); font-weight:800; }
+    .adj-mobile-action-trigger{ display:none!important; }
     .adj-empty-row td{ padding:0!important; border-top:0!important; }
     .adj-page .adj-empty{ display:grid; place-items:center; min-height:160px; padding:1rem; color:var(--adj-muted); text-align:center; }
     .adj-empty-icon{ display:grid; width:36px; height:36px; place-items:center; margin-bottom:.45rem; border-radius:12px; color:var(--adj-brand); background:color-mix(in srgb,var(--adj-brand) 10%,var(--adj-surface) 90%); }
@@ -761,13 +771,15 @@
         .adj-page .adj-gate-copy{ min-width:0; max-width:none; }
         .adj-page .adj-gate-hint{ margin-top:.35rem; }
         .adj-workflow-leading{
-            flex:1 1 auto;
+            width:100%;
+            flex:0 0 auto;
             align-items:center;
         }
         .adj-page .adj-workflow-bar{
-            flex-direction:row!important;
-            align-items:center!important;
+            flex-direction:column!important;
+            align-items:stretch!important;
             top:calc(var(--app-navbar-offset,58px) + .35rem);
+            margin-top:.6rem;
             padding:.6rem .7rem;
             gap:.55rem;
         }
@@ -778,20 +790,6 @@
             overflow:hidden;
             font-size:.76rem;
             text-overflow:ellipsis;
-            white-space:nowrap;
-        }
-        .adj-page .adj-workflow-actions{
-            width:auto;
-            display:flex;
-            flex-wrap:nowrap;
-            gap:.45rem;
-        }
-        .adj-page .adj-workflow-actions .btn{
-            min-width:0;
-            width:auto;
-            min-height:40px;
-            padding:.35rem .5rem!important;
-            font-size:.67rem!important;
             white-space:nowrap;
         }
         .adj-section-heading{ align-items:flex-start; flex-direction:column; }
@@ -855,25 +853,74 @@
             min-height:40px;
         }
         .adj-page .adj-footer{
+            position:fixed;
+            left:.55rem;
+            right:.55rem;
+            bottom:var(--mobile-bottom-nav-clearance,calc(70px + env(safe-area-inset-bottom,0px) + 1rem));
+            z-index:1000;
+            flex-direction:column;
             align-items:stretch;
-            gap:.6rem;
-        }
-        .adj-footer-meta{ display:flex; justify-content:flex-end; }
-        .adj-footer-actions{
-            width:100%;
-            display:grid;
-            grid-template-columns:1fr 1fr 1.35fr;
             gap:.45rem;
-            margin-left:0;
+            margin:0;
+            padding:.6rem .65rem calc(.6rem + env(safe-area-inset-bottom,0px));
+            border-radius:16px;
+            box-shadow:0 8px 24px rgba(16,24,40,.18),0 0 0 1px rgba(16,24,40,.06);
         }
-        .adj-page .adj-footer-actions .btn{
-            width:100%;
-            min-width:0;
+        .adj-page .adj-footer-meta,
+        .adj-page .adj-footer-actions{ display:none; }
+        .adj-page .adj-mobile-action-trigger{
+            display:inline-flex!important;
+            align-items:center;
+            justify-content:center;
+            gap:.35rem;
+            width:auto;
+            min-width:96px;
             min-height:44px;
-            padding:.35rem .45rem!important;
-            font-size:.68rem!important;
+            margin-left:auto;
+            padding:.35rem .75rem!important;
+            border-radius:var(--adj-radius-control)!important;
+            font-size:.72rem!important;
+            font-weight:750!important;
+        }
+        .adj-page{
+            padding-bottom:calc(5rem + var(--mobile-bottom-nav-clearance,calc(70px + env(safe-area-inset-bottom,0px) + 1rem)));
         }
         .adj-page .modal-footer .btn{ min-height:44px; }
+        .adj-page .adj-mobile-action-sheet .modal-dialog{
+            display:flex;
+            align-items:flex-end;
+            width:100%;
+            max-width:none;
+            min-height:100%;
+            margin:0;
+        }
+        .adj-page .adj-mobile-action-sheet .modal-content{
+            width:100%;
+            border-bottom:0!important;
+            border-radius:20px 20px 0 0!important;
+            padding-bottom:env(safe-area-inset-bottom,0px);
+        }
+        .adj-page .adj-mobile-action-sheet .modal-header{
+            align-items:flex-start;
+            padding:.9rem 1rem .65rem;
+        }
+        .adj-page .adj-mobile-action-sheet .modal-body{ padding:.6rem 1rem 1rem; }
+        .adj-page .adj-mobile-action-sheet .modal-body .btn{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:.35rem;
+            width:100%;
+            min-height:48px;
+            border-radius:var(--adj-radius-control)!important;
+            font-weight:750!important;
+        }
+        .adj-page .adj-mobile-action-sheet .modal-body .btn-adj-outline{
+            color:var(--adj-muted)!important;
+            background:color-mix(in srgb,var(--adj-surface) 86%,var(--adj-surface-muted) 14%)!important;
+            border-color:var(--adj-line)!important;
+            text-decoration:none!important;
+        }
     }
     @media(prefers-reduced-motion:reduce){
         .adj-page *, .adj-page *::before, .adj-page *::after{ scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; }
@@ -1036,6 +1083,16 @@
                         <div class="adj-footer-meta">
                             <span class="adj-footer-hint" id="summary-change">Selisih: 0.00</span>
                         </div>
+                        <button type="button"
+                                class="btn btn-sm btn-adj-outline adj-mobile-action-trigger"
+                                id="mobile-action-trigger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#mobileActionSheet"
+                                aria-controls="mobileActionSheet"
+                                aria-haspopup="dialog">
+                            <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+                            <span>Aksi</span>
+                        </button>
                         <div class="adj-footer-actions" aria-label="Aksi adjustment">
                             <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-sm btn-adj-outline">
                                 <i class="bi bi-x-lg" aria-hidden="true"></i>Batal
@@ -1144,6 +1201,32 @@
             </div>
         </div>
     </div>
+    <div class="modal fade adj-modal adj-mobile-action-sheet" id="mobileActionSheet" tabindex="-1" aria-labelledby="mobileActionSheetTitle" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <div class="adj-section-label mb-1">Adjustment manual</div>
+                        <h2 class="modal-title mb-0" id="mobileActionSheetTitle">Aksi adjustment</h2>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup aksi"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-adj-primary" id="mobile-submit">
+                            <i class="bi bi-check2" aria-hidden="true"></i>{{ $submitLabel }}
+                        </button>
+                        <button type="button" class="btn btn-adj-outline" id="mobile-clear-all">
+                            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset semua
+                        </button>
+                        <a href="{{ route('inventory.adjustments.index') }}" class="btn btn-adj-outline">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>Batal
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     </div>
 @endsection
 
@@ -1175,6 +1258,9 @@
             const confirmTotalLabel = document.getElementById('confirm-total-label');
             const confirmNotesLabel = document.getElementById('confirm-notes-label');
             const confirmSaveBtn = document.getElementById('confirm-save-draft');
+            const mobileActionSheetEl = document.getElementById('mobileActionSheet');
+            const mobileSubmitBtn = document.getElementById('mobile-submit');
+            const mobileClearAllBtn = document.getElementById('mobile-clear-all');
             const workflowBar = document.getElementById('workflow-bar');
             const workflowSections = document.getElementById('workflow-sections');
             const selectedWarehouseLabel = document.getElementById('selected-warehouse-label');
@@ -1710,6 +1796,22 @@
                     inp.value = ''; notes.value = ''; recalcRow(tr);
                 });
                 applyFilter(); updateSummary();
+            });
+
+            mobileSubmitBtn?.addEventListener('click', () => {
+                bootstrap.Modal.getOrCreateInstance(mobileActionSheetEl).hide();
+                window.setTimeout(() => {
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                }, 120);
+            });
+
+            mobileClearAllBtn?.addEventListener('click', () => {
+                bootstrap.Modal.getOrCreateInstance(mobileActionSheetEl).hide();
+                clearAllBtn?.click();
             });
 
             warehouseSelect.addEventListener('change', () => {
