@@ -470,9 +470,6 @@
         const netOrderRevenue = Math.max(0, Number(current.net_order_revenue ?? grossOrderRevenue));
         const totalHpp = Number(current.hpp_total ?? current.hpp ?? 0);
         const adCost = Number(current.ad_cost || 0);
-        const buyerPayment = Number(current.cash_gross_sales || 0) + Number(current.cash_unsettled_gross_sales || 0);
-        const buyerPaymentOrders = Number(current.cash_order_count || 0) + Number(current.cash_unsettled_order_count || 0);
-        const apc = buyerPaymentOrders > 0 ? buyerPayment / buyerPaymentOrders : 0;
         const aovNet = Number(current.order_total || 0) > 0 ? netOrderRevenue / Number(current.order_total) : 0;
         const actualFeeRate = Number(current.cash_order_revenue || 0) > 0
             ? Number(current.cash_marketplace_fees || 0) / Number(current.cash_order_revenue)
@@ -527,9 +524,6 @@
         const adCostRate = netOrderRevenue > 0 ? adCost / netOrderRevenue * 100 : 0;
         const settledProfitMargin = settledOrderRevenue > 0 ? settledProfit / settledOrderRevenue * 100 : 0;
         const estimatedUnsettledProfitMargin = unsettledOrderRevenue > 0 ? estimatedUnsettledProfit / unsettledOrderRevenue * 100 : 0;
-        const previousBuyerPayment = Number(previous.cash_gross_sales || 0) + Number(previous.cash_unsettled_gross_sales || 0);
-        const previousBuyerPaymentOrders = Number(previous.cash_order_count || 0) + Number(previous.cash_unsettled_order_count || 0);
-        const previousApc = previousBuyerPaymentOrders > 0 ? previousBuyerPayment / previousBuyerPaymentOrders : 0;
         const pulseChange = (value, previousValue, formatter = value => String(value)) => {
             const currentValue = Number(value || 0);
             const baseline = Number(previousValue || 0);
@@ -545,6 +539,7 @@
         const comparisonKpiMarkup = ({ label, value, description, icon, change, metric = '', extraClass = '', clickable = false }) => {
             const direction = change?.className === 'good' ? 'up' : (change?.className === 'bad' ? 'down' : 'neutral');
             const directionIcon = direction === 'up' ? 'bi-arrow-up-right' : (direction === 'down' ? 'bi-arrow-down-right' : 'bi-dash');
+            const comparePeriod = $('anCompare')?.selectedOptions?.[0]?.textContent?.trim() || 'Periode sebelumnya';
             const clickableAttrs = clickable
                 ? ` role="button" tabindex="0" title="Bandingkan grafik dengan periode sebelumnya" data-pulse-metric="${esc(metric)}"`
                 : '';
@@ -559,7 +554,7 @@
                 </div>
                 <div class="ds-comparison-kpi-comparisons" aria-label="Perbandingan periode">
                     <div class="ds-comparison-kpi-row">
-                        <div><span>Periode pembanding</span><small>${esc($('anCompare')?.selectedOptions?.[0]?.textContent?.trim() || 'Periode sebelumnya')}</small></div>
+                        <div><span>Vs periode</span><small>${esc(comparePeriod)}</small></div>
                         <div class="ds-comparison-kpi-result"><strong>${esc(change?.previousText || '—')}</strong><span class="ds-comparison-kpi-change is-${direction}"><i class="bi ${directionIcon}" aria-hidden="true"></i> ${esc(change?.changeText || '—')}</span></div>
                     </div>
                 </div>
@@ -573,7 +568,6 @@
         const adCostChange = pulseChange(adCost, previousAdCost, moneyText);
         const affiliateFeeChange = pulseChange(actualAffiliateFee, previousActualAffiliateFee, moneyText);
         const aovChange = pulseChange(aovNet, previousAovNet, moneyText);
-        const apcChange = pulseChange(apc, previousApc, moneyText);
         const cancelledAmountChange = pulseChange(cancelledAmount, previousCancelledAmount, moneyText);
         const refundAmountChange = pulseChange(returnRefundAmount, previousReturnRefundAmount, moneyText);
         const exceptionChange = change => ({ ...change, className: change.className === 'good' ? 'bad' : (change.className === 'bad' ? 'good' : '') });
@@ -581,7 +575,6 @@
         const settledProfitChange = pulseChange(settledProfit, previousSettledProfit, moneyText);
         const estimatedUnsettledProfitChange = pulseChange(estimatedUnsettledProfit, previousEstimatedUnsettledProfit, moneyText);
         const percentText = value => `${Number(value || 0).toFixed(1)}%`;
-        const completedOrdersChange = pulseChange(completedOrders, previousCompletedOrders, countText);
         const completionRateChange = pulseChange(completionRate, previousCompletionRate, percentText);
         const estimatedMarginChange = pulseChange(estimatedMargin, previousEstimatedMargin, percentText);
         const pendingPayoutChange = pulseChange(pendingPayout, previousPendingPayout, moneyText);
@@ -607,35 +600,35 @@
         const decisionAdCostChange = decisionChange(adCost, previousAdCost, true);
         const netProfitChange = decisionChange(estimatedNetProfit, previousEstimatedNetProfit);
         const recordedFeeNote = settledOrderRevenue > 0
-            ? `${recordedFeeRate.toFixed(1)}% dari omzet cair · sama dengan modal omzet`
-            : 'belum ada fee settlement tercatat';
+            ? `${recordedFeeRate.toFixed(1)}% dari omzet cair`
+            : 'Belum tercatat';
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
         const total = Math.max(Number(quality.total || 0), 1);
         const readyRate = Number(quality.ready || 0) / total * 100;
         const topStores = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0)).slice(0, 5);
+        // Keep Executive Pulse focused on the six decision signals that best
+        // cover volume, basket, completion quality, and operational exceptions.
+        // Order selesai duplicates Completion rate, while APC belongs to the
+        // cash/finance context already represented by Decision cockpit.
         const pulse = [
             ['Total order', totalOrder.toLocaleString('id-ID'), { text: `eligible · ${totalOrderChange.text}`, className: totalOrderChange.className }, 'orders'],
-            ['Order selesai', completedOrders.toLocaleString('id-ID'), { text: `${completionRate.toFixed(1)}% dari order masuk · ${completedOrdersChange.text}`, className: completedOrdersChange.className }, 'completed'],
             ['Completion rate', `${completionRate.toFixed(1)}%`, completionRateChange, 'completion-rate'],
             ['Produk terjual', totalProducts.toLocaleString('id-ID'), { text: `unit · ${totalProductsChange.text}`, className: totalProductsChange.className }, 'products'],
             ['AOV net', money(aovNet), aovChange, 'aov'],
-            ['APC pembeli', money(apc), { text: `cair + pending · ${apcChange.text}`, className: apcChange.className }, 'apc'],
             ['Dibatalkan', cancelledOrders.toLocaleString('id-ID'), { text: `${money(cancelledAmount)} · ${cancelledAmountChange.text}`, className: exceptionChange(cancelledAmountChange).className }, 'cancelled'],
             ['Refund / return', money(returnRefundAmount), { text: `${returnRefundOrders.toLocaleString('id-ID')} order · ${returnRefundRate.toFixed(1)}% · ${refundAmountChange.text}`, className: exceptionChange(refundAmountChange).className }, 'refund'],
         ];
         const pulseDescriptions = {
-            orders: 'Order eligible setelah pembatalan, refund, dan retur',
-            completed: 'Order yang sudah selesai diproses',
-            'completion-rate': 'Rasio order selesai dari order masuk',
-            products: 'Total unit produk pada periode aktif',
-            aov: 'Rata-rata omzet net per order',
-            apc: 'Rata-rata pembayaran per pembeli',
-            cancelled: 'Order yang tidak masuk omzet',
-            refund: 'Nilai refund dan return yang dikecualikan',
+            orders: 'Eligible',
+            'completion-rate': 'Order selesai',
+            products: 'Unit',
+            aov: 'Per order',
+            cancelled: 'Tidak masuk omzet',
+            refund: 'Tidak masuk omzet',
         };
         const pulseIcons = {
-            orders: 'bi-bag-check', completed: 'bi-check-circle', 'completion-rate': 'bi-speedometer2', products: 'bi-box-seam',
-            aov: 'bi-cash-stack', apc: 'bi-person-check', cancelled: 'bi-x-circle', refund: 'bi-arrow-counterclockwise',
+            orders: 'bi-bag-check', 'completion-rate': 'bi-speedometer2', products: 'bi-box-seam',
+            aov: 'bi-cash-stack', cancelled: 'bi-x-circle', refund: 'bi-arrow-counterclockwise',
         };
         $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => comparisonKpiMarkup({
             label,
@@ -648,7 +641,7 @@
             clickable: true,
         })).join('');
         const decisionPulse = [
-            ['GMV', money(gmv), { text: 'omzet order eligible', className: gmvChange.className }, gmvChange, 'cash'],
+            ['GMV', money(gmv), { text: 'Order eligible', className: gmvChange.className }, gmvChange, 'cash'],
             ['Dana cair', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi`, className: cashPayoutChange.className }, decisionPayoutChange, 'cash'],
             ['Dana belum cair', money(pendingPayout), { text: `${pendingPayoutRate.toFixed(1)}% dari estimasi`, className: decisionPendingPayoutChange.className }, decisionPendingPayoutChange, 'cash'],
             ['Fee marketplace tercatat', money(recordedMarketplaceFee), { text: recordedFeeNote, className: exceptionChange(decisionRecordedFeeChange).className }, decisionRecordedFeeChange, 'cost'],
@@ -685,7 +678,6 @@
         const maxStore = Math.max(...topStores.map(store => Number(store.gross_sales || 0)), 1);
         $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_count || 0).toLocaleString('id-ID')} order financial-ready · profit ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gross_sales || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gross_sales)}</div></div>`).join('') : stateMarkup('empty', 'Belum ada kontribusi toko', 'Belum ada kontribusi toko pada periode ini.');
         renderStorePerformance({ pulseId: 'anOverviewStorePulse', costPulseId: 'anOverviewStoreCostPulse', ledgerBodyId: 'overviewStoreLedgerBody' });
-        renderMarketplaceCosts('overviewCostBody');
         const settledGross = Number(current.cash_order_revenue ?? current.cash_gross_sales ?? 0);
         const unsettledGross = Number(current.cash_unsettled_order_revenue ?? Math.max(0, Number(current.gmv || 0) - settledGross));
         const totalOmzet = settledGross + unsettledGross || Number(current.gmv || 0);

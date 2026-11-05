@@ -17,7 +17,6 @@
 
 <div class="an-grid-secondary an-tab-pane" data-an-pane="overview">
     <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store performance accrual</div><div class="an-card-title">Performa toko akrual</div><div class="an-card-sub">Pengakuan order dan GMV pada periode berjalan; payout dan profit ditampilkan sebagai pencatatan biaya/pencairan.</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order masuk</th><th>Selesai</th><th>Cancel</th><th>Refund</th><th>GMV akrual</th><th>GMV belum cair</th><th>Payout tercatat</th><th>Adm fee tercatat</th><th>Biaya iklan</th><th>Profit operasional tercatat</th></tr></thead><tbody id="overviewStoreLedgerBody"><tr><td colspan="11"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div></div></section>
-    <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Fee estimasi mengikuti rate actual Unit economics; biaya settlement tetap tersedia untuk audit</div></div></div><div class="an-card-body"><div class="an-costs" id="overviewCostBody"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
 </div>
 
 <section class="an-control-tower an-tab-pane is-hidden" data-an-pane="operations">
