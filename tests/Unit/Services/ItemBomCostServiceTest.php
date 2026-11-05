@@ -151,6 +151,92 @@ class ItemBomCostServiceTest extends TestCase
         $this->assertEqualsWithDelta(66000, $service->total($bom, true), 0.000001);
     }
 
+    public function test_only_the_most_expensive_main_material_is_included_in_bom_estimate(): void
+    {
+        $bundle = Item::create([
+            'code' => 'BUNDLE-MAIN-ALTERNATIVE-001',
+            'name' => 'Bundle Main Material Alternative Test',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $cheaperFabric = Item::create([
+            'code' => 'FAB-MAIN-CHEAP-001',
+            'name' => 'Bahan Utama Lebih Murah',
+            'unit' => 'kg',
+            'type' => 'material',
+            'hpp' => 10000,
+            'base_unit_cost' => 10000,
+            'active' => true,
+        ]);
+        $expensiveFabric = Item::create([
+            'code' => 'FAB-MAIN-EXPENSIVE-001',
+            'name' => 'Bahan Utama Lebih Mahal',
+            'unit' => 'kg',
+            'type' => 'material',
+            'hpp' => 20000,
+            'base_unit_cost' => 20000,
+            'active' => true,
+        ]);
+        $sewingSupply = Item::create([
+            'code' => 'SUP-MAIN-ALTERNATIVE-001',
+            'name' => 'Kelengkapan Jahit',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'hpp' => 3000,
+            'base_unit_cost' => 3000,
+            'active' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $bundle->id,
+            'name' => 'BOM Main Material Alternative Test',
+            'active' => true,
+        ]);
+
+        $cheaperLine = ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $cheaperFabric->id,
+            'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
+            'qty' => '1',
+            'uom' => 'kg',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+        $expensiveLine = ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $expensiveFabric->id,
+            'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
+            'qty' => '1',
+            'uom' => 'kg',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 20,
+        ]);
+        $supplyLine = ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $sewingSupply->id,
+            'usage_stage' => ItemBomLine::STAGE_SEWING_SUPPLY,
+            'qty' => '1',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 30,
+        ]);
+
+        $estimate = app(ItemBomCostService::class)->estimate($bom);
+        $components = collect($estimate['components'])->keyBy('line_id');
+
+        $this->assertEqualsWithDelta(23000, $estimate['material_total'], 0.000001);
+        $this->assertEqualsWithDelta(23000, $estimate['total'], 0.000001);
+        $this->assertSame($expensiveLine->id, $estimate['selected_main_material_line_id']);
+        $this->assertSame(2, $estimate['main_material_line_count']);
+        $this->assertSame(1, $estimate['included_main_material_line_count']);
+        $this->assertFalse($components[$cheaperLine->id]['included_in_estimate']);
+        $this->assertTrue($components[$expensiveLine->id]['included_in_estimate']);
+        $this->assertTrue($components[$supplyLine->id]['included_in_estimate']);
+    }
+
     public function test_bom_uses_master_purchase_price_converted_to_stock_unit(): void
     {
         $bundle = Item::create([
@@ -339,5 +425,87 @@ class ItemBomCostServiceTest extends TestCase
         $this->assertEqualsWithDelta(4000, $estimate['production_wage']['sewing'], 0.000001);
         $this->assertEqualsWithDelta(5000, $estimate['production_wage_total'], 0.000001);
         $this->assertEqualsWithDelta(25000, $estimate['total'], 0.000001);
+    }
+
+    public function test_highest_active_piece_rate_from_item_category_is_used_per_process(): void
+    {
+        $category = \App\Models\ItemCategory::create([
+            'code' => 'CAT-WAGE-HIGHEST',
+            'name' => 'Kategori Tarif Tertinggi',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $bundle = Item::create([
+            'code' => 'BUNDLE-COST-CATEGORY-RATE-001',
+            'name' => 'Bundle Category Rate Test',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $category->id,
+            'active' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'MAT-COST-CATEGORY-RATE-001',
+            'name' => 'Material Category Rate Test',
+            'unit' => 'pcs',
+            'type' => 'material',
+            'hpp' => 10000,
+            'base_unit_cost' => 10000,
+            'active' => true,
+        ]);
+        $employee = Employee::create([
+            'code' => 'RATE-CATEGORY-001',
+            'name' => 'Operator Tarif Kategori',
+            'role' => 'cutting',
+            'payment_type' => 'variable',
+            'active' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $bundle->id,
+            'name' => 'BOM Category Rate Test',
+            'active' => true,
+        ]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_MAIN_MATERIAL,
+            'qty' => '1',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+        PieceRate::create([
+            'module' => 'cutting',
+            'employee_id' => $employee->id,
+            'item_category_id' => $category->id,
+            'item_id' => null,
+            'rate_per_pcs' => 1000,
+            'effective_from' => now()->subDay()->toDateString(),
+        ]);
+        PieceRate::create([
+            'module' => 'cutting',
+            'employee_id' => $employee->id,
+            'item_category_id' => $category->id,
+            'item_id' => null,
+            'rate_per_pcs' => 2500,
+            'effective_from' => now()->subDay()->toDateString(),
+        ]);
+        PieceRate::create([
+            'module' => 'sewing',
+            'employee_id' => $employee->id,
+            'item_category_id' => $category->id,
+            'item_id' => null,
+            'rate_per_pcs' => 1500,
+            'effective_from' => now()->subDay()->toDateString(),
+        ]);
+
+        $estimate = app(ItemBomCostService::class)->estimate($bom);
+
+        $this->assertSame('piece_rate_category', $estimate['production_wage']['source']);
+        $this->assertEqualsWithDelta(2500, $estimate['production_wage']['cutting'], 0.000001);
+        $this->assertEqualsWithDelta(1500, $estimate['production_wage']['sewing'], 0.000001);
+        $this->assertEqualsWithDelta(0, $estimate['production_wage']['finishing'], 0.000001);
+        $this->assertEqualsWithDelta(4000, $estimate['production_wage_total'], 0.000001);
+        $this->assertSame('Kategori item · tarif tertinggi', $estimate['production_wage']['processes'][0]['source_label']);
     }
 }

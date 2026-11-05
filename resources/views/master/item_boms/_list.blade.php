@@ -25,7 +25,7 @@
                     <tr>
                         <td class="bom-index">{{ ($boms->currentPage() - 1) * $boms->perPage() + $i + 1 }}</td>
                         <td>
-                            <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-item-code">{{ $b->item?->code ?? '—' }}</a>
+                            <a href="{{ route('master.item_boms.show', $b) }}" class="bom-item-code">{{ $b->item?->code ?? '—' }}</a>
                             <div class="bom-item-name">{{ $b->item?->name ?? 'Item tidak ditemukan' }}</div>
                             @if($b->name)<div class="bom-name">{{ $b->name }}</div>@endif
                         </td>
@@ -41,6 +41,7 @@
                         <td><span class="bom-status {{ $b->active ? 'bom-status-active' : 'bom-status-inactive' }}">{{ $b->active ? 'Aktif' : 'Nonaktif' }}</span></td>
                         <td>
                             <div class="bom-actions">
+                                <a href="{{ route('master.item_boms.show', $b) }}" class="bom-btn bom-btn-ghost"><i class="bi bi-calculator" aria-hidden="true"></i><span>HPP</span></a>
                                 <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-btn bom-btn-ghost"><i class="bi bi-pencil" aria-hidden="true"></i><span>Edit</span></a>
                                 <form method="post" action="{{ route('master.item_boms.destroy', $b) }}" data-gf-confirm data-gf-confirm-title="Hapus BOM?" data-gf-confirm-text="Semua komponen pada BOM ini ikut terhapus." data-gf-confirm-icon="warning" data-gf-confirm-ok="Ya, hapus" data-gf-confirm-cancel="Batal">
                                     @csrf @method('DELETE')
@@ -63,7 +64,7 @@
             <article class="bom-mobile-card">
                 <div class="bom-mobile-head">
                     <div>
-                        <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-item-code">{{ $b->item?->code ?? '—' }}</a>
+                        <a href="{{ route('master.item_boms.show', $b) }}" class="bom-item-code">{{ $b->item?->code ?? '—' }}</a>
                         <div class="bom-item-name">{{ $b->item?->name ?? 'Item tidak ditemukan' }}</div>
                         @if($b->name)<div class="bom-name">{{ $b->name }}</div>@endif
                     </div>
@@ -73,6 +74,7 @@
                 <div class="bom-mobile-cogs"><span>COGS total / pcs</span><strong>Rp {{ number_format((float) ($cogs['total'] ?? 0), 0, ',', '.') }}</strong><small>Material Rp {{ number_format((float) ($cogs['material_total'] ?? 0), 0, ',', '.') }} · Upah Rp {{ number_format((float) ($cogs['production_wage_total'] ?? 0), 0, ',', '.') }}</small></div>
                 @if($ub)<div class="bom-actual">Aktual <span class="bom-actual-value">{{ number_format($ub['kg_per_pcs'], 3, ',', '') }}/pcs</span> · {{ $ub['job_code'] }} @if($ub['status'] === 'over')<span class="bom-usage-over">· melebihi standar</span>@elseif($ub['status'] === 'under')<span class="bom-usage-under">· lebih hemat</span>@elseif($ub['status'] === 'ok')<span>· sesuai standar</span>@endif</div>@endif
                 <div class="bom-mobile-actions">
+                    <a href="{{ route('master.item_boms.show', $b) }}" class="bom-btn bom-btn-ghost"><i class="bi bi-calculator" aria-hidden="true"></i>Lihat HPP</a>
                     <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-btn bom-btn-primary"><i class="bi bi-pencil" aria-hidden="true"></i>Edit BOM</a>
                     <form method="post" action="{{ route('master.item_boms.destroy', $b) }}" data-gf-confirm data-gf-confirm-title="Hapus BOM?" data-gf-confirm-text="Semua komponen pada BOM ini ikut terhapus." data-gf-confirm-icon="warning" data-gf-confirm-ok="Ya, hapus" data-gf-confirm-cancel="Batal">
                         @csrf @method('DELETE')

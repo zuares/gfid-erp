@@ -69,23 +69,6 @@
         line-height: 1.45 !important;
     }
 
-    .bom-cost-summary {
-        display: grid !important;
-        grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, .8fr)) !important;
-        gap: 8px !important;
-        margin-top: 0 !important;
-        padding: 12px !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 12px !important;
-        background: #f8fafc !important;
-    }
-    .bom-cost-summary-label { color:#64748b !important; font-size:.64rem !important; font-weight:850 !important; text-transform:uppercase !important; letter-spacing:.04em !important; }
-    .bom-cost-summary-value { margin-top:2px !important; color:#0f172a !important; font-size:1rem !important; font-weight:950 !important; }
-    .bom-cost-summary-note { margin-top:2px !important; color:#64748b !important; font-size:.7rem !important; }
-    body[data-theme="dark"] .bom-cost-summary { background:#172554 !important; border-color:#3730a3 !important; }
-    body[data-theme="dark"] .bom-cost-summary-value { color:#f8fafc !important; }
-    @media(max-width:700px) { .bom-cost-summary { grid-template-columns:1fr 1fr !important; } .bom-cost-summary > :first-child { grid-column:1 / -1 !important; } }
-
     .mono {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
         letter-spacing: -.02em !important;
@@ -628,7 +611,12 @@
           {{ $isEdit ? ($bom->item->code . ' — ' . $bom->item->name) : 'Tentukan komponen dan kebutuhan material produksi.' }}
         </div>
       </div>
-      <a class="btnx ghost" href="{{ route('master.item_boms.index') }}"><i class="bi bi-arrow-left"></i> Kembali</a>
+      <div class="rowx">
+        @if($isEdit)
+          <a class="btnx ghost" href="{{ route('master.item_boms.show', $bom) }}"><i class="bi bi-calculator"></i> Lihat HPP</a>
+        @endif
+        <a class="btnx ghost" href="{{ route('master.item_boms.index') }}"><i class="bi bi-arrow-left"></i> Kembali</a>
+      </div>
     </div>
 
     @if($errors->any())
@@ -668,42 +656,6 @@
         </div>
       </div>
 
-      @if($isEdit && $bomEstimate)
-        <div class="bom-cost-summary" aria-label="Ringkasan estimasi HPP BOM">
-          <div>
-            <div class="bom-cost-summary-label">Total HPP BOM</div>
-            <div class="bom-cost-summary-value">{{ $bomEstimate['total'] > 0 ? 'Rp '.number_format($bomEstimate['total'], 0, ',', '.') : 'Belum tersedia' }}</div>
-            <div class="bom-cost-summary-note">
-              Material Rp {{ number_format($bomEstimate['material_total'], 0, ',', '.') }} +
-              upah Rp {{ number_format($bomEstimate['production_wage_total'], 0, ',', '.') }}
-              · per 1 {{ $bomEstimate['item_unit'] }} · optional termahal dihitung
-            </div>
-          </div>
-          <div>
-            <div class="bom-cost-summary-label">Komponen</div>
-            <div class="bom-cost-summary-value">{{ $bomEstimate['line_count'] }}</div>
-            <div class="bom-cost-summary-note">{{ $bomEstimate['required_line_count'] }} wajib · {{ $bomEstimate['optional_line_count'] }} opsional</div>
-          </div>
-          <div>
-            <div class="bom-cost-summary-label">Estimasi upah produksi</div>
-            <div class="bom-cost-summary-value">Rp {{ number_format($bomEstimate['production_wage_total'], 0, ',', '.') }}</div>
-            <div class="bom-cost-summary-note">
-              @if(($bomEstimate['production_wage']['source'] ?? null) === 'payroll_snapshot')
-                Snapshot payroll aktif
-              @elseif(($bomEstimate['production_wage']['source'] ?? null) === 'piece_rate_estimate')
-                Estimasi tarif tertinggi · cutting Rp {{ number_format($bomEstimate['production_wage']['cutting'], 0, ',', '.') }} · sewing Rp {{ number_format($bomEstimate['production_wage']['sewing'], 0, ',', '.') }}
-              @else
-                Belum ada snapshot payroll atau tarif piece rate aktif
-              @endif
-            </div>
-          </div>
-          <div>
-            <div class="bom-cost-summary-label">Status</div>
-            <div class="bom-cost-summary-value">{{ $bom->active ? 'Aktif' : 'Nonaktif' }}</div>
-            <div class="bom-cost-summary-note">Tidak mengubah histori</div>
-          </div>
-        </div>
-      @endif
     </div>
 
     <div style="height:12px"></div>
@@ -712,7 +664,7 @@
       <div class="rowx" style="justify-content:space-between;align-items:flex-start">
         <div>
           <div class="lbl" style="margin:0">Lines</div>
-          <div class="small">Qty 3 desimal · harga stok per kg/pcs dan harga beli per pack ditampilkan per baris.</div>
+          <div class="small">Qty 3 desimal · harga beli terakhir mengikuti Master Item.</div>
         </div>
       </div>
 
@@ -796,8 +748,7 @@
               <th style="width:100px">Satuan unit</th>
               <th style="width:92px">Waste (%)</th>
               <th style="width:88px">Optional</th>
-              <th style="width:130px">Harga / stok</th>
-              <th style="width:130px">Harga / beli</th>
+              <th style="width:150px">Harga beli terakhir</th>
               <th style="width:130px">Biaya baris</th>
               <th style="width:76px"></th>
             </tr>
@@ -866,11 +817,7 @@
                     <option value="1" {{ (int) data_get($r,'is_optional',0)===1 ? 'selected':'' }}>Yes</option>
                   </select>
                 </td>
-                <td class="text-end bom-price-cell line-stock-price" data-price-value="{{ (float) data_get($component, 'unit_cost', 0) }}" data-price-unit="{{ data_get($component, 'stock_unit', data_get($r, 'uom', 'pcs')) }}">
-                  <span class="bom-price-value">-</span>
-                  <span class="bom-price-unit">/{{ data_get($component, 'stock_unit', data_get($r, 'uom', 'pcs')) }}</span>
-                </td>
-                <td class="text-end bom-price-cell line-purchase-price" data-price-value="{{ (float) data_get($component, 'purchase_unit_cost', 0) }}" data-price-unit="{{ data_get($component, 'purchase_unit', data_get($r, 'uom', 'pcs')) }}">
+                <td class="text-end bom-price-cell line-purchase-price" data-price-value="{{ (float) data_get($component, 'last_purchase_price', 0) }}" data-price-unit="{{ data_get($component, 'purchase_unit', data_get($r, 'uom', 'pcs')) }}">
                   <span class="bom-price-value">-</span>
                   <span class="bom-price-unit">/{{ data_get($component, 'purchase_unit', data_get($r, 'uom', 'pcs')) }}</span>
                 </td>
@@ -1007,10 +954,6 @@
             <option value="1">Yes</option>
           </select>
         </td>
-        <td class="text-end bom-price-cell line-stock-price" data-price-value="0" data-price-unit="pcs">
-          <span class="bom-price-value">-</span>
-          <span class="bom-price-unit">/pcs</span>
-        </td>
         <td class="text-end bom-price-cell line-purchase-price" data-price-value="0" data-price-unit="pcs">
           <span class="bom-price-value">-</span>
           <span class="bom-price-unit">/pcs</span>
@@ -1080,8 +1023,8 @@
     return {
       stockUnit: selected.stock_unit || fromBom.stock_unit || selected.unit || fromBom.uom || $row.find('input.uom').val() || 'pcs',
       purchaseUnit: selected.purchase_unit || fromBom.purchase_unit || selected.stock_unit || fromBom.stock_unit || 'pcs',
+      lastPurchasePrice: Number(selected.last_purchase_price ?? fromBom.last_purchase_price ?? 0),
       unitCost: Number(selected.unit_cost ?? fromBom.unit_cost ?? 0),
-      purchaseUnitCost: Number(selected.purchase_unit_cost ?? fromBom.purchase_unit_cost ?? 0),
       conversionFactor: Number(selected.purchase_conversion_factor ?? fromBom.purchase_conversion_factor ?? 1) || 1,
     };
   }
@@ -1090,19 +1033,13 @@
     const meta = selectedMaterialMeta($row);
     const qty = Number(String($row.find('input.qty').val() || '0').replace(',', '.')) || 0;
     const scrap = Number($row.find('input.scrap').val() || 0) || 0;
-    const purchaseUnitCost = meta.purchaseUnitCost || (meta.unitCost * meta.conversionFactor);
     const estimated = qty * (1 + scrap / 100) * meta.unitCost;
 
-    const $stock = $row.find('.line-stock-price');
     const $purchase = $row.find('.line-purchase-price');
     const $estimated = $row.find('.line-estimated-price');
 
-    $stock.attr('data-price-value', meta.unitCost);
-    $stock.find('.bom-price-value').text(formatRupiah(meta.unitCost));
-    $stock.find('.bom-price-unit').text(`/${meta.stockUnit}`);
-
-    $purchase.attr('data-price-value', purchaseUnitCost);
-    $purchase.find('.bom-price-value').text(formatRupiah(purchaseUnitCost));
+    $purchase.attr('data-price-value', meta.lastPurchasePrice);
+    $purchase.find('.bom-price-value').text(formatRupiah(meta.lastPurchasePrice));
     $purchase.find('.bom-price-unit').text(`/${meta.purchaseUnit}`);
 
     $estimated.attr('data-price-value', estimated);

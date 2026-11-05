@@ -312,6 +312,69 @@ class MasterItemBomTest extends TestCase
             ->assertSee('Material Rp 25.000 · Upah Rp 0');
     }
 
+    public function test_bom_edit_shows_last_purchase_price_without_stock_price_column(): void
+    {
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-LAST-PRICE-001',
+            'name' => 'Produk BOM Harga Terakhir',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'OPP-BOM-LAST-PRICE-001',
+            'name' => 'Plastik OPP Harga Terakhir',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pack',
+            'purchase_conversion_factor' => 500,
+            'last_purchase_price' => 80000,
+            'hpp' => 160,
+            'base_unit_cost' => 160,
+            'type' => 'material',
+            'default_allocation' => 'hpp',
+            'active' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'BOM Harga Terakhir Test',
+            'active' => true,
+        ]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => '1',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.edit', $bom))
+            ->assertOk()
+            ->assertSee('Harga beli terakhir')
+            ->assertSee('data-price-value="80000"', false)
+            ->assertSee('/pack')
+            ->assertSee('Lihat HPP')
+            ->assertDontSee('Rincian estimasi HPP BOM')
+            ->assertDontSee('Harga / stok');
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.show', $bom))
+            ->assertOk()
+            ->assertSee('Rincian estimasi HPP BOM')
+            ->assertSee('Bahan baku utama')
+            ->assertSee('Kelengkapan packing')
+            ->assertSee('Cutting')
+            ->assertSee('Sewing')
+            ->assertSee('Finishing')
+            ->assertSee('Subtotal upah produksi')
+            ->assertSee('Total HPP BOM')
+            ->assertSee('Edit BOM');
+    }
+
     public function test_bom_api_returns_filtered_results_and_pagination_metadata(): void
     {
         $category = ItemCategory::create([

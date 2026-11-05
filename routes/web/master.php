@@ -180,6 +180,9 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         Route::post('item-boms/duplicate', [ItemBomController::class, 'duplicate'])
             ->name('item_boms.duplicate');
 
+        Route::get('item-boms/{bom}', [ItemBomController::class, 'show'])
+            ->name('item_boms.show');
+
     });
 
 });

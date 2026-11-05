@@ -107,7 +107,7 @@
     .bom-mobile-cogs span { color: var(--bom-muted); font-size: .68rem; }
     .bom-mobile-cogs strong { color: var(--bom-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8rem; text-align: right; }
     .bom-mobile-cogs small { grid-column: 1 / -1; color: var(--bom-muted); font-size: .64rem; text-align: right; }
-    .bom-mobile-actions { display: grid; grid-template-columns: 1fr 42px; gap: .45rem; margin-top: .8rem; }
+    .bom-mobile-actions { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 42px; gap: .45rem; margin-top: .8rem; }
     .bom-mobile-actions .bom-btn { width: 100%; min-height: 44px; }
     .bom-empty { padding: 2.8rem 1.25rem; text-align: center; }
     .bom-empty-icon { display: grid; width: 2.6rem; height: 2.6rem; margin: 0 auto .75rem; place-items: center; border-radius: 13px; color: var(--bom-brand); background: color-mix(in srgb, var(--bom-brand) 9%, var(--bom-surface)); font-size: 1.05rem; }

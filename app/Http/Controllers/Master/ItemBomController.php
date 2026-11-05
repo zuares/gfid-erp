@@ -216,6 +216,20 @@ class ItemBomController extends Controller
         ]);
     }
 
+    public function show(ItemBom $bom, ItemBomCostService $bomCostService)
+    {
+        $bom->load([
+            'item:id,code,name,item_category_id,unit,stock_unit',
+            'lines' => fn ($query) => $query->ordered()
+                ->with('material:id,code,name,unit,stock_unit,purchase_unit,purchase_conversion_factor,last_purchase_price,hpp,base_unit_cost'),
+        ]);
+
+        return view('master.item_boms.show', [
+            'bom' => $bom,
+            'bomEstimate' => $bomCostService->estimate($bom),
+        ]);
+    }
+
     public function bulkUpdateForm()
     {
         $itemCategories = ItemCategory::query()
@@ -374,9 +388,9 @@ class ItemBomController extends Controller
     public function edit(Request $request, ItemBom $bom, ItemBomCostService $bomCostService)
     {
         $bom->load([
-            'item:id,code,name',
+            'item:id,code,name,item_category_id',
             'lines' => fn($q) => $q->ordered()
-                ->with('material:id,code,name,unit,stock_unit,hpp,base_unit_cost'),
+                ->with('material:id,code,name,unit,stock_unit,purchase_unit,purchase_conversion_factor,last_purchase_price,hpp,base_unit_cost'),
         ]);
 
         $bomEstimate = $bomCostService->estimate($bom);
@@ -831,7 +845,7 @@ class ItemBomController extends Controller
             })
             ->orderBy('code')
             ->limit(30)
-            ->get(['id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor']);
+            ->get(['id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor', 'last_purchase_price', 'hpp', 'base_unit_cost']);
 
         $results = $items->map(function ($i) {
             $unitCost = $i->bomUnitCost();
@@ -844,6 +858,7 @@ class ItemBomController extends Controller
                 'stock_unit' => $i->stockUnit(),
                 'purchase_unit' => $i->purchaseUnit(),
                 'purchase_conversion_factor' => $purchaseFactor,
+                'last_purchase_price' => (float) ($i->last_purchase_price ?? 0),
                 'unit_cost' => $unitCost,
                 'purchase_unit_cost' => round($unitCost * $purchaseFactor, 2),
             ];
