@@ -360,13 +360,9 @@
 
     $selectedSupplier = isset($suppliers) ? $suppliers->firstWhere('id', $selectedSupplierId) : null;
 
-    $defaultWhCode = $defaultWhCode ?? 'WH-RTS';
-    $defaultWarehouse = $defaultWarehouse
-        ?? $warehouses->firstWhere('code', $defaultWhCode)
-        ?? $warehouses->firstWhere('code', 'RM');
-    if (!$defaultWarehouse) { $defaultWhCode = 'WH-RTS'; $defaultWarehouse = $warehouses->first(); }
-
-    $selectedWarehouseId = old('warehouse_id', $selectedWarehouseId ?? $defaultWarehouse?->id ?? '');
+    // Jangan memilih gudang secara otomatis. Penerimaan harus dikonfirmasi
+    // operator ke gudang tujuan yang benar sebelum GRN disimpan.
+    $selectedWarehouseId = old('warehouse_id', $selectedWarehouseId ?? '');
 
     // filter baris yang belum fully received — .values() wajib agar key sequential (0,1,2,…)
     // supaya name="selected[{{ $idx }}]" cocok dengan index po_line_id[]/item_id[] di controller

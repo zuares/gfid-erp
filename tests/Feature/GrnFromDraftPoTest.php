@@ -811,7 +811,8 @@ class GrnFromDraftPoTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Sebagian diterima', false)
-            ->assertSee('value="'.$this->rtsWarehouse->id.'" selected', false);
+            ->assertSee('<option value="">— Pilih gudang —</option>', false)
+            ->assertDontSee('value="'.$this->rtsWarehouse->id.'" selected', false);
 
         $second = $this->grnService->create($this->makeGrnPayload($po, 3));
         $this->assertCount(1, $second->lines);
