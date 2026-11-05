@@ -1773,7 +1773,7 @@
     .an-fee-analysis-head h2 { margin: .18rem 0 0; color: var(--gf-color-content, #101828); font-size: clamp(1.05rem, 2vw, 1.35rem); font-weight: 820; letter-spacing: -.04em; }
     .an-fee-analysis-head p { max-width: 640px; margin: .32rem 0 0; color: var(--gf-color-muted, #667085); font-size: var(--an-type-caption, .66rem); line-height: 1.45; }
     .an-fee-analysis-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
-    .an-fee-analysis-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gf-space-card, 16px); min-width: 0; }
+    .an-fee-analysis-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gf-space-card, 16px); min-width: 0; }
     .an-fee-analysis-summary:empty { display: none; }
     .an-fee-analysis-summary .an-modal-stat { min-width: 0; }
     .an-fee-analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gf-space-card, 16px); min-width: 0; }
@@ -1798,6 +1798,7 @@
     .an-fee-platform-amount { color: #087f86 !important; }
     .an-fee-ads-amount { color: #a15c07 !important; }
     .an-fee-ads-amount small { display: block; margin-top: .1rem; color: var(--gf-color-muted, #667085); font-size: .52rem; font-weight: 700; }
+    .an-fee-order-percent { display: block; margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: .52rem; font-weight: 700; white-space: nowrap; }
     .an-fee-type-name { color: var(--gf-color-content, #101828); font-size: .7rem; font-weight: 800; }
     .an-fee-burden-badge { display: inline-flex; align-items: center; justify-content: center; gap: .25rem; min-height: 22px; padding: 0 .48rem; border-radius: 999px; font-size: .58rem; font-weight: 800; white-space: nowrap; }
     .an-fee-burden-badge-seller { color: var(--gf-color-brand-strong, #4142bb); background: #eeefff; }
@@ -1821,6 +1822,22 @@
     .an-fee-shipping-metric > b { display: block; flex: 0 0 auto; color: var(--gf-color-content, #101828); font-size: .72rem; font-weight: 850; text-align: right; white-space: nowrap; }
     .an-fee-shipping-metric > b small { display: block; margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: .54rem; font-weight: 700; }
     .an-fee-shipping-metric-platform > b { color: #087f86; }
+    .an-fee-platform-section { margin: .8rem; border: 1px solid #cfd2ff; border-radius: var(--gf-radius-control, 10px); background: linear-gradient(135deg, #f7f6ff 0%, #fff 72%); overflow: hidden; }
+    .an-fee-platform-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .75rem .85rem .65rem; border-bottom: 1px solid #e4e3ff; }
+    .an-fee-platform-section > header strong, .an-fee-platform-section > header small { display: block; }
+    .an-fee-platform-section > header > div:first-child strong { margin-top: .15rem; color: var(--gf-color-content, #101828); font-size: .76rem; font-weight: 820; }
+    .an-fee-platform-section > header > div:first-child small { max-width: 560px; margin-top: .18rem; color: var(--gf-color-muted, #667085); font-size: .6rem; line-height: 1.4; }
+    .an-fee-platform-total { flex: 0 0 auto; text-align: right; }
+    .an-fee-platform-total strong { color: var(--gf-color-brand-strong, #4142bb); font-size: .78rem; font-weight: 850; white-space: nowrap; }
+    .an-fee-platform-total small { margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: .54rem; font-weight: 700; white-space: nowrap; }
+    .an-fee-platform-list { display: grid; gap: .45rem; padding: .7rem .85rem .8rem; }
+    .an-fee-platform-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: .65rem; padding: .48rem .55rem; border: 1px solid #e4e7ec; border-radius: var(--gf-radius-control, 10px); background: var(--gf-color-surface, #fff); }
+    .an-fee-platform-list span, .an-fee-platform-list small { display: block; }
+    .an-fee-platform-list span { color: var(--gf-color-content, #101828); font-size: .65rem; font-weight: 800; }
+    .an-fee-platform-list span small { margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: .54rem; font-weight: 700; }
+    .an-fee-platform-list > div > strong { color: #087f86; font-size: .7rem; font-weight: 850; text-align: right; white-space: nowrap; }
+    .an-fee-platform-list > div > strong small { margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: .54rem; font-weight: 700; }
+    .an-fee-platform-empty { padding: .75rem .85rem; color: var(--gf-color-muted, #667085); font-size: .62rem; }
     .an-fee-other-section { margin: .8rem; border: 1px solid #ead9b7; border-radius: var(--gf-radius-control, 10px); background: linear-gradient(135deg, #fffbf3 0%, #fff 72%); overflow: hidden; }
     .an-fee-other-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .75rem .85rem .65rem; border-bottom: 1px solid #f3e7ca; }
     .an-fee-other-section > header strong, .an-fee-other-section > header small { display: block; }
@@ -1856,6 +1873,9 @@
         .an-fee-composition-total { justify-items: start; }
         .an-fee-other-section { margin: .65rem; }
         .an-fee-other-section > header { flex-direction: column; }
+        .an-fee-platform-section { margin: .65rem; }
+        .an-fee-platform-section > header { flex-direction: column; }
+        .an-fee-platform-total { text-align: left; }
         .an-fee-analysis-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .an-fee-analysis-grid { grid-template-columns: 1fr; }
         .an-fee-analysis-card-wide { grid-column: auto; }

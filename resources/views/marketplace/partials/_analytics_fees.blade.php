@@ -14,7 +14,7 @@
         </div>
     </header>
 
-    <div class="an-fee-analysis-summary ds-grid ds-grid-4" id="feeOrdersSummary" aria-label="Ringkasan fee marketplace">
+    <div class="an-fee-analysis-summary ds-grid" id="feeOrdersSummary" aria-label="Ringkasan biaya marketplace">
         <x-gf.state type="loading" title="Memuat ringkasan fee…" />
     </div>
 
