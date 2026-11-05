@@ -96,11 +96,12 @@ class PurchaseOrderController extends Controller
         }
 
         if ($request->filled('q')) {
-            $term = (string) $request->q;
+            $term = trim((string) $request->q);
             $q->where(function ($sub) use ($term) {
                 $sub->where('purchase_orders.code', 'like', '%'.$term.'%')
                     ->orWhereHas('lines.item', fn ($itemQuery) => $itemQuery
                         ->where('code', 'like', '%'.$term.'%')
+                        ->orWhere('sku', 'like', '%'.$term.'%')
                         ->orWhere('name', 'like', '%'.$term.'%'));
             });
         }
