@@ -352,6 +352,35 @@
             min-width: 0;
         }
 
+        .lot-select-all-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            margin-left: auto;
+            padding: .18rem .5rem;
+            border: 1px solid rgba(37, 99, 235, .25);
+            border-radius: 999px;
+            color: var(--text);
+            font-size: .68rem;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .lot-select-all-wrap:hover {
+            border-color: rgba(37, 99, 235, .5);
+            background: rgba(37, 99, 235, .05);
+        }
+
+        .lot-select-all-wrap input {
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: #2563eb;
+            cursor: pointer;
+        }
+
         /* Hide accordion header in step 2 */
         .lot-accordion-header-hidden {
             display: none !important;
@@ -1026,6 +1055,10 @@
             <div class="lot-step2-header">
                 <button type="button" id="lot-back-btn" class="lot-back-btn">← Pilih kain lain</button>
                 <div id="lot-step2-item-name" class="lot-step2-item-name"></div>
+                <label class="lot-select-all-wrap" for="lot-select-all">
+                    <input type="checkbox" id="lot-select-all" autocomplete="off">
+                    Pilih semua LOT
+                </label>
             </div>
             <div id="lot-grid"></div>
         </div>
@@ -1073,6 +1106,10 @@
             <div class="lot-step2-header">
                 <button type="button" id="lot-back-btn" class="lot-back-btn">← Pilih kain lain</button>
                 <div id="lot-step2-item-name" class="lot-step2-item-name"></div>
+                <label class="lot-select-all-wrap" for="lot-select-all">
+                    <input type="checkbox" id="lot-select-all" autocomplete="off">
+                    Pilih semua LOT
+                </label>
             </div>
 
             <div id="lot-grid">
@@ -1212,6 +1249,7 @@
             const pickerFooter = document.getElementById('lot-picker-footer');
             const backBtn    = document.getElementById('lot-back-btn');
             const step2Name  = document.getElementById('lot-step2-item-name');
+            const lotSelectAll = document.getElementById('lot-select-all');
             const step3Label = document.getElementById('lot-step3-label');
             const footerHint = document.getElementById('lot-footer-hint');
             const stepInd1   = document.getElementById('lstep-ind-1');
@@ -1223,6 +1261,7 @@
 
             let lotCards  = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-card-item')) : [];
             let lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
+            let activeItemId = null;
 
             /* ── STEP NAVIGATION ─────────────────── */
             function setStepActive(n) {
@@ -1235,6 +1274,7 @@
             }
 
             function goToStep1() {
+                activeItemId = null;
                 lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
                 if (step1Panel) step1Panel.style.display = '';
                 if (step2Panel) step2Panel.style.display = 'none';
@@ -1244,11 +1284,13 @@
                     g.style.display = 'none';
                     g.classList.remove('step2-open');
                 });
+                syncSelectAllControl();
                 setStepActive(1);
                 if (footerHint) footerHint.textContent = 'Pilih kain dulu untuk melihat LOT yang tersedia.';
             }
 
             function goToStep2(itemId, itemName) {
+                activeItemId = String(itemId);
                 lotGroups = lotGrid ? Array.from(lotGrid.querySelectorAll('.lot-item-group')) : [];
                 if (step1Panel) step1Panel.style.display = 'none';
                 if (step2Panel) step2Panel.style.display = '';
@@ -1265,6 +1307,7 @@
                     }
                 });
                 if (step2Name) step2Name.textContent = itemName || '';
+                syncSelectAllControl();
                 setStepActive(2);
                 if (footerHint) footerHint.textContent = 'Centang satu atau beberapa LOT, lalu lanjut.';
             }
@@ -1310,6 +1353,35 @@
                 });
             }
 
+            function getActiveLotGroup() {
+                if (!lotGrid || activeItemId === null) return null;
+                return lotGrid.querySelector('.lot-item-group[data-item-id="' + activeItemId + '"]');
+            }
+
+            function syncSelectAllControl() {
+                if (!lotSelectAll) return;
+                const group = getActiveLotGroup();
+                const checkboxes = group ? Array.from(group.querySelectorAll('.lot-checkbox')) : [];
+                const checkedCount = checkboxes.filter(cb => cb.checked).length;
+                lotSelectAll.disabled = checkboxes.length === 0;
+                lotSelectAll.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+                lotSelectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+            }
+
+            if (lotSelectAll) {
+                lotSelectAll.addEventListener('change', function () {
+                    const group = getActiveLotGroup();
+                    if (!group) return;
+                    const shouldCheck = this.checked;
+
+                    group.querySelectorAll('.lot-checkbox').forEach(checkbox => {
+                        checkbox.checked = shouldCheck;
+                        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    });
+                    syncSelectAllControl();
+                });
+            }
+
             /* ── BADGE: N LOT dipilih ───────────────── */
             function updateGroupBadge(group) {
                 const itemId  = group.getAttribute('data-item-id');
@@ -1340,6 +1412,8 @@
                         lipbSel.classList.remove('visible');
                     }
                 }
+
+                if (String(itemId) === activeItemId) syncSelectAllControl();
             }
 
             /* ── CARD CLICK → toggle checkbox ──────── */
