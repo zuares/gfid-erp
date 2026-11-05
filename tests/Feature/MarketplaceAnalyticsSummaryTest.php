@@ -7,6 +7,7 @@ use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -131,6 +132,54 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(2, $products[0]['qty']);
         $this->assertSame(100000.0, (float) $products[0]['gross_sales']);
         $this->assertSame(0.0, (float) $products[0]['hpp']);
+    }
+
+    public function test_store_ledger_includes_actual_admin_fee_for_financial_ready_orders(): void
+    {
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-STORE-LEDGER',
+            'name' => 'Analytics Store Ledger',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = $this->order($store, 'COMPLETED', 100000);
+        $order->update(['financial_data_status' => MarketplaceFinancialDataQualityService::ORDER_READY]);
+
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'item_name' => 'Produk ledger',
+            'item_sku' => 'LEDGER-001',
+            'qty' => 1,
+            'price' => 100000,
+            'data_status' => 'valid',
+            'hpp_snapshot' => 40000,
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'commission_fee' => 7500,
+            'final_income' => 92500,
+            'settlement_time' => '2026-09-17 12:00:00',
+            'data_status' => MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE,
+        ]);
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $storeRow = $summary['stores'][0];
+
+        $this->assertSame(1, $storeRow['order_total']);
+        $this->assertSame(100000.0, (float) $storeRow['gross_sales']);
+        $this->assertSame(7500.0, (float) $storeRow['admin_fee_actual']);
     }
 
     private function order(Store $store, string $status, float $amount): MarketplaceOrder
