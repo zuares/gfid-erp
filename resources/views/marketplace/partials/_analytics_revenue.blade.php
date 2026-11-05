@@ -33,7 +33,7 @@
                 </div>
                 <span class="an-revenue-section-hint">Nilai mengikuti status tab aktif</span>
             </div>
-            <div class="an-modal-summary an-revenue-summary" id="revenueOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
+            <div class="an-modal-summary an-revenue-summary" id="revenueOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
         </section>
         <section class="an-revenue-section an-revenue-detail-section" aria-labelledby="revenueDetailTitle">
             <div class="an-revenue-section-head">
@@ -43,7 +43,7 @@
                 </div>
                 <span class="an-revenue-section-hint">Buka “Rincian mapping fee” untuk melihat komponen</span>
             </div>
-            <div class="an-modal-body an-revenue-body" id="revenueOrdersBody" aria-live="polite"><div class="an-empty">Memuat data omzet…</div></div>
+            <div class="an-modal-body an-revenue-body" id="revenueOrdersBody" aria-live="polite"><x-gf.state type="loading" title="Memuat data omzet…" /></div>
         </section>
         <div class="an-modal-foot"><button class="an-btn" id="revenueOrdersPrev" type="button" aria-label="Halaman sebelumnya">‹ Sebelumnya</button><div class="an-modal-pagination" aria-live="polite"><div><strong class="an-modal-page" id="revenueOrdersPage">—</strong><small class="an-modal-page-meta" id="revenueOrdersPageMeta">—</small></div></div><button class="an-btn" id="revenueOrdersNext" type="button" aria-label="Halaman berikutnya">Berikutnya ›</button></div>
     </div>

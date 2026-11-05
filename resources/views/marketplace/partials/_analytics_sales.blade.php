@@ -51,14 +51,14 @@
             <div class="an-sales-header-meta"><span class="an-sales-period" id="anSalesCompareLabel">vs periode pembanding</span></div>
         </div>
         <div class="an-sales-trend-body">
-            <div class="an-sales-trend-summary" id="anSalesTrendSummary"><div class="an-empty">Memuat ringkasan penjualan…</div></div>
+            <div class="an-sales-trend-summary" id="anSalesTrendSummary"><x-gf.state type="loading" title="Memuat ringkasan penjualan…" /></div>
             <div class="an-sales-trend-layout">
                 <div class="an-sales-trend-panel">
                     <div class="an-sales-trend-toolbar"><span class="an-sales-trend-label">Penjualan harian</span><span class="an-sales-trend-total" id="anSalesTrendTotal">—</span></div>
-                    <div class="an-sales-trend-chart" id="anSalesTrendChart"><div class="an-empty">Memuat grafik…</div></div>
+                    <div class="an-sales-trend-chart" id="anSalesTrendChart"><x-gf.state type="loading" title="Memuat grafik…" /></div>
                     <div class="an-sales-trend-legend"><span><i></i>Periode aktif</span><span><i class="previous"></i>Periode pembanding</span></div>
                 </div>
-                <div class="an-sales-trend-insights" id="anSalesTrendInsights"><div class="an-empty">Memuat insight…</div></div>
+                <div class="an-sales-trend-insights" id="anSalesTrendInsights"><x-gf.state type="loading" title="Memuat insight…" /></div>
             </div>
         </div>
     </section>
@@ -73,7 +73,7 @@
         <div class="an-table-wrap">
             <table class="an-table an-sales-table">
                 <thead><tr><th>Tanggal</th><th>Pesanan</th><th>Terjual</th><th>Avg Order</th><th>Gross Sales</th><th>Net Sales</th><th>Di Bayar</th><th>Est Revenue</th><th>COGS (HPP)</th><th>Gross Profit</th><th>Iklan</th><th>Net Profit</th></tr></thead>
-                <tbody id="anSalesDailyBody"><tr><td colspan="12"><div class="an-empty">Memuat rincian harian…</div></td></tr></tbody>
+                <tbody id="anSalesDailyBody"><tr><td colspan="12"><x-gf.state type="loading" title="Memuat rincian harian…" /></td></tr></tbody>
             </table>
         </div>
         <div class="an-sales-table-note" id="anSalesDailyNote"></div>

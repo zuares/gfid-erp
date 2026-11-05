@@ -318,6 +318,27 @@
     .an-list-name { color:var(--text,#0f172a); font-size:.78rem; font-weight:650; }
     .an-list-meta, .an-product-sku { color:var(--dsh-muted); }
     .an-empty { color:var(--dsh-muted); }
+    .gf-analytics-state.ds-empty { display:grid; place-items:center; min-height:160px; padding:1rem; text-align:center; border:1px dashed var(--dsh-border-strong,#d0d5dd); border-radius:13px; background:var(--hero-bg,#fcfcfd); }
+    .gf-analytics-state.ds-empty > div { width:100%; }
+    .gf-analytics-state .ds-empty-icon { display:grid; width:34px; height:34px; place-items:center; margin:0 auto .5rem; border-radius:11px; color:var(--gf-color-brand,#4f46e5); background:#eeefff; }
+    .gf-analytics-state strong { display:block; color:var(--text,#101828); font-size:.75rem; font-weight:800; }
+    .gf-analytics-state p { max-width:260px; margin:.22rem auto .7rem; color:var(--dsh-muted,#98a2b3); font-size:.65rem; font-weight:600; line-height:1.45; }
+    .gf-analytics-state .ds-empty-loading-label { margin-bottom:0 !important; }
+    .gf-analytics-state .ds-skeleton { display:grid; width:max-content; gap:.5rem; margin:0 auto .7rem; }
+    .gf-analytics-state .ds-skeleton span { display:block; width:130px; height:10px; border-radius:999px; background:linear-gradient(90deg,#eef0f3,#f8f9fa,#eef0f3); background-size:180% 100%; animation:gf-analytics-shimmer 1.3s ease-in-out infinite; }
+    .gf-analytics-state .ds-skeleton span:nth-child(2) { width:100px; }
+    .gf-analytics-state .ds-skeleton span:nth-child(3) { width:72px; }
+    .gf-analytics-state-error .ds-empty-icon { color:#b42318; background:#fef3f2; }
+    .gf-analytics-state-error strong { color:#b42318; }
+    .gf-analytics-state-error p { color:#b42318; }
+    .an-empty:not(.gf-analytics-state) { display:grid; min-height:120px; place-items:center; padding:1rem; border:1px dashed var(--dsh-border-strong,#d0d5dd); border-radius:13px; background:var(--hero-bg,#fcfcfd); font-size:.68rem; }
+    .an-error:not(.gf-analytics-state) { border-color:#fecaca; background:#fff7f7; }
+    body[data-theme="dark"] .gf-analytics-state.ds-empty { border-color:var(--dsh-border,#334155); background:#0f172a; }
+    body[data-theme="dark"] .gf-analytics-state strong { color:#f8fafc; }
+    body[data-theme="dark"] .gf-analytics-state .ds-empty-icon { background:#1e1b4b; }
+    body[data-theme="dark"] .gf-analytics-state-error .ds-empty-icon { background:#3f1d1d; }
+    @keyframes gf-analytics-shimmer { from { background-position:180% 0; } to { background-position:-20% 0; } }
+    @media (prefers-reduced-motion: reduce) { .gf-analytics-state .ds-skeleton span { animation:none; } }
     body[data-theme="dark"] .an-hero { background:var(--card,#0f172a); border-bottom-color:var(--dsh-border); }
     body[data-theme="dark"] .an-card, body[data-theme="dark"] .an-kpi { background:var(--card,#1e293b); }
     body[data-theme="dark"] .an-hero .an-field input, body[data-theme="dark"] .an-hero .an-field select { background:#0f172a; color:#e2e8f0; }
@@ -1088,6 +1109,146 @@
     body[data-theme="dark"] .an-hero-title { color: #f8fafc; }
     body[data-theme="dark"] .an-hero-controls,
     body[data-theme="dark"] .an-tabs-wrap { background: var(--card, #1e293b); }
+
+    /* Design System header + filter adapter for the Blade analytics page. */
+    .an-hero {
+        align-items: center;
+        min-height: 0;
+        margin: 0 0 .8rem;
+        padding: 1.25rem 1.4rem;
+        border: 1px solid #e0e2fb;
+        border-radius: var(--gf-radius-card, 16px);
+        background: linear-gradient(120deg, #f4f3ff 0%, var(--gf-color-surface, #fff) 52%, #edfcff 100%);
+        box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(16, 24, 40, .04));
+    }
+    .an-hero-copy { min-width: 0; }
+    .an-hero-heading { display: flex; align-items: flex-start; gap: .72rem; }
+    .an-hero-mark { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border-radius: 13px; color: #fff; background: linear-gradient(145deg, var(--gf-color-brand, #5b5ce2), var(--gf-color-accent, #13b8c4)); box-shadow: 0 8px 16px rgba(91, 92, 226, .2); font-size: 1rem; }
+    .an-hero-eyebrow { display: inline-flex; align-items: center; gap: .35rem; margin: 0 0 .25rem; color: var(--gf-color-brand-strong, #4142bb); font-size: .62rem; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+    .an-hero-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gf-color-accent, #13b8c4); box-shadow: 0 0 0 4px rgba(19, 184, 196, .12); }
+    .an-hero-title { margin: 0; color: var(--gf-color-content, #101828); font-size: clamp(1.35rem, 1.8vw, 1.7rem); font-weight: 820; letter-spacing: -.045em; line-height: 1.08; }
+    .an-hero-title i { color: inherit; }
+    .an-hero-sub { max-width: 620px; margin: .38rem 0 0; color: var(--gf-color-muted, #667085); font-size: .72rem; line-height: 1.45; }
+    .an-hero-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; flex: 0 0 auto; }
+    .an-hero-chip { display: inline-flex; align-items: center; gap: .32rem; min-height: 30px; padding: .34rem .55rem; border: 1px solid #dfe1ff; border-radius: 999px; color: var(--gf-color-brand-strong, #4142bb); background: rgba(255,255,255,.72); font-size: .6rem; font-weight: 800; white-space: nowrap; }
+    .an-hero-chip i { color: var(--gf-color-brand, #5b5ce2); }
+    .an-hero-chip-muted { border-color: #bcecef; color: #11737b; background: #effdfd; }
+    .an-hero-chip-muted i { color: var(--gf-color-accent, #13b8c4); }
+    .an-hero-controls { display: grid; grid-template-columns: minmax(190px, .65fr) minmax(0, 2.35fr); align-items: center; gap: .9rem; width: 100%; margin: 0 0 .2rem; padding: .8rem; border: 1px solid var(--gf-color-line, #e4e7ec); border-top: 3px solid var(--gf-color-brand, #5b5ce2); border-radius: var(--gf-radius-card, 16px); background: var(--gf-color-surface, #fff); box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(16, 24, 40, .04)); }
+    .an-filter-intro { display: flex; align-items: center; gap: .55rem; min-width: 0; padding: .25rem .45rem; }
+    .an-filter-icon { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; border-radius: 9px; color: var(--gf-color-brand-strong, #4142bb); background: #eeefff; font-size: .78rem; }
+    .an-filter-intro strong { display: block; color: var(--gf-color-content, #101828); font-size: .68rem; font-weight: 820; }
+    .an-filter-intro small { display: block; margin-top: .15rem; color: var(--gf-color-muted, #667085); font-size: .58rem; line-height: 1.35; }
+    .an-filter-fields { display: grid; grid-template-columns: minmax(125px, .9fr) minmax(145px, 1.1fr) minmax(180px, 1.3fr) minmax(150px, 1.1fr) auto; align-items: end; gap: .55rem; min-width: 0; }
+    .an-hero-controls .an-field { width: auto; min-width: 0; }
+    .an-hero-controls .an-field label { display: flex; align-items: center; gap: .25rem; margin: 0 0 .28rem .1rem; color: var(--gf-color-muted, #667085); font-size: .58rem; font-weight: 820; letter-spacing: .055em; line-height: 1; text-transform: uppercase; }
+    .an-hero-controls .an-field label i { color: var(--gf-color-brand, #5b5ce2); font-size: .68rem; }
+    .an-hero-controls .an-field input, .an-hero-controls .an-field select { width: 100%; min-width: 0; min-height: var(--gf-touch-target, 44px); padding: .45rem .65rem; border: 1px solid #d0d5dd; border-radius: var(--gf-radius-control, 10px); color: var(--gf-color-content, #101828); background: var(--gf-color-surface, #fff); font-size: .7rem; font-weight: 700; outline: none; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+    .an-hero-controls .an-field input:hover, .an-hero-controls .an-field select:hover { border-color: #b9baf4; }
+    .an-hero-controls .an-field input:focus, .an-hero-controls .an-field select:focus { border-color: var(--gf-color-brand, #5b5ce2); box-shadow: 0 0 0 3px rgba(91, 92, 226, .12); }
+    .an-period-field input { color: var(--gf-color-brand-strong, #4142bb) !important; background: #f8f7ff !important; font-weight: 800 !important; cursor: pointer; }
+    .an-filter-fields .an-btn { width: auto; min-height: var(--gf-touch-target, 44px); border-radius: var(--gf-radius-control, 10px); padding-inline: .78rem; white-space: nowrap; }
+    .an-hero-controls .an-btn-dark { border-color: var(--gf-color-brand, #5b5ce2); color: #fff; background: var(--gf-color-brand, #5b5ce2); box-shadow: 0 6px 12px rgba(91, 92, 226, .16); }
+    .an-hero-controls .an-btn-dark:hover { border-color: var(--gf-color-brand-strong, #4142bb); color: #fff; background: var(--gf-color-brand-strong, #4142bb); }
+    @media (max-width: 1120px) { .an-hero-controls { grid-template-columns: 1fr; gap: .55rem; } .an-filter-intro { padding-inline: .25rem; } }
+    @media (max-width: 900px) { .an-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .an-filter-fields .an-btn { width: 100%; } }
+    @media (max-width: 760px) { .an-hero { align-items: flex-start; flex-direction: column; gap: .85rem; padding: 1rem; } .an-hero-meta { justify-content: flex-start; } .an-hero-controls { padding: .7rem; } .an-filter-fields { grid-template-columns: 1fr; } .an-filter-fields .an-btn { width: 100%; } }
+    @media (prefers-reduced-motion: reduce) { .an-hero-controls .an-field input, .an-hero-controls .an-field select { transition: none; } }
+    body[data-theme="dark"] .an-hero { border-color: rgba(129, 140, 248, .4); background: linear-gradient(120deg, rgba(49, 46, 129, .38) 0%, #1e293b 56%, rgba(6, 78, 59, .28) 100%); }
+    body[data-theme="dark"] .an-hero-title, body[data-theme="dark"] .an-filter-intro strong { color: #f8fafc; }
+    body[data-theme="dark"] .an-hero-eyebrow { color: #c7c8f5; }
+    body[data-theme="dark"] .an-hero-sub, body[data-theme="dark"] .an-filter-intro small { color: #cbd5e1; }
+    body[data-theme="dark"] .an-hero-chip { border-color: rgba(129, 140, 248, .45); color: #dfe1ff; background: rgba(15, 23, 42, .42); }
+    body[data-theme="dark"] .an-hero-chip-muted { border-color: rgba(45, 212, 191, .35); color: #99f6e4; background: rgba(6, 78, 59, .25); }
+    body[data-theme="dark"] .an-hero-controls { border-color: #334155; background: #1e293b; }
+    body[data-theme="dark"] .an-hero-controls .an-field input, body[data-theme="dark"] .an-hero-controls .an-field select { border-color: #475569; color: #f8fafc; background: #0f172a; }
+    body[data-theme="dark"] .an-period-field input { color: #dfe1ff !important; background: rgba(49, 46, 129, .28) !important; }
+
+    /* ComparisonKpi adapter: keep the Blade analytics page on the same KPI contract as /design-system. */
+    .an-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; align-items: stretch; }
+    .an-kpis .ds-comparison-kpi.an-kpi { min-height: 0; overflow: hidden; padding: 0; border: 1px solid #e0e2fb; border-radius: 14px; background: linear-gradient(145deg, #fafaff 0%, #fff 58%, #f3feff 100%); box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(16, 24, 40, .04)); }
+    .an-kpis .ds-comparison-kpi.an-kpi::before { display: none; }
+    .an-kpis .ds-comparison-kpi-main { min-height: 126px; padding: .9rem .95rem .8rem; }
+    .an-kpis .ds-comparison-kpi-label { display: block; color: var(--gf-color-muted, #667085); font-size: .62rem; font-weight: 800; line-height: 1.3; }
+    .an-kpis .ds-comparison-kpi-main strong.an-kpi-value { display: block; margin: .38rem 0 .18rem; color: var(--gf-color-content, #101828); font-size: clamp(1.1rem, 1.5vw, 1.55rem); font-weight: 850; letter-spacing: -.055em; line-height: 1; }
+    .an-kpis .ds-comparison-kpi-description.an-kpi-note { display: block; min-height: 2.2em; margin: 0; padding: 0; border: 0; color: var(--gf-color-muted, #667085); font-size: .58rem; font-weight: 650; line-height: 1.35; white-space: normal; overflow: visible; }
+    .an-kpis .ds-comparison-kpi-icon { width: 33px; height: 33px; flex: 0 0 auto; border-radius: 11px; color: var(--gf-color-brand-strong, #4142bb); background: #e9e9ff; font-size: .85rem; }
+    .an-kpis .ds-comparison-kpi-comparisons { padding: .2rem .95rem .55rem; }
+    .an-kpis .ds-comparison-kpi-row { min-height: 49px; padding: .55rem 0; border-top: 1px solid rgba(228, 231, 236, .84); }
+    .an-kpis .ds-comparison-kpi-row span { color: #475467; font-size: .61rem; font-weight: 750; }
+    .an-kpis .ds-comparison-kpi-row small { margin-top: .1rem; color: #98a2b3; font-size: .56rem; }
+    .an-kpis .ds-comparison-kpi-result strong { color: var(--gf-color-content, #101828); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .an-kpis .ds-comparison-kpi-change { display: inline-flex; align-items: center; gap: .1rem; font-size: .59rem; font-weight: 800; white-space: nowrap; }
+    .an-kpis .ds-comparison-kpi-change.is-up { color: var(--gf-color-success, #14945a) !important; }
+    .an-kpis .ds-comparison-kpi-change.is-down { color: var(--gf-color-danger, #d6455d) !important; }
+    .an-kpis .ds-comparison-kpi-change.is-neutral { color: var(--gf-color-muted, #667085) !important; }
+    .an-kpis .ds-comparison-kpi.an-kpi.kpi-cancelled,
+    .an-kpis .ds-comparison-kpi.an-kpi.kpi-refund { border-color: #f1cbd3; }
+    .an-kpis .ds-comparison-kpi.kpi-cancelled .ds-comparison-kpi-icon,
+    .an-kpis .ds-comparison-kpi.kpi-refund .ds-comparison-kpi-icon { color: var(--gf-color-danger, #d6455d); background: #fff0f2; }
+    @media (max-width: 1120px) { .an-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 760px) { .an-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; } .an-kpis .ds-comparison-kpi-main { min-height: 116px; padding: .72rem .75rem .65rem; } .an-kpis .ds-comparison-kpi-main strong.an-kpi-value { font-size: 1.08rem; } .an-kpis .ds-comparison-kpi-comparisons { padding-inline: .75rem; } .an-kpis .ds-comparison-kpi-row { align-items: flex-start; flex-direction: column; gap: .22rem; } .an-kpis .ds-comparison-kpi-result { justify-content: space-between; width: 100%; } }
+    @media (max-width: 420px) { .an-kpis { grid-template-columns: 1fr; } }
+    @media (prefers-reduced-motion: reduce) { .an-kpis .ds-comparison-kpi-change { transition: none; } }
+    body[data-theme="dark"] .an-kpis .ds-comparison-kpi.an-kpi { border-color: #334155; background: linear-gradient(145deg, #17203a 0%, #111827 58%, #0e2b35 100%); }
+    body[data-theme="dark"] .an-kpis .ds-comparison-kpi-main strong.an-kpi-value,
+    body[data-theme="dark"] .an-kpis .ds-comparison-kpi-result strong { color: #f8fafc; }
+    body[data-theme="dark"] .an-kpis .ds-comparison-kpi-label,
+    body[data-theme="dark"] .an-kpis .ds-comparison-kpi-description.an-kpi-note,
+    body[data-theme="dark"] .an-kpis .ds-comparison-kpi-row small { color: #aab4c5; }
+    body[data-theme="dark"] .an-kpis .ds-comparison-kpi-row { border-color: #263149; }
+    body[data-theme="dark"] .an-kpis .ds-comparison-kpi-row span { color: #d1d5db; }
+
+    /* SelectField adapter: Blade filters follow the /design-system contract. */
+    .gf-select-field { display: grid; align-content: start; gap: .32rem; min-width: 0; }
+    .gf-select-field > label { color: var(--gf-color-muted, #667085); font-size: .68rem; font-weight: 750; }
+    .gf-select-field > label span { color: var(--gf-color-danger, #d6455d); }
+    .gf-select-field .ds-select-control { position: relative; display: flex; align-items: center; min-width: 0; min-height: var(--gf-touch-target, 44px); border: 1px solid var(--gf-color-line, #d0d5dd); border-radius: var(--gf-radius-control, 10px); background: var(--gf-color-surface, #fff); transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+    .gf-select-field .ds-select-control:focus-within { border-color: var(--gf-color-brand, #5b5ce2); box-shadow: 0 0 0 3px rgba(91, 92, 226, .12); }
+    .gf-select-field .ds-select-leading-icon { flex: 0 0 auto; margin-left: .7rem; color: var(--gf-color-muted, #98a2b3); font-size: .75rem; pointer-events: none; }
+    .gf-select-field .ds-select-control select { flex: 1; min-width: 0; min-height: 42px; padding: .55rem 2rem .55rem .48rem; border: 0; border-radius: 9px; color: var(--gf-color-content, #344054); outline: 0; background: transparent; font: inherit; font-size: .7rem; font-weight: 700; appearance: none; cursor: pointer; }
+    .gf-select-field .ds-select-control select:disabled { color: var(--gf-color-muted, #98a2b3); cursor: not-allowed; }
+    .gf-select-field .ds-select-chevron { position: absolute; right: .7rem; color: var(--gf-color-muted, #98a2b3); font-size: .65rem; pointer-events: none; }
+    .gf-select-field.is-disabled .ds-select-control { border-color: var(--gf-color-line, #e4e7ec); background: var(--gf-color-surface-muted, #f8fafc); }
+    .gf-select-field.is-error .ds-select-control { border-color: var(--gf-color-danger, #d6455d); }
+    .gf-select-field.is-error .ds-select-control:focus-within { box-shadow: 0 0 0 3px rgba(214, 69, 93, .12); }
+    .gf-select-field .ds-select-hint, .gf-select-field .ds-select-error { display: block; font-size: .6rem; line-height: 1.35; }
+    .gf-select-field .ds-select-hint { color: var(--gf-color-muted, #98a2b3); }
+    .gf-select-field .ds-select-hint i { margin-right: .2rem; color: var(--gf-color-brand, #5b5ce2); }
+    .gf-select-field .ds-select-error { color: var(--gf-color-danger, #d6455d); font-weight: 650; }
+    .gf-select-field .ds-select-error i { margin-right: .2rem; }
+    .an-hero-controls .gf-select-field .ds-select-control select { min-height: 42px; padding: .55rem 2rem .55rem .48rem; border: 0; border-radius: 9px; color: var(--gf-color-content, #101828); background: transparent; box-shadow: none; }
+    .an-cohort-field.gf-select-field { display: grid; gap: .22rem; }
+    .an-cohort-field.gf-select-field > label { color: var(--dsh-muted, #64748b); font-size: .59rem; font-weight: 850; }
+    .an-cohort-field.gf-select-field .ds-select-control { min-height: 38px; border-radius: 9px; }
+    .an-cohort-field.gf-select-field .ds-select-control select { min-height: 36px; font-size: .67rem; }
+    .an-product-select-control { position: relative; display: flex; align-items: center; min-width: 0; min-height: 32px; border: 1px solid var(--gf-color-line, #d0d5dd); border-radius: 9px; background: var(--gf-color-surface, #fff); transition: border-color .18s ease, box-shadow .18s ease; }
+    .an-product-select-control:focus-within { border-color: var(--gf-color-brand, #5b5ce2); box-shadow: 0 0 0 3px rgba(91, 92, 226, .12); }
+    .an-product-select-control select { flex: 1; min-width: 0; min-height: 30px; padding: .25rem 1.65rem .25rem .5rem; border: 0; border-radius: 8px; color: var(--gf-color-content, #344054); background: transparent; font: inherit; font-size: .66rem; font-weight: 700; outline: 0; appearance: none; cursor: pointer; }
+    .an-product-select-control .ds-select-chevron { position: absolute; right: .5rem; color: var(--gf-color-muted, #98a2b3); font-size: .6rem; pointer-events: none; }
+    .an-product-select-control select:disabled { color: var(--gf-color-muted, #98a2b3); cursor: not-allowed; }
+    body[data-theme="dark"] .gf-select-field .ds-select-control, body[data-theme="dark"] .an-product-select-control { border-color: #475569; background: #0f172a; }
+    body[data-theme="dark"] .gf-select-field .ds-select-control select, body[data-theme="dark"] .an-product-select-control select { color: #f8fafc; background: transparent; }
+    body[data-theme="dark"] .gf-select-field > label, body[data-theme="dark"] .an-cohort-field.gf-select-field > label { color: #aab4c5; }
+    body[data-theme="dark"] .gf-select-field.is-disabled .ds-select-control { background: #111827; }
+    @media (max-width: 900px) { .an-product-select-control { flex: 1 1 140px; } }
+    @media (max-width: 760px) { .an-product-select-control { width: 100%; } }
+    @media (prefers-reduced-motion: reduce) { .gf-select-field .ds-select-control, .an-product-select-control { transition: none; } }
+
+    /* Typography scale adapter: display 40/850, body 14/400, caption 11/650. */
+    .an-hero-title { font-size: clamp(2rem, 4vw, 2.5rem); font-weight: 850; letter-spacing: -.06em; line-height: 1.04; }
+    .an-hero-sub { font-size: .875rem; font-weight: 400; line-height: 1.6; }
+    .an-hero-eyebrow, .an-hero-chip, .an-tabs-meta, .an-tab { font-size: .6875rem; font-weight: 650; }
+    .an-hero-chip { letter-spacing: .01em; }
+    .an-filter-intro strong { font-size: .875rem; font-weight: 400; }
+    .an-filter-intro small, .an-hero-controls .an-field label, .an-revenue-section-kicker, .an-revenue-section-hint { font-size: .6875rem; font-weight: 650; }
+    .an-hero-controls .an-field input, .an-hero-controls .an-field select { font-size: .875rem; font-weight: 400; }
+    .an-period-field input { font-weight: 650 !important; }
+    .an-revenue-tabs .an-modal-tab { font-size: .6875rem; font-weight: 650; }
+    .an-revenue-tabs .an-modal-tab small { font-size: .6875rem; font-weight: 650; }
+    .an-revenue-section-head strong { font-size: .875rem; font-weight: 650; }
+    .an-revenue-head .an-enterprise-title { font-size: .875rem; font-weight: 650; }
+    @media (max-width: 760px) { .an-hero-title { font-size: clamp(1.75rem, 8vw, 2.25rem); } .an-hero-sub { font-size: .875rem; } }
 </style>
 @endpush
 
@@ -1096,17 +1257,33 @@
     <div class="page-wrap ads-shell an-page">
         <div class="an-hero">
             <div class="an-hero-copy">
-                <div class="an-hero-eyebrow">Marketplace / Operasional &amp; Keuangan</div>
-                <div class="an-hero-title"><i class="bi bi-bar-chart-line me-1"></i>Performance Analytics</div>
+                <div class="an-hero-heading">
+                    <span class="an-hero-mark" aria-hidden="true"><i class="bi bi-bar-chart-line"></i></span>
+                    <div>
+                        <div class="an-hero-eyebrow"><span class="an-hero-eyebrow-dot"></span>Marketplace analytics</div>
+                        <div class="an-hero-title">Performance Analytics</div>
+                        <p class="an-hero-sub">Satu workspace untuk membaca omzet, pencairan, fee, dan performa operasional.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="an-hero-meta" aria-label="Status workspace">
+                <span class="an-hero-chip"><i class="bi bi-grid-1x2" aria-hidden="true"></i>Decision workspace</span>
+                <span class="an-hero-chip an-hero-chip-muted"><i class="bi bi-broadcast" aria-hidden="true"></i>Data aktif</span>
             </div>
         </div>
-        <div class="an-hero-controls">
-            <div class="an-field"><label for="anPlatform">Platform</label><select id="anPlatform" aria-label="Filter platform"><option value="" @selected(empty($filters['platform']))>Semua platform</option><option value="shopee" @selected(($filters['platform'] ?? '') === 'shopee')>Shopee</option><option value="tiktok" @selected(($filters['platform'] ?? '') === 'tiktok')>TikTok Shop</option></select></div>
-            <div class="an-field"><label for="anStore">Filter toko</label><select id="anStore" aria-label="Filter toko"><option value="">Semua toko</option></select></div>
-            <div class="an-field"><label for="anDateRange">Periode</label><input type="text" id="anDateRange" autocomplete="off" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"></div>
-            <div class="an-field"><label for="anCompare">Bandingkan</label><select id="anCompare"><option value="prev_period" @selected(($filters['compare_mode'] ?? '') === 'prev_period')>Periode lalu</option><option value="prev_month" @selected(($filters['compare_mode'] ?? 'prev_month') === 'prev_month')>Tanggal sama bulan lalu</option><option value="prev_quarter" @selected(($filters['compare_mode'] ?? '') === 'prev_quarter')>Tanggal sama 3 bulan lalu</option><option value="prev_year" @selected(($filters['compare_mode'] ?? '') === 'prev_year')>Tanggal sama tahun lalu</option></select></div>
-            <input type="hidden" id="anDateFrom" value="{{ $filters['date_from'] }}"><input type="hidden" id="anDateTo" value="{{ $filters['date_to'] }}">
-            <button class="an-btn an-btn-dark" id="anRefresh" type="button"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+        <div class="an-hero-controls" role="group" aria-label="Filter analytics">
+            <div class="an-filter-intro">
+                <span class="an-filter-icon" aria-hidden="true"><i class="bi bi-sliders2"></i></span>
+                <div><strong>Filter laporan</strong><small>Atur cakupan data dan periode analisis.</small></div>
+            </div>
+            <div class="an-filter-fields">
+                <x-gf.select-field id="anPlatform" label="Platform" icon="bi-shop" wrapper-class="an-field" aria-label="Filter platform"><option value="" @selected(empty($filters['platform']))>Semua platform</option><option value="shopee" @selected(($filters['platform'] ?? '') === 'shopee')>Shopee</option><option value="tiktok" @selected(($filters['platform'] ?? '') === 'tiktok')>TikTok Shop</option></x-gf.select-field>
+                <x-gf.select-field id="anStore" label="Filter toko" icon="bi-shop-window" wrapper-class="an-field" aria-label="Filter toko"><option value="">Semua toko</option></x-gf.select-field>
+                <div class="an-field an-period-field ds-flatpickr-field"><label for="anDateRange">Periode</label><div class="ds-flatpickr-control"><i class="bi bi-calendar3 ds-flatpickr-icon" aria-hidden="true"></i><input type="text" id="anDateRange" autocomplete="off" aria-label="Periode" value="{{ $filters['date_from'] }} — {{ $filters['date_to'] }}"></div></div>
+                <x-gf.select-field id="anCompare" label="Bandingkan" icon="bi-arrow-left-right" wrapper-class="an-field"><option value="prev_period" @selected(($filters['compare_mode'] ?? '') === 'prev_period')>Periode lalu</option><option value="prev_month" @selected(($filters['compare_mode'] ?? 'prev_month') === 'prev_month')>Tanggal sama bulan lalu</option><option value="prev_quarter" @selected(($filters['compare_mode'] ?? '') === 'prev_quarter')>Tanggal sama 3 bulan lalu</option><option value="prev_year" @selected(($filters['compare_mode'] ?? '') === 'prev_year')>Tanggal sama tahun lalu</option></x-gf.select-field>
+                <input type="hidden" id="anDateFrom" value="{{ $filters['date_from'] }}"><input type="hidden" id="anDateTo" value="{{ $filters['date_to'] }}">
+                <button class="an-btn an-btn-dark ds-btn ds-btn-primary" id="anRefresh" type="button"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Refresh data</button>
+            </div>
         </div>
 
         <div class="an-shell">
@@ -1174,6 +1351,20 @@
     const completed = o => ['COMPLETED', 'DELIVERED', 'CLOSED'].includes(status(o));
     const money = v => fmtRp(Math.round(v || 0));
     const pct = (a,b) => b ? (a / b * 100).toFixed(1) + '%' : '0%';
+    const stateMarkup = (type = 'empty', title = '', message = '') => {
+        const stateType = ['empty', 'loading', 'error'].includes(type) ? type : 'empty';
+        const defaults = {
+            empty: { title: 'Belum ada data', message: 'Belum ada data untuk ditampilkan pada filter ini.', icon: 'bi-inbox' },
+            loading: { title: 'Memuat data', message: 'Menyiapkan data terbaru…', icon: '' },
+            error: { title: 'Data belum dapat dimuat', message: 'Coba muat ulang halaman atau ubah filter.', icon: 'bi-exclamation-triangle' },
+        }[stateType];
+        const heading = esc(title || defaults.title);
+        const detail = esc(message || defaults.message);
+        const content = stateType === 'loading'
+            ? `<div class="ds-skeleton" aria-hidden="true"><span></span><span></span><span></span></div><p class="ds-empty-loading-label">${heading}</p>`
+            : `<div class="ds-empty-icon" aria-hidden="true"><i class="bi ${defaults.icon}"></i></div><strong>${heading}</strong><p>${detail}</p>`;
+        return `<div class="ds-empty gf-analytics-state gf-analytics-state-${stateType}" role="status" aria-live="polite"><div>${content}</div></div>`;
+    };
     const skuKey = value => String(value || '').trim().toUpperCase();
     const parseAppDate = value => {
         const raw = String(value || '').trim();
@@ -1334,7 +1525,7 @@
         const current = currentRows.slice(-31);
         const previous = previousRows.slice(-31);
         if (!current.length && !previous.length) {
-            container.innerHTML = '<div class="an-empty">Belum ada data penjualan harian pada periode ini.</div>';
+            container.innerHTML = stateMarkup('empty', 'Belum ada data penjualan harian', 'Belum ada data penjualan harian pada periode ini.');
             return;
         }
         const active = current.length ? current : previous;
@@ -1405,7 +1596,7 @@
             const index = currentRows.length - reverseIndex - 1;
             const previousRow = previousRows[index] || {};
             return `<tr><td>${esc(salesPeriodLabel(row.date))}</td><td>${tableCell(row.orders, previousRow.orders, number)}</td><td>${tableCell(row.qty, previousRow.qty, number)}</td><td>${tableCell(row.avgOrder, previousRow.avgOrder, money)}</td><td>${tableCell(row.grossSales, previousRow.grossSales)}</td><td>${tableCell(row.netSales, previousRow.netSales)}</td><td>${tableCell(row.paid, previousRow.paid)}</td><td>${tableCell(row.payout, previousRow.payout)}</td><td>${tableCell(row.cogs, previousRow.cogs, money, true)}</td><td>${tableCell(row.grossProfit, previousRow.grossProfit, money, false, row.grossProfit < 0 ? 'is-negative' : 'is-positive')}</td><td>${tableCell(row.adCost, previousRow.adCost, money, true)}</td><td>${tableCell(row.profit, previousRow.profit, money, false, row.profit < 0 ? 'is-negative' : 'is-positive')}</td></tr>`;
-        }).join('') : '<tr><td colspan="12"><div class="an-empty">Belum ada rincian harian pada periode ini.</div></td></tr>';
+        }).join('') : `<tr><td colspan="12">${stateMarkup('empty', 'Belum ada rincian harian', 'Belum ada rincian harian pada periode ini.')}</td></tr>`;
         const dailyNote = $('anSalesDailyNote');
         if (dailyNote) {
             dailyNote.textContent = currentRows.length
@@ -1447,7 +1638,7 @@
     async function loadProducts() {
         if (productsLoaded) return;
         await loadStores();
-        $('bestProductBody').innerHTML = '<tr><td colspan="10"><div class="an-empty">Memuat detail produk…</div></td></tr>';
+        $('bestProductBody').innerHTML = `<tr><td colspan="10">${stateMarkup('loading', 'Memuat detail produk…')}</td></tr>`;
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to() });
             if (selectedPlatform()) params.set('platform', selectedPlatform());
@@ -1458,7 +1649,7 @@
             productsLoaded = true;
             renderProductSummary(productData);
         } catch (e) {
-            $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-error">Detail produk gagal dimuat.</div></td></tr>';
+            $('bestProductBody').innerHTML = `<tr><td colspan="9">${stateMarkup('error', 'Detail produk gagal dimuat')}</td></tr>`;
         }
     }
     async function load() {
@@ -1475,7 +1666,7 @@
         returnPayload = null;
         if (cashModalWasOpen || revenueTabWasActive) {
             loadCashOrders();
-            loadCashTabSummaries();
+            loadCashTabSummaries(cashSettlementTabs);
         }
         setLoading('Menyiapkan KPI utama…');
         $('anRefresh').disabled = true;
@@ -1505,14 +1696,14 @@
             summary = summaryPayload;
             fillStores();
             render();
-            $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-empty">Buka tab Produk untuk memuat detail.</div></td></tr>';
+            $('bestProductBody').innerHTML = `<tr><td colspan="9">${stateMarkup('empty', 'Menunggu data produk', 'Buka tab Produk untuk memuat detail.')}</td></tr>`;
             if (document.querySelector('[data-an-tab="cohort"]')?.classList.contains('active')) await loadCohort();
         } catch (e) {
             console.error('Analytics summary load failed', e);
             summary = null;
-            $('storeBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Tidak dapat memuat ringkasan analytics.</div></td></tr>';
-            $('overviewStoreLedgerBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Tidak dapat memuat performa toko.</div></td></tr>';
-            $('bestProductBody').innerHTML = '<tr><td colspan="9"><div class="an-error">Tidak dapat memuat data analytics.</div></td></tr>';
+            $('storeBody').innerHTML = `<tr><td colspan="8">${stateMarkup('error', 'Tidak dapat memuat ringkasan analytics')}</td></tr>`;
+            $('overviewStoreLedgerBody').innerHTML = `<tr><td colspan="8">${stateMarkup('error', 'Tidak dapat memuat performa toko')}</td></tr>`;
+            $('bestProductBody').innerHTML = `<tr><td colspan="9">${stateMarkup('error', 'Tidak dapat memuat data analytics')}</td></tr>`;
         } finally {
             $('anRefresh').disabled = false;
             $('anRefresh').textContent = '↻ Refresh';
@@ -1538,7 +1729,7 @@
             const needsReload = cashFocus !== 'combined' || !cashPayload;
             cashFocus = 'combined';
             if (needsReload && !cashLoading) { cashPage = 1; cashPayload = null; loadCashOrders(); }
-            loadCashTabSummaries();
+            loadCashTabSummaries(cashSettlementTabs);
         }
     }));
     const syncUrl = () => { const params = new URLSearchParams({date_from:from(),date_to:to(),compare_mode:$('anCompare').value}); if (selectedPlatform()) params.set('platform', selectedPlatform()); if (selectedStore()) params.set('store_id', selectedStore()); const activeTab = document.querySelector('[data-an-tab].active')?.dataset.anTab; if (activeTab) params.set('view', activeTab); history.replaceState(null,'',location.pathname+'?'+params.toString()); };

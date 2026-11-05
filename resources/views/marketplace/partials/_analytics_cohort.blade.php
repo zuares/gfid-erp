@@ -8,7 +8,7 @@
         <div class="an-cohort-pagebar-meta">
             <span class="an-cohort-period-label">Periode analisis</span>
             <strong id="anCohortPeriodLabel">—</strong>
-            <button class="an-cohort-reset" id="anCohortReset" type="button"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</button>
+            <button class="an-cohort-reset ds-btn ds-btn-ghost ds-btn-sm" id="anCohortReset" type="button"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</button>
         </div>
     </header>
 
@@ -22,19 +22,19 @@
         </div>
 
         <div class="an-cohort-control-grid an-cohort-primary-controls">
-            <div class="an-cohort-field"><label for="anCohortMode">Fokus</label><select id="anCohortMode"><option value="customer">Perilaku pelanggan</option><option value="product">Performa produk</option></select></div>
-            <div class="an-cohort-field"><label for="anCohortMetric">Metric</label><select id="anCohortMetric"></select></div>
-            <div class="an-cohort-field an-cohort-grouping-field" id="anCohortGroupingField"><label for="anCohortGroupBy">Kelompok produk</label><select id="anCohortGroupBy"><option value="category">Kategori master</option><option value="product">Produk / SKU</option></select></div>
-            <button class="an-btn an-btn-dark an-cohort-apply" id="anCohortApply" type="button"><i class="bi bi-play-fill me-1" aria-hidden="true"></i>Terapkan</button>
+            <x-gf.select-field id="anCohortMode" label="Fokus" icon="bi-bullseye" wrapper-class="an-cohort-field"><option value="customer">Perilaku pelanggan</option><option value="product">Performa produk</option></x-gf.select-field>
+            <x-gf.select-field id="anCohortMetric" label="Metric" icon="bi-bar-chart-line" wrapper-class="an-cohort-field"></x-gf.select-field>
+            <div class="an-cohort-grouping-field" id="anCohortGroupingField"><x-gf.select-field id="anCohortGroupBy" label="Kelompok produk" icon="bi-diagram-3" wrapper-class="an-cohort-field"><option value="category">Kategori master</option><option value="product">Produk / SKU</option></x-gf.select-field></div>
+            <button class="an-btn an-btn-dark an-cohort-apply ds-btn ds-btn-primary ds-btn-sm" id="anCohortApply" type="button"><i class="bi bi-play-fill me-1" aria-hidden="true"></i>Terapkan</button>
         </div>
 
         <details class="an-cohort-advanced">
             <summary><span><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter tambahan</span><small>Toko, marketplace, kategori, produk, dan SKU</small></summary>
             <div class="an-cohort-control-grid an-cohort-advanced-grid">
-                <div class="an-cohort-field"><label for="anCohortMarketplace">Marketplace</label><select id="anCohortMarketplace"><option value="">Semua marketplace</option></select></div>
-                <div class="an-cohort-field"><label for="anCohortCategory">Kategori master</label><select id="anCohortCategory"><option value="">Semua kategori</option></select></div>
-                <div class="an-cohort-field"><label for="anCohortProduct">Produk</label><select id="anCohortProduct"><option value="">Semua produk</option></select></div>
-                <div class="an-cohort-field"><label for="anCohortSku">SKU</label><select id="anCohortSku"><option value="">Semua SKU</option></select></div>
+                <x-gf.select-field id="anCohortMarketplace" label="Marketplace" icon="bi-shop" wrapper-class="an-cohort-field"><option value="">Semua marketplace</option></x-gf.select-field>
+                <x-gf.select-field id="anCohortCategory" label="Kategori master" icon="bi-grid-3x3-gap" wrapper-class="an-cohort-field"><option value="">Semua kategori</option></x-gf.select-field>
+                <x-gf.select-field id="anCohortProduct" label="Produk" icon="bi-box-seam" wrapper-class="an-cohort-field"><option value="">Semua produk</option></x-gf.select-field>
+                <x-gf.select-field id="anCohortSku" label="SKU" icon="bi-upc-scan" wrapper-class="an-cohort-field"><option value="">Semua SKU</option></x-gf.select-field>
             </div>
         </details>
 
@@ -54,14 +54,14 @@
                 <div><div class="an-cohort-panel-eyebrow">Perkembangan</div><div class="an-enterprise-title">Perubahan berdasarkan umur cohort</div><div class="an-enterprise-sub" id="anCohortCurveSubtitle">Rata-rata metric sejak transaksi pertama.</div></div>
                 <span class="an-cohort-panel-badge blue">M0 → terbaru</span>
             </div>
-            <div class="an-enterprise-body an-cohort-chart-body"><div class="an-cohort-chart-canvas" id="anCohortCurveChart"><div class="an-empty">Terapkan analisis untuk melihat grafik.</div></div></div>
+            <div class="an-enterprise-body an-cohort-chart-body"><div class="an-cohort-chart-canvas" id="anCohortCurveChart"><x-gf.state title="Terapkan analisis" message="Terapkan analisis untuk melihat grafik." /></div></div>
         </section>
         <section class="an-enterprise-card an-cohort-chart-card">
             <div class="an-enterprise-head">
                 <div><div class="an-cohort-panel-eyebrow">Sebaran</div><div class="an-enterprise-title">Cohort berdasarkan bulan mulai</div><div class="an-enterprise-sub" id="anCohortDistributionSubtitle">Ukuran cohort dari transaksi pertama.</div></div>
                 <span class="an-cohort-panel-badge green">Per bulan</span>
             </div>
-            <div class="an-enterprise-body an-cohort-chart-body"><div class="an-cohort-chart-canvas" id="anCohortDistributionChart"><div class="an-empty">Terapkan analisis untuk melihat grafik.</div></div></div>
+            <div class="an-enterprise-body an-cohort-chart-body"><div class="an-cohort-chart-canvas" id="anCohortDistributionChart"><x-gf.state title="Terapkan analisis" message="Terapkan analisis untuk melihat grafik." /></div></div>
         </section>
     </section>
 
@@ -78,7 +78,7 @@
                 <span class="an-cohort-reading-item"><strong>M1+</strong><small>bulan berikutnya</small></span>
                 <span class="an-cohort-reading-hint" id="anCohortMetricHint">Pilih metric untuk melihat definisinya.</span>
             </div>
-            <div class="an-table-wrap an-cohort-table-wrap"><table id="anCohortTable" class="an-table an-cohort-table"><caption class="visually-hidden">Matriks cohort berdasarkan periode transaksi pertama</caption><thead id="anCohortHead"><tr><th>Cohort</th><th>Base</th><th>M0</th><th>M1</th><th>M2</th></tr></thead><tbody id="anCohortBody" aria-live="polite"><tr><td colspan="5"><div class="an-empty">Terapkan analisis untuk memuat data.</div></td></tr></tbody></table></div>
+        <div class="an-table-wrap an-cohort-table-wrap"><table id="anCohortTable" class="an-table an-cohort-table"><caption class="visually-hidden">Matriks cohort berdasarkan periode transaksi pertama</caption><thead id="anCohortHead"><tr><th>Cohort</th><th>Base</th><th>M0</th><th>M1</th><th>M2</th></tr></thead><tbody id="anCohortBody" aria-live="polite"><tr><td colspan="5"><x-gf.state title="Terapkan analisis" message="Terapkan analisis untuk memuat data." /></td></tr></tbody></table></div>
         </div>
     </section>
 
@@ -97,7 +97,7 @@
     <div class="an-modal-backdrop" data-cohort-close></div>
     <section class="an-modal-dialog an-cohort-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="cohortDetailTitle">
         <div class="an-modal-head"><div><div class="an-modal-eyebrow">Detail cohort</div><div class="an-modal-title" id="cohortDetailTitle">Rincian cohort</div><div class="an-modal-sub" id="cohortDetailSubtitle">Periode aktif</div></div><button class="an-modal-close" type="button" data-cohort-close aria-label="Tutup">×</button></div>
-        <div class="an-modal-summary" id="cohortDetailSummary"><div class="an-empty">Pilih sel cohort.</div></div>
+        <div class="an-modal-summary" id="cohortDetailSummary"><x-gf.state title="Pilih sel cohort" message="Pilih sel cohort untuk melihat rincian." /></div>
         <div class="an-modal-body"><div class="an-cohort-note" id="cohortDetailNote">Detail mengikuti filter Cohort dan tidak menampilkan identitas pelanggan.</div></div>
     </section>
 </div>

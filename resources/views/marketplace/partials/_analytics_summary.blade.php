@@ -1,23 +1,23 @@
 <div class="an-summary-top-grid an-tab-pane" data-an-pane="overview">
     <section class="an-enterprise-card an-executive-top">
         <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Executive overview</div><div class="an-enterprise-title">Executive pulse</div><div class="an-enterprise-sub">Volume, basket, dan exception operasional</div></div></div>
-        <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-executive" id="anPulseGrid"><div class="an-empty">Memuat insight…</div></div></div>
+        <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-executive" id="anPulseGrid"><x-gf.state type="loading" title="Memuat insight…" /></div></div>
     </section>
 
     <section class="an-enterprise-card">
         <div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Decision cockpit</div><div class="an-enterprise-title">KPI keputusan</div><div class="an-enterprise-sub">GMV → dana → biaya → estimasi net profit</div></div></div>
-        <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><div class="an-empty">Memuat KPI…</div></div></div>
+        <div class="an-enterprise-body"><div class="an-pulse-grid an-pulse-grid-finance an-decision-pulse-grid" id="anDecisionPulse"><x-gf.state type="loading" title="Memuat KPI…" /></div></div>
     </section>
 </div>
 
 <div class="an-enterprise-grid an-tab-pane" data-an-pane="overview">
-    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Portfolio view</div><div class="an-enterprise-title">Store performance snapshot</div><div class="an-enterprise-sub">Ranking toko berdasarkan gross sales dan profit operasional terverifikasi.</div></div></div><div class="an-enterprise-body"><div class="an-pulse-grid" id="anOverviewStorePulse"><div class="an-empty">Memuat…</div></div></div></section>
-    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Cost structure</div><div class="an-enterprise-title">Cost efficiency</div><div class="an-enterprise-sub">Rasio biaya terhadap gross sales terverifikasi, bukan GMV operasional.</div></div></div><div class="an-enterprise-body"><div class="an-health-list" id="anOverviewStoreCostPulse"><div class="an-empty">Memuat…</div></div></div></section>
+    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Portfolio view</div><div class="an-enterprise-title">Store performance snapshot</div><div class="an-enterprise-sub">Ranking toko berdasarkan gross sales dan profit operasional terverifikasi.</div></div></div><div class="an-enterprise-body"><div class="an-pulse-grid" id="anOverviewStorePulse"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
+    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Cost structure</div><div class="an-enterprise-title">Cost efficiency</div><div class="an-enterprise-sub">Rasio biaya terhadap gross sales terverifikasi, bukan GMV operasional.</div></div></div><div class="an-enterprise-body"><div class="an-health-list" id="anOverviewStoreCostPulse"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
 </div>
 
 <div class="an-grid-secondary an-tab-pane" data-an-pane="overview">
-    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div><div class="an-card-title">Performa per toko</div><div class="an-card-sub">Hanya order financial-ready: settlement complete, item valid, dan HPP tersedia.</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order eligible</th><th>Selesai</th><th>Cancel</th><th>Gross sales terverifikasi</th><th>Adm fee aktual</th><th>Biaya iklan</th><th>Profit operasional</th></tr></thead><tbody id="overviewStoreLedgerBody"><tr><td colspan="8"><div class="an-empty">Memuat…</div></td></tr></tbody></table></div></div></section>
-    <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Fee estimasi mengikuti rate actual Unit economics; biaya settlement tetap tersedia untuk audit</div></div></div><div class="an-card-body"><div class="an-costs" id="overviewCostBody"><div class="an-empty">Memuat…</div></div></div></section>
+    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div><div class="an-card-title">Performa per toko</div><div class="an-card-sub">Hanya order financial-ready: settlement complete, item valid, dan HPP tersedia.</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order eligible</th><th>Selesai</th><th>Cancel</th><th>Gross sales terverifikasi</th><th>Adm fee aktual</th><th>Biaya iklan</th><th>Profit operasional</th></tr></thead><tbody id="overviewStoreLedgerBody"><tr><td colspan="8"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div></div></section>
+    <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Fee estimasi mengikuti rate actual Unit economics; biaya settlement tetap tersedia untuk audit</div></div></div><div class="an-card-body"><div class="an-costs" id="overviewCostBody"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
 </div>
 
 <section class="an-control-tower an-tab-pane is-hidden" data-an-pane="operations">
@@ -32,23 +32,23 @@
     <div class="an-control-grid">
         <section class="an-control-panel an-control-flow">
             <div class="an-control-panel-head"><div><div class="an-control-panel-kicker">Operational health</div><div class="an-control-panel-title">Order-to-cash flow</div><div class="an-control-panel-sub">Alur order dari masuk sampai profit tervalidasi.</div></div><span class="an-control-panel-value" id="anFlowStatus">—</span></div>
-            <div class="an-control-panel-body"><div class="an-funnel" id="salesFunnel"><div class="an-empty">Memuat…</div></div></div>
+            <div class="an-control-panel-body"><div class="an-funnel" id="salesFunnel"><x-gf.state type="loading" title="Memuat…" /></div></div>
         </section>
         <div class="an-control-column">
             <section class="an-control-panel">
                 <div class="an-control-panel-head"><div><div class="an-control-panel-kicker">Business health</div><div class="an-control-panel-title">Execution quality</div><div class="an-control-panel-sub">Kualitas data dan eksekusi order.</div></div><span class="an-health-score" id="anHealthScore">—</span></div>
-                <div class="an-control-panel-body"><div class="an-health-list" id="anHealthList"><div class="an-empty">Memuat health score…</div></div></div>
+                <div class="an-control-panel-body"><div class="an-health-list" id="anHealthList"><x-gf.state type="loading" title="Memuat health score…" /></div></div>
             </section>
             <section class="an-control-panel">
                 <div class="an-control-panel-head"><div><div class="an-control-panel-kicker">Management attention</div><div class="an-control-panel-title">Priority actions</div><div class="an-control-panel-sub">Exception yang perlu ditindaklanjuti.</div></div><span class="an-alert-count" id="anAlertCount">—</span></div>
-                <div class="an-control-panel-body"><div class="an-alerts" id="anAlerts"><div class="an-empty">Memuat alert…</div></div></div>
+                <div class="an-control-panel-body"><div class="an-alerts" id="anAlerts"><x-gf.state type="loading" title="Memuat alert…" /></div></div>
             </section>
         </div>
     </div>
 </section>
 
 <div class="an-grid-main an-grid-main-chart an-tab-pane is-hidden" data-an-pane="operations">
-    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Performance trend</div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><div class="an-empty">Memuat grafik…</div></div></div></section>
+    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Performance trend</div><div class="an-card-title"><i class="bi bi-graph-up-arrow me-1" style="color:#16a34a"></i>Grafik harian</div><div class="an-card-sub">Omzet &amp; estimasi profit</div></div></div><div class="an-card-body"><div class="an-chart-panel-head"><div class="an-chart-panel-title">Performa harian</div><div class="an-chart-summary" id="chartCompareNote">Memuat…</div></div><div class="an-chart" id="revenueChart"><x-gf.state type="loading" title="Memuat grafik…" /></div></div></section>
 </div>
 
 <div class="an-modal" id="cashOrdersModal" aria-hidden="true">
@@ -72,8 +72,8 @@
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="return_refund"><span>Return / Refund</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled"><span>Dana belum cair</span><small data-cash-tab-kpi>—</small></button>
         </div>
-        <div class="an-modal-summary" id="cashOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
-        <div class="an-modal-body" id="cashOrdersBody"><div class="an-empty">Pilih status pencairan untuk memuat order.</div></div>
+        <div class="an-modal-summary" id="cashOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
+        <div class="an-modal-body" id="cashOrdersBody"><x-gf.state title="Pilih status pencairan" message="Pilih status pencairan untuk memuat order." /></div>
         <div class="an-modal-foot"><button class="an-btn" id="cashOrdersPrev" type="button" aria-label="Halaman sebelumnya">‹ Sebelumnya</button><div class="an-modal-pagination" aria-live="polite"><div><strong class="an-modal-page" id="cashOrdersPage">—</strong><small class="an-modal-page-meta" id="cashOrdersPageMeta">—</small></div></div><button class="an-btn" id="cashOrdersNext" type="button" aria-label="Halaman berikutnya">Berikutnya ›</button></div>
     </section>
 </div>
@@ -93,13 +93,13 @@
             <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-return-type="return_refund">Return / refund</button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-return-type="failed_delivery">Pengiriman gagal</button>
         </div>
-        <div class="an-modal-summary" id="returnOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
-        <div class="an-modal-body" id="returnOrdersBody"><div class="an-empty">Pilih jenis exception untuk memuat data.</div></div>
+        <div class="an-modal-summary" id="returnOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
+        <div class="an-modal-body" id="returnOrdersBody"><x-gf.state title="Pilih jenis exception" message="Pilih jenis exception untuk memuat data." /></div>
         <div class="an-modal-foot"><button class="an-btn" id="returnOrdersPrev" type="button">‹ Sebelumnya</button><span class="an-modal-page" id="returnOrdersPage">—</span><button class="an-btn" id="returnOrdersNext" type="button">Berikutnya ›</button></div>
     </section>
 </div>
 
 <div class="an-contribution-grid an-tab-pane is-hidden" data-an-pane="operations">
-    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Kontribusi toko</div><div class="an-enterprise-sub">Toko dengan kontribusi omzet terbesar</div></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anTopStores"><div class="an-empty">Memuat…</div></div></div></section>
-    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Unit economics</div><div class="an-enterprise-sub">Omzet total, pencairan, dan biaya aktual</div></div><div class="an-economics-legend" aria-label="Legenda status omzet"><span><i></i>Cair</span><span><i class="pending"></i>Belum cair</span></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anEconomics"><div class="an-empty">Memuat…</div></div></div></section>
+    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Kontribusi toko</div><div class="an-enterprise-sub">Toko dengan kontribusi omzet terbesar</div></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anTopStores"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
+    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-enterprise-title">Unit economics</div><div class="an-enterprise-sub">Omzet total, pencairan, dan biaya aktual</div></div><div class="an-economics-legend" aria-label="Legenda status omzet"><span><i></i>Cair</span><span><i class="pending"></i>Belum cair</span></div></div><div class="an-enterprise-body"><div class="an-contribution-list" id="anEconomics"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
 </div>

@@ -47,12 +47,14 @@
             const element = button.querySelector('[data-cash-tab-kpi], [data-revenue-tab-kpi]');
             if (!element) return;
             if (!summary) {
-                element.textContent = settlement === cashSettlement ? 'Memuat…' : 'Pilih status';
+                element.textContent = 'Memuat…';
+                element.classList.add('is-loading');
                 return;
             }
             const count = Number(summary.cash_order_count || 0).toLocaleString('id-ID');
             const amount = money(cashTabAmount(settlement, summary));
             element.textContent = `${count} order · ${amount}`;
+            element.classList.remove('is-loading');
         });
     }
 
@@ -181,9 +183,9 @@
         const groups = isAll
             ? ['completed', 'warehouse', 'shipped', 'confirm', 'return_refund', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
             : [{ key: 'flat', label: '', rows }];
-        const table = groups.length ? groups.map(group => `<section class="an-cash-group">${renderTable(group.rows, isAll ? group.label : '')}</section>`).join('') : `<div class="an-empty">Tidak ada order pada periode ini.</div>`;
+        const table = groups.length ? groups.map(group => `<section class="an-cash-group">${renderTable(group.rows, isAll ? group.label : '')}</section>`).join('') : stateMarkup('empty', 'Belum ada order', 'Tidak ada order pada periode ini.');
         const body = isFeeFocus
-            ? (rows.length ? renderTable(rows) : '<div class="an-empty">Tidak ada order pada periode ini.</div>')
+            ? (rows.length ? renderTable(rows) : stateMarkup('empty', 'Belum ada order', 'Tidak ada order pada periode ini.'))
             : table;
         $('cashOrdersBody').innerHTML = feeBreakdown + body;
         const currentPage = Number(meta.current_page || cashPage);
@@ -218,9 +220,9 @@
     async function loadCashOrders() {
         if (cashLoading) return;
         cashLoading = true;
-        $('cashOrdersBody').innerHTML = '<div class="an-empty">Memuat order…</div>';
+        $('cashOrdersBody').innerHTML = stateMarkup('loading', 'Memuat order…');
         $('revenueOrdersBody')?.setAttribute('aria-busy', 'true');
-        $('cashOrdersSummary').innerHTML = '<div class="an-empty">Memuat ringkasan…</div>';
+        $('cashOrdersSummary').innerHTML = stateMarkup('loading', 'Memuat ringkasan…');
         $('cashOrdersPage').textContent = 'Memuat…';
         $('cashOrdersPageMeta').textContent = 'Mengambil data terbaru';
         $('cashOrdersPrev').disabled = true;
@@ -234,8 +236,8 @@
             renderCashOrders();
         } catch (e) {
             console.error('Cash order detail load failed', e);
-            $('cashOrdersSummary').innerHTML = '<div class="an-error">Ringkasan order cair gagal dimuat.</div>';
-            $('cashOrdersBody').innerHTML = '<div class="an-error">Detail order cair gagal dimuat.</div>';
+            $('cashOrdersSummary').innerHTML = stateMarkup('error', 'Ringkasan order cair gagal dimuat');
+            $('cashOrdersBody').innerHTML = stateMarkup('error', 'Detail order cair gagal dimuat');
             $('cashOrdersPage').textContent = 'Gagal memuat';
             $('cashOrdersPageMeta').textContent = 'Coba lagi';
             syncRevenueOrdersView();
@@ -258,7 +260,7 @@
         setCashSettlementTab('all');
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · semua status`;
         loadCashOrders();
-        loadCashTabSummaries();
+        loadCashTabSummaries(cashSettlementTabs);
     }
     function openFeeOrders() {
         closeReturnOrders();
@@ -273,7 +275,7 @@
         setCashSettlementTab('settled');
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · settlement complete`;
         loadCashOrders();
-        loadCashTabSummaries();
+        loadCashTabSummaries(cashSettlementTabs);
     }
     function renderReturnOrders() {
         const payload = returnPayload || {};
@@ -288,7 +290,7 @@
             cashStat('Kategori', isFailed ? 'Pengiriman gagal' : 'Return / refund'),
             cashStat('Basis data', isFailed ? 'RTS / status gagal' : 'Marketplace returns'),
         ].join('');
-        $('returnOrdersBody').innerHTML = rows.length ? `<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Referensi</th><th>Order &amp; toko</th><th>Status</th><th>Nilai kasus</th><th>Waktu</th></tr></thead><tbody>${rows.map(row => { const kindLabel = row.kind === 'failed_delivery' ? 'Pengiriman gagal' : (row.kind === 'refund' ? 'Refund' : 'Return + refund'); const kindClass = row.kind === 'failed_delivery' ? '' : 'return'; return `<tr><td><div class="an-cash-order">${esc(row.reference)}</div><span class="an-exception-kind ${kindClass}">${kindLabel}</span><span class="an-cash-meta">${esc(row.reason || '—')}</span></td><td><div class="an-cash-order">${esc(row.order_sn)}</div><span class="an-cash-meta">${esc(row.store_name)}</span></td><td><span class="an-cash-status">${esc(cashStatus(row.status))}</span>${row.tracking_number ? `<span class="an-cash-meta">AWB ${esc(row.tracking_number)}</span>` : ''}</td><td class="an-cash-money fee">${money(row.amount)}</td><td><span class="an-cash-meta">${esc(dateTime(row.event_time))}</span></td></tr>`; }).join('')}</tbody></table></div>` : `<div class="an-empty">Belum ada data ${isFailed ? 'pengiriman gagal eksplisit' : 'return / refund'} pada periode ini.</div>`;
+        $('returnOrdersBody').innerHTML = rows.length ? `<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Referensi</th><th>Order &amp; toko</th><th>Status</th><th>Nilai kasus</th><th>Waktu</th></tr></thead><tbody>${rows.map(row => { const kindLabel = row.kind === 'failed_delivery' ? 'Pengiriman gagal' : (row.kind === 'refund' ? 'Refund' : 'Return + refund'); const kindClass = row.kind === 'failed_delivery' ? '' : 'return'; return `<tr><td><div class="an-cash-order">${esc(row.reference)}</div><span class="an-exception-kind ${kindClass}">${kindLabel}</span><span class="an-cash-meta">${esc(row.reason || '—')}</span></td><td><div class="an-cash-order">${esc(row.order_sn)}</div><span class="an-cash-meta">${esc(row.store_name)}</span></td><td><span class="an-cash-status">${esc(cashStatus(row.status))}</span>${row.tracking_number ? `<span class="an-cash-meta">AWB ${esc(row.tracking_number)}</span>` : ''}</td><td class="an-cash-money fee">${money(row.amount)}</td><td><span class="an-cash-meta">${esc(dateTime(row.event_time))}</span></td></tr>`; }).join('')}</tbody></table></div>` : stateMarkup('empty', 'Belum ada data exception', `Belum ada data ${isFailed ? 'pengiriman gagal eksplisit' : 'return / refund'} pada periode ini.`);
         const currentPage = Number(meta.current_page || returnPage);
         const lastPage = Number(meta.last_page || 1);
         $('returnOrdersPage').textContent = `Halaman ${currentPage} / ${lastPage}`;
@@ -311,8 +313,8 @@
     async function loadReturnOrders() {
         if (returnLoading) return;
         returnLoading = true;
-        $('returnOrdersBody').innerHTML = '<div class="an-empty">Memuat data return…</div>';
-        $('returnOrdersSummary').innerHTML = '<div class="an-empty">Memuat ringkasan…</div>';
+        $('returnOrdersBody').innerHTML = stateMarkup('loading', 'Memuat data return…');
+        $('returnOrdersSummary').innerHTML = stateMarkup('loading', 'Memuat ringkasan…');
         $('returnOrdersPrev').disabled = true;
         $('returnOrdersNext').disabled = true;
         try {
@@ -323,8 +325,8 @@
             renderReturnOrders();
         } catch (e) {
             console.error('Return detail load failed', e);
-            $('returnOrdersSummary').innerHTML = '<div class="an-error">Ringkasan return gagal dimuat.</div>';
-            $('returnOrdersBody').innerHTML = '<div class="an-error">Data return gagal dimuat.</div>';
+            $('returnOrdersSummary').innerHTML = stateMarkup('error', 'Ringkasan return gagal dimuat');
+            $('returnOrdersBody').innerHTML = stateMarkup('error', 'Data return gagal dimuat');
             $('returnOrdersPage').textContent = '—';
         } finally {
             returnLoading = false;

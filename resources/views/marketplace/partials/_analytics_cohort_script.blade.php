@@ -134,13 +134,13 @@
         if (mode === 'customer') {
             $('anCohortHead').innerHTML = `<tr>${cohortHeader('Cohort', 'transaksi pertama')}${cohortHeader('Base', 'pelanggan')}${periods.map(index => cohortHeader(`M${index}`, index === 0 ? 'bulan pertama' : `+${index} bulan`)).join('')}</tr>`;
             const maxValue = Math.max(...(payload?.rows || []).flatMap(row => Object.values(row.periods || {}).map(period => Number(period[metric] || 0))), 1);
-            $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky"><span class="an-cohort-row-title">${esc(cohortMonthLabel(row.cohort_month))}</span><span class="an-cohort-row-sub">Bulan transaksi pertama</span></td><td><span class="an-cohort-base-value">${Number(row.cohort_size || 0).toLocaleString('id-ID')}</span><span class="an-cohort-row-sub">pelanggan</span></td>${periods.map(index => cohortCell(row.periods?.[index], metric, false, maxValue, { cohort_month:row.cohort_month })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 2}"><div class="an-empty">Tidak ada cohort pelanggan untuk filter ini.</div></td></tr>`;
+            $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky"><span class="an-cohort-row-title">${esc(cohortMonthLabel(row.cohort_month))}</span><span class="an-cohort-row-sub">Bulan transaksi pertama</span></td><td><span class="an-cohort-base-value">${Number(row.cohort_size || 0).toLocaleString('id-ID')}</span><span class="an-cohort-row-sub">pelanggan</span></td>${periods.map(index => cohortCell(row.periods?.[index], metric, false, maxValue, { cohort_month:row.cohort_month })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 2}">${stateMarkup('empty', 'Tidak ada cohort pelanggan', 'Tidak ada cohort pelanggan untuk filter ini.')}</td></tr>`;
             return;
         }
         const categoryGrouping = payload?.group_by === 'category';
         $('anCohortHead').innerHTML = `<tr>${cohortHeader(categoryGrouping ? 'Kategori master' : 'Produk', categoryGrouping ? 'item dalam kategori' : 'catalog item')}${cohortHeader('Cohort mulai', 'transaksi pertama')}${periods.map(index => cohortHeader(`M${index}`, index === 0 ? 'bulan pertama' : `+${index} bulan`)).join('')}</tr>`;
         const maxValue = Math.max(...(payload?.rows || []).flatMap(row => Object.values(row.periods || {}).map(period => Number(period[metric] || 0))), 1);
-        $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky an-cohort-product-cell"><span class="an-cohort-row-title">${esc(row.product_name)}</span><span class="an-cohort-row-sub">${categoryGrouping ? `${Number(row.product_count || 0).toLocaleString('id-ID')} produk dalam kategori master` : `${esc(row.sku)} · ${esc(row.category)}`}</span></td><td>${esc(cohortMonthLabel(row.cohort_month))}</td>${periods.map(index => cohortCell(row.periods?.[index], metric, true, maxValue, { cohort_month:row.cohort_month, product_name:row.product_name, sku:row.sku, category:row.category })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 2}"><div class="an-empty">Tidak ada cohort produk untuk filter ini.</div></td></tr>`;
+            $('anCohortBody').innerHTML = payload?.rows?.length ? payload.rows.map(row => `<tr><td class="an-cohort-sticky an-cohort-product-cell"><span class="an-cohort-row-title">${esc(row.product_name)}</span><span class="an-cohort-row-sub">${categoryGrouping ? `${Number(row.product_count || 0).toLocaleString('id-ID')} produk dalam kategori master` : `${esc(row.sku)} · ${esc(row.category)}`}</span></td><td>${esc(cohortMonthLabel(row.cohort_month))}</td>${periods.map(index => cohortCell(row.periods?.[index], metric, true, maxValue, { cohort_month:row.cohort_month, product_name:row.product_name, sku:row.sku, category:row.category })).join('')}</tr>`).join('') : `<tr><td colspan="${periods.length + 2}">${stateMarkup('empty', 'Tidak ada cohort produk', 'Tidak ada cohort produk untuk filter ini.')}</td></tr>`;
     }
     function openCohortDetail(detail) {
         const label = detail.is_product ? detail.product_name : cohortMonthLabel(detail.cohort_month);
@@ -168,7 +168,7 @@
         $('anCohortApply').disabled = true;
         $('anCohortApply').innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Memuat…';
         renderCohortActiveFilters();
-        $('anCohortBody').innerHTML = '<tr><td colspan="8"><div class="an-empty">Memuat cohort…</div></td></tr>';
+        $('anCohortBody').innerHTML = `<tr><td colspan="8">${stateMarkup('loading', 'Memuat cohort…')}</td></tr>`;
         try {
             await loadCohortOptions();
             cohortPayload = await api('/api/marketplace/analytics-cohort?' + cohortParams().toString(), { cache:'no-store' });
@@ -179,9 +179,9 @@
             console.error('Cohort load failed', error);
             cohortPayload = null;
             $('anCohortNote').textContent = 'Cohort gagal dimuat. Periksa filter atau log aplikasi.';
-            $('anCohortBody').innerHTML = '<tr><td colspan="8"><div class="an-error">Data cohort gagal dimuat.</div></td></tr>';
-            $('anCohortCurveChart').innerHTML = '<div class="an-error">Grafik cohort gagal dimuat.</div>';
-            $('anCohortDistributionChart').innerHTML = '<div class="an-error">Grafik cohort gagal dimuat.</div>';
+            $('anCohortBody').innerHTML = `<tr><td colspan="8">${stateMarkup('error', 'Data cohort gagal dimuat')}</td></tr>`;
+            $('anCohortCurveChart').innerHTML = stateMarkup('error', 'Grafik cohort gagal dimuat');
+            $('anCohortDistributionChart').innerHTML = stateMarkup('error', 'Grafik cohort gagal dimuat');
         } finally {
             cohortLoading = false;
             $('anCohortApply').disabled = false;

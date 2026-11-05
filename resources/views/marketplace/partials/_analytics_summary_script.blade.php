@@ -161,24 +161,40 @@
             const previousValue = Number(baseline || 0);
             const previousText = formatter(previousValue);
             if (previousValue === 0) {
-                return { text: `<i class="bi bi-arrow-left-right" aria-hidden="true"></i> ${previousText} · ${currentValue === 0 ? '0,0%' : 'baru'}`, className: currentValue > 0 ? 'good' : '' };
+                return { text: `<i class="bi bi-arrow-left-right" aria-hidden="true"></i> ${previousText} · ${currentValue === 0 ? '0,0%' : 'baru'}`, previousText, changeText: currentValue === 0 ? '0,0%' : 'baru', className: currentValue > 0 ? 'good' : '' };
             }
             const change = (currentValue - previousValue) / Math.abs(previousValue) * 100;
-            return { text: `<i class="bi bi-arrow-left-right" aria-hidden="true"></i> ${previousText} · ${change > 0 ? '+' : ''}${change.toFixed(1).replace('.', ',')}%`, className: change > 0 ? 'good' : (change < 0 ? 'bad' : '') };
+            return { text: `<i class="bi bi-arrow-left-right" aria-hidden="true"></i> ${previousText} · ${change > 0 ? '+' : ''}${change.toFixed(1).replace('.', ',')}%`, previousText, changeText: `${change > 0 ? '+' : ''}${change.toFixed(1).replace('.', ',')}%`, className: change > 0 ? 'good' : (change < 0 ? 'bad' : '') };
         };
         const setKpiComparison = (valueId, value, baseline, formatter = money) => {
             const valueElement = $(valueId);
             const card = valueElement?.closest('.an-kpi');
             if (!card) return;
-            let element = card.querySelector('.an-kpi-compare');
-            if (!element) {
-                element = document.createElement('span');
-                card.appendChild(element);
-            }
             const comparison = comparisonText(value, baseline, formatter);
-            element.className = `an-kpi-compare ${comparison.className}`;
-            element.title = 'Nilai periode pembanding dan perubahan';
-            element.innerHTML = comparison.text;
+            const comparisonRow = card.querySelector(`[data-kpi-comparison="${valueId}"]`);
+            if (comparisonRow) {
+                const period = comparisonRow.querySelector('[data-kpi-compare-period]');
+                const previousValue = comparisonRow.querySelector('[data-kpi-compare-value]');
+                const changeValue = comparisonRow.querySelector('[data-kpi-compare-change]');
+                const compareLabel = $('anCompare')?.selectedOptions?.[0]?.textContent?.trim() || 'Periode sebelumnya';
+                if (period) period.textContent = compareLabel;
+                if (previousValue) previousValue.textContent = comparison.previousText;
+                if (changeValue) {
+                    const direction = comparison.className === 'good' ? 'up' : (comparison.className === 'bad' ? 'down' : 'neutral');
+                    changeValue.className = `ds-comparison-kpi-change is-${direction}`;
+                    changeValue.title = 'Perubahan terhadap periode pembanding';
+                    changeValue.innerHTML = `<i class="bi ${direction === 'up' ? 'bi-arrow-up-right' : direction === 'down' ? 'bi-arrow-down-right' : 'bi-dash'}" aria-hidden="true"></i> ${comparison.changeText}`;
+                }
+                return;
+            }
+            let legacy = card.querySelector('.an-kpi-compare');
+            if (!legacy) {
+                legacy = document.createElement('span');
+                card.appendChild(legacy);
+            }
+            legacy.className = `an-kpi-compare ${comparison.className}`;
+            legacy.title = 'Nilai periode pembanding dan perubahan';
+            legacy.innerHTML = comparison.text;
         };
         const countFormatter = value => Number(value || 0).toLocaleString('id-ID');
         const percentFormatter = value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`;
@@ -220,16 +236,16 @@
     function renderChart(rows, previousRows) {
         const renderToken = ++chartRenderToken;
         const points = chartPoints(rows), previousPoints = chartPoints(previousRows || []);
-        if (!points.length && !previousPoints.length) { $('revenueChart').innerHTML = '<div class="an-empty">Belum ada order selesai untuk dibandingkan.</div>'; return; }
+        if (!points.length && !previousPoints.length) { $('revenueChart').innerHTML = stateMarkup('empty', 'Belum ada order selesai', 'Belum ada order selesai untuk dibandingkan.'); return; }
         const labelsSource = points.length ? points : previousPoints;
         const modeLabel = {prev_period:'periode lalu',prev_month:'tanggal sama bulan lalu',prev_quarter:'tanggal sama 3 bulan lalu',prev_year:'tanggal sama tahun lalu'}[$('anCompare')?.value] || 'tanggal sama bulan lalu';
         $('chartCompareNote').textContent = `vs ${modeLabel}`;
         if (!window.Chart) {
-            $('revenueChart').innerHTML = '<div class="an-empty">Menyiapkan grafik…</div>';
+            $('revenueChart').innerHTML = stateMarkup('loading', 'Menyiapkan grafik…');
             loadChartLibrary().then(() => {
                 if (renderToken === chartRenderToken) renderChart(rows, previousRows);
             }).catch(() => {
-                $('revenueChart').innerHTML = '<div class="an-empty">Grafik belum tersedia.</div>';
+                $('revenueChart').innerHTML = stateMarkup('empty', 'Grafik belum tersedia', 'Belum ada data yang dapat divisualisasikan.');
             });
             return;
         }
@@ -280,7 +296,7 @@
         const mode = payload?.mode === 'product' ? 'product' : 'customer';
         const metric = payload?.metric || (mode === 'product' ? 'revenue' : 'retention_pct');
         const periods = Array.from({ length: Math.max(0, Number(payload?.max_period || 0)) + 1 }, (_, index) => index);
-        const empty = '<div class="an-empty">Belum ada data cohort untuk divisualisasikan.</div>';
+        const empty = stateMarkup('empty', 'Belum ada data cohort', 'Belum ada data cohort untuk divisualisasikan.');
         if (!rows.length) {
             if (cohortChartInstance) cohortChartInstance.destroy();
             if (cohortDistributionChartInstance) cohortDistributionChartInstance.destroy();
@@ -291,13 +307,13 @@
             return;
         }
         if (!window.Chart) {
-            $('anCohortCurveChart').innerHTML = '<div class="an-empty">Menyiapkan grafik…</div>';
-            $('anCohortDistributionChart').innerHTML = '<div class="an-empty">Menyiapkan grafik…</div>';
+            $('anCohortCurveChart').innerHTML = stateMarkup('loading', 'Menyiapkan grafik…');
+            $('anCohortDistributionChart').innerHTML = stateMarkup('loading', 'Menyiapkan grafik…');
             loadChartLibrary().then(() => {
                 if (renderToken === cohortChartRenderToken) renderCohortCharts(payload);
             }).catch(() => {
-                $('anCohortCurveChart').innerHTML = '<div class="an-empty">Grafik belum tersedia.</div>';
-                $('anCohortDistributionChart').innerHTML = '<div class="an-empty">Grafik belum tersedia.</div>';
+                $('anCohortCurveChart').innerHTML = stateMarkup('empty', 'Grafik belum tersedia', 'Belum ada data yang dapat divisualisasikan.');
+                $('anCohortDistributionChart').innerHTML = stateMarkup('empty', 'Grafik belum tersedia', 'Belum ada data yang dapat divisualisasikan.');
             });
             return;
         }
@@ -425,7 +441,7 @@
         const ledgerElement = $(ledgerBodyId);
         if (ledgerElement) {
             const rows = [...list].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0));
-            ledgerElement.innerHTML = rows.length ? rows.map(store => `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.order_total || 0).toLocaleString('id-ID')}</td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.order_total)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(store.gross_sales)}<span class="an-table-subline">AOV financial-ready ${money(store.order_count ? store.gross_sales / store.order_count : 0)}</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">komisi platform actual</span></td><td style="font-weight:900;color:#b45309">${money(store.ad_cost)}<span class="an-table-subline">iklan incl. PPN</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Payout − HPP − iklan</span></td></tr>`).join('') : '<tr><td colspan="8"><div class="an-empty">Belum ada data toko siap profit.</div></td></tr>';
+            ledgerElement.innerHTML = rows.length ? rows.map(store => `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.order_total || 0).toLocaleString('id-ID')}</td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.order_total)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(store.gross_sales)}<span class="an-table-subline">AOV financial-ready ${money(store.order_count ? store.gross_sales / store.order_count : 0)}</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">komisi platform actual</span></td><td style="font-weight:900;color:#b45309">${money(store.ad_cost)}<span class="an-table-subline">iklan incl. PPN</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Payout − HPP − iklan</span></td></tr>`).join('') : `<tr><td colspan="8">${stateMarkup('empty', 'Belum ada data toko siap profit', 'Belum ada toko yang memenuhi kriteria financial-ready.')}</td></tr>`;
         }
     }
     function renderMarketplaceCosts(targetId) {
@@ -603,7 +619,7 @@
         $('anAlertCount').textContent = alerts[0][1] === 'bi-check2-circle' ? 'Aman' : `${alerts.length} prioritas`;
         $('anAlerts').innerHTML = alerts.map(([level,icon,title,note,action]) => `<div class="an-alert ${level}"><span class="an-alert-icon"><i class="bi ${icon}"></i></span><div><div class="an-alert-title">${title}</div><div class="an-alert-note">${note}</div></div><span class="an-alert-action">${action}</span></div>`).join('');
         const maxStore = Math.max(...topStores.map(store => Number(store.gross_sales || 0)), 1);
-        $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_count || 0).toLocaleString('id-ID')} order financial-ready · profit ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gross_sales || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gross_sales)}</div></div>`).join('') : '<div class="an-empty">Belum ada kontribusi toko.</div>';
+        $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_count || 0).toLocaleString('id-ID')} order financial-ready · profit ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gross_sales || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gross_sales)}</div></div>`).join('') : stateMarkup('empty', 'Belum ada kontribusi toko', 'Belum ada kontribusi toko pada periode ini.');
         renderStorePerformance({ pulseId: 'anOverviewStorePulse', costPulseId: 'anOverviewStoreCostPulse', ledgerBodyId: 'overviewStoreLedgerBody' });
         renderMarketplaceCosts('overviewCostBody');
         const settledGross = Number(current.cash_order_revenue ?? current.cash_gross_sales ?? 0);
