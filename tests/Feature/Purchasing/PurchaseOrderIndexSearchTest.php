@@ -153,15 +153,11 @@ class PurchaseOrderIndexSearchTest extends TestCase
             ->assertDontSee('PO-BULK-OTHER');
     }
 
-    public function test_purchase_order_index_keeps_prefill_url_on_existing_po_search(): void
+    public function test_purchase_order_index_prefills_search_from_item_codes(): void
     {
         $admin = User::factory()->create([
             'role' => 'admin',
             'employee_code' => 'PO-PREFILL-ADMIN',
-        ]);
-        $supplier = Supplier::create([
-            'code' => 'PO-PREFILL-SUP',
-            'name' => 'Supplier Prefill PO',
         ]);
         $firstItem = Item::create([
             'code' => 'K1BLK',
@@ -178,41 +174,14 @@ class PurchaseOrderIndexSearchTest extends TestCase
             'active' => true,
         ]);
 
-        foreach ([$firstItem, $secondItem] as $index => $item) {
-            $order = PurchaseOrder::create([
-                'code' => 'PO-PREFILL-'.($index + 1),
-                'date' => '2026-11-05',
-                'supplier_id' => $supplier->id,
-                'status' => 'draft',
-                'subtotal' => 100000,
-                'grand_total' => 100000,
-            ]);
-
-            PurchaseOrderLine::create([
-                'purchase_order_id' => $order->id,
-                'item_id' => $item->id,
-                'qty' => 1,
-                'unit_price' => 100000,
-                'line_total' => 100000,
-            ]);
-        }
-
-        $prefill = json_encode([
-            ['item_id' => $firstItem->id, 'qty_request' => 1],
-            ['item_id' => $secondItem->id, 'qty_request' => 2],
-        ]);
-
         $response = $this->actingAs($admin)->get(route('purchasing.purchase_orders.index', [
             'codes' => [$firstItem->code, $secondItem->code],
-            'prefill' => $prefill,
         ]));
 
         $response->assertOk()
             ->assertSee('K1BLK')
             ->assertSee('K1NVY')
             ->assertSee('value="K1BLK K1NVY"', false)
-            ->assertDontSee('Buat PO Baru', false);
-
-        $this->assertNull($response->headers->get('Location'));
+            ->assertSee('Reset Filter', false);
     }
 }

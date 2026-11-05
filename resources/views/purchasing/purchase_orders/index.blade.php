@@ -16,6 +16,16 @@
         ? ($sortDir === 'asc' ? '↑' : '↓')
         : '↕';
 
+    $prefillSearchCodes = collect((array) request('codes', []))
+        ->map(fn ($code) => trim((string) $code))
+        ->filter()
+        ->unique()
+        ->take(100)
+        ->values();
+    $poSearchValue = filled(request('q'))
+        ? (string) request('q')
+        : $prefillSearchCodes->implode(' ');
+
     $payStatusOptions = [
         '' => 'Semua Bayar',
         'unpaid' => 'Unpaid',
@@ -25,6 +35,7 @@
     ];
 
     $hasPoFilters = request()->filled('q')
+        || $prefillSearchCodes->isNotEmpty()
         || request()->filled('supplier_id')
         || request()->filled('status')
         || request()->filled('pay_status')
@@ -419,7 +430,7 @@
         <form id="po-filter-form" method="GET" action="{{ route('purchasing.purchase_orders.index') }}">
             <div class="filter-bar mb-3">
                 <div class="po-filter-main d-flex flex-wrap align-items-center">
-                    <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm search-input" style="max-width:260px;" placeholder="Cari PO / barang (spasi atau koma)..." autocomplete="off">
+                    <input type="text" name="q" value="{{ $poSearchValue }}" class="form-control form-control-sm search-input" style="max-width:260px;" placeholder="Cari PO / barang (spasi atau koma)..." autocomplete="off">
 
                     <select name="supplier_id" class="form-select form-select-sm po-filter-auto" style="max-width:160px;">
                         <option value="">Semua Supplier</option>
