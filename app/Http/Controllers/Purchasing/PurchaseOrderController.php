@@ -96,13 +96,42 @@ class PurchaseOrderController extends Controller
         }
 
         if ($request->filled('q')) {
-            $term = trim((string) $request->q);
-            $q->where(function ($sub) use ($term) {
-                $sub->where('purchase_orders.code', 'like', '%'.$term.'%')
-                    ->orWhereHas('lines.item', fn ($itemQuery) => $itemQuery
-                        ->where('code', 'like', '%'.$term.'%')
-                        ->orWhere('sku', 'like', '%'.$term.'%')
-                        ->orWhere('name', 'like', '%'.$term.'%'));
+            $terms = collect(preg_split('/[,\s]+/', trim((string) $request->q), -1, PREG_SPLIT_NO_EMPTY))
+                ->map(fn ($term) => trim((string) $term))
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($terms->isNotEmpty()) {
+                $q->where(function ($sub) use ($terms) {
+                    foreach ($terms as $term) {
+                        $like = '%'.$term.'%';
+                        $sub->orWhere('purchase_orders.code', 'like', $like)
+                            ->orWhereHas('lines.item', fn ($itemQuery) => $itemQuery
+                                ->where('code', 'like', $like)
+                                ->orWhere('sku', 'like', $like)
+                                ->orWhere('name', 'like', $like));
+                    }
+                });
+            }
+        }
+
+        $codes = collect((array) $request->input('codes', []))
+            ->map(fn ($code) => trim((string) $code))
+            ->filter()
+            ->unique()
+            ->take(100)
+            ->values();
+
+        if ($codes->isNotEmpty()) {
+            $q->where(function ($sub) use ($codes) {
+                foreach ($codes as $code) {
+                    $sub->orWhere('purchase_orders.code', 'like', '%'.$code.'%')
+                        ->orWhereHas('lines.item', fn ($itemQuery) => $itemQuery
+                            ->where('code', $code)
+                            ->orWhere('sku', $code)
+                            ->orWhere('name', 'like', '%'.$code.'%'));
+                }
             });
         }
 

@@ -419,7 +419,7 @@
         <form id="po-filter-form" method="GET" action="{{ route('purchasing.purchase_orders.index') }}">
             <div class="filter-bar mb-3">
                 <div class="po-filter-main d-flex flex-wrap align-items-center">
-                    <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm search-input" style="max-width:240px;" placeholder="Cari PO / kode barang..." autocomplete="off">
+                    <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm search-input" style="max-width:260px;" placeholder="Cari PO / barang (spasi atau koma)..." autocomplete="off">
 
                     <select name="supplier_id" class="form-select form-select-sm po-filter-auto" style="max-width:160px;">
                         <option value="">Semua Supplier</option>
