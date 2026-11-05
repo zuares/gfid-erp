@@ -148,6 +148,49 @@ class MarketplaceOrderSettlement extends Model
     }
 
     /**
+     * Read TikTok affiliate commission once from a normalized finance payload.
+     * TikTok may expose the same value through the before-PIT display field;
+     * when both values match, the display field is intentionally ignored.
+     */
+    public static function tiktokAffiliateFeeFromPayload(array $raw): float
+    {
+        $fees = data_get($raw, 'tiktok_fee_breakdown.fees');
+        if (! is_array($fees)) {
+            $fees = [];
+            foreach ((array) ($raw['sku_transactions'] ?? []) as $transaction) {
+                $transactionFees = data_get($transaction, 'fee_tax_breakdown.fee', []);
+                if (! is_array($transactionFees)) {
+                    continue;
+                }
+
+                foreach ($transactionFees as $key => $value) {
+                    if (is_numeric($value)) {
+                        $fees[$key] = (float) ($fees[$key] ?? 0) + (float) $value;
+                    }
+                }
+            }
+        }
+
+        $affiliate = $fees['affiliate_commission_amount'] ?? null;
+        $beforePit = $fees['affiliate_commission_amount_before_pit'] ?? null;
+        $skipBeforePit = is_numeric($affiliate) && is_numeric($beforePit)
+            && abs((float) $affiliate - (float) $beforePit) < 0.01;
+        $total = 0.0;
+
+        foreach ($fees as $key => $value) {
+            $key = strtolower((string) $key);
+            if (! str_contains($key, 'affiliate') || ($skipBeforePit && $key === 'affiliate_commission_amount_before_pit')) {
+                continue;
+            }
+            if (is_numeric($value)) {
+                $total += abs((float) $value);
+            }
+        }
+
+        return round($total, 2);
+    }
+
+    /**
      * Build a categorized breakdown for marketplace settlement fees.
      *
      * @return array<int, array{label: string, amount: float, category: string, source?: string}>
@@ -465,7 +508,7 @@ class MarketplaceOrderSettlement extends Model
                     continue;
                 }
                 if (str_contains($key, 'affiliate')) {
-                    $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi', $value, 'fee', 'tiktok_fee_breakdown.fees.'.$key);
+                    $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi', $value, 'affiliate', 'tiktok_fee_breakdown.fees.'.$key);
                     continue;
                 }
                 if (str_contains($key, 'dynamic')) {
@@ -544,8 +587,8 @@ class MarketplaceOrderSettlement extends Model
             $push($rows, $seen, 'program_service_fee', 'Biaya Layanan / Program', $this->service_fee, 'fee', 'service_fee');
         }
 
-        $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi / AMS', $this->affiliate_fee, 'fee', 'affiliate_fee');
-        $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi / AMS', $this->activity_fee, 'fee', 'activity_fee');
+        $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi / AMS', $this->affiliate_fee, 'affiliate', 'affiliate_fee');
+        $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi / AMS', $this->activity_fee, 'affiliate', 'activity_fee');
         $push($rows, $seen, 'shipping_cost', 'Biaya Kirim ke Jasa Kirim', $this->actual_shipping_fee ?: $this->shipping_cost_amount, 'shipping', 'actual_shipping_fee');
         $push($rows, $seen, 'shipping_subsidy', 'Subsidi / Potongan Ongkir', $this->shipping_fee_subsidy, 'shipping', 'shipping_fee_subsidy');
         $push($rows, $seen, 'insurance_fee', 'Premi / Asuransi', $this->shipping_insurance_fee, 'fee', 'shipping_insurance_fee');

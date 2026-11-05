@@ -425,9 +425,76 @@ class MarketplaceTikTokFinanceSyncTest extends TestCase
 
         $this->assertSame('pending', $result['status']);
         $settlement = MarketplaceOrderSettlement::where('order_id', $order->id)->firstOrFail();
-        $this->assertSame(22416.0, (float) $settlement->commission_fee);
+        $this->assertSame(5000.0, (float) $settlement->commission_fee);
+        $this->assertSame(17416.0, (float) $settlement->affiliate_fee);
         $this->assertSame(17416.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.affiliate_commission_amount'));
+        $this->assertSame(17416.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.affiliate_fee_total'));
+        $this->assertSame(5000.0, (float) data_get($settlement->raw_json, 'tiktok_fee_breakdown.non_affiliate_fee_total'));
         $this->assertNull(data_get($settlement->raw_json, 'tiktok_fee_breakdown.fees.affiliate_commission_amount_before_pit'));
+    }
+
+    public function test_historical_affiliate_fee_split_backfill_moves_affiliate_out_of_marketplace_fee(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'code' => 'TTK-AFFILIATE-SPLIT',
+            'name' => 'TikTok Affiliate Split Test',
+            'channel_id' => $channel->id,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'channel_order_id' => 'TT-ORDER-AFFILIATE-SPLIT-1',
+            'external_order_id' => 'TT-ORDER-AFFILIATE-SPLIT-1',
+            'order_status' => 'COMPLETED',
+            'ordered_at' => now()->subDay(),
+            'order_date' => now()->subDay(),
+            'total_paid_customer' => 100000,
+            'total_amount' => 100000,
+            'currency' => 'IDR',
+        ]);
+        $settlement = MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'commission_fee' => 21908,
+            'affiliate_fee' => 0,
+            'final_income' => 78092,
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_order_statement_transactions',
+                'tiktok_fee_breakdown' => [
+                    'fees' => [
+                        'platform_commission_amount' => -2707,
+                        'dynamic_commission_amount' => -4677,
+                        'service_fee' => -2339,
+                        'transaction_fee' => -1250,
+                        'affiliate_commission_amount' => -9945,
+                    ],
+                    'fee_total' => 21908,
+                ],
+            ],
+        ]);
+
+        $service = app(MarketplaceSyncService::class);
+        $dryRun = $service->backfillTikTokAffiliateFeeColumns($store);
+
+        $this->assertSame(1, $dryRun['candidates']);
+        $this->assertSame(1, $dryRun['scanned']);
+        $settlement->refresh();
+        $this->assertSame(21908.0, (float) $settlement->commission_fee);
+        $this->assertSame(0.0, (float) $settlement->affiliate_fee);
+
+        $applied = $service->backfillTikTokAffiliateFeeColumns($store, true);
+
+        $this->assertSame(1, $applied['updated']);
+        $settlement->refresh();
+        $this->assertSame(11963.0, (float) $settlement->commission_fee);
+        $this->assertSame(9945.0, (float) $settlement->affiliate_fee);
+        $this->assertSame(2, data_get($settlement->raw_json, 'tiktok_fee_breakdown.mapping_version'));
+
+        $secondApply = $service->backfillTikTokAffiliateFeeColumns($store, true);
+        $this->assertSame(0, $secondApply['candidates']);
     }
 
     public function test_historical_affiliate_fee_backfill_is_dry_run_by_default_and_idempotent(): void

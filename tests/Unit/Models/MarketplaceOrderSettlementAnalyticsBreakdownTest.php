@@ -36,6 +36,7 @@ class MarketplaceOrderSettlementAnalyticsBreakdownTest extends TestCase
         $this->assertSame(2339.0, $this->amountFor($rows, 'program_service_fee'));
         $this->assertSame(1250.0, $this->amountFor($rows, 'order_processing_fee'));
         $this->assertSame(9945.0, $this->amountFor($rows, 'affiliate_fee'));
+        $this->assertSame('affiliate', $this->categoryFor($rows, 'affiliate_fee'));
         $this->assertNotContains(21908.0, array_column($rows, 'amount'));
     }
 
@@ -69,5 +70,16 @@ class MarketplaceOrderSettlementAnalyticsBreakdownTest extends TestCase
         }
 
         return 0.0;
+    }
+
+    private function categoryFor(array $rows, string $code): ?string
+    {
+        foreach ($rows as $row) {
+            if (($row['code'] ?? null) === $code) {
+                return $row['category'] ?? null;
+            }
+        }
+
+        return null;
     }
 }

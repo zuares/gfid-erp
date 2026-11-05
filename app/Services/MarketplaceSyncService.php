@@ -1216,7 +1216,10 @@ class MarketplaceSyncService
             2,
         );
         $gmvMaxAdCost = round($gmvMaxAdFee + $gmvMaxCouponFee + $gmvMaxAdTax, 2);
-        $commission = round(max(0, $feeTotal - $gmvMaxAdFee - $gmvMaxCouponFee), 2);
+        $affiliateFee = MarketplaceOrderSettlement::tiktokAffiliateFeeFromPayload([
+            'tiktok_fee_breakdown' => $tiktokFeeBreakdown,
+        ]);
+        $commission = round(max(0, $feeTotal - $gmvMaxAdFee - $gmvMaxCouponFee - $affiliateFee), 2);
         $tax = round(max(0, $taxTotal - $gmvMaxAdTax), 2);
         $refundAmount = MarketplaceOrderSettlement::tiktokRefundAmountFromPayload([
             'sku_transactions' => $skuTransactions,
@@ -1230,6 +1233,9 @@ class MarketplaceSyncService
         $tiktokFeeBreakdown['fee_total'] = $feeTotal;
         $tiktokFeeBreakdown['tax_total'] = $taxTotal;
         $tiktokFeeBreakdown['non_ad_fee_total'] = $commission;
+        $tiktokFeeBreakdown['affiliate_fee_total'] = $affiliateFee;
+        $tiktokFeeBreakdown['non_affiliate_fee_total'] = $commission;
+        $tiktokFeeBreakdown['mapping_version'] = 2;
         $tiktokFeeBreakdown['non_ad_tax_total'] = $tax;
         $tiktokFeeBreakdown['gmv_max_ad_cost'] = $gmvMaxAdCost;
         $tiktokFeeBreakdown['gmv_max'] = [
@@ -1313,7 +1319,7 @@ class MarketplaceSyncService
             'commission_fee' => $this->nn($this->decimalValue($commission)),
             'service_fee' => '0.00',
             'transaction_fee' => '0.00',
-            'affiliate_fee' => '0.00',
+            'affiliate_fee' => $this->nn($this->decimalValue($affiliateFee)),
             'escrow_tax' => $this->nn($this->decimalValue($tax)),
             'ad_cost' => $this->nn($this->decimalValue($gmvMaxAdCost)),
             'actual_shipping_fee' => $this->nn($this->decimalValue($shippingAmounts['actual_shipping_fee_amount'])),
@@ -1819,6 +1825,147 @@ class MarketplaceSyncService
             } catch (\Throwable $e) {
                 $stats['errors']++;
                 Log::warning('[TikTok Finance] Gagal backfill duplicate affiliate fee', [
+                    'store_id' => $store->id,
+                    'order_id' => $settlement->channel_order_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Split TikTok affiliate commission out of the legacy marketplace fee
+     * column. The default command mode is dry-run so historical rows can be
+     * reviewed before the settlement snapshot is changed.
+     *
+     * @return array{scanned:int,candidates:int,updated:int,unchanged:int,moved_total:float,errors:int,examples:array<int,array<string,mixed>>}
+     */
+    public function backfillTikTokAffiliateFeeColumns(
+        Store $store,
+        bool $apply = false,
+        int $limit = 5000,
+    ): array {
+        $store->loadMissing('channel');
+        $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
+            return [
+                'scanned' => 0,
+                'candidates' => 0,
+                'updated' => 0,
+                'unchanged' => 0,
+                'moved_total' => 0.0,
+                'errors' => 1,
+                'examples' => [],
+            ];
+        }
+
+        $settlements = MarketplaceOrderSettlement::query()
+            ->where('store_id', $store->id)
+            ->orderBy('id')
+            ->limit(max(1, $limit))
+            ->get();
+        $stats = [
+            'scanned' => $settlements->count(),
+            'candidates' => 0,
+            'updated' => 0,
+            'unchanged' => 0,
+            'moved_total' => 0.0,
+            'errors' => 0,
+            'examples' => [],
+        ];
+
+        foreach ($settlements as $settlement) {
+            $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+            $breakdown = is_array($raw['tiktok_fee_breakdown'] ?? null)
+                ? $raw['tiktok_fee_breakdown']
+                : [];
+            if (($breakdown['mapping_version'] ?? null) === 2 || ! is_array($breakdown['fees'] ?? null)) {
+                $stats['unchanged']++;
+                continue;
+            }
+
+            $fees = $breakdown['fees'];
+            $normalizedFees = $this->withoutDuplicateTikTokAffiliateFee($fees, $duplicateAmount);
+            $normalizedRaw = $raw;
+            $normalizedRaw['tiktok_fee_breakdown']['fees'] = $normalizedFees;
+            $affiliateAmount = MarketplaceOrderSettlement::tiktokAffiliateFeeFromPayload($normalizedRaw);
+            if ($affiliateAmount <= 0 && $duplicateAmount <= 0) {
+                $stats['unchanged']++;
+                continue;
+            }
+
+            $oldCommission = (float) ($settlement->commission_fee ?? 0);
+            $oldAffiliate = (float) ($settlement->affiliate_fee ?? 0);
+            // Rows with a populated affiliate column are already split unless
+            // the old duplicate-before-PIT field still needs to be removed.
+            if ($oldAffiliate > 0 && $duplicateAmount <= 0) {
+                $stats['unchanged']++;
+                continue;
+            }
+
+            $targetAffiliate = round(max($oldAffiliate, $affiliateAmount), 2);
+            $targetCommission = round(max(0, $oldCommission - $affiliateAmount - $duplicateAmount), 2);
+            if (abs($oldCommission - $targetCommission) < 0.01 && abs($oldAffiliate - $targetAffiliate) < 0.01) {
+                $stats['unchanged']++;
+                continue;
+            }
+
+            $stats['candidates']++;
+            $stats['moved_total'] = round($stats['moved_total'] + $affiliateAmount, 2);
+            if (count($stats['examples']) < 20) {
+                $stats['examples'][] = [
+                    'settlement_id' => $settlement->id,
+                    'order_id' => $settlement->channel_order_id,
+                    'affiliate_fee' => $targetAffiliate,
+                    'marketplace_fee' => $targetCommission,
+                    'previous_commission_fee' => $oldCommission,
+                    'duplicate_removed' => round($duplicateAmount, 2),
+                ];
+            }
+
+            if (! $apply) {
+                continue;
+            }
+
+            try {
+                $breakdown['fees'] = $normalizedFees;
+                if (array_key_exists('fee_total', $breakdown)) {
+                    $breakdown['fee_total'] = round(max(0, (float) $breakdown['fee_total'] - $duplicateAmount), 2);
+                }
+                $breakdown['affiliate_fee_total'] = $targetAffiliate;
+                $breakdown['non_affiliate_fee_total'] = $targetCommission;
+                $breakdown['mapping_version'] = 2;
+                $raw['tiktok_fee_breakdown'] = $breakdown;
+                $raw['tiktok_fee_mapping'] = [
+                    'version' => 2,
+                    'affiliate_fee' => $targetAffiliate,
+                    'marketplace_fee' => $targetCommission,
+                    'duplicate_before_pit_removed' => round($duplicateAmount, 2),
+                    'backfilled_at' => now()->toIso8601String(),
+                ];
+
+                $settlement->commission_fee = $this->nn($this->decimalValue($targetCommission));
+                $settlement->affiliate_fee = $this->nn($this->decimalValue($targetAffiliate));
+                $settlement->raw_json = $raw;
+                $settlement->data_checked_at = now();
+                $settlement->save();
+                $stats['updated']++;
+
+                try {
+                    $this->financeBackfill->syncOrderSettlement($settlement->fresh(['store.channel', 'order.store.channel']));
+                } catch (\Throwable $e) {
+                    $stats['errors']++;
+                    Log::warning('[TikTok Finance] Gagal memproyeksikan split affiliate fee ke Marketplace Finance', [
+                        'store_id' => $store->id,
+                        'order_id' => $settlement->channel_order_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $stats['errors']++;
+                Log::warning('[TikTok Finance] Gagal backfill split affiliate fee', [
                     'store_id' => $store->id,
                     'order_id' => $settlement->channel_order_id,
                     'error' => $e->getMessage(),
