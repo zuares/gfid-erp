@@ -1297,13 +1297,22 @@
         .qc-cutting-page .page-wrap {
             padding: 0 8px 96px;
         }
-        .qcs-breadcrumb,
         .qcs-stepper,
         .qcs-head-actions,
         .qcs-page-meta + .qcs-page-meta,
         .qcs-alert-info,
         .qcs-action-info {
             display: none !important;
+        }
+        .qcs-breadcrumb {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            width: 100%;
+            margin: 0;
+            padding: 8px 0;
+            overflow-x: auto;
+            white-space: nowrap;
         }
         .qcs-page-head {
             position: sticky;
