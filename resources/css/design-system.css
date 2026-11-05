@@ -12,6 +12,7 @@
     --gf-color-danger: #d6455d;
     --gf-radius-card: 16px;
     --gf-radius-control: 10px;
+    --gf-touch-target: 44px;
     --gf-space-section: 24px;
     --gf-content-max: 1280px;
     --gf-shadow-sm: 0 1px 2px rgba(16, 24, 40, .04), 0 4px 12px rgba(16, 24, 40, .04);
@@ -236,7 +237,7 @@
 .ds-search-contract code { color: var(--gf-color-brand-strong); font-size: .63rem; font-weight: 750; }
 .ds-search-contract span { color: var(--gf-color-muted); font-size: .62rem; line-height: 1.35; }
 .ds-tab-system { display: flex; gap: .22rem; padding: .22rem; overflow-x: auto; border: 1px solid var(--gf-color-line); border-radius: 12px; background: #f8f9fc; scrollbar-width: thin; }
-.ds-tab-system-button { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; min-height: 34px; flex: 0 0 auto; padding: 0 .7rem; border: 0; border-radius: 9px; color: var(--gf-color-muted); background: transparent; font: inherit; font-size: .68rem; font-weight: 750; cursor: pointer; white-space: nowrap; transition: color .18s ease, background .18s ease, box-shadow .18s ease; }
+.ds-tab-system-button { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; min-height: var(--gf-touch-target,44px); flex: 0 0 auto; padding: 0 .7rem; border: 0; border-radius: 9px; color: var(--gf-color-muted); background: transparent; font: inherit; font-size: .68rem; font-weight: 750; cursor: pointer; white-space: nowrap; transition: color .18s ease, background .18s ease, box-shadow .18s ease; }
 .ds-tab-system-button:hover { color: var(--gf-color-brand-strong); background: #eeefff; }
 .ds-tab-system-button.is-active { color: var(--gf-color-brand-strong); background: #fff; box-shadow: 0 1px 4px rgba(16,24,40,.1); }
 .ds-tab-system-button:focus-visible { outline: 3px solid rgba(91,92,226,.28); outline-offset: 2px; }

@@ -80,6 +80,7 @@
     --gf-color-danger:#d6455d;
     --gf-radius-card:16px;
     --gf-radius-control:10px;
+    --gf-touch-target:44px;
     --gf-content-max:var(--app-content-max-width);
     --gf-content-gutter:var(--app-content-gutter);
     --gf-shadow-sm:0 1px 2px rgba(16,24,40,.04), 0 4px 12px rgba(16,24,40,.04);

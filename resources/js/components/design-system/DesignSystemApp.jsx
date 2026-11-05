@@ -480,6 +480,7 @@ export default function DesignSystemApp() {
                                 activeId={activeProductTab}
                                 onChange={handleProductTabChange}
                                 ariaLabel="Product sections"
+                                panelId="ds-product-tabs-panel"
                             />
                             <div className="ds-tabs-connector" aria-hidden="true" />
                             <Tabs
@@ -489,8 +490,9 @@ export default function DesignSystemApp() {
                                 onChange={setActiveProductSubtab}
                                 ariaLabel={`${activeProductTab} subsections`}
                                 variant="subtabs"
+                                panelId="ds-product-tabs-panel"
                             />
-                            <div className="ds-tab-preview-panel" role="tabpanel" aria-live="polite" aria-label={`${activeProductTab} ${activeProductSubtab}`}>
+                            <div id="ds-product-tabs-panel" className="ds-tab-preview-panel" role="tabpanel" aria-live="polite" aria-label={`${activeProductTab} ${activeProductSubtab}`}>
                                 <span className="ds-preview-label">Active panel</span>
                                 <strong>{activeTabCopy[0]}</strong>
                                 <p>{activeTabCopy[1]}</p>

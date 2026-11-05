@@ -1,26 +1,50 @@
-<section class="an-revenue-workspace an-tab-pane is-hidden" data-an-pane="revenue" aria-labelledby="revenueWorkspaceTitle">
+<section class="an-revenue-workspace an-tab-pane is-hidden" data-an-pane="revenue" role="tabpanel" tabindex="-1" aria-labelledby="revenueWorkspaceTitle">
     <div class="an-revenue-head">
-        <div>
+        <div class="an-revenue-head-copy">
+            <span class="an-revenue-head-icon" aria-hidden="true"><i class="bi bi-wallet2"></i></span>
+            <div>
             <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Financial order ledger</div>
             <div class="an-enterprise-title" id="revenueWorkspaceTitle">Omzet, Pencairan &amp; Fee</div>
             <div class="an-enterprise-sub">Rincian omzet, status pencairan, fee marketplace aktual, dan payout per order pada periode aktif.</div>
+            </div>
         </div>
-        <div class="an-revenue-head-meta"><i class="bi bi-info-circle" aria-hidden="true"></i><span id="revenueOrdersSubtitle">Periode aktif</span></div>
+        <div class="an-revenue-head-meta">
+            <span class="an-revenue-status"><i class="bi bi-broadcast-pin" aria-hidden="true"></i><span>Ledger aktif</span></span>
+            <span class="an-revenue-period"><i class="bi bi-calendar3" aria-hidden="true"></i><span id="revenueOrdersSubtitle">Periode aktif</span></span>
+        </div>
     </div>
 
-    <div class="an-revenue-panel">
+    <div class="an-revenue-panel" id="revenueOrdersPanel" role="tabpanel" tabindex="-1" aria-labelledby="revenueOrdersTabs">
         <div class="an-modal-tabs an-revenue-tabs" id="revenueOrdersTabs" role="tablist" aria-label="Filter status omzet dan pencairan">
-            <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-revenue-settlement="all"><span>Pesanan</span><small data-revenue-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-revenue-settlement="settled"><span>Sudah cair</span><small data-revenue-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-revenue-settlement="shipped"><span>Masih dikirim</span><small data-revenue-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-revenue-settlement="warehouse"><span>Disimpan di Gudang Shopee</span><small data-revenue-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-revenue-settlement="confirm"><span>Menunggu konfirmasi</span><small data-revenue-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-revenue-settlement="cancelled"><span>Dibatalkan</span><small data-revenue-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-revenue-settlement="return_refund"><span>Return / Refund</span><small data-revenue-tab-kpi>—</small></button>
-            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-revenue-settlement="unsettled"><span>Dana belum cair</span><small data-revenue-tab-kpi>—</small></button>
+            <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" aria-controls="revenueOrdersPanel" tabindex="0" data-revenue-settlement="all"><span class="an-revenue-tab-label"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Pesanan</span></span><small data-revenue-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="settled"><span class="an-revenue-tab-label"><i class="bi bi-check2-circle" aria-hidden="true"></i><span>Sudah cair</span></span><small data-revenue-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="shipped"><span class="an-revenue-tab-label"><i class="bi bi-truck" aria-hidden="true"></i><span>Masih dikirim</span></span><small data-revenue-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="warehouse"><span class="an-revenue-tab-label"><i class="bi bi-box-seam" aria-hidden="true"></i><span>Disimpan di Gudang Shopee</span></span><small data-revenue-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="confirm"><span class="an-revenue-tab-label"><i class="bi bi-hourglass-split" aria-hidden="true"></i><span>Menunggu konfirmasi</span></span><small data-revenue-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="cancelled"><span class="an-revenue-tab-label"><i class="bi bi-x-circle" aria-hidden="true"></i><span>Dibatalkan</span></span><small data-revenue-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="return_refund"><span class="an-revenue-tab-label"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>Return / Refund</span></span><small data-revenue-tab-kpi>—</small></button>
+            <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="unsettled"><span class="an-revenue-tab-label"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Dana belum cair</span></span><small data-revenue-tab-kpi>—</small></button>
         </div>
-        <div class="an-modal-summary" id="revenueOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
-        <div class="an-modal-body an-revenue-body" id="revenueOrdersBody"><div class="an-empty">Memuat data omzet…</div></div>
+        <section class="an-revenue-section" aria-labelledby="revenueSummaryTitle">
+            <div class="an-revenue-section-head">
+                <div>
+                    <span class="an-revenue-section-kicker">Snapshot periode</span>
+                    <strong id="revenueSummaryTitle">Ringkasan omzet &amp; biaya</strong>
+                </div>
+                <span class="an-revenue-section-hint">Nilai mengikuti status tab aktif</span>
+            </div>
+            <div class="an-modal-summary an-revenue-summary" id="revenueOrdersSummary"><div class="an-empty">Memuat ringkasan…</div></div>
+        </section>
+        <section class="an-revenue-section an-revenue-detail-section" aria-labelledby="revenueDetailTitle">
+            <div class="an-revenue-section-head">
+                <div>
+                    <span class="an-revenue-section-kicker">Order ledger</span>
+                    <strong id="revenueDetailTitle">Detail transaksi per order</strong>
+                </div>
+                <span class="an-revenue-section-hint">Buka “Rincian mapping fee” untuk melihat komponen</span>
+            </div>
+            <div class="an-modal-body an-revenue-body" id="revenueOrdersBody" aria-live="polite"><div class="an-empty">Memuat data omzet…</div></div>
+        </section>
         <div class="an-modal-foot"><button class="an-btn" id="revenueOrdersPrev" type="button" aria-label="Halaman sebelumnya">‹ Sebelumnya</button><div class="an-modal-pagination" aria-live="polite"><div><strong class="an-modal-page" id="revenueOrdersPage">—</strong><small class="an-modal-page-meta" id="revenueOrdersPageMeta">—</small></div></div><button class="an-btn" id="revenueOrdersNext" type="button" aria-label="Halaman berikutnya">Berikutnya ›</button></div>
     </div>
 </section>

@@ -5,7 +5,7 @@
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
     };
     const cashStatus = value => String(value || '—').replace(/_/g, ' ').toLowerCase();
-    const cashStat = (label, value, note = '') => `<div class="an-modal-stat"><div class="an-modal-stat-label">${label}</div><div class="an-modal-stat-value">${value}</div>${note ? `<span class="an-modal-stat-note">${note}</span>` : ''}</div>`;
+    const cashStat = (label, value, note = '', tone = 'neutral') => `<div class="an-modal-stat an-modal-stat-${tone}"><div class="an-modal-stat-label">${label}</div><div class="an-modal-stat-value">${value}</div>${note ? `<span class="an-modal-stat-note">${note}</span>` : ''}</div>`;
     const cashSettlementTabs = ['all', 'settled', 'unsettled', 'shipped', 'warehouse', 'confirm', 'cancelled', 'return_refund'];
     const cashFeeDetail = (row, label, value, className = '') => `<span>${esc(label)}<strong class="${className}">${money(value)}</strong></span>`;
     const canonicalFeeDetails = row => {
@@ -47,7 +47,7 @@
             const element = button.querySelector('[data-cash-tab-kpi], [data-revenue-tab-kpi]');
             if (!element) return;
             if (!summary) {
-                element.textContent = 'Memuat KPI…';
+                element.textContent = settlement === cashSettlement ? 'Memuat…' : 'Pilih status';
                 return;
             }
             const count = Number(summary.cash_order_count || 0).toLocaleString('id-ID');
@@ -81,14 +81,16 @@
             const active = button.dataset.revenueSettlement === cashSettlement;
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
+            button.tabIndex = active ? 0 : -1;
         });
         renderCashTabSummaries();
     }
 
-    async function loadCashTabSummaries() {
+    async function loadCashTabSummaries(requestedSettlements = [cashSettlement]) {
         const token = ++cashTabSummaryToken;
         renderCashTabSummaries();
-        const settlements = cashSettlementTabs.filter(settlement => !cashTabSummaries[settlement]);
+        const settlements = [...new Set(requestedSettlements)]
+            .filter(settlement => cashSettlementTabs.includes(settlement) && !cashTabSummaries[settlement]);
         if (!settlements.length) return;
         const results = await Promise.allSettled(settlements.map(async settlement => {
             const params = new URLSearchParams({ date_from: from(), date_to: to(), settlement, page: '1', per_page: '10', _ts: Date.now().toString() });
@@ -136,25 +138,25 @@
             ['tax', 'Pajak', 'tax'],
         ].map(([code, label, category]) => [code, label, category, canonicalAmount(code)])
             .filter(([, , , amount]) => amount > 0)
-            .map(([, label, category, amount]) => cashStat(label, money(amount), category === 'shipping' ? 'mapping pengiriman' : 'mapping fee'));
+            .map(([, label, category, amount]) => cashStat(label, money(amount), category === 'shipping' ? 'mapping pengiriman' : 'mapping fee', category));
         const feeSummaryCards = canonicalFeeCards.length > 0 ? canonicalFeeCards : (isTikTokPlatform
             ? [
-                cashStat('Total fee marketplace', money(aggregate.cash_marketplace_fees), feePercent(aggregate.cash_marketplace_fees)),
-                cashStat('Rincian fee', 'Per order', 'Platform · dinamis · program · proses'),
+                cashStat('Total fee marketplace', money(aggregate.cash_marketplace_fees), feePercent(aggregate.cash_marketplace_fees), 'fee'),
+                cashStat('Rincian fee', 'Per order', 'Platform · dinamis · program · proses', 'neutral'),
             ]
             : [
-                cashStat('Administrasi', money(aggregate.cash_commission_fee), feePercent(aggregate.cash_commission_fee)),
-                cashStat('Layanan / program', money(aggregate.cash_service_fee), feePercent(aggregate.cash_service_fee)),
-                cashStat('Proses / transaksi', money(aggregate.cash_transaction_fee), feePercent(aggregate.cash_transaction_fee)),
-                cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees), feePercent(aggregate.cash_affiliate_fees)),
+                cashStat('Administrasi', money(aggregate.cash_commission_fee), feePercent(aggregate.cash_commission_fee), 'fee'),
+                cashStat('Layanan / program', money(aggregate.cash_service_fee), feePercent(aggregate.cash_service_fee), 'fee'),
+                cashStat('Proses / transaksi', money(aggregate.cash_transaction_fee), feePercent(aggregate.cash_transaction_fee), 'fee'),
+                cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees), feePercent(aggregate.cash_affiliate_fees), 'neutral'),
             ]);
         $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Omzet, pencairan & fee marketplace';
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${modeLabel} · ${totalOrders} order`;
         $('cashOrdersSummary').innerHTML = isCombined ? [
-            cashStat(isAll ? 'Omzet revenue' : (isSettled ? 'Omzet cair' : 'Omzet belum cair'), money(isSettled ? aggregate.cash_payout : aggregate.cash_gross_sales)),
-            cashStat('Payout tercatat', money(aggregate.cash_payout), feePercent(aggregate.cash_payout)),
+            cashStat(isAll ? 'Omzet revenue' : (isSettled ? 'Omzet cair' : 'Omzet belum cair'), money(isSettled ? aggregate.cash_payout : aggregate.cash_gross_sales), '', 'primary'),
+            cashStat('Payout tercatat', money(aggregate.cash_payout), feePercent(aggregate.cash_payout), 'accent'),
             ...feeSummaryCards,
-            cashStat('Refund / adjustment', money(aggregate.cash_refund)),
+            cashStat('Refund / adjustment', money(aggregate.cash_refund), '', 'neutral'),
         ].join('') : isFeeFocus ? [
             ...feeSummaryCards,
         ].join('') : [
@@ -165,12 +167,15 @@
         ].join('');
         cashTabSummaries[cashSettlement] = aggregate;
         renderCashTabSummaries();
-        const feeBreakdown = (isFeeFocus || isCombined) ? `<div class="an-modal-fee-breakdown"><div><span>Total fee marketplace</span><strong>${money(aggregate.cash_marketplace_fees)}<small>${feePercent(aggregate.cash_marketplace_fees)}</small></strong></div>${isTikTokPlatform ? '<div><span>Mapping detail</span><strong>Per order<small>Platform · dinamis · program · proses</small></strong></div>' : `<div><span>Administrasi</span><strong>${money(aggregate.cash_commission_fee)}<small>${feePercent(aggregate.cash_commission_fee)}</small></strong></div><div><span>Layanan / program</span><strong>${money(aggregate.cash_service_fee)}<small>${feePercent(aggregate.cash_service_fee)}</small></strong></div><div><span>Proses / transaksi</span><strong>${money(aggregate.cash_transaction_fee)}<small>${feePercent(aggregate.cash_transaction_fee)}</small></strong></div>`}<div><span>Asuransi</span><strong>${money(aggregate.cash_shipping_insurance_fee)}<small>${feePercent(aggregate.cash_shipping_insurance_fee)}</small></strong></div><div><span>Pajak escrow</span><strong>${money(aggregate.cash_escrow_tax)}<small>${feePercent(aggregate.cash_escrow_tax)}</small></strong></div></div>` : '';
+        const feeBreakdownItems = `<div class="an-modal-fee-breakdown"><div><span>Total fee marketplace</span><strong>${money(aggregate.cash_marketplace_fees)}<small>${feePercent(aggregate.cash_marketplace_fees)}</small></strong></div>${isTikTokPlatform ? '<div><span>Mapping detail</span><strong>Per order<small>Platform · dinamis · program · proses</small></strong></div>' : `<div><span>Administrasi</span><strong>${money(aggregate.cash_commission_fee)}<small>${feePercent(aggregate.cash_commission_fee)}</small></strong></div><div><span>Layanan / program</span><strong>${money(aggregate.cash_service_fee)}<small>${feePercent(aggregate.cash_service_fee)}</small></strong></div><div><span>Proses / transaksi</span><strong>${money(aggregate.cash_transaction_fee)}<small>${feePercent(aggregate.cash_transaction_fee)}</small></strong></div>`}<div><span>Asuransi</span><strong>${money(aggregate.cash_shipping_insurance_fee)}<small>${feePercent(aggregate.cash_shipping_insurance_fee)}</small></strong></div><div><span>Pajak escrow</span><strong>${money(aggregate.cash_escrow_tax)}<small>${feePercent(aggregate.cash_escrow_tax)}</small></strong></div></div>`;
+        const feeBreakdown = isCombined
+            ? `<section class="an-revenue-fee-breakdown" aria-label="Rincian fee marketplace aktual"><div class="an-revenue-fee-breakdown-head"><div><div class="an-revenue-fee-breakdown-kicker">Fee ledger</div><strong>Rincian fee marketplace aktual</strong></div><small>Nominal dan rasio terhadap omzet order pada status aktif.</small></div>${feeBreakdownItems}</section>`
+            : isFeeFocus ? feeBreakdownItems : '';
         const renderRows = groupRows => groupRows.map(row => {
             const rowSettled = Boolean(row.settlement_time);
             const payout = rowSettled && n(row.cash_payout) > 0 ? money(row.cash_payout) : (n(row.cash_payout) > 0 ? money(row.cash_payout) : 'Belum tersedia');
             const mappedDetails = canonicalFeeDetails(row) || `${cashFeeDetail(row, 'Administrasi / komisi', row.commission_fee, 'fee')}${cashFeeDetail(row, 'Layanan / program', row.service_fee, 'fee')}${cashFeeDetail(row, 'Proses / transaksi', row.transaction_fee, 'fee')}${cashFeeDetail(row, 'Affiliate / AMS', row.affiliate_fee_raw, 'affiliate')}`;
-            return `<tr><td><div class="an-cash-order">${esc(row.channel_order_id)}</div><span class="an-cash-meta">Order ${esc(dateTime(row.ordered_at))}</span><details class="an-cash-detail"><summary>Rincian mapping fee</summary><div class="an-cash-detail-grid">${mappedDetails}${cashFeeDetail(row, 'Refund / adjustment', row.refund)}${cashFeeDetail(row, 'Total fee', row.total_fees, 'fee')}</div></details></td><td><div>${esc(row.store_name)}</div><span class="an-cash-status">${esc(statusLabel(row))}</span><span class="an-cash-meta">Payout: ${settlementLabel(row)}</span></td><td><span class="an-cash-payment">${esc(paymentLabel(row.payment_method))}</span></td><td class="an-cash-money">${money(row.gross_sales)}</td><td class="an-cash-money">${money(row.buyer_payment_amount)}</td><td class="an-cash-money ${rowSettled ? 'good' : ''}">${payout}</td><td class="an-cash-money fee">${money(row.marketplace_fee)}</td><td class="an-cash-money affiliate">${money(row.affiliate_fee)}</td></tr>`;
+            return `<tr><td data-label="Order"><div class="an-cash-order">${esc(row.channel_order_id)}</div><span class="an-cash-meta">Order ${esc(dateTime(row.ordered_at))}</span><details class="an-cash-detail"><summary>Rincian mapping fee</summary><div class="an-cash-detail-grid">${mappedDetails}${cashFeeDetail(row, 'Refund / adjustment', row.refund)}${cashFeeDetail(row, 'Total fee', row.total_fees, 'fee')}</div></details></td><td data-label="Toko & status"><div>${esc(row.store_name)}</div><span class="an-cash-status">${esc(statusLabel(row))}</span><span class="an-cash-meta">Payout: ${settlementLabel(row)}</span></td><td data-label="Pembayaran"><span class="an-cash-payment">${esc(paymentLabel(row.payment_method))}</span></td><td data-label="Nilai order" class="an-cash-money">${money(row.gross_sales)}</td><td data-label="Pembayaran pembeli" class="an-cash-money">${money(row.buyer_payment_amount)}</td><td data-label="Payout" class="an-cash-money ${rowSettled ? 'good' : ''}">${payout}</td><td data-label="Fee marketplace" class="an-cash-money fee">${money(row.marketplace_fee)}</td><td data-label="Affiliate / AMS" class="an-cash-money affiliate">${money(row.affiliate_fee)}</td></tr>`;
         }).join('');
         const renderTable = (groupRows, groupLabel = '') => groupRows.length ? `${groupLabel ? `<div class="an-cash-group-head"><strong>${esc(groupLabel)}</strong><span>${groupRows.length.toLocaleString('id-ID')} order</span></div>` : ''}<div class="an-table-wrap"><table class="an-table an-cash-table"><thead><tr><th>Order</th><th>Toko &amp; status</th><th>Metode pembayaran</th><th>${isAll ? 'Nilai order' : 'Omzet order'}</th><th>Pembayaran pembeli</th><th>${isSettled ? 'Omzet cair' : 'Payout tercatat'}</th><th>Fee marketplace</th><th>Affiliate / AMS</th></tr></thead><tbody>${renderRows(groupRows)}</tbody></table></div>` : '';
         const groups = isAll
@@ -207,12 +212,14 @@
             const active = settlement === cashSettlement;
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
+            if (button.dataset.revenueSettlement) button.tabIndex = active ? 0 : -1;
         });
     }
     async function loadCashOrders() {
         if (cashLoading) return;
         cashLoading = true;
         $('cashOrdersBody').innerHTML = '<div class="an-empty">Memuat order…</div>';
+        $('revenueOrdersBody')?.setAttribute('aria-busy', 'true');
         $('cashOrdersSummary').innerHTML = '<div class="an-empty">Memuat ringkasan…</div>';
         $('cashOrdersPage').textContent = 'Memuat…';
         $('cashOrdersPageMeta').textContent = 'Mengambil data terbaru';
@@ -234,6 +241,7 @@
             syncRevenueOrdersView();
         } finally {
             cashLoading = false;
+            $('revenueOrdersBody')?.setAttribute('aria-busy', 'false');
             if (cashPayload) renderCashOrders();
             else syncRevenueOrdersView();
         }

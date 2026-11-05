@@ -726,7 +726,7 @@ class MarketplaceAnalyticsSummaryService
         if (in_array($settlement, ['all', 'cancelled'], true)) {
             $base->whereRaw($this->isRevenueStatus());
         }
-        $rows = $base
+        return round($base
             ->select([
                 'mo.total_amount',
                 'mo.total_paid_customer',
@@ -736,9 +736,9 @@ class MarketplaceAnalyticsSummaryService
                 'ms.seller_voucher',
                 'ms.raw_json as settlement_raw_json',
             ])
-            ->get();
-
-        return round($rows->sum(fn ($row) => $this->cashOrderGrossSales($row)), 2);
+            ->orderBy('mo.id')
+            ->lazy(250)
+            ->sum(fn ($row) => $this->cashOrderGrossSales($row)), 2);
     }
 
     private function hppAggregate(array $filters): array
@@ -2230,12 +2230,12 @@ class MarketplaceAnalyticsSummaryService
 
     private function returnRefundExistsSql(): string
     {
-        return 'EXISTS (SELECT 1 FROM marketplace_returns AS mr_status'
+        return '(EXISTS (SELECT 1 FROM marketplace_returns AS mr_status'
             .' WHERE mr_status.store_id = mo.store_id'
             .' AND (mr_status.order_sn = mo.channel_order_id OR mr_status.order_sn = mo.external_order_id))'
             .' OR EXISTS (SELECT 1 FROM marketplace_order_settlements AS ms_refund'
             .' WHERE ms_refund.order_id = mo.id'
-            .' AND ABS(COALESCE(ms_refund.drc_adjustable_refund, 0)) > 0)';
+            .' AND ABS(COALESCE(ms_refund.drc_adjustable_refund, 0)) > 0))';
     }
 
     /**

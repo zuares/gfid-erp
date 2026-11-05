@@ -551,7 +551,7 @@ export function PeriodPicker({ id = 'ds-period-picker', label = 'Periode Data', 
     );
 }
 
-export function Tabs({ idPrefix = 'ds-tabs', items = [], activeId, onChange, ariaLabel = 'Tabs', variant = 'primary' }) {
+export function Tabs({ idPrefix = 'ds-tabs', items = [], activeId, onChange, ariaLabel = 'Tabs', variant = 'primary', panelId }) {
     const moveFocus = (index) => {
         const nextItem = items[index];
         if (!nextItem) return;
@@ -582,6 +582,7 @@ export function Tabs({ idPrefix = 'ds-tabs', items = [], activeId, onChange, ari
                         id={`${idPrefix}-${item.id}`}
                         key={item.id}
                         aria-selected={isActive}
+                        aria-controls={panelId}
                         tabIndex={isActive ? 0 : -1}
                         onClick={() => onChange?.(item.id)}
                         onKeyDown={(event) => handleKeyDown(event, index)}
