@@ -113,7 +113,7 @@ body[data-theme="dark"] .sd-order-item-review{background:rgba(245,158,11,.09);bo
 .sd-info-banner{display:flex;align-items:center;gap:.45rem;margin-bottom:.65rem;padding:.62rem .75rem;border:1px solid rgba(37,99,235,.2);border-radius:8px;background:rgba(239,246,255,.8);color:#1e40af;font-size:.78rem;font-weight:700}
 .sd-stock-warning{margin-bottom:.65rem;border:1px solid rgba(220,38,38,.24);border-radius:8px;background:rgba(254,242,242,.72);overflow:hidden}
 .sd-stock-head{padding:.65rem .75rem;border-bottom:1px solid rgba(220,38,38,.16);color:#991b1b;font-size:.8rem;font-weight:900}
-.sd-stock-table-wrap{overflow:auto}.sd-stock-table{width:100%;border-collapse:collapse}.sd-stock-table th,.sd-stock-table td{padding:.5rem .65rem;border-bottom:1px solid rgba(220,38,38,.12);font-size:.78rem}.sd-stock-table th{text-align:left;color:#991b1b;font-size:.68rem;text-transform:uppercase;letter-spacing:.02em;background:rgba(254,226,226,.45)}.sd-stock-table td{color:#475569}.sd-stock-table tr:last-child td{border-bottom:0}.sd-stock-table .sd-stock-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}.sd-stock-table .sd-stock-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.sd-stock-table .sd-stock-short{color:#dc2626;font-weight:900}
+.sd-stock-table-wrap{overflow:auto}.sd-stock-table{width:100%;border-collapse:collapse}.sd-stock-table th,.sd-stock-table td{padding:.5rem .65rem;border-bottom:1px solid rgba(220,38,38,.12);font-size:.78rem}.sd-stock-table th{text-align:left;color:#991b1b;font-size:.68rem;text-transform:uppercase;letter-spacing:.02em;background:rgba(254,226,226,.45)}.sd-stock-table td{color:#475569}.sd-stock-table tr:last-child td{border-bottom:0}.sd-stock-table .sd-stock-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:900;color:#111827}.sd-stock-table .sd-stock-number{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.sd-stock-table .sd-stock-short{color:#dc2626;font-weight:900}.sd-stock-actions{display:flex;justify-content:flex-end;gap:.28rem;flex-wrap:wrap;min-width:240px}.sd-stock-action{display:inline-flex;align-items:center;gap:.25rem;border:1px solid rgba(148,163,184,.35);border-radius:7px;padding:.22rem .4rem;background:#fff;color:#475569;font-size:.68rem;font-weight:800;text-decoration:none;white-space:nowrap}.sd-stock-action:hover,.sd-stock-action:focus-visible{border-color:#94a3b8;background:#f8fafc;color:#1e293b;text-decoration:none}.sd-stock-action--adjust{border-color:#fed7aa;background:#fff7ed;color:#9a3412}.sd-stock-action--adjust:hover,.sd-stock-action--adjust:focus-visible{border-color:#fdba74;background:#ffedd5;color:#7c2d12}
 @media(max-width:860px){
   .sd-wrap{padding:.5rem .5rem 1.5rem}.sd-topbar{padding:.5rem}.sd-code{flex:1;min-width:150px;font-size:1.02rem}.sd-head{padding:.65rem .7rem}.sd-body{padding:.65rem .7rem}.sd-order{grid-template-columns:1fr;align-items:flex-start;gap:.4rem}
 }
@@ -921,6 +921,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
     }
     $editShipmentUrl = route('sales.shipments.scan_order', $shipment);
     $pendingDeletionLineIds = $pendingDeletionLineIds ?? [];
+    $stockWarehouseId = $stockWarehouseId ?? null;
     $canDeleteShipmentRows = in_array(strtolower((string) auth()->user()?->role), ['owner', 'admin'], true);
     $isAdmin = strtolower((string) auth()->user()?->role) === 'admin';
     $deleteButtonTitle = $isAdmin ? 'Hapus item — menunggu persetujuan owner' : 'Hapus item dari shipment';
@@ -1209,16 +1210,43 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                             <th class="sd-stock-number">Stok</th>
                             <th class="sd-stock-number">Perlu</th>
                             <th class="sd-stock-number">Kurang</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($stockInsufficient as $stockError)
+                            @php
+                                $stockCode = (string) ($stockError['code'] ?? '');
+                                $stockItemId = (int) ($stockError['item_id'] ?? 0);
+                                $stockShort = (int) ($stockError['short'] ?? 0);
+                                $adjustmentUrl = route('inventory.adjustments.manual.create', array_filter([
+                                    'warehouse_id' => $stockWarehouseId,
+                                    'item_id' => $stockItemId ?: null,
+                                    'item_code' => $stockCode ?: null,
+                                    'qty_change' => $stockShort > 0 ? $stockShort : null,
+                                ]));
+                                $purchaseOrderUrl = route('purchasing.purchase_orders.index', ['q' => $stockCode]);
+                                $stockRequestUrl = route('rts.stock-requests.index', ['search' => $stockCode]);
+                            @endphp
                             <tr>
                                 <td class="sd-stock-code">{{ $stockError['code'] ?? '-' }}</td>
                                 <td>{{ $stockError['name'] ?? '-' }}</td>
                                 <td class="sd-stock-number">{{ number_format((int) ($stockError['stock'] ?? 0), 0, ',', '.') }}</td>
                                 <td class="sd-stock-number">{{ number_format((int) ($stockError['needed'] ?? 0), 0, ',', '.') }}</td>
                                 <td class="sd-stock-number sd-stock-short">-{{ number_format((int) ($stockError['short'] ?? 0), 0, ',', '.') }}</td>
+                                <td>
+                                    <div class="sd-stock-actions" aria-label="Aksi {{ $stockCode }}">
+                                        <a href="{{ $adjustmentUrl }}" class="sd-stock-action sd-stock-action--adjust" title="Koreksi stok {{ $stockCode }}">
+                                            <i class="bi bi-sliders2-vertical" aria-hidden="true"></i><span>Koreksi stok</span>
+                                        </a>
+                                        <a href="{{ $purchaseOrderUrl }}" class="sd-stock-action" title="Cari PO untuk {{ $stockCode }}">
+                                            <i class="bi bi-receipt" aria-hidden="true"></i><span>Cek PO</span>
+                                        </a>
+                                        <a href="{{ $stockRequestUrl }}" class="sd-stock-action" title="Cari permintaan stok {{ $stockCode }}">
+                                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i><span>Cek permintaan</span>
+                                        </a>
+                                    </div>
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

@@ -463,7 +463,7 @@
                         <select name="warehouse_id" id="warehouse_id" class="form-select form-select-sm" required>
                             <option value="">Pilih gudang…</option>
                             @foreach ($warehouses as $wh)
-                                <option value="{{ $wh->id }}" {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>{{ $wh->code }} — {{ $wh->name }}</option>
+                                <option value="{{ $wh->id }}" {{ old('warehouse_id', $prefillWarehouseId ?? null) == $wh->id ? 'selected' : '' }}>{{ $wh->code }} — {{ $wh->name }}</option>
                             @endforeach
                         </select>
                         @error('warehouse_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
@@ -519,7 +519,7 @@
                         <div class="col-12 col-lg-8">
                             <label class="adj-field-label">Cari kode / nama / lot</label>
                             <input type="text" id="item-search" class="form-control form-control-sm"
-                                placeholder="Contoh: K001, kaos, LOT-01" style="font-size:.82rem;">
+                                placeholder="Contoh: K001, kaos, LOT-01" value="{{ $prefillItemCode ?? '' }}" style="font-size:.82rem;">
                         </div>
                         <div class="col-12 col-lg-2">
                             <label class="adj-field-label">&nbsp;</label>
@@ -702,6 +702,10 @@
             const workflowSections = document.getElementById('workflow-sections');
             const selectedWarehouseLabel = document.getElementById('selected-warehouse-label');
             const warehouseLockNote = document.getElementById('warehouse-lock-note');
+            const prefillWarehouseId = @json($prefillWarehouseId ?? null);
+            const prefillItemId = @json($prefillItemId ?? null);
+            const prefillItemCode = @json($prefillItemCode ?? '');
+            const prefillQtyChange = Number(@json($prefillQtyChange ?? 0));
 
             const itemsUrl = @json(route('inventory.adjustments.items_for_warehouse', [], false));
             const quickItemUrl = @json(route('inventory.adjustments.items.quick_store', [], false));
@@ -870,6 +874,28 @@
                 warehouseItems.forEach((item, idx) => { tbody.appendChild(buildRow(item, idx)); });
                 applyFilter();
                 updateSummary();
+            }
+
+            function applyPrefillAdjustment() {
+                if (!prefillItemId || !prefillQtyChange) return;
+                const row = Array.from(tbody.querySelectorAll('tr')).find(tr =>
+                    String(tr.querySelector('.row-item-id')?.value || '') === String(prefillItemId)
+                );
+                if (!row) return;
+
+                const physicalInput = row.querySelector('.physical-input');
+                const onHand = parseFloat(row.querySelector('.on-hand')?.dataset.onHand || '0') || 0;
+                if (physicalInput) {
+                    physicalInput.value = fmt(onHand + prefillQtyChange);
+                    recalcRow(row);
+                }
+                const notesInput = row.querySelector('.notes-input');
+                if (notesInput && !notesInput.value) {
+                    notesInput.value = 'Koreksi dari kekurangan stok shipment';
+                }
+                applyFilter();
+                updateSummary();
+                flashRow(row);
             }
 
             function applyFilter() {
@@ -1091,7 +1117,7 @@
                     return;
                 }
                 itemsHint.textContent = 'Memuat item…';
-                fetch(itemsUrl + '?warehouse_id=' + encodeURIComponent(warehouseId))
+                return fetch(itemsUrl + '?warehouse_id=' + encodeURIComponent(warehouseId))
                     .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
                     .then(data => {
                         warehouseItems = Array.isArray(data) ? data : [];
@@ -1217,9 +1243,21 @@
 
             setWorkflowReady(!!warehouseSelect.value);
             if (warehouseSelect.value) {
-                loadItemsForWarehouse(warehouseSelect.value);
+                const initialLoad = loadItemsForWarehouse(warehouseSelect.value);
+                if (prefillItemCode) {
+                    Promise.resolve(initialLoad).then(() => fetchSearchItems(prefillItemCode, true)).then(applyPrefillAdjustment);
+                }
             } else {
                 loadItemsForWarehouse(null);
+            }
+
+            if (prefillWarehouseId && !warehouseSelect.value) {
+                warehouseSelect.value = String(prefillWarehouseId);
+                setWorkflowReady(true);
+                const initialLoad = loadItemsForWarehouse(prefillWarehouseId);
+                if (prefillItemCode) {
+                    Promise.resolve(initialLoad).then(() => fetchSearchItems(prefillItemCode, true)).then(applyPrefillAdjustment);
+                }
             }
         })();
     </script>

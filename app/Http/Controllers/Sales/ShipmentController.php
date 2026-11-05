@@ -2025,6 +2025,7 @@ class ShipmentController extends Controller
 
             if (($trueAvailable + 0.0000001) < $qty) {
                 $errors[] = [
+                    'item_id' => $itemId,
                     'code' => $requirement['item']->code ?? "item#{$itemId}",
                     'name' => $requirement['item']->name ?? '',
                     'stock' => (int) $trueAvailable,
@@ -4307,6 +4308,7 @@ class ShipmentController extends Controller
         }
 
         $warehouse = $this->whRts();
+        $stockWarehouseId = $warehouse?->id;
         $stockInsufficient = $warehouse
             ? $this->checkStockSufficiency($shipment, $warehouse)
             : [];
@@ -4326,6 +4328,7 @@ class ShipmentController extends Controller
             'shipment',
             'currentWave',
             'isDaily',
+            'stockWarehouseId',
             'stockInsufficient',
             'mappingErrors',
             'kilatMatches',

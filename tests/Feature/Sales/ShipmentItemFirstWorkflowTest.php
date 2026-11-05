@@ -162,6 +162,40 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertDontSee('Stok WH-RTS belum cukup untuk shipment ini');
     }
 
+    public function test_confirmation_stock_shortage_shows_item_action_links(): void
+    {
+        [$user, $store, $item] = $this->shipmentContext();
+        $warehouse = Warehouse::create([
+            'code' => 'WH-RTS',
+            'name' => 'Gudang RTS',
+            'type' => 'finished_goods',
+            'active' => true,
+        ]);
+        $shipment = Shipment::create([
+            'code' => 'SHP-STOCK-ACTIONS-001',
+            'shipment_type' => Shipment::TYPE_MARKETPLACE,
+            'scan_mode' => 'item_first',
+            'store_id' => $store->id,
+            'date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+        ShipmentLine::create([
+            'shipment_id' => $shipment->id,
+            'item_id' => $item->id,
+            'qty_scanned' => 1,
+            'allocated_qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('sales.shipments.confirm_orders', $shipment))
+            ->assertOk()
+            ->assertSee('Koreksi stok')
+            ->assertSee('Cek PO')
+            ->assertSee('Cek permintaan')
+            ->assertSee('/inventory/adjustments/manual/create?warehouse_id=', false)
+            ->assertSee('item_code='.$item->code, false);
+    }
+
     public function test_item_first_confirmation_shows_mapping_error_when_item_is_unassigned(): void
     {
         [$user, $store, $item] = $this->shipmentContext();

@@ -461,7 +461,23 @@ class InventoryAdjustmentController extends Controller
             ->orderBy('code')
             ->get();
 
-        return view('inventory.adjustments.manual_create', compact('warehouses', 'itemCategories', 'itemRoles'));
+        $prefillWarehouseId = request()->integer('warehouse_id') ?: null;
+        $prefillItemId = request()->integer('item_id') ?: null;
+        $prefillItemCode = trim((string) request()->query('item_code', ''));
+        if ($prefillItemId && $prefillItemCode === '') {
+            $prefillItemCode = (string) (Item::query()->whereKey($prefillItemId)->value('code') ?? '');
+        }
+        $prefillQtyChange = max(0, (float) request()->query('qty_change', 0));
+
+        return view('inventory.adjustments.manual_create', compact(
+            'warehouses',
+            'itemCategories',
+            'itemRoles',
+            'prefillWarehouseId',
+            'prefillItemId',
+            'prefillItemCode',
+            'prefillQtyChange',
+        ));
     }
 
     /**
