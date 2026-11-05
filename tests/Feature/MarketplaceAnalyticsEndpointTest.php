@@ -308,6 +308,58 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertJsonPath('summary.cash_order_revenue', 0);
     }
 
+    public function test_fee_analysis_follows_platform_and_store_filters(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-FEE-FILTER']);
+        $shopee = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $tiktok = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $shopeeStore = Store::create([
+            'channel_id' => $shopee->id,
+            'code' => 'FEE-FILTER-SHOPEE',
+            'name' => 'Fee Filter Shopee',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $tiktokStore = Store::create([
+            'channel_id' => $tiktok->id,
+            'code' => 'FEE-FILTER-TIKTOK',
+            'name' => 'Fee Filter TikTok',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $shopeeOrder = $this->order($shopeeStore, 'fee-seller-a', '2026-09-10', 'FEE-FILTER-SHOPEE-1');
+        $tiktokOrder = $this->order($tiktokStore, 'fee-seller-b', '2026-09-11', 'FEE-FILTER-TIKTOK-1');
+        foreach ([[$shopeeStore, $shopeeOrder, 10000], [$tiktokStore, $tiktokOrder, 20000]] as [$store, $order, $commission]) {
+            MarketplaceOrderSettlement::create([
+                'store_id' => $store->id,
+                'order_id' => $order->id,
+                'channel_order_id' => $order->channel_order_id,
+                'commission_fee' => $commission,
+                'settlement_time' => '2026-09-12 10:00:00',
+                'data_status' => 'complete',
+                'final_income' => 100000 - $commission,
+                'raw_json' => [],
+            ]);
+        }
+
+        $query = [
+            'date_from' => '2026-09-01',
+            'date_to' => '2026-09-30',
+            'settlement' => 'settled',
+        ];
+        $all = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?'.http_build_query($query));
+        $all->assertOk()->assertJsonPath('meta.total', 2);
+        $this->assertCount(2, $all->json('fee_by_store'));
+
+        $filtered = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?'.http_build_query(array_merge($query, [
+            'platform' => 'shopee',
+            'store_id' => $shopeeStore->id,
+        ])));
+        $filtered->assertOk()->assertJsonPath('meta.total', 1);
+        $this->assertSame(['Fee Filter Shopee'], collect($filtered->json('fee_by_store'))->pluck('store_name')->unique()->values()->all());
+        $this->assertSame(10000.0, (float) collect($filtered->json('fee_by_type'))->firstWhere('code', 'platform_commission')['amount']);
+    }
+
     public function test_analytics_rejects_store_and_platform_mismatch(): void
     {
         $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-SCOPE']);
