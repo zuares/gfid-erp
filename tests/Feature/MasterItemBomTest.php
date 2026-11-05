@@ -84,7 +84,7 @@ class MasterItemBomTest extends TestCase
                 'material_item_id' => $accessory->id,
                 'usage_stage' => ItemBomLine::STAGE_SEWING_SUPPLY,
                 'qty' => '1',
-                'uom' => 'pcs',
+                'uom' => 'pack',
                 'scrap_pct' => '0',
                 'is_optional' => 0,
                 'sort_order' => 10,
@@ -264,6 +264,458 @@ class MasterItemBomTest extends TestCase
             ]))
             ->assertOk()
             ->assertJsonFragment(['id' => $finishedGood->id]);
+    }
+
+    public function test_bom_api_returns_filtered_results_and_pagination_metadata(): void
+    {
+        $category = ItemCategory::create([
+            'code' => 'BOM-API-CAT',
+            'name' => 'Kategori API BOM',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-API-001',
+            'name' => 'Produk API BOM',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $category->id,
+            'active' => true,
+        ]);
+        ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'BOM API Test',
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->owner)
+            ->getJson(route('master.item_boms.api', [
+                'q' => 'FG-BOM-API-001',
+                'item_category_id' => $category->id,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('filters.q', 'FG-BOM-API-001')
+            ->assertJsonPath('filters.item_category_id', $category->id)
+            ->assertJsonPath('summary.total', 1);
+
+        $this->assertStringContainsString($finishedGood->code, (string) $response->json('html'));
+
+        $this->actingAs($this->owner)
+            ->getJson(route('master.item_boms.api', ['q' => '%']))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_bom_index_can_filter_by_finished_good_item_category(): void
+    {
+        $categoryA = ItemCategory::create([
+            'code' => 'BOM-FILTER-A',
+            'name' => 'Kategori Filter A',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $categoryB = ItemCategory::create([
+            'code' => 'BOM-FILTER-B',
+            'name' => 'Kategori Filter B',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $finishedGoodA = Item::create([
+            'code' => 'FG-BOM-FILTER-A',
+            'name' => 'Produk Filter A',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $categoryA->id,
+            'active' => true,
+        ]);
+        $finishedGoodB = Item::create([
+            'code' => 'FG-BOM-FILTER-B',
+            'name' => 'Produk Filter B',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $categoryB->id,
+            'active' => true,
+        ]);
+
+        ItemBom::create(['item_id' => $finishedGoodA->id, 'name' => 'BOM Filter A', 'active' => true]);
+        ItemBom::create(['item_id' => $finishedGoodB->id, 'name' => 'BOM Filter B', 'active' => true]);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.index', ['item_category_id' => $categoryA->id]))
+            ->assertOk()
+            ->assertSee($finishedGoodA->code)
+            ->assertDontSee($finishedGoodB->code)
+            ->assertSee($categoryA->name);
+    }
+
+    public function test_bom_index_category_filter_only_lists_finished_good_categories(): void
+    {
+        $finishedGoodCategory = ItemCategory::create([
+            'code' => 'BOM-FILTER-FG',
+            'name' => 'Kategori Finished Good',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $materialCategory = ItemCategory::create([
+            'code' => 'BOM-FILTER-MATERIAL',
+            'name' => 'Kategori Material',
+            'kind' => 'material',
+            'active' => true,
+        ]);
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-FILTER-ONLY',
+            'name' => 'Produk Finished Good Filter',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $finishedGoodCategory->id,
+            'active' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'MAT-BOM-FILTER-ONLY',
+            'name' => 'Material Filter',
+            'unit' => 'kg',
+            'type' => 'material',
+            'item_category_id' => $materialCategory->id,
+            'active' => true,
+        ]);
+
+        ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'BOM Finished Good Filter',
+            'active' => true,
+        ]);
+        $materialBom = ItemBom::create([
+            'item_id' => $material->id,
+            'name' => 'BOM Material Filter',
+            'active' => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.index'))
+            ->assertOk()
+            ->assertSee($finishedGoodCategory->name)
+            ->assertDontSee($materialCategory->name);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.index', ['item_category_id' => $materialCategory->id]))
+            ->assertOk()
+            ->assertDontSee($materialBom->name)
+            ->assertDontSee($material->code);
+    }
+
+    public function test_bulk_update_applies_a_component_to_all_boms_in_a_category_without_duplicates(): void
+    {
+        $category = ItemCategory::create([
+            'code' => 'BOM-BULK-CAT',
+            'name' => 'Kategori Bulk BOM',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $finishedGoodA = Item::create([
+            'code' => 'FG-BOM-BULK-A',
+            'name' => 'Produk Bulk A',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $category->id,
+            'active' => true,
+        ]);
+        $finishedGoodB = Item::create([
+            'code' => 'FG-BOM-BULK-B',
+            'name' => 'Produk Bulk B',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $category->id,
+            'active' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'OPP-BOM-BULK',
+            'name' => 'OPP Bulk BOM',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pack',
+            'type' => 'material',
+            'active' => true,
+        ]);
+        $bomA = ItemBom::create(['item_id' => $finishedGoodA->id, 'name' => 'BOM Bulk A', 'active' => true]);
+        $bomB = ItemBom::create(['item_id' => $finishedGoodB->id, 'name' => 'BOM Bulk B', 'active' => true]);
+        ItemBomLine::create([
+            'item_bom_id' => $bomA->id,
+            'material_item_id' => $material->id,
+            'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+            'qty' => '1',
+            'uom' => 'pcs',
+            'scrap_pct' => '0',
+            'is_optional' => false,
+            'sort_order' => 10,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post(route('master.item_boms.bulk_update'), [
+                'item_category_id' => $category->id,
+                'material_item_id' => $material->id,
+                'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                'qty' => '2',
+                'uom' => 'pack',
+                'scrap_pct' => '5',
+                'is_optional' => '0',
+            ])
+            ->assertRedirect(route('master.item_boms.bulk_update_form'));
+
+        $this->assertDatabaseHas('item_bom_lines', [
+            'item_bom_id' => $bomA->id,
+            'material_item_id' => $material->id,
+            'qty' => '2.00000000',
+            'uom' => 'pcs',
+            'scrap_pct' => '5.000',
+        ]);
+        $this->assertDatabaseHas('item_bom_lines', [
+            'item_bom_id' => $bomB->id,
+            'material_item_id' => $material->id,
+            'qty' => '2.00000000',
+            'uom' => 'pcs',
+            'scrap_pct' => '5.000',
+        ]);
+        $this->assertSame(1, ItemBomLine::query()
+            ->where('item_bom_id', $bomA->id)
+            ->where('material_item_id', $material->id)
+            ->count());
+    }
+
+    public function test_bulk_update_all_targets_finished_good_boms_only(): void
+    {
+        $finishedGoodCategory = ItemCategory::create([
+            'code' => 'BOM-BULK-ALL-FG',
+            'name' => 'Kategori Semua Finished Good',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $materialCategory = ItemCategory::create([
+            'code' => 'BOM-BULK-ALL-MAT',
+            'name' => 'Kategori Semua Material',
+            'kind' => 'material',
+            'active' => true,
+        ]);
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-BULK-ALL',
+            'name' => 'Produk Semua Finished Good',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $finishedGoodCategory->id,
+            'active' => true,
+        ]);
+        $materialParent = Item::create([
+            'code' => 'MAT-BOM-BULK-ALL',
+            'name' => 'Material Parent Tidak Ditargetkan',
+            'unit' => 'kg',
+            'type' => 'material',
+            'item_category_id' => $materialCategory->id,
+            'active' => true,
+        ]);
+        $component = Item::create([
+            'code' => 'OPP-BOM-BULK-ALL',
+            'name' => 'Komponen Bulk Semua',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'type' => 'material',
+            'active' => true,
+        ]);
+
+        $finishedGoodBom = ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'BOM Finished Good Semua',
+            'active' => true,
+        ]);
+        $materialBom = ItemBom::create([
+            'item_id' => $materialParent->id,
+            'name' => 'BOM Material Tidak Ditargetkan',
+            'active' => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post(route('master.item_boms.bulk_update'), [
+                'item_category_id' => '',
+                'material_item_id' => $component->id,
+                'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                'qty' => '1',
+                'scrap_pct' => '0',
+                'is_optional' => '0',
+            ])
+            ->assertRedirect(route('master.item_boms.bulk_update_form'));
+
+        $this->assertDatabaseHas('item_bom_lines', [
+            'item_bom_id' => $finishedGoodBom->id,
+            'material_item_id' => $component->id,
+            'uom' => 'pcs',
+        ]);
+        $this->assertDatabaseMissing('item_bom_lines', [
+            'item_bom_id' => $materialBom->id,
+            'material_item_id' => $component->id,
+        ]);
+    }
+
+    public function test_bulk_update_skips_inactive_finished_good_boms(): void
+    {
+        $category = ItemCategory::create([
+            'code' => 'BOM-BULK-ACTIVE-ONLY',
+            'name' => 'Kategori BOM Aktif Saja',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $activeFinishedGood = Item::create([
+            'code' => 'FG-BOM-ACTIVE-ONLY',
+            'name' => 'Produk BOM Aktif',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $category->id,
+            'active' => true,
+        ]);
+        $inactiveFinishedGood = Item::create([
+            'code' => 'FG-BOM-INACTIVE-ONLY',
+            'name' => 'Produk BOM Inactive',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $category->id,
+            'active' => true,
+        ]);
+        $component = Item::create([
+            'code' => 'RIB-BOM-ACTIVE-ONLY',
+            'name' => 'Komponen BOM Aktif Saja',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'type' => 'material',
+            'active' => true,
+        ]);
+
+        $activeBom = ItemBom::create([
+            'item_id' => $activeFinishedGood->id,
+            'name' => 'BOM Aktif',
+            'active' => true,
+        ]);
+        $inactiveBom = ItemBom::create([
+            'item_id' => $inactiveFinishedGood->id,
+            'name' => 'BOM Inactive',
+            'active' => false,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post(route('master.item_boms.bulk_update'), [
+                'item_category_id' => $category->id,
+                'material_item_id' => $component->id,
+                'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                'qty' => '1',
+                'scrap_pct' => '0',
+                'is_optional' => '0',
+            ])
+            ->assertRedirect(route('master.item_boms.bulk_update_form'));
+
+        $this->assertDatabaseHas('item_bom_lines', [
+            'item_bom_id' => $activeBom->id,
+            'material_item_id' => $component->id,
+        ]);
+        $this->assertDatabaseMissing('item_bom_lines', [
+            'item_bom_id' => $inactiveBom->id,
+            'material_item_id' => $component->id,
+        ]);
+    }
+
+    public function test_bulk_update_keeps_legacy_duplicate_component_lines_in_sync(): void
+    {
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-DUPLICATE-LEGACY',
+            'name' => 'Produk BOM Duplikat Legacy',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $component = Item::create([
+            'code' => 'LABEL-BOM-DUPLICATE-LEGACY',
+            'name' => 'Label Duplikat Legacy',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'type' => 'material',
+            'active' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'BOM Duplikat Legacy',
+            'active' => true,
+        ]);
+        foreach ([10, 20] as $sortOrder) {
+            ItemBomLine::create([
+                'item_bom_id' => $bom->id,
+                'material_item_id' => $component->id,
+                'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                'qty' => '1',
+                'uom' => 'pcs',
+                'scrap_pct' => '0',
+                'is_optional' => false,
+                'sort_order' => $sortOrder,
+            ]);
+        }
+
+        $this->actingAs($this->owner)
+            ->post(route('master.item_boms.bulk_update'), [
+                'item_category_id' => '',
+                'material_item_id' => $component->id,
+                'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                'qty' => '2',
+                'scrap_pct' => '7.5',
+                'is_optional' => '1',
+            ])
+            ->assertRedirect(route('master.item_boms.bulk_update_form'));
+
+        $this->assertSame(2, ItemBomLine::query()
+            ->where('item_bom_id', $bom->id)
+            ->where('material_item_id', $component->id)
+            ->where('qty', '2.00')
+            ->where('scrap_pct', '7.50')
+            ->where('is_optional', true)
+            ->count());
+    }
+
+    public function test_bom_line_unit_always_follows_component_master_stock_unit(): void
+    {
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-UOM-001',
+            'name' => 'Produk UOM BOM Test',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'can_make' => true,
+            'default_supply_source' => 'make',
+            'active' => true,
+        ]);
+        $material = Item::create([
+            'code' => 'MAT-BOM-UOM-001',
+            'name' => 'Material UOM BOM Test',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'purchase_unit' => 'pack',
+            'type' => 'material',
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->owner)
+            ->post(route('master.item_boms.store'), [
+                'item_id' => $finishedGood->id,
+                'name' => 'BOM UOM Test',
+                'active' => 1,
+                'lines' => [[
+                    'material_item_id' => $material->id,
+                    'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                    'qty' => '1',
+                    'uom' => 'pack',
+                    'scrap_pct' => '0',
+                    'is_optional' => 0,
+                    'sort_order' => 10,
+                ]],
+            ]);
+        $response->assertRedirect();
+
+        $this->assertDatabaseHas('item_bom_lines', [
+            'material_item_id' => $material->id,
+            'uom' => 'pcs',
+        ]);
     }
 
     public function test_existing_bom_can_be_edited_with_a_small_quantity(): void

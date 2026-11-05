@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
+use App\Models\FinishingMaterialCorrection;
 use App\Models\Item;
 use App\Models\ItemBom;
 use App\Models\ItemBomLine;
+use App\Models\ItemCategory;
 use App\Services\Production\ItemBomCostService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ItemBomController extends Controller
@@ -16,12 +19,45 @@ class ItemBomController extends Controller
     private const QTY_MIN = 0.0001; // biar bisa 0,0095
     private const DEFAULT_WASTE_PCT = '0';
     private const PAGINATE = 20;
+    private const BULK_UPDATE_CHUNK_SIZE = 100;
 
     public function index(Request $request)
     {
-        $q = trim((string) $request->query('q', ''));
+        return view('master.item_boms.index', $this->indexData($request));
+    }
+
+    public function apiIndex(Request $request)
+    {
+        $data = $this->indexData($request);
+
+        return response()->json([
+            'html' => view('master.item_boms._list', $data)->render(),
+            'toolbar_meta' => view('master.item_boms._toolbar_meta', $data)->render(),
+            'summary' => $data['bomSummary'],
+            'meta' => [
+                'current_page' => $data['boms']->currentPage(),
+                'last_page' => $data['boms']->lastPage(),
+                'per_page' => $data['boms']->perPage(),
+                'total' => $data['boms']->total(),
+                'from' => $data['boms']->firstItem(),
+                'to' => $data['boms']->lastItem(),
+            ],
+            'filters' => [
+                'q' => $data['q'],
+                'status' => $data['status'],
+                'structure' => $data['structure'],
+                'item_category_id' => $data['categoryId'],
+            ],
+        ]);
+    }
+
+    private function indexData(Request $request): array
+    {
+        $q = mb_substr(trim((string) $request->query('q', '')), 0, 100);
+        $like = $this->likePattern($q);
         $status = (string) $request->query('status', '');
         $structure = (string) $request->query('structure', '');
+        $categoryId = max(0, (int) $request->query('item_category_id', 0));
 
         if (!in_array($status, ['active', 'inactive'], true)) {
             $status = '';
@@ -32,25 +68,29 @@ class ItemBomController extends Controller
         }
 
         $bomQuery = ItemBom::query()
-            ->with(['item:id,code,name'])
+            ->with(['item:id,code,name,item_category_id'])
             ->withCount([
                 'lines',
                 'mainMaterialLines',
                 'sewingSupplyLines',
                 'packingSupplyLines',
             ])
-            ->when($q !== '', function ($qq) use ($q) {
-                $qq->where(function ($w) use ($q) {
-                    $w->whereHas('item', function ($i) use ($q) {
-                        $i->where(function ($item) use ($q) {
-                            $item->where('code', 'like', "%{$q}%")
-                                ->orWhere('sku', 'like', "%{$q}%")
-                                ->orWhere('name', 'like', "%{$q}%");
+            ->when($q !== '', function ($qq) use ($like) {
+                $qq->where(function ($w) use ($like) {
+                    $w->whereHas('item', function ($i) use ($like) {
+                        $i->where(function ($item) use ($like) {
+                            $item->whereRaw("code LIKE ? ESCAPE '\\'", [$like])
+                                ->orWhereRaw("sku LIKE ? ESCAPE '\\'", [$like])
+                                ->orWhereRaw("name LIKE ? ESCAPE '\\'", [$like]);
                         });
-                    })->orWhere('item_boms.name', 'like', "%{$q}%");
+                    })->orWhereRaw("item_boms.name LIKE ? ESCAPE '\\'", [$like]);
                 });
             })
             ->when($status !== '', fn ($qq) => $qq->where('active', $status === 'active'))
+            ->when($categoryId > 0, fn ($qq) => $qq->whereHas('item', fn ($item) => $item
+                ->where('type', 'finished_good')
+                ->where('item_category_id', $categoryId)
+            ))
             ->when($structure === 'main', fn ($qq) => $qq->whereHas('mainMaterialLines'))
             ->when($structure === 'sewing', fn ($qq) => $qq->whereHas('sewingSupplyLines'))
             ->when($structure === 'packing', fn ($qq) => $qq->whereHas('packingSupplyLines'))
@@ -69,6 +109,15 @@ class ItemBomController extends Controller
         $boms = (clone $bomQuery)
             ->paginate(self::PAGINATE)
             ->withQueryString();
+
+        $itemCategories = ItemCategory::query()
+            ->whereHas('items', fn ($item) => $item
+                ->where('type', 'finished_good')
+                ->whereHas('boms')
+            )
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
+        $selectedCategory = $itemCategories->firstWhere('id', $categoryId);
 
         // Badge "standar vs aktual" per BOM — dari cutting job non-void terakhir.
         // { bom_id => { kg_per_pcs, job_code, std_max, status: over|under|ok } }
@@ -129,11 +178,12 @@ class ItemBomController extends Controller
             }
         }
 
-        $hasFilters = $q !== '' || $status !== '' || $structure !== '';
+        $hasFilters = $q !== '' || $status !== '' || $structure !== '' || $categoryId > 0;
 
-        return view('master.item_boms.index', compact(
-            'boms', 'q', 'status', 'structure', 'hasFilters', 'bomUsageBadges', 'bomSummary'
-        ));
+        return compact(
+            'boms', 'q', 'status', 'structure', 'categoryId', 'itemCategories', 'selectedCategory',
+            'hasFilters', 'bomUsageBadges', 'bomSummary'
+        );
     }
 
     public function create(Request $request)
@@ -152,15 +202,135 @@ class ItemBomController extends Controller
             'bom' => null,
             'rows' => $rows,
             'prefilledItem' => $prefilledItem,
+            'materialCorrectionId' => (int) $request->query('correction_id', old('material_correction_id', 0)),
         ]);
     }
 
-    public function edit(ItemBom $bom, ItemBomCostService $bomCostService)
+    public function bulkUpdateForm()
+    {
+        $itemCategories = ItemCategory::query()
+            ->whereHas('items', fn ($query) => $query
+                ->where('type', 'finished_good')
+                ->whereHas('boms', fn ($bom) => $bom->where('active', true))
+            )
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
+
+        $categoryBomCounts = ItemBom::query()
+            ->join('items', 'items.id', '=', 'item_boms.item_id')
+            ->where('items.type', 'finished_good')
+            ->where('item_boms.active', true)
+            ->selectRaw('items.item_category_id, COUNT(item_boms.id) as bom_count')
+            ->groupBy('items.item_category_id')
+            ->pluck('bom_count', 'items.item_category_id');
+
+        $itemCategories->each(function (ItemCategory $category) use ($categoryBomCounts): void {
+            $category->setAttribute('bom_count', (int) ($categoryBomCounts[$category->id] ?? 0));
+        });
+
+        $allBomCount = ItemBom::query()
+            ->where('active', true)
+            ->whereHas('item', fn ($query) => $query->where('type', 'finished_good'))
+            ->count();
+
+        return view('master.item_boms.bulk_update', compact('itemCategories', 'allBomCount'));
+    }
+
+    public function bulkUpdate(Request $request)
+    {
+        $request->merge([
+            'qty' => $this->normalizeDecimal($request->input('qty')),
+            'scrap_pct' => $this->normalizeDecimal($request->input('scrap_pct', self::DEFAULT_WASTE_PCT)),
+        ]);
+
+        $data = $request->validate([
+            'item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
+            'material_item_id' => ['required', 'integer', 'exists:items,id'],
+            'usage_stage' => ['required', Rule::in(array_keys(ItemBomLine::usageStageLabels()))],
+            'qty' => ['required', 'numeric', 'min:' . self::QTY_MIN],
+            'scrap_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'is_optional' => ['nullable', 'boolean'],
+        ], [
+            'material_item_id.required' => 'Komponen wajib dipilih.',
+            'qty.required' => 'Qty wajib diisi.',
+        ]);
+
+        $material = Item::query()
+            ->whereKey($data['material_item_id'])
+            ->where('type', 'material')
+            ->whereDoesntHave('category', fn ($query) => $query->where('kind', 'operational'))
+            ->where(function ($query) {
+                $query->whereNull('default_allocation')
+                    ->orWhere('default_allocation', 'hpp');
+            })
+            ->first();
+
+        if (! $material) {
+            throw ValidationException::withMessages([
+                'material_item_id' => 'Komponen tidak dapat dipakai sebagai bahan BOM persediaan/HPP.',
+            ]);
+        }
+
+        $categoryId = $data['item_category_id'] ?? null;
+        $bomQuery = ItemBom::query()
+            ->where('active', true)
+            ->whereHas('item', function ($query) use ($categoryId): void {
+                $query->where('type', 'finished_good')
+                    ->when($categoryId !== null, fn ($category) => $category->where('item_category_id', $categoryId));
+            });
+
+        if (! $bomQuery->exists()) {
+            throw ValidationException::withMessages([
+                'item_category_id' => 'Tidak ada BOM aktif finished good untuk target yang dipilih.',
+            ]);
+        }
+
+        $updated = 0;
+        $added = 0;
+
+        DB::transaction(function () use ($bomQuery, $data, $material, &$updated, &$added): void {
+            $bomQuery
+                ->with('lines')
+                ->chunkById(self::BULK_UPDATE_CHUNK_SIZE, function ($boms) use ($data, $material, &$updated, &$added): void {
+                    foreach ($boms as $bom) {
+                        $lines = $bom->lines->where('material_item_id', (int) $data['material_item_id']);
+                        $attributes = [
+                            'usage_stage' => $data['usage_stage'],
+                            'qty' => (string) ($data['qty'] ?? '0'),
+                            'uom' => $material->stockUnit(),
+                            'scrap_pct' => (string) ($data['scrap_pct'] ?? self::DEFAULT_WASTE_PCT),
+                            'is_optional' => (bool) ($data['is_optional'] ?? false),
+                        ];
+
+                        if ($lines->isNotEmpty()) {
+                            foreach ($lines as $line) {
+                                $line->update($attributes);
+                                $updated++;
+                            }
+                            continue;
+                        }
+
+                        $nextSortOrder = ((int) $bom->lines->max('sort_order')) + 10;
+                        $bom->lines()->create($attributes + [
+                            'material_item_id' => (int) $data['material_item_id'],
+                            'sort_order' => $nextSortOrder,
+                        ]);
+                        $added++;
+                    }
+                });
+        });
+
+        return redirect()
+            ->route('master.item_boms.bulk_update_form')
+            ->with('success', "Update massal selesai: {$added} baris ditambahkan dan {$updated} baris diperbarui pada BOM finished good aktif.");
+    }
+
+    public function edit(Request $request, ItemBom $bom, ItemBomCostService $bomCostService)
     {
         $bom->load([
             'item:id,code,name',
             'lines' => fn($q) => $q->ordered()
-                ->with('material:id,code,name,unit,hpp,base_unit_cost'),
+                ->with('material:id,code,name,unit,stock_unit,hpp,base_unit_cost'),
         ]);
 
         $bomEstimate = $bomCostService->estimate($bom);
@@ -222,7 +392,7 @@ class ItemBomController extends Controller
                     'material_text' => $text !== '—' ? $text : null,
                     'usage_stage' => $l->usage_stage ?: ItemBomLine::STAGE_MAIN_MATERIAL,
                     'qty' => (string) $l->qty, // keep as string
-                    'uom' => $l->uom ?: ($l->material?->unit ?? 'pcs'),
+                    'uom' => $l->material?->stockUnit() ?: ($l->uom ?: 'pcs'),
                     'scrap_pct' => (string) ($l->scrap_pct ?? 0),
                     'is_optional' => (int) ($l->is_optional ? 1 : 0),
                 ];
@@ -233,7 +403,13 @@ class ItemBomController extends Controller
             }
         }
 
-        return view('master.item_boms.form', compact('bom', 'rows', 'usageByMaterial', 'bomEstimate'));
+        return view('master.item_boms.form', [
+            'bom' => $bom,
+            'rows' => $rows,
+            'usageByMaterial' => $usageByMaterial,
+            'bomEstimate' => $bomEstimate,
+            'materialCorrectionId' => (int) $request->query('correction_id', old('material_correction_id', 0)),
+        ]);
     }
 
     public function store(Request $request)
@@ -258,6 +434,7 @@ class ItemBomController extends Controller
             );
 
             $this->syncLines($bom, $data['lines'], (int) $item->id);
+            $this->completeMaterialCorrection($data['material_correction_id'] ?? null, $bom);
 
             return redirect()
                 ->route('master.item_boms.edit', $bom)
@@ -283,6 +460,7 @@ class ItemBomController extends Controller
             ]);
 
             $this->syncLines($bom, $data['lines'], (int) $bom->item_id);
+            $this->completeMaterialCorrection($data['material_correction_id'] ?? null, $bom);
 
             return redirect()
                 ->route('master.item_boms.edit', $bom)
@@ -329,6 +507,7 @@ class ItemBomController extends Controller
 
         $rules = [
             'item_id' => [$isUpdate ? 'nullable' : 'required', 'integer', 'exists:items,id'],
+            'material_correction_id' => ['nullable', 'integer', 'exists:finishing_material_corrections,id'],
             'name' => ['nullable', 'string', 'max:255'],
             'active' => ['nullable', 'in:0,1'],
 
@@ -369,6 +548,22 @@ class ItemBomController extends Controller
         return $data;
     }
 
+    private function completeMaterialCorrection(?int $correctionId, ItemBom $bom): void
+    {
+        if (! $correctionId) {
+            return;
+        }
+
+        FinishingMaterialCorrection::query()
+            ->whereKey($correctionId)
+            ->where('action', 'bom')
+            ->update([
+                'status' => 'completed',
+                'reference_type' => ItemBom::class,
+                'reference_id' => $bom->id,
+            ]);
+    }
+
     private function normalizeDecimal($v): ?string
     {
         if ($v === null) {
@@ -391,6 +586,11 @@ class ItemBomController extends Controller
         return $v;
     }
 
+    private function likePattern(string $value): string
+    {
+        return '%' . addcslashes($value, '\\%_') . '%';
+    }
+
     private function defaultRow(): array
     {
         return [
@@ -408,6 +608,10 @@ class ItemBomController extends Controller
     {
         $this->validateBomComponents($lines, $parentItemId);
         $lines = $this->normalizeLineOrder($lines);
+        $materialUnits = Item::query()
+            ->whereIn('id', collect($lines)->pluck('material_item_id')->map(fn ($id) => (int) $id)->unique())
+            ->get(['id', 'unit', 'stock_unit'])
+            ->mapWithKeys(fn (Item $item) => [$item->id => $item->stockUnit()]);
         ItemBomLine::where('item_bom_id', $bom->id)->delete();
 
         foreach (array_values($lines) as $idx => $l) {
@@ -418,7 +622,7 @@ class ItemBomController extends Controller
 
                 // ✅ simpan string, biar decimal DB yang handle presisi
                 'qty' => (string) ($this->normalizeDecimal($l['qty']) ?? '0'),
-                'uom' => (string) ($l['uom'] ?? 'pcs'),
+                'uom' => (string) ($materialUnits->get((int) $l['material_item_id']) ?? 'pcs'),
                 'scrap_pct' => (string) ($this->normalizeDecimal($l['scrap_pct'] ?? self::DEFAULT_WASTE_PCT) ?? self::DEFAULT_WASTE_PCT),
 
                 'is_optional' => (bool) ($l['is_optional'] ?? false),
