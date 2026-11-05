@@ -10,23 +10,15 @@
     </section>
 </div>
 
-<section class="an-card an-tab-pane" data-an-pane="overview" aria-labelledby="overviewStoreLedgerTitle">
-    <div class="an-card-head">
-        <div>
-            <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div>
-            <div class="an-card-title" id="overviewStoreLedgerTitle">Performa per toko</div>
-            <div class="an-card-sub">Order eligible, gross sales terverifikasi, dan adm fee aktual per toko pada periode aktif.</div>
-        </div>
-    </div>
-    <div class="an-card-body">
-        <div class="an-table-wrap">
-            <table class="an-table">
-                <thead><tr><th>Toko</th><th>Order eligible</th><th>Gross sales terverifikasi</th><th>Adm fee aktual</th></tr></thead>
-                <tbody id="overviewStoreLedgerBody"><tr><td colspan="4"><div class="an-empty">Memuat…</div></td></tr></tbody>
-            </table>
-        </div>
-    </div>
-</section>
+<div class="an-enterprise-grid an-tab-pane" data-an-pane="overview">
+    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Portfolio view</div><div class="an-enterprise-title">Store performance snapshot</div><div class="an-enterprise-sub">Ranking toko berdasarkan gross sales dan profit operasional terverifikasi.</div></div></div><div class="an-enterprise-body"><div class="an-pulse-grid" id="anOverviewStorePulse"><div class="an-empty">Memuat…</div></div></div></section>
+    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Cost structure</div><div class="an-enterprise-title">Cost efficiency</div><div class="an-enterprise-sub">Rasio biaya terhadap gross sales terverifikasi, bukan GMV operasional.</div></div></div><div class="an-enterprise-body"><div class="an-health-list" id="anOverviewStoreCostPulse"><div class="an-empty">Memuat…</div></div></div></section>
+</div>
+
+<div class="an-grid-secondary an-tab-pane" data-an-pane="overview">
+    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div><div class="an-card-title">Performa per toko</div><div class="an-card-sub">Hanya order financial-ready: settlement complete, item valid, dan HPP tersedia.</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order eligible</th><th>Selesai</th><th>Cancel</th><th>Gross sales terverifikasi</th><th>Adm fee aktual</th><th>Profit operasional</th></tr></thead><tbody id="overviewStoreLedgerBody"><tr><td colspan="7"><div class="an-empty">Memuat…</div></td></tr></tbody></table></div></div></section>
+    <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Fee estimasi mengikuti rate actual Unit economics; biaya settlement tetap tersedia untuk audit</div></div></div><div class="an-card-body"><div class="an-costs" id="overviewCostBody"><div class="an-empty">Memuat…</div></div></div></section>
+</div>
 
 <section class="an-control-tower an-tab-pane is-hidden" data-an-pane="operations">
     <div class="an-control-head">

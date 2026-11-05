@@ -396,6 +396,49 @@
         const score = inverse ? 100 - Number(value || 0) : Number(value || 0);
         return score >= 85 ? '' : (score >= 65 ? 'warn' : 'bad');
     }
+    function renderStorePerformance({ pulseId, costPulseId, ledgerBodyId }) {
+        const list = summary?.stores || [];
+        const contributing = list.filter(store => Number(store.gross_sales || 0) > 0);
+        const totalGross = contributing.reduce((sum, store) => sum + Number(store.gross_sales || 0), 0);
+        const top = [...contributing].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0))[0];
+        const bestMargin = [...contributing].sort((a,b) => Number(b.margin_pct || 0) - Number(a.margin_pct || 0))[0];
+        const pulseElement = $(pulseId);
+        if (pulseElement) {
+            pulseElement.innerHTML = [
+                ['Toko berkontribusi', Number(contributing.length || 0).toLocaleString('id-ID'), 'dengan gross sales terverifikasi'],
+                ['Kontributor utama', top?.store_name || '—', top ? `${(Number(top.gross_sales || 0) / Math.max(totalGross,1) * 100).toFixed(1)}% gross sales` : '—'],
+                ['Margin terbaik', bestMargin?.store_name || '—', bestMargin ? `${Number(bestMargin.margin_pct || 0).toFixed(1)}% profit operasional` : '—'],
+            ].map(([label,value,note]) => `<div class="an-pulse"><div class="an-pulse-label">${label}</div><div class="an-pulse-value" style="font-size:${String(value).length > 16 ? '.78rem' : '1rem'}">${esc(value)}</div><div class="an-pulse-note">${note}</div></div>`).join('');
+        }
+        const storeBase = Math.max(totalGross, 1);
+        const costPulseElement = $(costPulseId);
+        if (costPulseElement) {
+            costPulseElement.innerHTML = [
+                ['Payout / gross sales', list.reduce((sum, store) => sum + Number(store.payout || 0), 0) / storeBase * 100],
+                ['Fee marketplace / gross sales', list.reduce((sum, store) => sum + Number(store.marketplace_fees || 0), 0) / storeBase * 100],
+                ['HPP / gross sales', list.reduce((sum, store) => sum + Number(store.hpp || 0), 0) / storeBase * 100],
+                ['Iklan / gross sales', list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0) / storeBase * 100],
+            ].map(([label,value]) => `<div class="an-health-row"><span>${label}<small>basis: gross sales terverifikasi</small></span><div class="an-health-track"><span style="width:${Math.min(100, Math.max(0, value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');
+        }
+        const ledgerElement = $(ledgerBodyId);
+        if (ledgerElement) {
+            const rows = [...list].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0));
+            ledgerElement.innerHTML = rows.length ? rows.map(store => `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.order_total || 0).toLocaleString('id-ID')}</td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.order_total)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(store.gross_sales)}<span class="an-table-subline">AOV financial-ready ${money(store.order_count ? store.gross_sales / store.order_count : 0)}</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">komisi platform actual</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Payout − HPP − iklan · Iklan ${money(store.ad_cost)}</span></td></tr>`).join('') : '<tr><td colspan="7"><div class="an-empty">Belum ada data toko siap profit.</div></td></tr>';
+        }
+    }
+    function renderMarketplaceCosts(targetId) {
+        const current = summary?.current || {};
+        const orderRevenue = Number(current.cash_order_revenue || 0) + Number(current.cash_unsettled_order_revenue || 0);
+        const base = Math.max(orderRevenue || Number(current.gmv || current.gross_sales || 0), 1);
+        const rows = [
+            [`Fee marketplace (estimasi ${(Number(current.marketplace_fee_estimate_rate || 0)).toFixed(1)}% actual)`, current.marketplace_fee_estimate],
+            ['Refund / adjustment', current.return_refund_amount ?? current.refund],
+            ['Biaya iklan (incl. PPN 11%)', current.ad_cost],
+            ['HPP total', current.hpp_total ?? current.hpp],
+        ];
+        const element = $(targetId);
+        if (element) element.innerHTML = rows.map(([label,value]) => `<div class="an-cost-row"><span>${label} <small style="color:#94a3b8">(${(Number(value || 0) / base * 100).toFixed(1)}%)</small></span><strong>${money(value)}</strong><div class="an-bar" style="grid-column:1/-1"><span style="width:${Math.min(100, Math.max(0, Number(value || 0) / base * 100))}%"></span></div></div>`).join('');
+    }
     function renderEnterprise() {
         const current = summary?.current || {};
         const quality = summary?.quality || {};
@@ -518,8 +561,7 @@
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
         const total = Math.max(Number(quality.total || 0), 1);
         const readyRate = Number(quality.ready || 0) / total * 100;
-        const storeLedgerRows = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0));
-        const topStores = storeLedgerRows.slice(0, 5);
+        const topStores = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0)).slice(0, 5);
         const pulse = [
             ['Total order', totalOrder.toLocaleString('id-ID'), { text: `eligible · ${totalOrderChange.text}`, className: totalOrderChange.className }, 'orders'],
             ['Order selesai', completedOrders.toLocaleString('id-ID'), { text: `${completionRate.toFixed(1)}% dari order masuk · ${completedOrdersChange.text}`, className: completedOrdersChange.className }, 'completed'],
@@ -560,7 +602,8 @@
         $('anAlerts').innerHTML = alerts.map(([level,icon,title,note,action]) => `<div class="an-alert ${level}"><span class="an-alert-icon"><i class="bi ${icon}"></i></span><div><div class="an-alert-title">${title}</div><div class="an-alert-note">${note}</div></div><span class="an-alert-action">${action}</span></div>`).join('');
         const maxStore = Math.max(...topStores.map(store => Number(store.gross_sales || 0)), 1);
         $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_count || 0).toLocaleString('id-ID')} order financial-ready · profit ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gross_sales || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gross_sales)}</div></div>`).join('') : '<div class="an-empty">Belum ada kontribusi toko.</div>';
-        $('overviewStoreLedgerBody').innerHTML = storeLedgerRows.length ? storeLedgerRows.map(store => `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.order_total || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(store.gross_sales)}</td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}</td></tr>`).join('') : '<tr><td colspan="4"><div class="an-empty">Belum ada data toko pada periode ini.</div></td></tr>';
+        renderStorePerformance({ pulseId: 'anOverviewStorePulse', costPulseId: 'anOverviewStoreCostPulse', ledgerBodyId: 'overviewStoreLedgerBody' });
+        renderMarketplaceCosts('overviewCostBody');
         const settledGross = Number(current.cash_order_revenue ?? current.cash_gross_sales ?? 0);
         const unsettledGross = Number(current.cash_unsettled_order_revenue ?? Math.max(0, Number(current.gmv || 0) - settledGross));
         const totalOmzet = settledGross + unsettledGross || Number(current.gmv || 0);
