@@ -469,6 +469,104 @@ class CuttingQcPilotLifecycleTest extends TestCase
             ->count());
     }
 
+    public function test_qc_cutting_auto_bom_does_not_require_cutting_accounting_mirror(): void
+    {
+        config([
+            'accounting.standalone_dual_posting_production_cutting_enabled' => false,
+            'accounting.standalone_production_cutting_qc_auto_bom_enabled' => true,
+        ]);
+
+        [$owner, $job, $bundle] = $this->makePostedCuttingJob();
+        $rm = Warehouse::create([
+            'code' => 'RM',
+            'name' => 'QC Auto BOM Without Mirror RM',
+            'type' => 'internal',
+            'active' => true,
+        ]);
+        $supply = Item::create([
+            'code' => 'SUP-QC-NO-MIRROR-'.uniqid(),
+            'name' => 'QC Supply Without Mirror',
+            'type' => 'material',
+            'item_role' => 'production_supply',
+            'unit' => 'pcs',
+            'is_stocked' => true,
+            'active' => true,
+        ]);
+        $bom = ItemBom::create([
+            'item_id' => $bundle->finished_item_id,
+            'name' => 'QC BOM Without Mirror',
+            'active' => true,
+        ]);
+        ItemBomLine::create([
+            'item_bom_id' => $bom->id,
+            'material_item_id' => $supply->id,
+            'usage_stage' => ItemBomLine::STAGE_SEWING_SUPPLY,
+            'qty' => 0.25,
+            'uom' => 'pcs',
+            'scrap_pct' => 0,
+            'is_optional' => false,
+            'sort_order' => 1,
+        ]);
+        InventoryStock::create([
+            'warehouse_id' => $rm->id,
+            'item_id' => $supply->id,
+            'qty' => 3,
+            'allocated_qty' => 0,
+        ]);
+        $lot = Lot::create([
+            'code' => 'LOT-QC-NO-MIRROR-'.uniqid(),
+            'item_id' => $supply->id,
+            'initial_qty' => 3,
+            'initial_cost' => 100,
+            'qty_onhand' => 3,
+            'total_cost' => 300,
+            'avg_cost' => 100,
+            'status' => 'open',
+        ]);
+        InventoryMutation::create([
+            'date' => '2026-10-27',
+            'warehouse_id' => $rm->id,
+            'item_id' => $supply->id,
+            'qty_change' => 3,
+            'direction' => 'in',
+            'source_type' => 'qc_no_mirror_supply_fixture',
+            'source_id' => $job->id,
+            'lot_id' => $lot->id,
+            'unit_cost' => 100,
+            'total_cost' => 300,
+        ]);
+
+        $this->actingAs($owner)
+            ->put(route('production.qc.cutting.update', $job), [
+                'qc_date' => '2026-10-27',
+                'results' => [[
+                    'cutting_job_bundle_id' => $bundle->id,
+                    'qty_ok' => 8,
+                    'qty_reject' => 2,
+                ]],
+            ])
+            ->assertRedirect(route('production.cutting_jobs.show', $job));
+
+        $this->assertDatabaseHas('inventory_mutations', [
+            'source_type' => JournalService::SRC_CUTTING_QC_SEWING_SUPPLY,
+            'source_id' => $job->id,
+            'item_id' => $supply->id,
+            'qty_change' => -2,
+        ]);
+        $this->assertDatabaseHas('journals', [
+            'source_type' => JournalService::SRC_CUTTING_QC_SEWING_SUPPLY,
+            'source_id' => $job->id,
+            'voided_at' => null,
+        ]);
+        $this->assertSame(0, StandaloneAccountingJournal::query()
+            ->where('source_id', $job->id)
+            ->whereIn('source_type', [
+                'cutting_wip',
+                JournalService::SRC_CUTTING_QC_SEWING_SUPPLY,
+            ])
+            ->count());
+    }
+
     public function test_auto_bom_lot_allocator_consumes_fifo_across_multiple_lots(): void
     {
         $warehouse = Warehouse::create([

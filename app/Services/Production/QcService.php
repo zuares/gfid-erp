@@ -215,12 +215,6 @@ class QcService
             return;
         }
 
-        if (! config('accounting.standalone_dual_posting_production_cutting_enabled', false)) {
-            throw new \RuntimeException(
-                'Auto BOM QC Cutting membutuhkan feature flag mirror akuntansi baru Cutting aktif.'
-            );
-        }
-
         if ($this->hasActiveCuttingQcSewingSupplyJournal((int) $job->id)) {
             return;
         }
@@ -2332,12 +2326,6 @@ class QcService
     {
         if (! config('accounting.standalone_production_cutting_qc_auto_bom_enabled', false)) {
             return;
-        }
-
-        if (! config('accounting.standalone_dual_posting_production_cutting_enabled', false)) {
-            throw new \RuntimeException(
-                'Auto BOM QC Cutting membutuhkan feature flag mirror akuntansi baru Cutting aktif.'
-            );
         }
 
         $job->loadMissing(['bundles']);
