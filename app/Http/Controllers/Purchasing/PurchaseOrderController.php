@@ -37,6 +37,13 @@ class PurchaseOrderController extends Controller
      */
     public function index(Request $request)
     {
+        $prefillRows = $this->normalizePrefillRows($request->query('prefill'));
+        if ($prefillRows !== []) {
+            return redirect()->route('purchasing.purchase_orders.create', [
+                'prefill' => json_encode($prefillRows, JSON_UNESCAPED_SLASHES),
+            ]);
+        }
+
         $sortCol = in_array($request->sort, ['date', 'code', 'grand_total', 'status', 'supplier_id'], true)
             ? $request->sort : 'date';
         $sortDir = $request->dir === 'asc' ? 'asc' : 'desc';
@@ -307,6 +314,36 @@ class PurchaseOrderController extends Controller
             }
         }
 
+        if ($lines->isEmpty()) {
+            $prefillRows = $this->normalizePrefillRows($request->input('prefill'));
+            if ($prefillRows !== []) {
+                $prefillItems = Item::query()
+                    ->select([
+                        'id', 'code', 'name', 'unit', 'stock_unit', 'purchase_unit', 'purchase_conversion_factor',
+                        'item_category_id', 'item_role', 'item_role_id', 'type', 'active',
+                        'default_allocation', 'default_expense_account_id',
+                    ])
+                    ->where('active', 1)
+                    ->whereIn('id', collect($prefillRows)->pluck('item_id'))
+                    ->with(['category:id,code,name', 'role:id,code'])
+                    ->get()
+                    ->keyBy('id');
+
+                $lines = collect($prefillRows)
+                    ->map(function (array $prefillRow) use ($prefillItems) {
+                        $item = $prefillItems->get((int) $prefillRow['item_id']);
+
+                        return $item ? $this->mapItemToPurchaseOrderLine($item, $prefillRow['qty_request']) : null;
+                    })
+                    ->filter()
+                    ->values();
+
+                if ($prefillItems->isNotEmpty()) {
+                    $items = $items->concat($prefillItems->values())->unique('id')->values();
+                }
+            }
+        }
+
         return view('purchasing.purchase_orders.create', [
             'order' => $order,
             'suppliers' => $suppliers,
@@ -319,6 +356,73 @@ class PurchaseOrderController extends Controller
             'fromPr' => $fromPr, // PR-D: null atau PurchaseRequest model
             'autoBomShortage' => $autoBomShortage,
         ]);
+    }
+
+    /**
+     * Normalize the JSON payload used by bulk stock-shortage actions.
+     *
+     * @return array<int, array{item_id: int, qty_request: float}>
+     */
+    private function normalizePrefillRows(mixed $prefill): array
+    {
+        if (is_string($prefill)) {
+            $prefill = json_decode($prefill, true);
+        }
+
+        if (! is_array($prefill)) {
+            return [];
+        }
+
+        $quantities = [];
+        foreach ($prefill as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $itemId = (int) ($row['item_id'] ?? 0);
+            $qty = (float) ($row['qty_request'] ?? $row['qty'] ?? 0);
+            if ($itemId <= 0 || $qty <= 0) {
+                continue;
+            }
+
+            $quantities[$itemId] = ($quantities[$itemId] ?? 0) + $qty;
+        }
+
+        return collect($quantities)
+            ->map(fn (float $qty, int|string $itemId) => [
+                'item_id' => (int) $itemId,
+                'qty_request' => $qty,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Build the line shape expected by the purchase-order form.
+     */
+    private function mapItemToPurchaseOrderLine(Item $item, float $qty): array
+    {
+        return [
+            'item_id' => (int) $item->id,
+            'item' => [
+                'id' => (int) $item->id,
+                'code' => (string) $item->code,
+                'name' => (string) $item->name,
+                'unit' => (string) $item->unit,
+                'item_role' => $item->item_role,
+                'role' => $item->role ? ['code' => $item->role->code] : null,
+                'stock_unit' => $item->stockUnit(),
+                'purchase_unit' => $item->purchaseUnit(),
+                'purchase_conversion_factor' => $item->purchaseConversionFactor(),
+                'default_allocation' => $item->default_allocation ?? 'hpp',
+                'default_expense_account_id' => $item->default_expense_account_id ?? null,
+            ],
+            'qty' => max($qty, 0.0001),
+            'unit_price' => 0,
+            'discount' => 0,
+            'allocation' => $item->default_allocation ?? 'hpp',
+            'expense_account_id' => $item->default_expense_account_id ?? '',
+        ];
     }
 
     /**

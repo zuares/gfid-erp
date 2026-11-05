@@ -152,4 +152,46 @@ class PurchaseOrderIndexSearchTest extends TestCase
             ->assertSee('PO-BULK-SECOND')
             ->assertDontSee('PO-BULK-OTHER');
     }
+
+    public function test_purchase_order_index_prefill_redirects_to_a_multi_item_create_form(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'employee_code' => 'PO-PREFILL-ADMIN',
+        ]);
+        $firstItem = Item::create([
+            'code' => 'K1BLK',
+            'name' => 'K1 Black',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+        $secondItem = Item::create([
+            'code' => 'K1NVY',
+            'name' => 'K1 Navy',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'active' => true,
+        ]);
+
+        $prefill = json_encode([
+            ['item_id' => $firstItem->id, 'qty_request' => 1],
+            ['item_id' => $secondItem->id, 'qty_request' => 2],
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('purchasing.purchase_orders.index', [
+            'codes' => [$firstItem->code, $secondItem->code],
+            'prefill' => $prefill,
+        ]));
+
+        $response->assertRedirect();
+        $response->assertRedirectContains('purchasing/purchase-orders/create');
+
+        $this->actingAs($admin)
+            ->get($response->headers->get('Location'))
+            ->assertOk()
+            ->assertSee('K1BLK')
+            ->assertSee('K1NVY')
+            ->assertSee('value="2"', false);
+    }
 }
