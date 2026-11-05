@@ -28,6 +28,42 @@ class FinishingJobLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_finishing_show_resolves_bundle_and_employee_operator(): void
+    {
+        $fixture = $this->postedFixture();
+
+        $response = $this->actingAs($fixture['user'])
+            ->get(route('production.finishing_jobs.show', $fixture['job']->id));
+
+        $response->assertOk();
+        $response->assertSee('Finishing lifecycle operator');
+        $response->assertSee('summary-warn mono">1', false);
+    }
+
+    public function test_finishing_create_hides_legacy_wip_already_consumed_by_active_job(): void
+    {
+        config(['inventory.readiness_source' => 'cache']);
+        $fixture = $this->postedFixture();
+
+        // Simulate the legacy state found in production: the posted job has
+        // consumed the WIP, but the old reservation marker was not updated.
+        DB::table('sewing_return_lines')
+            ->where('id', $fixture['return_line_id'])
+            ->update(['finished_qty' => 0]);
+        DB::table('cutting_job_bundles')
+            ->where('id', $fixture['bundle_id'])
+            ->update([
+                'wip_warehouse_id' => $fixture['warehouses']['WIP-FIN'],
+                'wip_qty' => 2,
+            ]);
+
+        $response = $this->actingAs($fixture['user'])
+            ->get(route('production.finishing_jobs.create'));
+
+        $response->assertOk();
+        $response->assertDontSee('FIN-LIFECYCLE-TEST');
+    }
+
     public function test_finishing_packing_bom_is_consumed_once_and_marks_line_applied(): void
     {
         $fixture = $this->postedFixture();

@@ -259,15 +259,37 @@ class FinishingJobController extends Controller
             $base->whereNull('sr.voided_at');
         }
 
+        // Finishing jobs created before the reservation marker was reliable can
+        // already consume this WIP while sewing_return_lines.finished_qty is
+        // still zero. Reconcile against active finishing lines by item/operator
+        // so those historical jobs do not reappear as available WIP.
+        $activeFinishingByItemOp = DB::table('finishing_job_lines as fl')
+            ->join('finishing_jobs as fj', 'fj.id', '=', 'fl.finishing_job_id')
+            ->whereIn('fj.status', ['draft', 'posted'])
+            ->whereRaw('COALESCE(fl.sewing_operator_id, fl.operator_id) IS NOT NULL')
+            ->selectRaw('
+                fl.item_id,
+                COALESCE(fl.sewing_operator_id, fl.operator_id) as source_operator_id,
+                SUM(COALESCE(fl.qty_in, 0)) as consumed_qty
+            ')
+            ->groupBy('fl.item_id')
+            ->groupByRaw('COALESCE(fl.sewing_operator_id, fl.operator_id)');
+
         // 4A) remaining per item+op
         $rowsByOp = (clone $base)
+            ->leftJoinSub($activeFinishingByItemOp, 'af', function ($join) {
+                $join->on('af.item_id', '=', 'b.finished_item_id')
+                    ->on('af.source_operator_id', '=', 'sr.operator_id');
+            })
             ->selectRaw('
                 b.finished_item_id as item_id,
                 sr.operator_id as operator_id,
                 MAX(e.code) as operator_code,
                 MAX(e.name) as operator_name,
                 sr.date as setor_date,
-                SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining_ok,
+                SUM(COALESCE(srl.qty_ok,0)) as gross_ok,
+                SUM(COALESCE(srl.finished_qty,0)) as reserved_finished,
+                MAX(COALESCE(af.consumed_qty,0)) as active_finishing_qty,
                 MAX(sp.date) as pickup_date
             ')
             ->groupBy('b.finished_item_id', 'sr.operator_id', 'sr.date')
@@ -276,17 +298,22 @@ class FinishingJobController extends Controller
             ->orderBy('sr.date')
             ->get();
 
-        // 4B) remaining per item
-        $rowsAll = (clone $base)
-            ->selectRaw('
-                b.finished_item_id as item_id,
-                SUM(COALESCE(srl.qty_ok,0) - COALESCE(srl.finished_qty,0)) as remaining_ok,
-                MAX(sp.date) as pickup_date,
-                MAX(sr.date) as setor_date
-            ')
-            ->groupBy('b.finished_item_id')
-            ->orderBy('b.finished_item_id')
-            ->get();
+        $rowsByOp = $this->reconcileFinishingRows($rowsByOp);
+
+        // The ALL view should use the same reconciled per-operator source as
+        // the BY OP view. Keeping a second independent aggregate here allowed
+        // the two views to disagree when historical reservations were stale.
+        $rowsAll = $rowsByOp
+            ->groupBy('item_id')
+            ->map(function ($rows) {
+                return (object) [
+                    'item_id' => (int) $rows->first()->item_id,
+                    'remaining_ok' => (float) $rows->sum(fn ($row) => (float) ($row->remaining_ok ?? 0)),
+                    'pickup_date' => $rows->max('pickup_date'),
+                    'setor_date' => $rows->max('setor_date'),
+                ];
+            })
+            ->values();
 
         // 5) eligible WIP per item+op
         $qEligibleBundles = DB::table('cutting_job_bundles as b')
@@ -1680,6 +1707,53 @@ class FinishingJobController extends Controller
             ->get();
 
         return $rows->keyBy(fn ($w) => $norm($w->code));
+    }
+
+    /**
+     * Reconcile legacy finishing consumption that predates a reliable
+     * sewing_return_lines.finished_qty reservation.
+     *
+     * The normal path is still finished_qty. Active draft/posted finishing
+     * lines are only used for the missing delta, so current reservations are
+     * not double-counted.
+     */
+    protected function reconcileFinishingRows(\Illuminate\Support\Collection $rows): \Illuminate\Support\Collection
+    {
+        $rows->each(function ($row): void {
+            $gross = (float) ($row->gross_ok ?? 0);
+            $reserved = (float) ($row->reserved_finished ?? 0);
+            $row->remaining_ok = max($gross - $reserved, 0);
+        });
+
+        // An ALL-mode finishing line has no sewing_return_date and may cover
+        // several return dates. Allocate only the still-missing active qty in
+        // date order so the aggregate list cannot show already-consumed WIP.
+        return $rows
+            ->groupBy(fn ($row) => (int) $row->item_id.':'.(int) $row->operator_id)
+            ->flatMap(function ($group) {
+                $group = $group->sortBy('setor_date')->values();
+                $active = (float) ($group->max('active_finishing_qty') ?? 0);
+                $reserved = (float) $group->sum(fn ($row) => (float) ($row->reserved_finished ?? 0));
+                $missing = max($active - $reserved, 0);
+
+                if ($missing <= 0) {
+                    return $group;
+                }
+
+                return $group->map(function ($row) use (&$missing) {
+                    if ($missing <= 0) {
+                        return $row;
+                    }
+
+                    $available = (float) ($row->remaining_ok ?? 0);
+                    $consume = min($available, $missing);
+                    $row->remaining_ok = max($available - $consume, 0);
+                    $missing -= $consume;
+
+                    return $row;
+                });
+            })
+            ->values();
     }
 
     protected function resolveMovementDate(FinishingJob $job): \DateTimeInterface

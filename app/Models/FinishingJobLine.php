@@ -59,7 +59,9 @@ class FinishingJobLine extends Model
 
     public function sewingOperator()
     {
-        return $this->belongsTo(User::class, 'sewing_operator_id');
+        // sewing_operator_id stores the Employee id from sewing_returns,
+        // not the authenticated users.id.
+        return $this->belongsTo(Employee::class, 'sewing_operator_id');
     }
 
     public function setQtyInAttribute($value): void

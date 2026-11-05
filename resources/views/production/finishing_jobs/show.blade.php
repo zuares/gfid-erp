@@ -94,7 +94,7 @@
   $totalReject = (float) $lines->sum('qty_reject');
   $totalProcessed = $totalOk + $totalReject;
   $rejectPercent = $totalProcessed > 0 ? ($totalReject / $totalProcessed) * 100 : 0;
-  $bundleCount = $lines->pluck('cutting_job_bundle_id')->filter()->unique()->count();
+  $bundleCount = $lines->pluck('bundle_id')->filter()->unique()->count();
   $hasReject = $totalReject > 0.000001;
 
   try {
@@ -110,6 +110,7 @@
 
   $operatorName = function ($line) {
     return $line->sewingOperator?->name
+      ?? $line->sewing_operator_name
       ?? $line->sewingPickupLine?->sewingPickup?->operator?->name
       ?? '-';
   };
