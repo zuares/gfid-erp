@@ -3,6 +3,7 @@
 namespace App\Services\Marketplace;
 
 use App\Models\MarketplaceOrderSettlement;
+use App\Services\Marketplace\TikTokShop\TikTokWalletAdCostService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -19,6 +20,18 @@ class MarketplaceAnalyticsSummaryService
     private const ESTIMATED_MARKETPLACE_FEE_RATE = 0.21;
 
     private const ADS_VAT_RATE = 0.11;
+
+    private const SHOPEE_AD_CHARGE_TYPES = [
+        '450',
+        'paid_ads_charge',
+        'paid-ads-charge',
+    ];
+
+    private const SHOPEE_AD_REFUND_TYPES = [
+        '451',
+        'paid_ads_refund',
+        'paid-ads-refund',
+    ];
 
     private const MARKETPLACE_FEE_FIELDS = [
         'commission_fee',
@@ -53,7 +66,10 @@ class MarketplaceAnalyticsSummaryService
         'REFUNDED',
     ];
 
-    public function __construct(private MarketplaceProfitReportService $profitReport) {}
+    public function __construct(
+        private MarketplaceProfitReportService $profitReport,
+        private TikTokWalletAdCostService $tiktokWalletAdCost,
+    ) {}
 
     public function summary(array $filters): array
     {
@@ -160,6 +176,16 @@ class MarketplaceAnalyticsSummaryService
             'changes' => $this->changes($current, $previousSnapshot),
             'quality' => $this->qualitySummary($filters),
         ];
+    }
+
+    /**
+     * Lightweight store ledger payload used by the portfolio view. Keeping
+     * this separate from the full summary prevents the store ranking from
+     * waiting on daily charts, returns, and other detail aggregates.
+     */
+    public function stores(array $filters): array
+    {
+        return $this->storeSummary($this->normalizeFilters($filters));
     }
 
     private function kpiSnapshot(array $filters): array
@@ -1639,6 +1665,7 @@ class MarketplaceAnalyticsSummaryService
                 'ad_cost_before_tax' => (float) ($ad->ad_cost_before_tax ?? 0),
                 'ad_cost_vat' => (float) ($ad->ad_cost_vat ?? 0),
                 'ad_cost' => (float) ($ad->ad_cost ?? 0),
+                'ad_cost_source' => (string) ($ad->ad_cost_source ?? 'none'),
             ]));
         })->sortByDesc('gross_sales')->values()->all();
     }
@@ -2050,21 +2077,161 @@ class MarketplaceAnalyticsSummaryService
             ->groupBy('store_id')
             ->map(fn ($rows): float => (float) $rows->sum(fn (array $row): float => (float) ($row['spend'] ?? 0)));
 
-        if ($spendByStore->isEmpty()) {
+        $platformTransactionSpend = $this->platformTransactionAdSpendByStore($filters);
+
+        $storeIds = $spendByStore->keys()
+            ->merge($platformTransactionSpend->keys())
+            ->unique()
+            ->values();
+
+        if ($storeIds->isEmpty()) {
             return collect();
         }
 
         return DB::table('stores as st')
-            ->whereIn('st.id', $spendByStore->keys()->all())
+            ->whereIn('st.id', $storeIds->all())
             ->get(['st.id as store_id', 'st.name as store_name'])
-            ->map(function ($row) use ($spendByStore) {
-                $beforeTax = (float) ($spendByStore->get((int) $row->store_id) ?? 0);
-                $row->ad_cost_before_tax = round($beforeTax, 2);
-                $row->ad_cost_vat = round($beforeTax * self::ADS_VAT_RATE, 2);
-                $row->ad_cost = round($beforeTax * (1 + self::ADS_VAT_RATE), 2);
+            ->map(function ($row) use ($spendByStore, $platformTransactionSpend) {
+                $storeId = (int) $row->store_id;
+                $adsDailyBeforeTax = (float) ($spendByStore->get($storeId) ?? 0);
+                $platformTransactionCost = (float) ($platformTransactionSpend->get($storeId) ?? 0);
+
+                if ($adsDailyBeforeTax > 0) {
+                    $row->ad_cost_before_tax = round($adsDailyBeforeTax, 2);
+                    $row->ad_cost_vat = round($adsDailyBeforeTax * self::ADS_VAT_RATE, 2);
+                    $row->ad_cost = round($adsDailyBeforeTax * (1 + self::ADS_VAT_RATE), 2);
+                    $row->ad_cost_source = 'ads_api_or_import';
+
+                    return $row;
+                }
+
+                // Ads Daily can be empty even though the platform has already
+                // recorded an actual advertising deduction. Use the platform
+                // mutation only for that store, never on top of Ads Daily.
+                $row->ad_cost = round(max($platformTransactionCost, 0), 2);
+                $row->ad_cost_before_tax = round($row->ad_cost / (1 + self::ADS_VAT_RATE), 2);
+                $row->ad_cost_vat = round($row->ad_cost - $row->ad_cost_before_tax, 2);
+                $row->ad_cost_source = $row->ad_cost > 0
+                    ? 'platform_transaction_fallback'
+                    : 'none';
 
                 return $row;
             });
+    }
+
+    /**
+     * Resolve actual platform advertising mutations per store for the
+     * store-ledger fallback. This is intentionally separate from adsFacts():
+     * Ads Daily remains the primary delivery-cost source and mutations are
+     * only consulted when that store has no positive Ads Daily spend.
+     */
+    private function platformTransactionAdSpendByStore(array $filters)
+    {
+        $storePlatforms = DB::table('stores as st')
+            ->leftJoin('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->whereIn('st.id', $filters['store_ids'])
+            ->pluck('ch.code', 'st.id')
+            ->map(fn ($code): string => strtolower(trim((string) $code)));
+
+        $spendByStore = collect();
+        $tiktokStoreIds = $storePlatforms
+            ->filter(fn (string $platform): bool => $platform === 'tiktok')
+            ->keys()
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        if ($tiktokStoreIds !== []) {
+            $tiktokDaily = $this->tiktokWalletAdCost->storeDaily(
+                $tiktokStoreIds,
+                null,
+                $filters['date_from'],
+                $filters['date_to'],
+            );
+            $tiktokDaily
+                ->groupBy(fn (float $value, string $key): string => explode('|', $key, 2)[1])
+                ->each(function ($rows, string $storeId) use ($spendByStore): void {
+                    $spendByStore->put((int) $storeId, round((float) $rows->sum(), 2));
+                });
+        }
+
+        $shopeeStoreIds = $storePlatforms
+            ->filter(fn (string $platform): bool => $platform === 'shopee')
+            ->keys()
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+        foreach ($this->shopeePlatformAdSpendByStore($shopeeStoreIds, $filters['date_from'], $filters['date_to']) as $storeId => $spend) {
+            $spendByStore->put((int) $storeId, round((float) $spend, 2));
+        }
+
+        return $spendByStore;
+    }
+
+    private function shopeePlatformAdSpendByStore(array $storeIds, string $dateFrom, string $dateTo): array
+    {
+        if ($storeIds === []) {
+            return [];
+        }
+
+        $preferred = $this->aggregateShopeeAdMutations(
+            'marketplace_shopee_wallet_transactions',
+            $storeIds,
+            $dateFrom,
+            $dateTo,
+        );
+        $legacy = $this->aggregateShopeeAdMutations(
+            'marketplace_ad_wallet_transactions',
+            $storeIds,
+            $dateFrom,
+            $dateTo,
+        );
+
+        $result = [];
+        foreach ($storeIds as $storeId) {
+            $storeId = (int) $storeId;
+            $spend = array_key_exists($storeId, $preferred)
+                ? $preferred[$storeId]
+                : ($legacy[$storeId] ?? 0.0);
+            if ((float) $spend > 0) {
+                $result[$storeId] = round((float) $spend, 2);
+            }
+        }
+
+        return $result;
+    }
+
+    private function aggregateShopeeAdMutations(string $table, array $storeIds, string $dateFrom, string $dateTo): array
+    {
+        if (! Schema::hasTable($table)) {
+            return [];
+        }
+
+        $rows = DB::table($table)
+            ->whereIn('store_id', $storeIds)
+            ->whereBetween('transaction_created_at', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])
+            ->where(function ($query): void {
+                $query
+                    ->whereIn('transaction_type', array_merge(self::SHOPEE_AD_CHARGE_TYPES, self::SHOPEE_AD_REFUND_TYPES))
+                    ->orWhereRaw("LOWER(transaction_type) LIKE '%paid%ads%charge%'")
+                    ->orWhereRaw("LOWER(transaction_type) LIKE '%paid%ads%refund%'");
+            })
+            ->get(['store_id', 'transaction_type', 'amount']);
+
+        return $rows
+            ->groupBy('store_id')
+            ->map(function ($storeRows): float {
+                $total = $storeRows->sum(function ($row): float {
+                    $type = strtolower(str_replace('-', '_', trim((string) $row->transaction_type)));
+                    $isRefund = $type === '451' || str_contains($type, 'refund');
+                    $amount = abs((float) ($row->amount ?? 0));
+
+                    return $isRefund ? -$amount : $amount;
+                });
+
+                return round(max((float) $total, 0), 2);
+            })
+            ->all();
     }
 
     /**

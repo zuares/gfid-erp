@@ -229,6 +229,7 @@ Route::middleware(['auth', 'access:marketplace'])->prefix('api/marketplace')->gr
     Route::get('/analytics-orders', [MarketplaceController::class, 'analyticsOrders']);
     Route::get('/analytics-summary', [MarketplaceAnalyticsController::class, 'summary']);
     Route::get('/analytics-kpis', [MarketplaceAnalyticsController::class, 'kpis']);
+    Route::get('/analytics-stores', [MarketplaceAnalyticsController::class, 'stores']);
     Route::get('/analytics-products', [MarketplaceAnalyticsController::class, 'products']);
     Route::get('/analytics-cohort', [MarketplaceAnalyticsController::class, 'cohort']);
     Route::get('/analytics-cohort-options', [MarketplaceAnalyticsController::class, 'cohortOptions']);

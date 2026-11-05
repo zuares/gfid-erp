@@ -44,6 +44,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
 
         foreach ([
             '/api/marketplace/analytics-summary',
+            '/api/marketplace/analytics-stores',
             '/api/marketplace/analytics-products',
             '/api/marketplace/analytics-cohort-options',
             '/api/marketplace/analytics-cash-orders',

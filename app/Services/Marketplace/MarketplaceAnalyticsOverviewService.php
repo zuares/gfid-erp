@@ -24,4 +24,9 @@ final class MarketplaceAnalyticsOverviewService
     {
         return $this->summary->kpis($filters);
     }
+
+    public function stores(array $filters): array
+    {
+        return $this->summary->stores($filters);
+    }
 }

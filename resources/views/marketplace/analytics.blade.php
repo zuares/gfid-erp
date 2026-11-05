@@ -1543,11 +1543,62 @@
     .an-revenue-section-kicker { font-size: var(--an-type-caption); }
     .an-revenue-summary { gap: .5rem; padding: .4rem .75rem .65rem; }
     .an-revenue-summary .an-modal-stat { min-height: 70px; padding: .58rem .62rem; }
+    .an-revenue-summary { grid-template-columns: repeat(auto-fit, minmax(172px, 1fr)); align-items: stretch; }
+    .an-revenue-summary .an-modal-stat { position: relative; display: flex; flex-direction: column; min-height: 104px; overflow: hidden; padding: .72rem .75rem; border-radius: var(--an-radius-card); }
+    .an-revenue-summary .an-modal-stat::after { position: absolute; right: -.9rem; bottom: -.9rem; width: 52px; height: 52px; border-radius: 50%; background: currentColor; content: ''; opacity: .045; pointer-events: none; }
+    .an-modal-stat-head { display: flex; align-items: center; min-width: 0; gap: .42rem; }
+    .an-modal-stat-icon { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border-radius: 9px; color: var(--gf-color-brand-strong, #4142bb); background: #eeefff; font-size: .78rem; }
+    .an-modal-stat-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .an-revenue-summary .an-modal-stat-value { margin-top: .65rem; font-size: clamp(1.05rem, 1.5vw, 1.35rem); font-weight: 850; letter-spacing: -.045em; line-height: 1.05; }
+    .an-revenue-summary .an-modal-stat-note { min-height: 1.35em; margin-top: auto; padding-top: .32rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .an-revenue-summary .an-modal-stat-primary { background: linear-gradient(145deg, #f1f0ff 0%, #fbfbff 100%); }
+    .an-revenue-summary .an-modal-stat-primary .an-modal-stat-icon { color: var(--gf-color-brand-strong, #4142bb); background: #e5e5ff; }
+    .an-revenue-summary .an-modal-stat-accent { background: linear-gradient(145deg, #edfcfc 0%, #fbffff 100%); }
+    .an-revenue-summary .an-modal-stat-accent .an-modal-stat-icon { color: #087f86; background: #d9f7f7; }
+    .an-revenue-summary .an-modal-stat-fee .an-modal-stat-icon { color: #a15c00; background: #fff0cc; }
+    .an-revenue-summary .an-modal-stat-shipping .an-modal-stat-icon { color: #1769aa; background: #e2f1ff; }
+    .an-revenue-summary .an-modal-stat-tax .an-modal-stat-icon { color: #b42318; background: #ffe4e1; }
+    .an-revenue-summary .an-modal-stat-neutral .an-modal-stat-icon { color: var(--gf-color-muted, #667085); background: var(--gf-color-surface-muted, #f2f4f7); }
+    .an-revenue-summary .an-modal-stat-settled { border-color: #bcecef; background: linear-gradient(145deg, #effdfd 0%, #fbffff 100%); }
+    .an-revenue-summary .an-modal-stat-settled .an-modal-stat-icon { color: #087f86; background: #d9f7f7; }
+    body[data-theme="dark"] .an-revenue-summary .an-modal-stat-icon { color: #c7c8f5; background: #1e293b; }
+    body[data-theme="dark"] .an-revenue-summary .an-modal-stat-accent .an-modal-stat-icon { color: #99f6e4; background: rgba(6, 78, 59, .45); }
+    body[data-theme="dark"] .an-revenue-summary .an-modal-stat-fee .an-modal-stat-icon { color: #fed7aa; background: rgba(124, 45, 18, .45); }
+    body[data-theme="dark"] .an-revenue-summary .an-modal-stat-shipping .an-modal-stat-icon { color: #bfdbfe; background: rgba(30, 64, 175, .45); }
+    body[data-theme="dark"] .an-revenue-summary .an-modal-stat-tax .an-modal-stat-icon { color: #fecaca; background: rgba(127, 29, 29, .45); }
+    body[data-theme="dark"] .an-revenue-summary .an-modal-stat-settled { border-color: rgba(45, 212, 191, .35); background: rgba(6, 78, 59, .25); }
+    body[data-theme="dark"] .an-revenue-summary .an-modal-stat-settled .an-modal-stat-icon { color: #99f6e4; background: rgba(6, 78, 59, .45); }
     .an-revenue-tabs .an-modal-tab { min-height: var(--gf-touch-target, 44px); padding: .44rem .55rem .4rem; }
     .an-revenue-fee-breakdown { margin: .25rem 0 .55rem; padding: .62rem .68rem .12rem; }
     .an-revenue-fee-breakdown-kicker { font-size: var(--an-type-caption); }
     .an-revenue-fee-breakdown-head strong { font-size: var(--an-type-body); }
     .an-revenue-fee-breakdown-head small { display: none; }
+    .an-revenue-fee-breakdown { margin: .45rem .75rem .7rem; padding: .7rem; border-color: var(--gf-color-line, #e4e7ec); border-radius: var(--an-radius-card); background: var(--gf-color-surface-muted, #f8f9fc); box-shadow: none; }
+    .an-revenue-fee-breakdown-head { align-items: center; margin: 0; }
+    .an-revenue-fee-breakdown-head strong { display: block; margin: 0; font-size: var(--an-type-body); font-weight: 800; }
+    .an-revenue-fee-breakdown-head small { display: block; margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: var(--an-type-caption); font-weight: 650; }
+    .an-fee-burden-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin-top: .6rem; }
+    .an-fee-burden { min-width: 0; padding: .65rem; border: 1px solid var(--gf-color-line, #e4e7ec); border-radius: var(--an-radius-control); background: var(--gf-color-surface, #fff); }
+    .an-fee-burden-head { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: .42rem; }
+    .an-fee-burden-icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; color: var(--gf-color-brand-strong, #4142bb); background: #eeefff; font-size: .78rem; }
+    .an-fee-burden-head > div { min-width: 0; }
+    .an-fee-burden-head strong, .an-fee-burden-head small { display: block; }
+    .an-fee-burden-head strong { color: var(--gf-color-content, #101828); font-size: .72rem; font-weight: 800; }
+    .an-fee-burden-head small { margin-top: .1rem; color: var(--gf-color-muted, #667085); font-size: .6rem; font-weight: 650; }
+    .an-fee-burden-head b { color: var(--gf-color-content, #101828); font-size: .72rem; font-weight: 800; white-space: nowrap; }
+    .an-fee-burden-list { display: grid; gap: .32rem; margin-top: .55rem; padding-top: .5rem; border-top: 1px solid var(--gf-color-line, #eef0f3); }
+    .an-fee-burden-row { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; color: var(--gf-color-muted, #667085); font-size: var(--an-type-caption); }
+    .an-fee-burden-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .an-fee-burden-row strong { flex: 0 0 auto; color: var(--gf-color-content, #101828); font-size: .68rem; font-weight: 750; text-align: right; }
+    .an-fee-burden-row small { display: block; margin-top: .08rem; color: var(--gf-color-muted, #667085); font-size: .58rem; font-weight: 650; }
+    .an-fee-burden-empty { color: var(--gf-color-muted, #98a2b3); font-size: var(--an-type-caption); }
+    .an-fee-burden-platform .an-fee-burden-icon { color: #087f86; background: #d9f7f7; }
+    .an-fee-burden-platform .an-fee-burden-head b { color: #087f86; }
+    body[data-theme="dark"] .an-revenue-fee-breakdown { border-color: #334155; background: #0f172a; }
+    body[data-theme="dark"] .an-fee-burden { border-color: #334155; background: #1e293b; }
+    body[data-theme="dark"] .an-fee-burden-icon { background: #1e1b4b; color: #c7c8f5; }
+    body[data-theme="dark"] .an-fee-burden-platform .an-fee-burden-icon { background: rgba(6, 78, 59, .45); color: #99f6e4; }
+    body[data-theme="dark"] .an-fee-burden-list { border-color: #334155; }
     .an-revenue-panel > .an-modal-foot { padding: .55rem .75rem; }
     @media (min-width: 961px) and (max-width: 1199px) {
         .an-revenue-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1560,9 +1611,10 @@
         .an-revenue-section-head { align-items: flex-start; flex-direction: column; gap: .25rem; padding-inline: .65rem; }
         .an-revenue-section-hint { max-width: none; text-align: left; }
         .an-revenue-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; padding-inline: .65rem; }
-        .an-revenue-summary .an-modal-stat { min-height: 68px; padding: .55rem .58rem; }
+        .an-revenue-summary .an-modal-stat { min-height: 96px; padding: .65rem; }
         .an-revenue-fee-breakdown-head { align-items: flex-start; flex-direction: column; gap: .25rem; }
         .an-revenue-fee-breakdown-head small { max-width: none; text-align: left; }
+        .an-fee-burden-grid { grid-template-columns: 1fr; }
         .an-revenue-body .an-modal-fee-breakdown { grid-template-columns: 1fr; }
         .an-revenue-panel > .an-modal-foot { flex-wrap: wrap; gap: .5rem; padding: .65rem; }
         .an-revenue-panel > .an-modal-foot > .an-btn { flex: 1 1 0; min-width: 120px; min-height: var(--gf-touch-target, 44px); }
@@ -1570,10 +1622,98 @@
     }
     @media (max-width: 420px) {
         .an-revenue-summary { grid-template-columns: 1fr; }
+        .an-revenue-summary .an-modal-stat { min-height: 92px; }
         .an-revenue-head-copy { gap: .55rem; }
         .an-revenue-head-icon { flex-basis: 34px; width: 34px; height: 34px; border-radius: 10px; }
         .an-revenue-head-meta { grid-template-columns: 1fr; justify-items: start; }
         .an-revenue-panel > .an-modal-foot > .an-btn { min-width: 100%; }
+    }
+
+    /* Design System tab hierarchy adapter. */
+    .an-tabs-wrap {
+        display: grid;
+        gap: .45rem;
+        min-width: 0;
+        padding: .6rem .65rem .5rem;
+        border: 1px solid var(--gf-color-line, var(--dsh-border, #d4d7e3));
+        border-radius: var(--gf-radius-card, 14px);
+        background: var(--gf-color-surface, var(--card, #fff));
+        box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(16, 24, 40, .04));
+    }
+    .an-tabs-meta {
+        min-height: 24px;
+        padding: 0 .2rem;
+        color: var(--gf-color-muted, var(--dsh-muted, #667085));
+    }
+    .an-tabs-primary,
+    .an-subtabs {
+        width: 100%;
+        min-width: 0;
+        scrollbar-width: thin;
+    }
+    .an-tabs-primary .an-tab {
+        min-height: var(--gf-touch-target, 44px);
+        flex: 0 0 auto;
+        border-radius: 9px;
+        padding-inline: .72rem;
+        color: var(--gf-color-muted, var(--dsh-muted, #667085));
+        background: transparent;
+        font-size: .68rem;
+        font-weight: 750;
+    }
+    .an-tabs-primary .an-tab:hover {
+        color: var(--gf-color-brand-strong, var(--accent, #2563eb));
+        background: var(--gf-color-brand-soft, var(--accent-soft, #eef0ff));
+    }
+    .an-tabs-primary .an-tab.is-active,
+    .an-tabs-primary .an-tab.active {
+        color: var(--gf-color-brand-strong, var(--accent, #2563eb));
+        background: var(--gf-color-surface, #fff);
+        box-shadow: 0 1px 4px rgba(16, 24, 40, .1);
+    }
+    .an-tabs-primary .an-tab:focus-visible,
+    .an-subtabs .ds-tab-system-button:focus-visible {
+        outline: 3px solid rgba(91, 92, 226, .28);
+        outline-offset: 2px;
+    }
+    .an-tabs-connector {
+        width: auto;
+        height: 1px;
+        margin: 0 .5rem;
+        background: var(--gf-color-line, #eaecf0);
+    }
+    .an-subtabs .ds-tab-system-button {
+        min-height: 32px;
+        padding-inline: .55rem;
+        font-size: .65rem;
+    }
+    @media (max-width: 760px) {
+        .an-tabs-wrap { gap: .38rem; padding: .55rem .5rem .45rem; }
+        .an-tabs-meta { padding-inline: .1rem; }
+        .an-tabs-primary,
+        .an-subtabs { overflow-x: auto; }
+        .an-tabs-primary .an-tab { min-height: 42px; padding-inline: .65rem; }
+    }
+    body[data-theme="dark"] .an-tabs-primary .an-tab.is-active,
+    body[data-theme="dark"] .an-tabs-primary .an-tab.active { color: #e0e7ff; background: #1f2937; }
+    body[data-theme="dark"] .an-tabs-connector { background: #334155; }
+
+    /* Keep every analytics section on the same Design System rhythm. */
+    .an-hero-controls { margin-bottom: var(--gf-space-section, 24px); }
+    .an-shell { gap: var(--gf-space-section, 24px); }
+    #analyticsTabPanel {
+        display: grid;
+        gap: var(--gf-space-section, 24px);
+        min-width: 0;
+    }
+    #analyticsTabPanel > .an-tab-pane { margin-top: 0; }
+    #analyticsTabPanel .an-portfolio-ledger-grid,
+    #analyticsTabPanel .an-product-snapshot-content { margin-top: var(--gf-space-card, 16px); }
+    #analyticsTabPanel .an-portfolio-overview-grid,
+    #analyticsTabPanel .an-portfolio-ledger-grid { gap: var(--gf-space-card, 16px); }
+    @media (max-width: 760px) {
+        .an-hero-controls { margin-bottom: var(--gf-space-section, 24px); }
+        #analyticsTabPanel { gap: var(--gf-space-section, 24px); }
     }
 </style>
 @endpush
@@ -1613,24 +1753,26 @@
         </div>
 
         <div class="an-shell">
-          <div class="an-tabs-wrap">
-            <div class="an-tabs-meta"><i class="bi bi-sliders2" aria-hidden="true"></i>Analytics workspace</div>
-            <nav class="an-tabs" id="analyticsTabs" role="tablist" aria-label="Navigasi analytics">
-                <button class="an-tab active" type="button" data-an-tab="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2 me-1"></i>Ikhtisar</button>
-                <button class="an-tab" type="button" data-an-tab="sales" role="tab" aria-selected="false"><i class="bi bi-graph-up-arrow me-1"></i>Penjualan</button>
-                <button class="an-tab" type="button" data-an-tab="revenue" role="tab" aria-selected="false"><i class="bi bi-cash-stack me-1"></i>Omzet, Pencairan &amp; Fee</button>
-                <button class="an-tab" type="button" data-an-tab="operations" role="tab" aria-selected="false"><i class="bi bi-activity me-1"></i>Operasional</button>
-                <button class="an-tab" type="button" data-an-tab="stores" role="tab" aria-selected="false"><i class="bi bi-shop me-1"></i>Toko &amp; Biaya</button>
-                <button class="an-tab" type="button" data-an-tab="products" role="tab" aria-selected="false"><i class="bi bi-box-seam me-1"></i>Produk</button>
-                <button class="an-tab" type="button" data-an-tab="cohort" role="tab" aria-selected="false"><i class="bi bi-grid-3x3-gap me-1"></i>Cohort</button>
+          <div class="an-tabs-wrap" id="analyticsTabNavigation">
+            <div class="an-tabs-meta"><i class="bi bi-sliders2" aria-hidden="true"></i><span>Analytics workspace</span></div>
+            <nav class="ds-tab-system an-tabs-primary" id="analyticsTabs" role="tablist" aria-label="Navigasi analytics">
+                <button class="ds-tab-system-button an-tab is-active active" type="button" data-an-tab="overview" role="tab" id="analytics-tab-overview" aria-selected="true" aria-controls="analyticsTabPanel" tabindex="0"><i class="bi bi-grid-1x2" aria-hidden="true"></i>Ikhtisar</button>
+                <button class="ds-tab-system-button an-tab" type="button" data-an-tab="sales" role="tab" id="analytics-tab-sales" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i>Penjualan</button>
+                <button class="ds-tab-system-button an-tab" type="button" data-an-tab="revenue" role="tab" id="analytics-tab-revenue" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-cash-stack" aria-hidden="true"></i>Omzet, Pencairan &amp; Fee</button>
+                <button class="ds-tab-system-button an-tab" type="button" data-an-tab="operations" role="tab" id="analytics-tab-operations" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-activity" aria-hidden="true"></i>Operasional</button>
+                <button class="ds-tab-system-button an-tab" type="button" data-an-tab="stores" role="tab" id="analytics-tab-stores" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-shop" aria-hidden="true"></i>Toko &amp; Biaya</button>
+                <button class="ds-tab-system-button an-tab" type="button" data-an-tab="products" role="tab" id="analytics-tab-products" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-box-seam" aria-hidden="true"></i>Produk</button>
+                <button class="ds-tab-system-button an-tab" type="button" data-an-tab="cohort" role="tab" id="analytics-tab-cohort" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>Cohort</button>
             </nav>
           </div>
-        @include('marketplace.partials._analytics_summary')
-        @include('marketplace.partials._analytics_sales')
-        @include('marketplace.partials._analytics_revenue')
-        @include('marketplace.partials._analytics_stores')
-        @include('marketplace.partials._analytics_products')
-        @include('marketplace.partials._analytics_cohort')
+          <div id="analyticsTabPanel" role="tabpanel" aria-live="polite" aria-label="Ikhtisar">
+            @include('marketplace.partials._analytics_summary')
+            @include('marketplace.partials._analytics_sales')
+            @include('marketplace.partials._analytics_revenue')
+            @include('marketplace.partials._analytics_stores')
+            @include('marketplace.partials._analytics_products')
+            @include('marketplace.partials._analytics_cohort')
+          </div>
         </div>
     </div>
 </div>
@@ -2019,11 +2161,24 @@
             } catch (kpiError) {
                 console.warn('Analytics KPI fast load failed', kpiError);
             }
+            const activeView = document.querySelector('[data-an-tab].active')?.dataset.anTab || 'overview';
+            const storeSummaryPromise = ['overview', 'stores'].includes(activeView)
+                ? api('/api/marketplace/analytics-stores?' + params.toString(), { cache: 'no-store' })
+                    .then(payload => ({ ok: true, payload }))
+                    .catch(error => ({ ok: false, error }))
+                : Promise.resolve({ ok: true, payload: null });
             const detailsPromise = Promise.all([
                 loadStores(),
-                api('/api/marketplace/analytics-summary?' + params.toString(), { cache: 'no-store' }),
+                api('/api/marketplace/analytics-summary?' + params.toString(), { cache: 'no-store' })
+                    .then(payload => ({ ok: true, payload }))
+                    .catch(error => ({ ok: false, error })),
+                storeSummaryPromise,
             ]);
-            const [storeRows, summaryPayload] = await detailsPromise;
+            const [storeRows, summaryResult, storeSummaryResult] = await detailsPromise;
+            if (!summaryResult.ok && !storeSummaryResult.ok) throw summaryResult.error;
+            const summaryPayload = summaryResult.ok ? summaryResult.payload : { stores: [] };
+            const fallbackStores = storeSummaryResult.ok ? (storeSummaryResult.payload?.stores || []) : [];
+            if (!Array.isArray(summaryPayload.stores) || summaryPayload.stores.length === 0) summaryPayload.stores = fallbackStores;
             stores = storeRows;
             summary = summaryPayload;
             fillStores();
@@ -2043,18 +2198,75 @@
             document.querySelector('.an-shell')?.removeAttribute('aria-busy');
         }
     }
+    const analyticsSubtabDefinitions = {
+        overview: { label: 'Detail Ikhtisar', items: [{ key: 'summary', label: 'Ringkasan', icon: 'bi-grid-1x2', target: 'anPulseGrid' }] },
+        sales: { label: 'Detail Penjualan', items: [{ key: 'trend', label: 'Tren penjualan', icon: 'bi-graph-up-arrow', target: 'anSalesTrendChart' }, { key: 'daily', label: 'Rincian harian', icon: 'bi-table', target: 'anSalesDailyBody' }] },
+        revenue: { label: 'Detail Omzet, Pencairan & Fee', items: [{ key: 'snapshot', label: 'Snapshot', icon: 'bi-grid-1x2', target: 'revenueOrdersSummary' }, { key: 'ledger', label: 'Detail transaksi', icon: 'bi-receipt', target: 'revenueOrdersBody' }] },
+        operations: { label: 'Detail Operasional', items: [{ key: 'funnel', label: 'Order funnel', icon: 'bi-filter', target: 'salesFunnel' }, { key: 'trend', label: 'Tren harian', icon: 'bi-graph-up-arrow', target: 'revenueChart' }] },
+        stores: { label: 'Detail Toko & Biaya', items: [{ key: 'portfolio', label: 'Portfolio', icon: 'bi-shop-window', target: 'anStorePulse' }, { key: 'ledger', label: 'Store ledger', icon: 'bi-table', target: 'storeBody' }, { key: 'products', label: 'Produk', icon: 'bi-box-seam', target: 'anProductSnapshotList' }] },
+        products: { label: 'Detail Produk', items: [{ key: 'portfolio', label: 'Portfolio', icon: 'bi-grid-1x2', target: 'anProductPulse' }, { key: 'ledger', label: 'Kinerja produk', icon: 'bi-table', target: 'bestProductBody' }, { key: 'attention', label: 'Perlu perhatian', icon: 'bi-exclamation-circle', target: 'worstProductBody' }] },
+        cohort: { label: 'Detail Cohort', items: [{ key: 'summary', label: 'Ringkasan', icon: 'bi-bar-chart-line', target: 'anCohortKpis' }, { key: 'matrix', label: 'Matriks', icon: 'bi-grid-3x3-gap', target: 'anCohortTable' }] },
+    };
+    const activeAnalyticsSubtabs = {};
+    function activateSubtab(key, { scroll = false } = {}) {
+        const activeTab = document.querySelector('[data-an-tab].is-active')?.dataset.anTab || 'overview';
+        const definition = analyticsSubtabDefinitions[activeTab] || analyticsSubtabDefinitions.overview;
+        const selected = definition.items.some(item => item.key === key) ? key : definition.items[0].key;
+        activeAnalyticsSubtabs[activeTab] = selected;
+        document.querySelectorAll('[data-an-subtab]').forEach(button => {
+            const active = button.dataset.anSubtab === selected;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+            button.setAttribute('tabindex', active ? '0' : '-1');
+        });
+        const selectedLabel = definition.items.find(item => item.key === selected)?.label || '';
+        $('analyticsTabPanel')?.setAttribute('aria-label', `${definition.label} · ${selectedLabel}`);
+        if (!scroll) return;
+        const item = definition.items.find(candidate => candidate.key === selected);
+        const target = item?.target ? $(item.target) : null;
+        const section = target?.closest('section, .an-card, .an-enterprise-card, .an-grid-secondary') || target;
+        section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function renderSubtabs(name) {
+        const navigation = $('analyticsSubtabs');
+        if (!navigation) return;
+        const definition = analyticsSubtabDefinitions[name] || analyticsSubtabDefinitions.overview;
+        navigation.setAttribute('aria-label', definition.label);
+        navigation.innerHTML = definition.items.map((item, index) => `<button class="ds-tab-system-button" type="button" role="tab" data-an-subtab="${item.key}" id="analytics-subtab-${name}-${item.key}" aria-selected="${index === 0 ? 'true' : 'false'}" aria-controls="analyticsTabPanel" tabindex="${index === 0 ? '0' : '-1'}"><i class="bi ${item.icon}" aria-hidden="true"></i>${item.label}</button>`).join('');
+        navigation.querySelectorAll('[data-an-subtab]').forEach(button => {
+            button.addEventListener('click', () => activateSubtab(button.dataset.anSubtab, { scroll: true }));
+            button.addEventListener('keydown', event => handleTabKeydown(event, '[data-an-subtab]'));
+        });
+        activateSubtab(activeAnalyticsSubtabs[name] || definition.items[0].key);
+    }
+    function handleTabKeydown(event, selector) {
+        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (!keys.includes(event.key)) return;
+        const tabs = [...document.querySelectorAll(selector)];
+        const currentIndex = tabs.indexOf(event.currentTarget);
+        if (currentIndex < 0) return;
+        const nextIndex = event.key === 'Home' ? 0 : (event.key === 'End' ? tabs.length - 1 : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length);
+        event.preventDefault();
+        tabs[nextIndex]?.focus();
+        tabs[nextIndex]?.click();
+    }
     function activateTab(name) {
         document.querySelectorAll('[data-an-tab]').forEach(button => {
             const active = button.dataset.anTab === name;
             button.classList.toggle('active', active);
+            button.classList.toggle('is-active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
+            button.setAttribute('tabindex', active ? '0' : '-1');
         });
         document.querySelectorAll('[data-an-pane]').forEach(pane => pane.classList.toggle('is-hidden', pane.dataset.anPane !== name));
+        $('analyticsTabPanel')?.setAttribute('aria-label', (analyticsSubtabDefinitions[name] || analyticsSubtabDefinitions.overview).label);
+        renderSubtabs(name);
         const params = new URLSearchParams(location.search);
         params.set('view', name);
         history.replaceState(null, '', location.pathname + '?' + params.toString());
     }
-    document.querySelectorAll('[data-an-tab]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-an-tab]').forEach(button => {
+        button.addEventListener('click', () => {
         activateTab(button.dataset.anTab);
         if (button.dataset.anTab === 'products' || button.dataset.anTab === 'stores') loadProducts();
         if (button.dataset.anTab === 'cohort') loadCohort();
@@ -2064,7 +2276,9 @@
             if (needsReload && !cashLoading) { cashPage = 1; cashPayload = null; loadCashOrders(); }
             loadCashTabSummaries(cashSettlementTabs);
         }
-    }));
+        });
+        button.addEventListener('keydown', event => handleTabKeydown(event, '[data-an-tab]'));
+    });
     const syncUrl = () => { const params = new URLSearchParams({date_from:from(),date_to:to(),compare_mode:$('anCompare').value}); if (selectedPlatform()) params.set('platform', selectedPlatform()); if (selectedStore()) params.set('store_id', selectedStore()); const activeTab = document.querySelector('[data-an-tab].active')?.dataset.anTab; if (activeTab) params.set('view', activeTab); history.replaceState(null,'',location.pathname+'?'+params.toString()); };
     $('anRefresh').addEventListener('click',load); $('anPlatform').addEventListener('change',()=>{ $('anStore').value = ''; fillStores(); syncUrl(); load(); }); $('anStore').addEventListener('change',()=>{syncUrl();load();}); $('anCompare').addEventListener('change',()=>{syncUrl();load();});
     document.querySelectorAll('[data-open-products-tab]').forEach(button => button.addEventListener('click', () => { activateTab('products'); loadProducts(); }));

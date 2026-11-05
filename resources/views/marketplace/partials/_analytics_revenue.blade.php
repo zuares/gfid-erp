@@ -25,22 +25,10 @@
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="return_refund"><span class="an-revenue-tab-label"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>Return / Refund</span></span><small data-revenue-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" aria-controls="revenueOrdersPanel" tabindex="-1" data-revenue-settlement="unsettled"><span class="an-revenue-tab-label"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Dana belum cair</span></span><small data-revenue-tab-kpi>—</small></button>
         </div>
-        <section class="an-revenue-section" aria-labelledby="revenueSummaryTitle">
-            <div class="an-revenue-section-head">
-                <div>
-                    <span class="an-revenue-section-kicker">Snapshot</span>
-                    <strong id="revenueSummaryTitle">Ringkasan omzet &amp; biaya</strong>
-                </div>
-            </div>
+        <section class="an-revenue-section" aria-label="Ringkasan omzet dan biaya">
             <div class="an-modal-summary an-revenue-summary" id="revenueOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
         </section>
-        <section class="an-revenue-section an-revenue-detail-section" aria-labelledby="revenueDetailTitle">
-            <div class="an-revenue-section-head">
-                <div>
-                    <span class="an-revenue-section-kicker">Order ledger</span>
-                    <strong id="revenueDetailTitle">Detail transaksi per order</strong>
-                </div>
-            </div>
+        <section class="an-revenue-section an-revenue-detail-section" aria-label="Detail transaksi per order">
             <div class="an-modal-body an-revenue-body" id="revenueOrdersBody" aria-live="polite"><x-gf.state type="loading" title="Memuat data omzet…" /></div>
         </section>
         <div class="an-modal-foot"><button class="an-btn" id="revenueOrdersPrev" type="button" aria-label="Halaman sebelumnya">‹ Sebelumnya</button><div class="an-modal-pagination" aria-live="polite"><div><strong class="an-modal-page" id="revenueOrdersPage">—</strong><small class="an-modal-page-meta" id="revenueOrdersPageMeta">—</small></div></div><button class="an-btn" id="revenueOrdersNext" type="button" aria-label="Halaman berikutnya">Berikutnya ›</button></div>

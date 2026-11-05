@@ -5,7 +5,18 @@
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
     };
     const cashStatus = value => String(value || '—').replace(/_/g, ' ').toLowerCase();
-    const cashStat = (label, value, note = '', tone = 'neutral') => `<div class="an-modal-stat an-modal-stat-${tone}"><div class="an-modal-stat-label">${label}</div><div class="an-modal-stat-value">${value}</div>${note ? `<span class="an-modal-stat-note">${note}</span>` : ''}</div>`;
+    const cashStatIcon = (label, tone) => {
+        const text = String(label || '').toLowerCase();
+        if (text.includes('refund') || text.includes('adjustment')) return 'bi-arrow-counterclockwise';
+        if (text.includes('affiliate') || text.includes('ams')) return 'bi-people';
+        if (text.includes('pajak') || text.includes('tax')) return 'bi-percent';
+        if (text.includes('ongkir') || text.includes('logistik') || text.includes('premi') || text.includes('asuransi')) return 'bi-truck';
+        if (text.includes('fee') || text.includes('komisi') || text.includes('administrasi') || text.includes('layanan') || text.includes('proses')) return 'bi-receipt';
+        if (text.includes('payout') || text.includes('cair')) return 'bi-wallet2';
+        if (text.includes('omzet') || text.includes('revenue') || text.includes('gross sales') || text.includes('net sales')) return 'bi-graph-up-arrow';
+        return tone === 'accent' ? 'bi-wallet2' : 'bi-grid-1x2';
+    };
+    const cashStat = (label, value, note = '', tone = 'neutral') => `<article class="an-modal-stat an-modal-stat-${tone}" aria-label="${label}"><div class="an-modal-stat-head"><span class="an-modal-stat-icon" aria-hidden="true"><i class="bi ${cashStatIcon(label, tone)}"></i></span><span class="an-modal-stat-label">${label}</span></div><div class="an-modal-stat-value">${value}</div>${note ? `<span class="an-modal-stat-note">${note}</span>` : ''}</article>`;
     const cashSettlementTabs = ['all', 'settled', 'unsettled', 'shipped', 'warehouse', 'confirm', 'cancelled', 'return_refund'];
     const cashFeeDetail = (row, label, value, className = '') => `<span>${esc(label)}<strong class="${className}">${money(value)}</strong></span>`;
     const canonicalFeeDetails = row => {
@@ -108,6 +119,9 @@
             }
         });
         renderCashTabSummaries();
+        if (cashPayload) {
+            renderCashOrders();
+        }
     }
 
     function renderCashOrders() {
@@ -120,7 +134,11 @@
         const isCombined = cashFocus === 'combined';
         const isFeeFocus = cashFocus === 'fees';
         const totalOrders = Number(meta.total || aggregate.cash_order_count || 0).toLocaleString('id-ID');
-        const feePercent = value => aggregate.cash_order_revenue > 0 ? `${(n(value) / n(aggregate.cash_order_revenue) * 100).toFixed(1)}% omzet order` : '0.0% omzet order';
+        const grossSales = n(aggregate.cash_gross_sales);
+        const netSales = n(aggregate.cash_order_revenue);
+        const settledNetSales = isSettled ? netSales : n(cashTabSummaries.settled?.cash_order_revenue);
+        const netSalesPercent = value => netSales > 0 ? `${(n(value) / netSales * 100).toFixed(1)}% net sales` : '—';
+        const settledNetSalesPercent = value => settledNetSales > 0 ? `${(n(value) / settledNetSales * 100).toFixed(1)}% net sales cair` : '—';
         const settlementLabel = row => row.settlement_time ? 'Sudah cair' : 'Belum cair';
         const statusLabel = row => row.status_group_label || cashStatus(row.status);
         const statusTone = row => {
@@ -134,7 +152,7 @@
         const isTikTokPlatform = selectedPlatform() === 'tiktok';
         const canonicalTotals = Array.isArray(payload.canonical_fee_totals) ? payload.canonical_fee_totals : [];
         const canonicalAmount = code => Number(canonicalTotals.find(item => item.code === code)?.amount || 0);
-        const canonicalFeeCards = [
+        const canonicalFeeItems = [
             ['platform_commission', 'Komisi Platform', 'fee'],
             ['dynamic_commission', 'Komisi Dinamis', 'fee'],
             ['program_service_fee', 'Program / layanan', 'fee'],
@@ -147,39 +165,58 @@
             ['tax', 'Pajak', 'tax'],
         ].map(([code, label, category]) => [code, label, category, canonicalAmount(code)])
             .filter(([, , , amount]) => amount > 0)
-            .map(([, label, category, amount]) => cashStat(label, money(amount), category === 'shipping' ? 'mapping pengiriman' : 'mapping fee', category));
+            .map(([code, label, category, amount]) => ({ code, label, category, amount }));
+        const canonicalFeeCards = canonicalFeeItems.map(item => cashStat(item.label, money(item.amount), `${settledNetSalesPercent(item.amount)} · ${item.category === 'shipping' ? 'logistik' : 'fee'}`, item.category));
         const feeSummaryCards = canonicalFeeCards.length > 0 ? canonicalFeeCards : (isTikTokPlatform
             ? [
-                cashStat('Total fee marketplace', money(aggregate.cash_marketplace_fees), feePercent(aggregate.cash_marketplace_fees), 'fee'),
-                cashStat('Rincian fee', 'Per order', 'Platform · dinamis · program · proses', 'neutral'),
+                cashStat('Total fee marketplace', money(aggregate.cash_marketplace_fees), settledNetSalesPercent(aggregate.cash_marketplace_fees), 'fee'),
+                cashStat('Rincian fee', 'Per order', `${settledNetSalesPercent(aggregate.cash_marketplace_fees)} · platform · program · proses`, 'neutral'),
             ]
             : [
-                cashStat('Administrasi', money(aggregate.cash_commission_fee), feePercent(aggregate.cash_commission_fee), 'fee'),
-                cashStat('Layanan / program', money(aggregate.cash_service_fee), feePercent(aggregate.cash_service_fee), 'fee'),
-                cashStat('Proses / transaksi', money(aggregate.cash_transaction_fee), feePercent(aggregate.cash_transaction_fee), 'fee'),
-                cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees), feePercent(aggregate.cash_affiliate_fees), 'neutral'),
+                cashStat('Administrasi', money(aggregate.cash_commission_fee), netSalesPercent(aggregate.cash_commission_fee), 'fee'),
+                cashStat('Layanan / program', money(aggregate.cash_service_fee), netSalesPercent(aggregate.cash_service_fee), 'fee'),
+                cashStat('Proses / transaksi', money(aggregate.cash_transaction_fee), netSalesPercent(aggregate.cash_transaction_fee), 'fee'),
+                cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees), netSalesPercent(aggregate.cash_affiliate_fees), 'neutral'),
             ]);
         $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Omzet, pencairan & fee marketplace';
         $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${modeLabel} · ${totalOrders} order`;
         $('cashOrdersSummary').innerHTML = isCombined ? [
-            cashStat(isAll ? 'Omzet revenue' : (isSettled ? 'Omzet cair' : 'Omzet belum cair'), money(isSettled ? aggregate.cash_payout : aggregate.cash_gross_sales), '', 'primary'),
-            cashStat('Payout tercatat', money(aggregate.cash_payout), feePercent(aggregate.cash_payout), 'accent'),
+            cashStat('Gross Sales', money(grossSales), netSalesPercent(grossSales), 'primary'),
+            cashStat('Net Sales', money(netSales), netSalesPercent(netSales), 'accent'),
+            cashStat('Net Sales cair', money(settledNetSales), settledNetSalesPercent(settledNetSales), 'settled'),
+            cashStat('Payout tercatat', money(aggregate.cash_payout), settledNetSalesPercent(aggregate.cash_payout), 'neutral'),
             ...feeSummaryCards,
-            cashStat('Refund / adjustment', money(aggregate.cash_refund), '', 'neutral'),
+            cashStat('Refund / adjustment', money(aggregate.cash_refund), settledNetSalesPercent(aggregate.cash_refund), 'neutral'),
         ].join('') : isFeeFocus ? [
             ...feeSummaryCards,
         ].join('') : [
-            cashStat(isAll ? 'Omzet revenue' : (isSettled ? 'Omzet cair' : 'Omzet belum cair'), money(isSettled ? aggregate.cash_payout : aggregate.cash_gross_sales)),
-            cashStat(isSettled ? 'Fee marketplace actual' : 'Fee marketplace tercatat', money(aggregate.cash_marketplace_fees)),
-            cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees)),
-            cashStat('Refund / adjustment', money(aggregate.cash_refund)),
+            cashStat('Gross Sales', money(grossSales), netSalesPercent(grossSales), 'primary'),
+            cashStat('Net Sales', money(netSales), netSalesPercent(netSales), 'accent'),
+            cashStat('Net Sales cair', money(settledNetSales), settledNetSalesPercent(settledNetSales), 'settled'),
+            cashStat(isSettled ? 'Payout aktual' : 'Payout tercatat', money(aggregate.cash_payout), settledNetSalesPercent(aggregate.cash_payout), 'neutral'),
+            cashStat(isSettled ? 'Fee marketplace actual' : 'Fee marketplace tercatat', money(aggregate.cash_marketplace_fees), settledNetSalesPercent(aggregate.cash_marketplace_fees), 'fee'),
+            cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees), settledNetSalesPercent(aggregate.cash_affiliate_fees), 'neutral'),
+            cashStat('Refund / adjustment', money(aggregate.cash_refund), settledNetSalesPercent(aggregate.cash_refund), 'neutral'),
         ].join('');
         cashTabSummaries[cashSettlement] = aggregate;
         renderCashTabSummaries();
-        const feeBreakdownItems = `<div class="an-modal-fee-breakdown"><div><span>Total fee marketplace</span><strong>${money(aggregate.cash_marketplace_fees)}<small>${feePercent(aggregate.cash_marketplace_fees)}</small></strong></div>${isTikTokPlatform ? '<div><span>Mapping detail</span><strong>Per order<small>Platform · dinamis · program · proses</small></strong></div>' : `<div><span>Administrasi</span><strong>${money(aggregate.cash_commission_fee)}<small>${feePercent(aggregate.cash_commission_fee)}</small></strong></div><div><span>Layanan / program</span><strong>${money(aggregate.cash_service_fee)}<small>${feePercent(aggregate.cash_service_fee)}</small></strong></div><div><span>Proses / transaksi</span><strong>${money(aggregate.cash_transaction_fee)}<small>${feePercent(aggregate.cash_transaction_fee)}</small></strong></div>`}<div><span>Asuransi</span><strong>${money(aggregate.cash_shipping_insurance_fee)}<small>${feePercent(aggregate.cash_shipping_insurance_fee)}</small></strong></div><div><span>Pajak escrow</span><strong>${money(aggregate.cash_escrow_tax)}<small>${feePercent(aggregate.cash_escrow_tax)}</small></strong></div></div>`;
-        const feeBreakdown = isCombined
-            ? `<section class="an-revenue-fee-breakdown" aria-label="Rincian fee marketplace aktual"><div class="an-revenue-fee-breakdown-head"><div><div class="an-revenue-fee-breakdown-kicker">Fee ledger</div><strong>Rincian fee marketplace aktual</strong></div></div>${feeBreakdownItems}</section>`
-            : isFeeFocus ? feeBreakdownItems : '';
+        const fallbackFeeItems = [
+            ['marketplace_fee', 'Fee marketplace', aggregate.cash_marketplace_fees, 'fee'],
+            ['affiliate_fee', 'Komisi Afiliasi / AMS', aggregate.cash_affiliate_fees, 'affiliate'],
+        ].filter(([, , amount]) => n(amount) > 0).map(([code, label, amount, category]) => ({ code, label, amount: n(amount), category }));
+        const feeItems = canonicalFeeItems.length > 0 ? canonicalFeeItems : fallbackFeeItems;
+        const sellerFeeItems = feeItems.filter(item => item.code !== 'shipping_subsidy' && item.category !== 'platform');
+        const platformFeeItems = feeItems.filter(item => item.code === 'shipping_subsidy' || item.category === 'platform');
+        const feeBurdenSection = (title, subtitle, items, tone, icon, emptyLabel) => {
+            const total = items.reduce((sum, item) => sum + n(item.amount), 0);
+            const rows = items.length
+                ? items.map(item => `<div class="an-fee-burden-row"><span>${esc(item.label)}</span><strong>${money(item.amount)}<small>${settledNetSalesPercent(item.amount)}</small></strong></div>`).join('')
+                : `<div class="an-fee-burden-empty">${emptyLabel}</div>`;
+            return `<section class="an-fee-burden an-fee-burden-${tone}" aria-label="${title}"><div class="an-fee-burden-head"><span class="an-fee-burden-icon" aria-hidden="true"><i class="bi ${icon}"></i></span><div><strong>${title}</strong><small>${subtitle}</small></div><b>${items.length ? money(total) : '—'}</b></div><div class="an-fee-burden-list">${rows}</div></section>`;
+        };
+        const feeBreakdown = (isCombined || isFeeFocus)
+            ? `<section class="an-revenue-fee-breakdown" aria-label="Rincian fee marketplace"><div class="an-revenue-fee-breakdown-head"><div><strong>Fee marketplace</strong><small>Basis biaya: Net Sales Cair</small></div></div><div class="an-fee-burden-grid">${feeBurdenSection('Ditanggung penjual', `${sellerFeeItems.length} komponen`, sellerFeeItems, 'seller', 'bi-receipt', 'Tidak ada fee penjual')}${feeBurdenSection('Ditanggung platform', `${platformFeeItems.length} komponen`, platformFeeItems, 'platform', 'bi-building-check', 'Tidak ada subsidi platform')}</div></section>`
+            : '';
         const renderRows = groupRows => groupRows.map(row => {
             const rowSettled = Boolean(row.settlement_time);
             const payout = rowSettled && n(row.cash_payout) > 0 ? money(row.cash_payout) : (n(row.cash_payout) > 0 ? money(row.cash_payout) : 'Belum tersedia');

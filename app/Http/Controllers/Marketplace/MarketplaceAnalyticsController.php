@@ -48,6 +48,17 @@ class MarketplaceAnalyticsController extends Controller
         return $this->json($payload);
     }
 
+    public function stores(Request $request, MarketplaceAnalyticsOverviewService $analytics): JsonResponse
+    {
+        $filters = $this->summaryFilters($request);
+        $cacheKey = $this->cacheKey('stores', $filters);
+        $payload = Cache::remember($cacheKey, now()->addSeconds(45), fn (): array => [
+            'stores' => $analytics->stores($filters),
+        ]);
+
+        return $this->json($payload);
+    }
+
     public function products(Request $request, MarketplaceAnalyticsProductService $products): JsonResponse
     {
         $filters = $request->validate([

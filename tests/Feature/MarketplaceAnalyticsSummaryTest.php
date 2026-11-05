@@ -6,6 +6,7 @@ use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MarketplaceTikTokFinancialTransaction;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
@@ -180,6 +181,45 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(1, $storeRow['order_total']);
         $this->assertSame(100000.0, (float) $storeRow['gross_sales']);
         $this->assertSame(7500.0, (float) $storeRow['admin_fee_actual']);
+    }
+
+    public function test_store_ledger_uses_platform_ad_mutation_when_ads_daily_is_empty(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-TIKTOK-ADS-FALLBACK',
+            'name' => 'TikTok Ads Fallback',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        MarketplaceTikTokFinancialTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'TT-ADS-FALLBACK-1',
+            'source' => 'statement_transactions',
+            'transaction_type' => 'GMV_PAYMENT_FOR_TIKTOK_ADS',
+            'amount' => 111000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_OUT',
+            'transaction_created_at' => '2026-09-17 12:00:00',
+            'source_payload' => [],
+        ]);
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'platform' => 'tiktok',
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $storeRow = $summary['stores'][0];
+
+        $this->assertSame(111000.0, (float) $storeRow['ad_cost']);
+        $this->assertSame('platform_transaction_fallback', $storeRow['ad_cost_source']);
+        $this->assertSame(100000.0, (float) $storeRow['ad_cost_before_tax']);
+        $this->assertSame(11000.0, (float) $storeRow['ad_cost_vat']);
     }
 
     public function test_order_eligible_completed_and_cancelled_counts_are_scoped_to_active_platform_stores(): void
