@@ -3,9 +3,9 @@
         <div class="an-revenue-head-copy">
             <span class="an-revenue-head-icon" aria-hidden="true"><i class="bi bi-wallet2"></i></span>
             <div>
-            <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Financial order ledger</div>
+            <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Financial ledger</div>
             <div class="an-enterprise-title" id="revenueWorkspaceTitle">Omzet, Pencairan &amp; Fee</div>
-            <div class="an-enterprise-sub">Rincian omzet, status pencairan, fee marketplace aktual, dan payout per order pada periode aktif.</div>
+            <div class="an-enterprise-sub">Omzet, payout, dan fee per order.</div>
             </div>
         </div>
         <div class="an-revenue-head-meta">
@@ -28,10 +28,9 @@
         <section class="an-revenue-section" aria-labelledby="revenueSummaryTitle">
             <div class="an-revenue-section-head">
                 <div>
-                    <span class="an-revenue-section-kicker">Snapshot periode</span>
+                    <span class="an-revenue-section-kicker">Snapshot</span>
                     <strong id="revenueSummaryTitle">Ringkasan omzet &amp; biaya</strong>
                 </div>
-                <span class="an-revenue-section-hint">Nilai mengikuti status tab aktif</span>
             </div>
             <div class="an-modal-summary an-revenue-summary" id="revenueOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
         </section>
@@ -41,7 +40,6 @@
                     <span class="an-revenue-section-kicker">Order ledger</span>
                     <strong id="revenueDetailTitle">Detail transaksi per order</strong>
                 </div>
-                <span class="an-revenue-section-hint">Buka “Rincian mapping fee” untuk melihat komponen</span>
             </div>
             <div class="an-modal-body an-revenue-body" id="revenueOrdersBody" aria-live="polite"><x-gf.state type="loading" title="Memuat data omzet…" /></div>
         </section>

@@ -92,6 +92,30 @@
         if (!focus.length) focus.push(['','bi-check2-circle','Portofolio sehat','Belum ada produk dengan profit negatif','—']);
         $('anProductFocus').innerHTML = focus.map(([level,icon,title,note,action]) => `<div class="an-alert ${level}"><span class="an-alert-icon"><i class="bi ${icon}"></i></span><div><div class="an-alert-title">${title}</div><div class="an-alert-note">${note}</div></div><span class="an-alert-action">${action}</span></div>`).join('');
     }
+    function renderProductSnapshot(rows) {
+        const list = Array.isArray(rows) ? rows : [];
+        const pulse = $('anProductSnapshotPulse');
+        const snapshotList = $('anProductSnapshotList');
+        if (!pulse || !snapshotList) return;
+        const totalGross = list.reduce((sum, product) => sum + Number(product.gross_sales || 0), 0);
+        const totalProfit = list.reduce((sum, product) => sum + Number(product.operating_profit || 0), 0);
+        const negative = list.filter(product => Number(product.operating_profit || 0) < 0).length;
+        const missingHpp = list.filter(product => Number(product.hpp || 0) <= 0).length;
+        const topProducts = [...list]
+            .sort((a, b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0))
+            .slice(0, 4);
+        pulse.innerHTML = [
+            ['Produk dianalisis', list.length.toLocaleString('id-ID'), 'top 100 gross sales'],
+            ['Gross sales', money(totalGross), 'basis eligible'],
+            ['Profit operasional', money(totalProfit), `${totalGross > 0 ? (totalProfit / totalGross * 100).toFixed(1) : '0.0'}% margin`],
+            ['Perlu review', (negative + missingHpp).toLocaleString('id-ID'), `${negative} negatif · ${missingHpp} HPP belum lengkap`],
+        ].map(([label, value, note]) => `<div class="an-pulse"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${esc(value)}</div><div class="an-pulse-note">${esc(note)}</div></div>`).join('');
+        snapshotList.innerHTML = topProducts.length
+            ? topProducts.map((product, index) => `<div class="an-product-snapshot-row"><div><a class="an-product-link an-product-snapshot-name" href="${productUrl(product)}" title="Buka produk terkait">${index + 1}. ${esc(product.product_name || 'Produk tanpa nama')}</a><div class="an-product-snapshot-meta">${esc(product.sku || 'SKU tidak tersedia')} · ${Number(product.qty || 0).toLocaleString('id-ID')} pcs</div></div><div class="an-product-snapshot-value">${money(product.gross_sales)}<small>${Number(product.margin_pct || 0).toFixed(1)}% margin</small></div></div>`).join('')
+            : stateMarkup('empty', 'Belum ada produk', 'Tidak ada produk pada filter aktif.');
+        const reading = $('anProductSnapshotReading');
+        if (reading) reading.innerHTML = `<i class="bi bi-info-circle" aria-hidden="true"></i><span><strong>${list.length.toLocaleString('id-ID')} produk teranalisis</strong> · ${negative.toLocaleString('id-ID')} profit negatif · ${missingHpp.toLocaleString('id-ID')} belum memiliki HPP lengkap.</span>`;
+    }
     function renderProductSummary(rows) {
         const query = String($('anProductSearch')?.value || '').trim().toLowerCase();
         const sortKey = $('anProductSort')?.value || 'gross_sales';
@@ -105,6 +129,7 @@
         const worst = [...sales].sort((a,b) => a.operating_profit - b.operating_profit).slice(0, 6);
         const max = Math.max(...sales.map(p => Math.abs(Number(p.operating_profit || 0))), 1);
         renderProductInsights(rows || []);
+        renderProductSnapshot(rows || []);
         $('anProductResultCount').textContent = `${filteredRows.length.toLocaleString('id-ID')} dari ${rows.length.toLocaleString('id-ID')} produk`;
         $('bestProductBody').innerHTML = sales.length ? sales.map((p,i) => `<tr><td class="an-product-value"><span class="an-rank ${i < 3 ? 'top' : ''}">${i+1}</span></td><td><span class="an-product"><span class="an-product-copy"><a class="an-product-link" href="${productUrl(p)}" title="Buka produk terkait"> <span class="an-product-name">${esc(p.product_name)}</span></a><span class="an-product-sku">Kode: ${esc(p.sku || '—')}</span></span></span></td><td>${Number(p.qty || 0).toLocaleString('id-ID')}</td><td class="an-product-value">${money(p.gross_sales)}<span class="an-table-subline">eligible gross sales</span></td><td class="an-product-value">${money(p.payout)}<span class="an-table-subline">setelah fee marketplace</span></td><td class="an-product-value">${money(p.hpp)}</td><td class="an-product-value" style="color:#b45309">${money(p.ad_cost)}<span class="an-table-subline">alokasi proporsional</span></td><td class="an-product-value" style="color:${p.gross_profit>=0?'#15803d':'#dc2626'}">${money(p.gross_profit)}<span class="an-table-subline">${Number(p.gross_sales || 0) > 0 ? (Number(p.gross_profit || 0) / Number(p.gross_sales) * 100).toFixed(1) : '0.0'}% gross sales</span></td><td class="an-product-value" style="color:${p.operating_profit>=0?'#15803d':'#dc2626'}">${money(p.operating_profit)}<span class="an-table-subline">${Number(p.margin_pct || 0).toFixed(1)}% margin</span></td><td>${productStatusMarkup(p)}</td></tr>`).join('') : `<tr><td colspan="10">${stateMarkup('empty', 'Tidak ada produk yang cocok', 'Tidak ada produk yang cocok dengan filter ini.')}</td></tr>`;
         $('worstProductBody').innerHTML = worst.length ? worst.map(p => `<div class="an-list-row"><div class="an-list-main"><div class="an-list-name"><span class="an-dot ${p.operating_profit<0?'red':''}"></span> <a class="an-product-link" href="${productUrl(p)}" title="Buka produk terkait">${esc(p.product_name)}</a></div><div class="an-list-meta">Kode: ${esc(p.sku || '—')} · ${Number(p.qty || 0).toLocaleString('id-ID')} pcs</div><div class="an-bar"><span style="width:${Math.max(4, Math.min(100, Math.round(Math.abs(Number(p.operating_profit || 0)) / max * 100)))}%;background:${p.operating_profit<0?'#ef4444':'#facc15'}"></span></div></div><div class="an-list-value" style="color:${p.operating_profit<0?'#dc2626':'#a16207'}">${money(p.operating_profit)}</div></div>`).join('') : stateMarkup('empty', 'Belum ada produk untuk ditinjau', 'Tidak ada produk yang membutuhkan perhatian.');

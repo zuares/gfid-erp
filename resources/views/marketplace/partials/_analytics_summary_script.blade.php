@@ -533,9 +533,36 @@
             const currentValue = Number(value || 0);
             const baseline = Number(previousValue || 0);
             const previousText = formatter(baseline);
-            if (baseline === 0) return { text: `<i class="bi bi-arrow-left-right" title="Periode lalu" aria-hidden="true"></i> ${previousText} · ${currentValue === 0 ? '0.0% vs lalu' : 'baru'}`, className: currentValue > 0 ? 'good' : '' };
+            if (baseline === 0) {
+                const changeText = currentValue === 0 ? '0.0% vs lalu' : 'baru';
+                return { text: `<i class="bi bi-arrow-left-right" title="Periode lalu" aria-hidden="true"></i> ${previousText} · ${changeText}`, previousText, changeText, className: currentValue > 0 ? 'good' : '' };
+            }
             const change = (currentValue - baseline) / Math.abs(baseline) * 100;
-            return { text: `<i class="bi bi-arrow-left-right" title="Periode lalu" aria-hidden="true"></i> ${previousText} · ${change > 0 ? '+' : ''}${change.toFixed(1)}% vs lalu`, className: change > 0 ? 'good' : (change < 0 ? 'bad' : '') };
+            const changeText = `${change > 0 ? '+' : ''}${change.toFixed(1)}% vs lalu`;
+            return { text: `<i class="bi bi-arrow-left-right" title="Periode lalu" aria-hidden="true"></i> ${previousText} · ${changeText}`, previousText, changeText, className: change > 0 ? 'good' : (change < 0 ? 'bad' : '') };
+        };
+        const comparisonKpiMarkup = ({ label, value, description, icon, change, metric = '', extraClass = '', clickable = false }) => {
+            const direction = change?.className === 'good' ? 'up' : (change?.className === 'bad' ? 'down' : 'neutral');
+            const directionIcon = direction === 'up' ? 'bi-arrow-up-right' : (direction === 'down' ? 'bi-arrow-down-right' : 'bi-dash');
+            const clickableAttrs = clickable
+                ? ` role="button" tabindex="0" title="Bandingkan grafik dengan periode sebelumnya" data-pulse-metric="${esc(metric)}"`
+                : '';
+            return `<article class="ds-comparison-kpi an-kpi an-pulse ${extraClass}${clickable ? ' an-pulse-action' : ''}" aria-label="${esc(label)}"${clickableAttrs}>
+                <div class="ds-comparison-kpi-main">
+                    <div>
+                        <span class="ds-comparison-kpi-label">${esc(label)}</span>
+                        <strong>${esc(value)}</strong>
+                        <span class="ds-comparison-kpi-description">${esc(description)}</span>
+                    </div>
+                    <span class="ds-comparison-kpi-icon" aria-hidden="true"><i class="bi ${icon}"></i></span>
+                </div>
+                <div class="ds-comparison-kpi-comparisons" aria-label="Perbandingan periode">
+                    <div class="ds-comparison-kpi-row">
+                        <div><span>Periode pembanding</span><small>${esc($('anCompare')?.selectedOptions?.[0]?.textContent?.trim() || 'Periode sebelumnya')}</small></div>
+                        <div class="ds-comparison-kpi-result"><strong>${esc(change?.previousText || '—')}</strong><span class="ds-comparison-kpi-change is-${direction}"><i class="bi ${directionIcon}" aria-hidden="true"></i> ${esc(change?.changeText || '—')}</span></div>
+                    </div>
+                </div>
+            </article>`;
         };
         const countText = value => Number(value || 0).toLocaleString('id-ID');
         const moneyText = value => money(value);
@@ -558,12 +585,17 @@
         const estimatedMarginChange = pulseChange(estimatedMargin, previousEstimatedMargin, percentText);
         const pendingPayoutChange = pulseChange(pendingPayout, previousPendingPayout, moneyText);
         const cashPayoutChange = pulseChange(cashPayout, previousCashPayout, moneyText);
-        const decisionChange = (value, previousValue, inverse = false) => {
+        const decisionChange = (value, previousValue, inverse = false, formatter = money) => {
             const currentValue = Number(value || 0);
             const baseline = Number(previousValue || 0);
-            if (baseline === 0) return { text: currentValue === 0 ? '0% vs lalu' : 'Baru', className: inverse && currentValue > 0 ? 'bad' : (currentValue > 0 ? 'good' : '') };
+            const previousText = formatter(baseline);
+            if (baseline === 0) {
+                const changeText = currentValue === 0 ? '0% vs lalu' : 'Baru';
+                return { text: changeText, previousText, changeText, className: inverse && currentValue > 0 ? 'bad' : (currentValue > 0 ? 'good' : '') };
+            }
             const change = (currentValue - baseline) / Math.abs(baseline) * 100;
-            return { text: `${change > 0 ? '+' : ''}${change.toFixed(1)}% vs lalu`, className: inverse ? (change > 0 ? 'bad' : (change < 0 ? 'good' : '')) : (change > 0 ? 'good' : (change < 0 ? 'bad' : '')) };
+            const changeText = `${change > 0 ? '+' : ''}${change.toFixed(1)}% vs lalu`;
+            return { text: changeText, previousText, changeText, className: inverse ? (change > 0 ? 'bad' : (change < 0 ? 'good' : '')) : (change > 0 ? 'good' : (change < 0 ? 'bad' : '')) };
         };
         const gmvChange = decisionChange(gmv, previousGmv);
         const decisionPayoutChange = decisionChange(cashPayout, previousCashPayout);
@@ -590,7 +622,30 @@
             ['Dibatalkan', cancelledOrders.toLocaleString('id-ID'), { text: `${money(cancelledAmount)} · ${cancelledAmountChange.text}`, className: exceptionChange(cancelledAmountChange).className }, 'cancelled'],
             ['Refund / return', money(returnRefundAmount), { text: `${returnRefundOrders.toLocaleString('id-ID')} order · ${returnRefundRate.toFixed(1)}% · ${refundAmountChange.text}`, className: exceptionChange(refundAmountChange).className }, 'refund'],
         ];
-        $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => `<div class="an-pulse an-pulse-action ${selectedPulseMetric === metric ? 'is-active' : ''}" data-pulse-metric="${metric}" role="button" tabindex="0" title="Bandingkan grafik dengan tanggal sama bulan lalu"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-pulse-note ${change.className}">${change.text}</div></div>`).join('');
+        const pulseDescriptions = {
+            orders: 'Order eligible setelah pembatalan, refund, dan retur',
+            completed: 'Order yang sudah selesai diproses',
+            'completion-rate': 'Rasio order selesai dari order masuk',
+            products: 'Total unit produk pada periode aktif',
+            aov: 'Rata-rata omzet net per order',
+            apc: 'Rata-rata pembayaran per pembeli',
+            cancelled: 'Order yang tidak masuk omzet',
+            refund: 'Nilai refund dan return yang dikecualikan',
+        };
+        const pulseIcons = {
+            orders: 'bi-bag-check', completed: 'bi-check-circle', 'completion-rate': 'bi-speedometer2', products: 'bi-box-seam',
+            aov: 'bi-cash-stack', apc: 'bi-person-check', cancelled: 'bi-x-circle', refund: 'bi-arrow-counterclockwise',
+        };
+        $('anPulseGrid').innerHTML = pulse.map(([label,value,change,metric]) => comparisonKpiMarkup({
+            label,
+            value,
+            description: pulseDescriptions[metric] || 'Ringkasan periode aktif',
+            icon: pulseIcons[metric] || 'bi-graph-up-arrow',
+            change,
+            metric,
+            extraClass: selectedPulseMetric === metric ? 'is-active' : '',
+            clickable: true,
+        })).join('');
         const decisionPulse = [
             ['GMV', money(gmv), { text: 'omzet order eligible', className: gmvChange.className }, gmvChange, 'cash'],
             ['Dana cair', money(cashPayout), { text: `${payoutRealization.toFixed(1)}% dari estimasi`, className: cashPayoutChange.className }, decisionPayoutChange, 'cash'],
@@ -599,7 +654,15 @@
             ['Biaya iklan', money(adCost), { text: `${adCostRate.toFixed(1)}% dari omzet net`, className: exceptionChange(adCostChange).className }, decisionAdCostChange, 'cost'],
             ['Est. net profit', money(estimatedNetProfit), { text: `${estimatedMargin.toFixed(1)}% margin`, className: netProfitChange.className }, netProfitChange, 'profit'],
         ];
-        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison,group]) => `<div class="an-pulse decision-${group}"><div class="an-pulse-label">${label}</div><div class="an-pulse-value">${value}</div><div class="an-decision-pulse-footer"><div class="an-pulse-note ${note.className}">${note.text}</div><span class="an-pulse-compare ${comparison.className}">${comparison.text}</span></div></div>`).join('');
+        const decisionIcons = { cash: 'bi-wallet2', cost: 'bi-receipt', profit: 'bi-graph-up-arrow' };
+        $('anDecisionPulse').innerHTML = decisionPulse.map(([label,value,note,comparison,group]) => comparisonKpiMarkup({
+            label,
+            value,
+            description: note.text,
+            icon: decisionIcons[group] || 'bi-graph-up-arrow',
+            change: comparison,
+            extraClass: `decision-${group}`,
+        })).join('');
         const health = [
             ['Completion rate', Number(current.completion_rate || 0), false, `${Number(current.completed_count || 0).toLocaleString('id-ID')} selesai`],
             ['Cancellation', Number(current.cancel_rate || 0), true, `${Number(current.cancelled_count || 0).toLocaleString('id-ID')} dibatalkan`],

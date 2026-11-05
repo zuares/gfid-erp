@@ -21,12 +21,78 @@
     </div>
 </div>
 
-<div class="an-enterprise-grid an-tab-pane is-hidden" data-an-pane="stores">
-    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Portfolio view</div><div class="an-enterprise-title">Store performance snapshot</div><div class="an-enterprise-sub">Ranking toko berdasarkan gross sales dan profit operasional terverifikasi.</div></div></div><div class="an-enterprise-body"><div class="an-pulse-grid" id="anStorePulse"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
-    <section class="an-enterprise-card"><div class="an-enterprise-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Cost structure</div><div class="an-enterprise-title">Cost efficiency</div><div class="an-enterprise-sub">Rasio biaya terhadap gross sales terverifikasi, bukan GMV operasional.</div></div></div><div class="an-enterprise-body"><div class="an-health-list" id="anStoreCostPulse"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
-</div>
+<section class="an-portfolio-section an-enterprise-card an-tab-pane is-hidden" data-an-pane="stores">
+    <div class="an-enterprise-head">
+        <div>
+            <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Portfolio view</div>
+            <div class="an-enterprise-title">Store performance snapshot</div>
+            <div class="an-enterprise-sub">Satu ruang untuk membaca performa toko, efisiensi biaya, dan ledger operasional.</div>
+        </div>
+        <span class="an-product-scope-pill"><i class="bi bi-shop-window" aria-hidden="true"></i> Store portfolio</span>
+    </div>
+    <div class="an-portfolio-section-body">
+        <div class="an-portfolio-overview-grid">
+            <section class="an-portfolio-subsection">
+                <div class="an-portfolio-subsection-head">
+                    <div>
+                        <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store performance</div>
+                        <div class="an-card-title">Ranking toko</div>
+                        <div class="an-card-sub">Gross sales dan profit operasional terverifikasi.</div>
+                    </div>
+                </div>
+                <div class="an-pulse-grid" id="anStorePulse"><x-gf.state type="loading" title="Memuat…" /></div>
+            </section>
+            <section class="an-portfolio-subsection">
+                <div class="an-portfolio-subsection-head">
+                    <div>
+                        <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Cost structure</div>
+                        <div class="an-card-title">Cost efficiency</div>
+                        <div class="an-card-sub">Rasio biaya terhadap gross sales terverifikasi.</div>
+                    </div>
+                </div>
+                <div class="an-health-list" id="anStoreCostPulse"><x-gf.state type="loading" title="Memuat…" /></div>
+            </section>
+        </div>
 
-<div class="an-grid-secondary an-tab-pane is-hidden" data-an-pane="stores">
-    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div><div class="an-card-title">Performa per toko</div><div class="an-card-sub">Hanya order financial-ready: settlement complete, item valid, dan HPP tersedia.</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order eligible</th><th>Selesai</th><th>Cancel</th><th>Gross sales terverifikasi</th><th>Adm fee aktual</th><th>Biaya iklan</th><th>Profit operasional</th></tr></thead><tbody id="storeBody"><tr><td colspan="8"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div></div></section>
-    <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Fee estimasi mengikuti rate actual Unit economics; biaya settlement tetap tersedia untuk audit</div></div></div><div class="an-card-body"><div class="an-costs" id="costBody"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
-</div>
+        <div class="an-portfolio-ledger-grid">
+            <section class="an-portfolio-subsection an-portfolio-table-section">
+                <div class="an-portfolio-subsection-head">
+                    <div>
+                        <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div>
+                        <div class="an-card-title">Performa per toko</div>
+                        <div class="an-card-sub">Settlement complete, item valid, dan HPP tersedia.</div>
+                    </div>
+                </div>
+                <div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order eligible</th><th>Selesai</th><th>Cancel</th><th>Gross sales terverifikasi</th><th>Adm fee aktual</th><th>Biaya iklan</th><th>Profit operasional</th></tr></thead><tbody id="storeBody"><tr><td colspan="8"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div>
+            </section>
+            <section class="an-portfolio-subsection">
+                <div class="an-portfolio-subsection-head">
+                    <div>
+                        <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Cost ledger</div>
+                        <div class="an-card-title">Biaya marketplace</div>
+                        <div class="an-card-sub">Fee estimasi dan biaya settlement untuk audit.</div>
+                    </div>
+                </div>
+                <div class="an-costs" id="costBody"><x-gf.state type="loading" title="Memuat…" /></div>
+            </section>
+        </div>
+    </div>
+</section>
+
+<section class="an-product-snapshot-section an-enterprise-card an-tab-pane is-hidden" data-an-pane="stores">
+    <div class="an-enterprise-head">
+        <div>
+            <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Product portfolio</div>
+            <div class="an-enterprise-title">Product performance snapshot</div>
+            <div class="an-enterprise-sub">Ringkasan produk teratas berdasarkan gross sales pada filter aktif.</div>
+        </div>
+        <button class="ds-btn ds-btn-ghost ds-btn-sm an-product-open-tab" type="button" data-open-products-tab><i class="bi bi-box-seam" aria-hidden="true"></i>Lihat semua produk</button>
+    </div>
+    <div class="an-product-snapshot-body">
+        <div class="an-pulse-grid an-product-snapshot-pulse" id="anProductSnapshotPulse"><x-gf.state title="Menunggu data produk" message="Data produk akan dimuat saat portfolio dibuka." /></div>
+        <div class="an-product-snapshot-content">
+            <div class="an-product-snapshot-list" id="anProductSnapshotList"><x-gf.state title="Menunggu data produk" message="Belum ada ringkasan produk untuk ditampilkan." /></div>
+            <div class="an-product-reading" id="anProductSnapshotReading"><i class="bi bi-info-circle" aria-hidden="true"></i><span>Profit operasional memperhitungkan HPP dan alokasi iklan.</span></div>
+        </div>
+    </div>
+</section>
