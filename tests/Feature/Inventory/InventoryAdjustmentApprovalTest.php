@@ -148,7 +148,8 @@ it('accepts multiple related items for a bulk inventory correction prefill', fun
     expect($view->getData()['prefillLines'])->toBe([
         ['item_id' => $first->id, 'item_code' => 'BULK-ADJ-001', 'qty_change' => 2.0],
         ['item_id' => $second->id, 'item_code' => 'BULK-ADJ-002', 'qty_change' => 4.0],
-    ]);
+    ])
+        ->and($view->getData()['prefillItemCode'])->toBe('BULK-ADJ-001 BULK-ADJ-002');
 });
 
 it('searches multiple manual correction items when terms are separated by spaces', function () {

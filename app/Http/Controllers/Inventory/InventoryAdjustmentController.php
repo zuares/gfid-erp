@@ -507,7 +507,11 @@ class InventoryAdjustmentController extends Controller
 
         if ($prefillLines !== []) {
             $prefillItemId = $prefillLines[0]['item_id'];
-            $prefillItemCode = $prefillLines[0]['item_code'];
+            // Tampilkan semua item prefill di filter tabel, bukan hanya item pertama.
+            $prefillItemCode = collect($prefillLines)
+                ->pluck('item_code')
+                ->filter()
+                ->implode(' ');
             $prefillQtyChange = $prefillLines[0]['qty_change'];
         } elseif ($prefillItemId && $prefillItemCode === '') {
             $prefillItemCode = (string) (Item::query()->whereKey($prefillItemId)->value('code') ?? '');
