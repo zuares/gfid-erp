@@ -17,6 +17,15 @@
     .bom-bulk-field input, .bom-bulk-field select { width: 100%; min-height: 42px; padding: .55rem .7rem; border: 1px solid var(--gf-color-line, #e4e7ec); border-radius: 10px; color: var(--gf-color-content, #101828); background: var(--gf-color-surface, #fff); font: inherit; font-size: .8rem; }
     .bom-bulk-field input:focus, .bom-bulk-field select:focus { border-color: var(--gf-color-brand, #5b5ce2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 14%, transparent); outline: none; }
     .bom-bulk-field small { display: block; margin-top: .35rem; color: var(--gf-color-muted, #667085); font-size: .68rem; line-height: 1.45; }
+    .bom-bulk-category-picker { display: grid; gap: .55rem; }
+    .bom-bulk-category-all, .bom-bulk-category-option { display: flex; align-items: flex-start; gap: .55rem; padding: .65rem .7rem; border: 1px solid var(--gf-color-line, #e4e7ec); border-radius: 10px; background: var(--gf-color-surface, #fff); }
+    .bom-bulk-category-all { border-color: color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 26%, var(--gf-color-line, #e4e7ec)); background: color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 5%, var(--gf-color-surface, #fff)); }
+    .bom-bulk-category-all input, .bom-bulk-category-option input { flex: 0 0 auto; width: 1rem; min-height: 1rem; margin-top: .12rem; accent-color: var(--gf-color-brand, #5b5ce2); }
+    .bom-bulk-category-copy { display: grid; gap: .12rem; min-width: 0; }
+    .bom-bulk-category-copy strong { font-size: .76rem; }
+    .bom-bulk-category-copy span { color: var(--gf-color-muted, #667085); font-size: .7rem; line-height: 1.35; }
+    .bom-bulk-category-list { display: grid; gap: .4rem; max-height: 220px; padding: .15rem; overflow-y: auto; }
+    .bom-bulk-category-option:has(input:disabled) { opacity: .56; }
     .bom-bulk-search { position: relative; }
     .bom-bulk-results { display: grid; gap: .35rem; max-height: 220px; margin-top: .4rem; overflow: auto; }
     .bom-bulk-result { display: flex; align-items: center; justify-content: space-between; gap: .7rem; width: 100%; padding: .55rem .65rem; border: 1px solid var(--gf-color-line, #e4e7ec); border-radius: 10px; color: inherit; background: var(--gf-color-surface, #fff); font: inherit; font-size: .76rem; text-align: left; cursor: pointer; }
@@ -70,18 +79,33 @@
             @csrf
             <div class="bom-bulk-grid">
                 <div class="bom-bulk-field">
-                    <label for="bulk-category">Kategori finished good target</label>
-                    <select id="bulk-category" name="item_category_id">
-                        <option value="" data-bom-count="{{ $allBomCount }}" @selected(blank(old('item_category_id')))>
-                            Semua kategori finished good aktif ({{ $allBomCount }} BOM)
-                        </option>
-                        @foreach($itemCategories as $category)
-                            <option value="{{ $category->id }}" data-bom-count="{{ $category->bom_count }}" @selected(old('item_category_id') == $category->id)>
-                                {{ $category->code }} — {{ $category->name }} ({{ $category->bom_count }} BOM)
-                            </option>
-                        @endforeach
-                    </select>
+                    <label id="bulk-category-label">Kategori finished good target</label>
+                    @php
+                        $oldCategoryIds = collect(old('item_category_ids', []))->map(fn ($id) => (int) $id)->filter()->all();
+                        $oldApplyAll = old('all_categories', $oldCategoryIds === [] ? '1' : '0') === '1';
+                    @endphp
+                    <div class="bom-bulk-category-picker" role="group" aria-labelledby="bulk-category-label">
+                        <label class="bom-bulk-category-all">
+                            <input id="bulk-all-categories" type="checkbox" name="all_categories" value="1" @checked($oldApplyAll)>
+                            <span class="bom-bulk-category-copy">
+                                <strong>Semua kategori finished good aktif</strong>
+                                <span>{{ $allBomCount }} BOM akan menjadi target</span>
+                            </span>
+                        </label>
+                        <div class="bom-bulk-category-list" id="bulk-category-list">
+                            @foreach($itemCategories as $category)
+                                <label class="bom-bulk-category-option">
+                                    <input type="checkbox" name="item_category_ids[]" value="{{ $category->id }}" data-bom-count="{{ $category->bom_count }}" @checked(in_array((int) $category->id, $oldCategoryIds, true))>
+                                    <span class="bom-bulk-category-copy">
+                                        <strong>{{ $category->code }} — {{ $category->name }}</strong>
+                                        <span>{{ $category->bom_count }} BOM aktif</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
                     <small>Hanya kategori dari item bertipe finished good yang memiliki BOM aktif. Material, packaging, WIP, dan BOM inactive tidak termasuk target.</small>
+                    @error('item_category_ids')<small class="text-danger">{{ $message }}</small>@enderror
                 </div>
 
                 <div class="bom-bulk-field">
@@ -145,7 +169,8 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const category = document.querySelector('#bulk-category');
+    const allCategories = document.querySelector('#bulk-all-categories');
+    const categoryChecks = [...document.querySelectorAll('input[name="item_category_ids[]"]')];
     const impact = document.querySelector('[data-bom-bulk-impact]');
     const form = document.querySelector('[data-bom-bulk-form]');
     const search = document.querySelector('#bulk-material-search');
@@ -159,13 +184,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let controller = null;
 
     const refreshImpact = () => {
-        const option = category?.selectedOptions?.[0];
-        const count = Number(option?.dataset.bomCount || 0);
-        if (!option?.value) {
+        const applyAll = Boolean(allCategories?.checked);
+        const count = applyAll
+            ? {{ (int) $allBomCount }}
+            : categoryChecks.filter((checkbox) => checkbox.checked).reduce((total, checkbox) => total + Number(checkbox.dataset.bomCount || 0), 0);
+        if (applyAll) {
             impact.innerHTML = `<i class="bi bi-layers" aria-hidden="true"></i><span><strong>${count}</strong> BOM finished good aktif akan menerima perubahan ini.</span>`;
             return;
         }
-        impact.innerHTML = `<i class="bi bi-layers" aria-hidden="true"></i><span><strong>${count}</strong> BOM finished good aktif dalam kategori ini akan menerima perubahan.</span>`;
+        impact.innerHTML = `<i class="bi bi-layers" aria-hidden="true"></i><span><strong>${count}</strong> BOM finished good aktif dari kategori terpilih akan menerima perubahan.</span>`;
+    };
+
+    const refreshCategoryState = () => {
+        const applyAll = Boolean(allCategories?.checked);
+        categoryChecks.forEach((checkbox) => { checkbox.disabled = applyAll; });
+        refreshImpact();
     };
 
     const clearMaterial = () => {
@@ -215,7 +248,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 250);
     });
 
-    category?.addEventListener('change', refreshImpact);
+    allCategories?.addEventListener('change', refreshCategoryState);
+    categoryChecks.forEach((checkbox) => checkbox.addEventListener('change', () => {
+        if (checkbox.checked && allCategories) allCategories.checked = false;
+        refreshCategoryState();
+    }));
     form?.addEventListener('submit', (event) => {
         if (!materialId.value) {
             event.preventDefault();
@@ -223,12 +260,21 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Pilih komponen terlebih dahulu.');
             return;
         }
-        const option = category.selectedOptions[0];
-        const count = Number(option?.dataset.bomCount || 0);
-        const scope = option?.value ? 'kategori ini' : 'semua kategori finished good aktif';
+        const applyAll = Boolean(allCategories?.checked);
+        const selectedCount = categoryChecks.filter((checkbox) => checkbox.checked).length;
+        if (!applyAll && selectedCount === 0) {
+            event.preventDefault();
+            allCategories?.focus();
+            alert('Pilih minimal satu kategori atau pilih semua kategori finished good.');
+            return;
+        }
+        const count = applyAll
+            ? {{ (int) $allBomCount }}
+            : categoryChecks.filter((checkbox) => checkbox.checked).reduce((total, checkbox) => total + Number(checkbox.dataset.bomCount || 0), 0);
+        const scope = applyAll ? 'semua kategori finished good aktif' : `${selectedCount} kategori terpilih`;
         if (!window.confirm(`Terapkan perubahan ke ${count} BOM finished good pada ${scope}?`)) event.preventDefault();
     });
-    refreshImpact();
+    refreshCategoryState();
 });
 </script>
 @endpush

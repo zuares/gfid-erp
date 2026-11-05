@@ -482,6 +482,106 @@ class MasterItemBomTest extends TestCase
             ->count());
     }
 
+    public function test_bulk_update_applies_to_multiple_selected_finished_good_categories(): void
+    {
+        $categoryA = ItemCategory::create([
+            'code' => 'BOM-BULK-MULTI-A',
+            'name' => 'Kategori Bulk Multi A',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $categoryB = ItemCategory::create([
+            'code' => 'BOM-BULK-MULTI-B',
+            'name' => 'Kategori Bulk Multi B',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $finishedGoodA = Item::create([
+            'code' => 'FG-BOM-BULK-MULTI-A',
+            'name' => 'Produk Bulk Multi A',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $categoryA->id,
+            'active' => true,
+        ]);
+        $finishedGoodB = Item::create([
+            'code' => 'FG-BOM-BULK-MULTI-B',
+            'name' => 'Produk Bulk Multi B',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $categoryB->id,
+            'active' => true,
+        ]);
+        $component = Item::create([
+            'code' => 'OPP-BOM-BULK-MULTI',
+            'name' => 'Komponen Bulk Multi',
+            'unit' => 'pcs',
+            'stock_unit' => 'pcs',
+            'type' => 'material',
+            'active' => true,
+        ]);
+        $bomA = ItemBom::create(['item_id' => $finishedGoodA->id, 'name' => 'BOM Multi A', 'active' => true]);
+        $bomB = ItemBom::create(['item_id' => $finishedGoodB->id, 'name' => 'BOM Multi B', 'active' => true]);
+
+        $this->actingAs($this->owner)
+            ->post(route('master.item_boms.bulk_update'), [
+                'all_categories' => '0',
+                'item_category_ids' => [$categoryA->id, $categoryB->id],
+                'material_item_id' => $component->id,
+                'usage_stage' => ItemBomLine::STAGE_PACKING_SUPPLY,
+                'qty' => '1',
+                'scrap_pct' => '0',
+                'is_optional' => '0',
+            ])
+            ->assertRedirect(route('master.item_boms.bulk_update_form'));
+
+        $this->assertDatabaseHas('item_bom_lines', [
+            'item_bom_id' => $bomA->id,
+            'material_item_id' => $component->id,
+        ]);
+        $this->assertDatabaseHas('item_bom_lines', [
+            'item_bom_id' => $bomB->id,
+            'material_item_id' => $component->id,
+        ]);
+    }
+
+    public function test_bulk_update_form_exposes_multiple_finished_good_category_choices(): void
+    {
+        $finishedGoodCategory = ItemCategory::create([
+            'code' => 'BOM-BULK-UI-FG',
+            'name' => 'Kategori UI Finished Good',
+            'kind' => 'product',
+            'active' => true,
+        ]);
+        $materialCategory = ItemCategory::create([
+            'code' => 'BOM-BULK-UI-MAT',
+            'name' => 'Kategori UI Material',
+            'kind' => 'material',
+            'active' => true,
+        ]);
+        $finishedGood = Item::create([
+            'code' => 'FG-BOM-BULK-UI',
+            'name' => 'Produk UI Finished Good',
+            'unit' => 'pcs',
+            'type' => 'finished_good',
+            'item_category_id' => $finishedGoodCategory->id,
+            'active' => true,
+        ]);
+        ItemBom::create([
+            'item_id' => $finishedGood->id,
+            'name' => 'BOM UI Finished Good',
+            'active' => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('master.item_boms.bulk_update_form'))
+            ->assertOk()
+            ->assertSee('name="all_categories"', false)
+            ->assertSee('name="item_category_ids[]"', false)
+            ->assertSee($finishedGoodCategory->name)
+            ->assertDontSee($materialCategory->name);
+    }
+
     public function test_bulk_update_all_targets_finished_good_boms_only(): void
     {
         $finishedGoodCategory = ItemCategory::create([

@@ -238,13 +238,25 @@ class ItemBomController extends Controller
 
     public function bulkUpdate(Request $request)
     {
+        $legacyCategoryId = $request->input('item_category_id');
+        $hasCategoryArray = $request->has('item_category_ids');
+        $applyAll = $request->boolean('all_categories')
+            || (! $hasCategoryArray && blank($legacyCategoryId));
+
+        if (! $hasCategoryArray && filled($legacyCategoryId)) {
+            $request->merge(['item_category_ids' => [$legacyCategoryId]]);
+        }
+
         $request->merge([
+            'all_categories' => $applyAll,
             'qty' => $this->normalizeDecimal($request->input('qty')),
             'scrap_pct' => $this->normalizeDecimal($request->input('scrap_pct', self::DEFAULT_WASTE_PCT)),
         ]);
 
         $data = $request->validate([
-            'item_category_id' => ['nullable', 'integer', 'exists:item_categories,id'],
+            'all_categories' => ['boolean'],
+            'item_category_ids' => ['nullable', 'array'],
+            'item_category_ids.*' => ['integer', 'distinct', 'exists:item_categories,id'],
             'material_item_id' => ['required', 'integer', 'exists:items,id'],
             'usage_stage' => ['required', Rule::in(array_keys(ItemBomLine::usageStageLabels()))],
             'qty' => ['required', 'numeric', 'min:' . self::QTY_MIN],
@@ -271,12 +283,24 @@ class ItemBomController extends Controller
             ]);
         }
 
-        $categoryId = $data['item_category_id'] ?? null;
+        $categoryIds = collect($data['item_category_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (! $applyAll && $categoryIds === []) {
+            throw ValidationException::withMessages([
+                'item_category_ids' => 'Pilih minimal satu kategori finished good atau pilih semua kategori.',
+            ]);
+        }
+
         $bomQuery = ItemBom::query()
             ->where('active', true)
-            ->whereHas('item', function ($query) use ($categoryId): void {
+            ->whereHas('item', function ($query) use ($applyAll, $categoryIds): void {
                 $query->where('type', 'finished_good')
-                    ->when($categoryId !== null, fn ($category) => $category->where('item_category_id', $categoryId));
+                    ->when(! $applyAll, fn ($category) => $category->whereIn('item_category_id', $categoryIds));
             });
 
         if (! $bomQuery->exists()) {
