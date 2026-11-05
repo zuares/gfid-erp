@@ -131,6 +131,15 @@ Route::middleware(['web', 'auth', 'access:master'])->group(function () {
         Route::get('item-boms', [ItemBomController::class, 'index'])
             ->name('item_boms.index');
 
+        Route::get('item-boms/api', [ItemBomController::class, 'apiIndex'])
+            ->name('item_boms.api');
+
+        Route::get('item-boms/bulk-update', [ItemBomController::class, 'bulkUpdateForm'])
+            ->name('item_boms.bulk_update_form');
+
+        Route::post('item-boms/bulk-update', [ItemBomController::class, 'bulkUpdate'])
+            ->name('item_boms.bulk_update');
+
         Route::get('item-boms/create', [ItemBomController::class, 'create'])
             ->name('item_boms.create');
 

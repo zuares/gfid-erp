@@ -45,7 +45,7 @@
     .bom-stat-note { display: block; margin-top: .3rem; color: var(--bom-muted); font-size: .62rem; }
     .bom-card { overflow: hidden; border: 1px solid var(--bom-line); border-radius: var(--gf-radius-card, 16px); background: var(--bom-surface); box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(16,24,40,.04), 0 4px 12px rgba(16,24,40,.04)); }
     .bom-toolbar { padding: .9rem 1rem; border-bottom: 1px solid var(--bom-line); background: color-mix(in srgb, var(--bom-surface-muted) 56%, var(--bom-surface)); }
-    .bom-filter-grid { display: grid; grid-template-columns: minmax(240px, 1.65fr) minmax(145px, .72fr) minmax(180px, .9fr) auto; align-items: end; gap: .65rem; }
+    .bom-filter-grid { display: grid; grid-template-columns: minmax(220px, 1.45fr) minmax(135px, .65fr) minmax(165px, .8fr) minmax(175px, .85fr) auto; align-items: end; gap: .65rem; }
     .bom-search { position: relative; min-width: 0; }
     .bom-search label { display: block; margin: 0 0 .35rem .1rem; color: var(--bom-muted); font-size: .65rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
     .bom-search i { position: absolute; left: .75rem; bottom: .72rem; color: var(--bom-brand); font-size: .8rem; pointer-events: none; }
@@ -62,6 +62,8 @@
     .bom-toolbar-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; min-height: 24px; margin-top: .7rem; color: var(--bom-muted); font-size: .7rem; }
     .bom-filter-chip { display: inline-flex; align-items: center; gap: .3rem; padding: .35rem .55rem; border: 1px solid var(--bom-line); border-radius: 999px; color: var(--bom-muted); background: var(--bom-surface); font-weight: 700; }
     .bom-filter-chip strong { color: var(--bom-ink); }
+    [data-bom-results].is-loading { opacity: .58; pointer-events: none; transition: opacity .16s ease; }
+    .bom-api-error { padding: 2rem 1.25rem; color: var(--bom-danger); text-align: center; }
     .bom-table-wrap { position: relative; max-height: min(66vh, 720px); overflow: auto; isolation: isolate; scrollbar-color: color-mix(in srgb, var(--bom-brand) 32%, var(--bom-line)) var(--bom-surface-muted); }
     .bom-table { width: 100%; min-width: 920px; margin: 0; border-collapse: separate; border-spacing: 0; color: var(--bom-ink); font-size: .76rem; }
     .bom-table th { position: sticky; top: 0; z-index: 10; padding: .75rem .85rem; border-bottom: 1px solid var(--bom-line); color: var(--bom-muted); background: var(--bom-surface-muted); box-shadow: 0 1px 0 var(--bom-line), 0 4px 10px rgba(16,24,40,.04); font-size: .65rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; }
@@ -219,6 +221,7 @@
         <div class="bom-hero-actions" aria-label="Aksi BOM">
             <a href="{{ route('master.item_boms.import_form') }}" class="bom-btn bom-btn-ghost"><i class="bi bi-upload" aria-hidden="true"></i><span>Import</span></a>
             <a href="{{ route('master.item_boms.duplicate_form') }}" class="bom-btn bom-btn-ghost"><i class="bi bi-files" aria-hidden="true"></i><span>Duplikat</span></a>
+            <a href="{{ route('master.item_boms.bulk_update_form') }}" class="bom-btn bom-btn-ghost"><i class="bi bi-layers" aria-hidden="true"></i><span>Update massal</span></a>
             <button type="button" class="bom-btn bom-btn-primary" data-bom-open-create aria-haspopup="dialog" aria-controls="bom-create-modal"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>BOM Baru</span></button>
         </div>
     </section>
@@ -253,19 +256,19 @@
     </div>
 
     <section class="bom-stats" aria-label="Ringkasan BOM">
-        <div class="bom-stat"><span class="bom-stat-label"><i class="bi bi-diagram-3" aria-hidden="true"></i>Total BOM</span><strong class="bom-stat-value">{{ number_format((int) ($bomSummary['total'] ?? 0), 0, ',', '.') }}</strong><small class="bom-stat-note">Sesuai pencarian aktif</small></div>
-        <div class="bom-stat"><span class="bom-stat-label"><i class="bi bi-check-circle" aria-hidden="true"></i>Aktif</span><strong class="bom-stat-value">{{ number_format((int) ($bomSummary['active'] ?? 0), 0, ',', '.') }}</strong><small class="bom-stat-note">Siap dipakai produksi</small></div>
-        <div class="bom-stat"><span class="bom-stat-label"><i class="bi bi-pause-circle" aria-hidden="true"></i>Nonaktif</span><strong class="bom-stat-value">{{ number_format((int) ($bomSummary['inactive'] ?? 0), 0, ',', '.') }}</strong><small class="bom-stat-note">Perlu ditinjau</small></div>
-        <div class="bom-stat"><span class="bom-stat-label"><i class="bi bi-list-check" aria-hidden="true"></i>Halaman ini</span><strong class="bom-stat-value">{{ number_format((int) $boms->count(), 0, ',', '.') }}</strong><small class="bom-stat-note">{{ $boms->perPage() }} item per halaman</small></div>
+        <div class="bom-stat"><span class="bom-stat-label"><i class="bi bi-diagram-3" aria-hidden="true"></i>Total BOM</span><strong class="bom-stat-value" data-bom-stat="total">{{ number_format((int) ($bomSummary['total'] ?? 0), 0, ',', '.') }}</strong><small class="bom-stat-note">Sesuai pencarian aktif</small></div>
+        <div class="bom-stat"><span class="bom-stat-label"><i class="bi bi-check-circle" aria-hidden="true"></i>Aktif</span><strong class="bom-stat-value" data-bom-stat="active">{{ number_format((int) ($bomSummary['active'] ?? 0), 0, ',', '.') }}</strong><small class="bom-stat-note">Siap dipakai produksi</small></div>
+        <div class="bom-stat"><span class="bom-stat-label"><i class="bi bi-pause-circle" aria-hidden="true"></i>Nonaktif</span><strong class="bom-stat-value" data-bom-stat="inactive">{{ number_format((int) ($bomSummary['inactive'] ?? 0), 0, ',', '.') }}</strong><small class="bom-stat-note">Perlu ditinjau</small></div>
+        <div class="bom-stat"><span class="bom-stat-label"><i class="bi bi-list-check" aria-hidden="true"></i>Halaman ini</span><strong class="bom-stat-value" data-bom-stat="page">{{ number_format((int) $boms->count(), 0, ',', '.') }}</strong><small class="bom-stat-note">{{ $boms->perPage() }} item per halaman</small></div>
     </section>
 
     <section class="bom-card" aria-label="Daftar BOM">
-        <form method="get" action="{{ route('master.item_boms.index') }}" class="bom-toolbar" data-bom-search-form>
+        <form method="get" action="{{ route('master.item_boms.index') }}" class="bom-toolbar" data-bom-search-form data-bom-api-url="{{ route('master.item_boms.api') }}">
             <div class="bom-filter-grid">
                 <div class="bom-search">
                     <label for="bom-search-input">Cari BOM</label>
                     <i class="bi bi-search" aria-hidden="true"></i>
-                    <input id="bom-search-input" type="search" name="q" value="{{ $q }}" autocomplete="off" inputmode="search" enterkeyhint="search" placeholder="Kode SKU, nama item, atau nama BOM" aria-label="Cari kode SKU, nama item, atau nama BOM">
+                    <input id="bom-search-input" type="search" name="q" value="{{ $q }}" maxlength="100" autocomplete="off" inputmode="search" enterkeyhint="search" placeholder="Kode SKU, nama item, atau nama BOM" aria-label="Cari kode SKU, nama item, atau nama BOM" data-bom-restore-focus="{{ $q !== '' ? 'true' : 'false' }}">
                     <span class="bom-search-status" data-bom-search-status aria-live="polite">Mencari…</span>
                 </div>
                 <div class="bom-filter-field">
@@ -286,6 +289,17 @@
                         <option value="complete" @selected($structure === 'complete')>Struktur lengkap</option>
                     </select>
                 </div>
+                <div class="bom-filter-field">
+                    <label for="bom-category-filter">Kategori item</label>
+                    <select id="bom-category-filter" name="item_category_id" aria-label="Filter kategori item">
+                        <option value="">Semua kategori</option>
+                        @foreach($itemCategories as $category)
+                            <option value="{{ $category->id }}" @selected($categoryId === (int) $category->id)>
+                                {{ $category->code }} — {{ $category->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
                 <div class="bom-filter-actions">
                     <button type="submit" class="bom-btn bom-btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i><span>Terapkan</span></button>
                     @if($hasFilters)
@@ -293,90 +307,14 @@
                     @endif
                 </div>
             </div>
-            <div class="bom-toolbar-meta">
-                @if($q !== '')<span class="bom-filter-chip"><i class="bi bi-search" aria-hidden="true"></i><strong>{{ $q }}</strong></span>@endif
-                @if($status !== '')<span class="bom-filter-chip"><i class="bi bi-activity" aria-hidden="true"></i><strong>{{ $status === 'active' ? 'Aktif' : 'Nonaktif' }}</strong></span>@endif
-                @if($structure !== '')<span class="bom-filter-chip"><i class="bi bi-diagram-3" aria-hidden="true"></i><strong>{{ ['main' => 'Bahan utama', 'sewing' => 'Bahan jahit', 'packing' => 'Bahan packing', 'complete' => 'Struktur lengkap'][$structure] }}</strong></span>@endif
-                @if(!$hasFilters)<span><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Live search aktif · gunakan filter untuk mempersempit daftar</span>@else<span><i class="bi bi-funnel me-1" aria-hidden="true"></i>{{ collect([$q !== '', $status !== '', $structure !== ''])->filter()->count() }} filter aktif</span>@endif
+            <div class="bom-toolbar-meta" data-bom-toolbar-meta>
+                @include('master.item_boms._toolbar_meta')
             </div>
         </form>
 
-        @if($boms->count() === 0)
-            <div class="bom-empty">
-                <div class="bom-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
-                <h2 class="bom-empty-title">{{ $hasFilters ? 'BOM tidak ditemukan' : 'Belum ada BOM' }}</h2>
-                <p class="bom-empty-copy">{{ $hasFilters ? 'Coba ubah kata kunci atau filter, atau reset untuk melihat semua BOM.' : 'Buat BOM pertama untuk mulai mengatur standar komponen produksi.' }}</p>
-                @if($hasFilters)
-                    <a href="{{ route('master.item_boms.index') }}" class="bom-btn bom-btn-ghost mt-3">Reset filter</a>
-                @else
-                    <a href="{{ route('master.item_boms.create') }}" class="bom-btn bom-btn-primary mt-3"><i class="bi bi-plus-lg" aria-hidden="true"></i>Buat BOM</a>
-                @endif
-            </div>
-        @else
-            <div class="bom-table-wrap">
-                <table class="bom-table">
-                    <caption class="visually-hidden">Daftar BOM SKU</caption>
-                    <thead>
-                        <tr><th class="bom-index">No.</th><th>SKU / Item</th><th>Struktur BOM</th><th>Status</th><th class="text-end">Aksi</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach($boms as $i => $b)
-                            @php $ub = $bomUsageBadges[$b->id] ?? null; @endphp
-                            <tr>
-                                <td class="bom-index">{{ ($boms->currentPage() - 1) * $boms->perPage() + $i + 1 }}</td>
-                                <td>
-                                    <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-item-code">{{ $b->item?->code ?? '—' }}</a>
-                                    <div class="bom-item-name">{{ $b->item?->name ?? 'Item tidak ditemukan' }}</div>
-                                    @if($b->name)<div class="bom-name">{{ $b->name }}</div>@endif
-                                </td>
-                                <td>
-                                    <div class="bom-structure"><strong>{{ (int) $b->main_material_lines_count }}</strong> utama <span class="text-muted">·</span> <strong>{{ (int) $b->sewing_supply_lines_count }}</strong> jahit <span class="text-muted">·</span> <strong>{{ (int) $b->packing_supply_lines_count }}</strong> packing</div>
-                                    <div class="bom-structure-meta">{{ (int) $b->lines_count }} komponen total</div>
-                                    @if($ub)<div class="bom-actual">Aktual <span class="bom-actual-value">{{ number_format($ub['kg_per_pcs'], 3, ',', '') }}/pcs</span> · {{ $ub['job_code'] }} @if($ub['status'] === 'over')<span class="bom-usage-over">· melebihi standar</span>@elseif($ub['status'] === 'under')<span class="bom-usage-under">· lebih hemat</span>@elseif($ub['status'] === 'ok')<span>· sesuai standar</span>@endif</div>@endif
-                                </td>
-                                <td><span class="bom-status {{ $b->active ? 'bom-status-active' : 'bom-status-inactive' }}">{{ $b->active ? 'Aktif' : 'Nonaktif' }}</span></td>
-                                <td>
-                                    <div class="bom-actions">
-                                        <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-btn bom-btn-ghost"><i class="bi bi-pencil" aria-hidden="true"></i><span>Edit</span></a>
-                                        <form method="post" action="{{ route('master.item_boms.destroy', $b) }}" data-gf-confirm data-gf-confirm-title="Hapus BOM?" data-gf-confirm-text="Semua komponen pada BOM ini ikut terhapus." data-gf-confirm-icon="warning" data-gf-confirm-ok="Ya, hapus" data-gf-confirm-cancel="Batal">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="bom-btn bom-btn-danger" aria-label="Hapus BOM {{ $b->item?->code ?? '' }}" title="Hapus BOM"><i class="bi bi-trash3" aria-hidden="true"></i></button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="bom-mobile-list">
-                @foreach($boms as $b)
-                    @php $ub = $bomUsageBadges[$b->id] ?? null; @endphp
-                    <article class="bom-mobile-card">
-                        <div class="bom-mobile-head">
-                            <div>
-                                <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-item-code">{{ $b->item?->code ?? '—' }}</a>
-                                <div class="bom-item-name">{{ $b->item?->name ?? 'Item tidak ditemukan' }}</div>
-                                @if($b->name)<div class="bom-name">{{ $b->name }}</div>@endif
-                            </div>
-                            <span class="bom-status {{ $b->active ? 'bom-status-active' : 'bom-status-inactive' }}">{{ $b->active ? 'Aktif' : 'Nonaktif' }}</span>
-                        </div>
-                        <div class="bom-mobile-structure"><span><strong>{{ (int) $b->main_material_lines_count }}</strong> utama</span><span><strong>{{ (int) $b->sewing_supply_lines_count }}</strong> jahit</span><span><strong>{{ (int) $b->packing_supply_lines_count }}</strong> packing</span><span><strong>{{ (int) $b->lines_count }}</strong> total</span></div>
-                        @if($ub)<div class="bom-actual">Aktual <span class="bom-actual-value">{{ number_format($ub['kg_per_pcs'], 3, ',', '') }}/pcs</span> · {{ $ub['job_code'] }} @if($ub['status'] === 'over')<span class="bom-usage-over">· melebihi standar</span>@elseif($ub['status'] === 'under')<span class="bom-usage-under">· lebih hemat</span>@elseif($ub['status'] === 'ok')<span>· sesuai standar</span>@endif</div>@endif
-                        <div class="bom-mobile-actions">
-                            <a href="{{ route('master.item_boms.edit', $b) }}" class="bom-btn bom-btn-primary"><i class="bi bi-pencil" aria-hidden="true"></i>Edit BOM</a>
-                            <form method="post" action="{{ route('master.item_boms.destroy', $b) }}" data-gf-confirm data-gf-confirm-title="Hapus BOM?" data-gf-confirm-text="Semua komponen pada BOM ini ikut terhapus." data-gf-confirm-icon="warning" data-gf-confirm-ok="Ya, hapus" data-gf-confirm-cancel="Batal">
-                                @csrf @method('DELETE')
-                                <button type="submit" class="bom-btn bom-btn-danger" aria-label="Hapus BOM {{ $b->item?->code ?? '' }}" title="Hapus BOM"><i class="bi bi-trash3" aria-hidden="true"></i></button>
-                            </form>
-                        </div>
-                    </article>
-                @endforeach
-            </div>
-
-            <footer class="bom-footer"><span>Menampilkan {{ $boms->firstItem() }}–{{ $boms->lastItem() }} dari {{ number_format($boms->total(), 0, ',', '.') }} BOM</span><nav aria-label="Navigasi halaman BOM">{{ $boms->links() }}</nav></footer>
-        @endif
+        <div data-bom-results>
+            @include('master.item_boms._list')
+        </div>
     </section>
 </main>
 @endsection
@@ -387,21 +325,129 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.querySelector('[data-bom-search-form]');
     const input = document.querySelector('#bom-search-input');
     const status = document.querySelector('[data-bom-search-status]');
-    if (!form || !input) return;
+    const results = document.querySelector('[data-bom-results]');
+    const toolbarMeta = document.querySelector('[data-bom-toolbar-meta]');
+    const apiUrl = form?.dataset.bomApiUrl;
+    if (!form || !input || !results || !apiUrl) return;
+
+    if (input.dataset.bomRestoreFocus === 'true') {
+        window.requestAnimationFrame(() => {
+            input.focus({ preventScroll: true });
+            const cursor = input.value.length;
+            input.setSelectionRange(cursor, cursor);
+        });
+    }
+
     let timer = null;
-    let submitting = false;
-    const submitSearch = (delay = 450) => {
-        window.clearTimeout(timer);
-        timer = window.setTimeout(() => {
-            if (submitting) return;
-            submitting = true;
-            if (status) status.classList.add('is-show');
-            form.requestSubmit ? form.requestSubmit() : form.submit();
-        }, delay);
+    let requestController = null;
+    let requestSequence = 0;
+    let lastPage = 1;
+
+    const updateUrl = (params) => {
+        const url = new URL(window.location.href);
+        url.search = params.toString();
+        window.history.replaceState({}, '', url);
     };
-    input.addEventListener('input', () => submitSearch());
+
+    const paramsFromForm = (page = 1) => {
+        const params = new URLSearchParams(new FormData(form));
+        [...params.entries()].forEach(([key, value]) => {
+            if (String(value).trim() === '') params.delete(key);
+        });
+        if (page > 1) params.set('page', String(page));
+        else params.delete('page');
+        return params;
+    };
+
+    const setLoading = (loading) => {
+        results.classList.toggle('is-loading', loading);
+        if (status) {
+            status.textContent = loading ? 'Memuat…' : 'Mencari…';
+            status.classList.toggle('is-show', loading);
+        }
+    };
+
+    const updateStats = (summary, pageCount) => {
+        const values = {
+            total: summary?.total ?? 0,
+            active: summary?.active ?? 0,
+            inactive: summary?.inactive ?? 0,
+            page: pageCount ?? 0,
+        };
+        Object.entries(values).forEach(([key, value]) => {
+            const node = document.querySelector(`[data-bom-stat="${key}"]`);
+            if (node) node.textContent = new Intl.NumberFormat('id-ID').format(Number(value));
+        });
+    };
+
+    const renderError = () => {
+        results.innerHTML = '<div class="bom-api-error" role="alert"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Filter gagal dimuat. <button type="button" class="bom-btn bom-btn-ghost" data-bom-retry>Coba lagi</button></div>';
+    };
+
+    const fetchResults = async (page = 1) => {
+        window.clearTimeout(timer);
+        const params = paramsFromForm(page);
+        updateUrl(params);
+        requestController?.abort();
+        requestController = new AbortController();
+        const currentRequest = ++requestSequence;
+        lastPage = page;
+        setLoading(true);
+
+        try {
+            const url = new URL(apiUrl, window.location.origin);
+            url.search = params.toString();
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                signal: requestController.signal,
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const payload = await response.json();
+            if (currentRequest !== requestSequence) return;
+
+            results.innerHTML = payload.html || '';
+            if (toolbarMeta && payload.toolbar_meta !== undefined) toolbarMeta.innerHTML = payload.toolbar_meta;
+            const pageCount = payload.meta?.from && payload.meta?.to
+                ? payload.meta.to - payload.meta.from + 1
+                : 0;
+            updateStats(payload.summary, pageCount);
+            setLoading(false);
+        } catch (error) {
+            if (error.name === 'AbortError' || currentRequest !== requestSequence) return;
+            setLoading(false);
+            renderError();
+        }
+    };
+
+    const scheduleSearch = (delay = 450) => {
+        window.clearTimeout(timer);
+        requestController?.abort();
+        requestController = null;
+        requestSequence++;
+        timer = window.setTimeout(() => fetchResults(1), delay);
+    };
+
+    input.addEventListener('input', () => scheduleSearch());
     input.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') { event.preventDefault(); submitSearch(0); }
+        if (event.key === 'Enter') { event.preventDefault(); fetchResults(1); }
+    });
+    form.querySelectorAll('select').forEach((select) => {
+        select.addEventListener('change', () => fetchResults(1));
+    });
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        fetchResults(1);
+    });
+    results.addEventListener('click', (event) => {
+        const pageLink = event.target.closest('[data-bom-pagination] a');
+        const retry = event.target.closest('[data-bom-retry]');
+        if (pageLink) {
+            event.preventDefault();
+            const page = Number(new URL(pageLink.href, window.location.origin).searchParams.get('page') || 1);
+            fetchResults(page);
+        } else if (retry) {
+            fetchResults(lastPage);
+        }
     });
 });
 </script>
