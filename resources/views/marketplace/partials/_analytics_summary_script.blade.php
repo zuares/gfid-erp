@@ -518,7 +518,8 @@
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
         const total = Math.max(Number(quality.total || 0), 1);
         const readyRate = Number(quality.ready || 0) / total * 100;
-        const topStores = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0)).slice(0, 5);
+        const storeLedgerRows = [...(summary?.stores || [])].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0));
+        const topStores = storeLedgerRows.slice(0, 5);
         const pulse = [
             ['Total order', totalOrder.toLocaleString('id-ID'), { text: `eligible · ${totalOrderChange.text}`, className: totalOrderChange.className }, 'orders'],
             ['Order selesai', completedOrders.toLocaleString('id-ID'), { text: `${completionRate.toFixed(1)}% dari order masuk · ${completedOrdersChange.text}`, className: completedOrdersChange.className }, 'completed'],
@@ -559,6 +560,7 @@
         $('anAlerts').innerHTML = alerts.map(([level,icon,title,note,action]) => `<div class="an-alert ${level}"><span class="an-alert-icon"><i class="bi ${icon}"></i></span><div><div class="an-alert-title">${title}</div><div class="an-alert-note">${note}</div></div><span class="an-alert-action">${action}</span></div>`).join('');
         const maxStore = Math.max(...topStores.map(store => Number(store.gross_sales || 0)), 1);
         $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_count || 0).toLocaleString('id-ID')} order financial-ready · profit ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gross_sales || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gross_sales)}</div></div>`).join('') : '<div class="an-empty">Belum ada kontribusi toko.</div>';
+        $('overviewStoreLedgerBody').innerHTML = storeLedgerRows.length ? storeLedgerRows.map(store => `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.order_total || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(store.gross_sales)}</td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}</td></tr>`).join('') : '<tr><td colspan="4"><div class="an-empty">Belum ada data toko pada periode ini.</div></td></tr>';
         const settledGross = Number(current.cash_order_revenue ?? current.cash_gross_sales ?? 0);
         const unsettledGross = Number(current.cash_unsettled_order_revenue ?? Math.max(0, Number(current.gmv || 0) - settledGross));
         const totalOmzet = settledGross + unsettledGross || Number(current.gmv || 0);

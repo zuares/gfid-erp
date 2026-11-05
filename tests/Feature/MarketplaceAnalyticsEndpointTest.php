@@ -33,7 +33,8 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertSee('Disimpan di Gudang Shopee')
             ->assertSee('Menunggu konfirmasi')
             ->assertSee('Dibatalkan')
-            ->assertSee('Return / Refund');
+            ->assertSee('Return / Refund')
+            ->assertSee('Adm fee aktual');
 
         $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?date_from=2099-01-01&date_to=2099-01-31');
 

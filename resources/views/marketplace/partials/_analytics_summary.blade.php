@@ -10,6 +10,24 @@
     </section>
 </div>
 
+<section class="an-card an-tab-pane" data-an-pane="overview" aria-labelledby="overviewStoreLedgerTitle">
+    <div class="an-card-head">
+        <div>
+            <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div>
+            <div class="an-card-title" id="overviewStoreLedgerTitle">Performa per toko</div>
+            <div class="an-card-sub">Order eligible, gross sales terverifikasi, dan adm fee aktual per toko pada periode aktif.</div>
+        </div>
+    </div>
+    <div class="an-card-body">
+        <div class="an-table-wrap">
+            <table class="an-table">
+                <thead><tr><th>Toko</th><th>Order eligible</th><th>Gross sales terverifikasi</th><th>Adm fee aktual</th></tr></thead>
+                <tbody id="overviewStoreLedgerBody"><tr><td colspan="4"><div class="an-empty">Memuat…</div></td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
 <section class="an-control-tower an-tab-pane is-hidden" data-an-pane="operations">
     <div class="an-control-head">
         <div>
