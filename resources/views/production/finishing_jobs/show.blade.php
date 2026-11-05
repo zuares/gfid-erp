@@ -630,14 +630,15 @@
 @if ($stockShortages->isNotEmpty())
   @push('scripts')
     <script>
-      document.addEventListener('DOMContentLoaded', function () {
+      (function () {
+        const initShortageActions = function () {
         const shortages = @json($stockShortages->values()->all());
         const fallback = document.getElementById('finishing-stock-shortage-fallback');
         const correctionUrl = @json(route('production.finishing_material_corrections.store'));
         const jobCode = @json($job->code);
         const canCorrectStock = @json($isOwner);
 
-        if (!window.Swal || !shortages.length) return;
+        if (!shortages.length) return;
 
         const escapeHtml = function (value) {
           const element = document.createElement('span');
@@ -668,9 +669,9 @@
             + '</tr>';
         }).join('');
 
-        if (fallback) fallback.hidden = true;
-
-        window.Swal.fire({
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+          if (fallback) fallback.hidden = true;
+          window.Swal.fire({
           icon: 'error',
           title: 'Stok RM belum cukup',
           html: '<p style="margin:0 0 .7rem;text-align:left;color:#64748b;font-size:.84rem">'
@@ -683,7 +684,8 @@
           confirmButtonColor: '#b91c1c',
           width: 'min(94vw, 680px)',
           customClass: { popup: 'gf-stock-shortage-alert' }
-        });
+          });
+        }
 
         const submitCorrection = function (row, action, reason) {
           const form = document.createElement('form');
@@ -709,6 +711,9 @@
           });
 
           document.body.appendChild(form);
+          if (window.Swal && typeof window.Swal.showLoading === 'function') {
+            window.Swal.showLoading();
+          }
           form.submit();
         };
 
@@ -716,6 +721,13 @@
           const isPurchase = action === 'purchase';
           const actionLabel = isPurchase ? 'Purchase Request' : 'Koreksi Persediaan';
           const defaultReason = 'Stok RM kurang saat posting Finishing ' + jobCode + ' (' + row.item + ').';
+
+          // Jika SweetAlert gagal dimuat, aksi tetap diproses dan endpoint
+          // akan mengarahkan browser ke halaman terkait.
+          if (!window.Swal || typeof window.Swal.fire !== 'function') {
+            submitCorrection(row, action, defaultReason);
+            return;
+          }
 
           window.Swal.fire({
             icon: isPurchase ? 'info' : 'warning',
@@ -752,6 +764,11 @@
         };
 
         const openOwnerNotice = function () {
+          if (!window.Swal || typeof window.Swal.fire !== 'function') {
+            window.alert('Koreksi persediaan hanya dapat dilakukan oleh Owner. Silakan hubungi Owner.');
+            return;
+          }
+
           window.Swal.fire({
             icon: 'info',
             title: 'Perlu persetujuan Owner',
@@ -779,7 +796,14 @@
           }
           openCorrection(row, action);
         });
-      });
+        };
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initShortageActions, { once: true });
+        } else {
+          initShortageActions();
+        }
+      })();
     </script>
   @endpush
 @endif

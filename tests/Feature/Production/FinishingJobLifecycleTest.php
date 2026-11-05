@@ -67,9 +67,9 @@ class FinishingJobLifecycleTest extends TestCase
             'reason' => 'Stok RM tidak cukup untuk finishing hari ini.',
         ]);
 
-        $response->assertRedirect();
         $correction = FinishingMaterialCorrection::query()->latest('id')->firstOrFail();
         $purchaseRequest = PurchaseRequest::query()->findOrFail($correction->reference_id);
+        $response->assertRedirect(route('purchasing.purchase_requests.show', $purchaseRequest));
 
         $this->assertSame('purchase', $correction->action);
         $this->assertSame('open', $correction->status);
@@ -107,16 +107,17 @@ class FinishingJobLifecycleTest extends TestCase
             'sort_order' => 1,
         ]);
 
-        $this->actingAs($fixture['user'])->post(route('production.finishing_material_corrections.store'), [
+        $response = $this->actingAs($fixture['user'])->post(route('production.finishing_material_corrections.store'), [
             'finishing_item_id' => $fixture['item_id'],
             'material_item_id' => $material->id,
             'action' => 'stock',
             'qty' => 2.5,
             'reason' => 'Hasil hitung fisik berbeda dari saldo sistem.',
-        ])->assertRedirect();
+        ]);
 
         $correction = FinishingMaterialCorrection::query()->latest('id')->firstOrFail();
         $adjustment = InventoryAdjustment::query()->findOrFail($correction->reference_id);
+        $response->assertRedirect(route('inventory.adjustments.show', $adjustment));
 
         $this->assertSame('stock', $correction->action);
         $this->assertSame('draft', $adjustment->status);
