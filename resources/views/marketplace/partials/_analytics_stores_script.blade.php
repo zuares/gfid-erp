@@ -226,6 +226,10 @@
             return 'pending';
         };
         const modeLabel = { all: 'semua pesanan', settled: 'payout sudah cair', shipped: 'order masih dikirim', warehouse: 'disimpan di gudang Shopee', confirm: 'menunggu konfirmasi pembeli', cancelled: 'order dibatalkan', return_refund: 'order return / refund', unsettled: 'dana belum cair' }[cashSettlement] || 'semua pesanan';
+        const scopeLabel = [
+            selectedPlatform() ? $('anPlatform')?.selectedOptions?.[0]?.textContent?.trim() : 'Semua platform',
+            selectedStore() ? $('anStore')?.selectedOptions?.[0]?.textContent?.trim() : 'Semua toko',
+        ].filter(Boolean).join(' · ');
         const isTikTokPlatform = selectedPlatform() === 'tiktok';
         const canonicalTotals = Array.isArray(payload.canonical_fee_totals) ? payload.canonical_fee_totals : [];
         const canonicalAmount = code => Number(canonicalTotals.find(item => item.code === code)?.amount || 0);
@@ -270,7 +274,7 @@
                 cashStat('Affiliate / AMS', money(aggregate.cash_affiliate_fees), netSalesPercent(aggregate.cash_affiliate_fees), 'neutral'),
             ]);
         $('cashOrdersTitle').textContent = isFeeFocus ? 'Rincian fee marketplace actual' : 'Omzet, pencairan & fee marketplace';
-        $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${modeLabel} · ${totalOrders} order`;
+        $('cashOrdersSubtitle').textContent = `${from()} — ${to()} · ${scopeLabel} · ${modeLabel} · ${totalOrders} order`;
         $('cashOrdersSummary').innerHTML = isCombined ? [
             cashStat('Gross Sales', money(grossSales), netSalesPercent(grossSales), 'primary'),
             cashStat('Net Sales', money(netSales), netSalesPercent(netSales), 'accent'),

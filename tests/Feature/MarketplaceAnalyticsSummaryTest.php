@@ -93,6 +93,50 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(150000.0, (float) $current['cash_unsettled_order_revenue']);
     }
 
+    public function test_cash_sales_kpis_keep_gross_sales_at_or_above_net_sales_with_platform_discount(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-GROSS-NET',
+            'name' => 'Analytics Gross Net Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = $this->order($store, 'COMPLETED', 100000);
+        $order->update(['financial_data_status' => MarketplaceFinancialDataQualityService::ORDER_READY]);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 90000,
+            'seller_voucher' => 5000,
+            'final_income' => 85000,
+            'settlement_time' => '2026-09-17 12:00:00',
+            'data_status' => MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE,
+            'raw_json' => [
+                'income_details' => [
+                    'order_selling_price' => 100000,
+                    'voucher_from_seller' => 5000,
+                ],
+            ],
+        ]);
+
+        $payload = app(MarketplaceAnalyticsSummaryService::class)->cashOrders([
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'settlement' => 'settled',
+        ]);
+
+        $summary = $payload['summary'];
+
+        $this->assertSame(100000.0, (float) $summary['cash_gross_sales']);
+        $this->assertSame(95000.0, (float) $summary['cash_order_revenue']);
+        $this->assertLessThanOrEqual($summary['cash_gross_sales'], $summary['cash_order_revenue']);
+    }
+
     public function test_products_include_eligible_orders_when_hpp_is_incomplete(): void
     {
         $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);

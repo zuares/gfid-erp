@@ -659,6 +659,13 @@ class MarketplaceAnalyticsSummaryService
 
     private function cashOrderGrossSales($row): float
     {
+        $grossSales = $this->cashOrderGrossSalesBeforeSellerDiscount($row);
+
+        return round(max(0, $grossSales - $this->cashOrderSellerDiscount($row)), 2);
+    }
+
+    private function cashOrderGrossSalesBeforeSellerDiscount($row): float
+    {
         $decode = function ($value): array {
             if (is_array($value)) {
                 return $value;
@@ -713,7 +720,29 @@ class MarketplaceAnalyticsSummaryService
             return round((float) ($row->buyer_payment_amount ?? $row->total_amount ?? $row->total_paid_customer ?? $row->subtotal_items ?? 0), 2);
         }
 
-        $sellerVoucher = (float) ($row->seller_voucher ?? 0);
+        return round($grossSales, 2);
+    }
+
+    private function cashOrderSellerDiscount($row): float
+    {
+        $decode = function ($value): array {
+            if (is_array($value)) {
+                return $value;
+            }
+
+            $decoded = json_decode((string) $value, true);
+
+            return is_array($decoded) ? $decoded : [];
+        };
+        $settlement = $decode($row->settlement_raw_json ?? null);
+        $order = $decode($row->order_raw_json ?? null);
+        $sources = array_filter([
+            $settlement['income_details'] ?? null,
+            $settlement,
+            $order,
+        ], 'is_array');
+
+        $sellerVoucher = max((float) ($row->seller_voucher ?? 0), 0);
         if ($sellerVoucher <= 0) {
             foreach ($sources as $source) {
                 $sellerVoucher = (float) ($source['voucher_from_seller'] ?? $source['seller_voucher'] ?? 0);
@@ -723,7 +752,7 @@ class MarketplaceAnalyticsSummaryService
             }
         }
 
-        return round(max(0, $grossSales - $sellerVoucher), 2);
+        return round(max(0, $sellerVoucher), 2);
     }
 
     private function cashPaymentMethod($row): ?string
@@ -856,7 +885,7 @@ class MarketplaceAnalyticsSummaryService
             });
     }
 
-    private function cashOrderRevenueAggregate(array $filters, string $settlement, bool $includePreShipment = false): float
+    private function cashOrderRevenueAggregates(array $filters, string $settlement, bool $includePreShipment = false): array
     {
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
@@ -868,11 +897,11 @@ class MarketplaceAnalyticsSummaryService
             'return_refund' => $this->returnRefundBase($filters),
             default => $this->cashBase($filters),
         };
+        $netBase = clone $base;
         if (in_array($settlement, ['all', 'cancelled'], true)) {
-            $base->whereRaw($this->isRevenueStatus());
+            $netBase->whereRaw($this->isRevenueStatus());
         }
-        return round($base
-            ->select([
+        $selectFields = [
                 'mo.total_amount',
                 'mo.total_paid_customer',
                 'mo.subtotal_items',
@@ -880,10 +909,22 @@ class MarketplaceAnalyticsSummaryService
                 'ms.buyer_payment_amount',
                 'ms.seller_voucher',
                 'ms.raw_json as settlement_raw_json',
-            ])
+            ];
+        $grossSales = $base
+            ->select($selectFields)
             ->orderBy('mo.id')
             ->lazy(250)
-            ->sum(fn ($row) => $this->cashOrderGrossSales($row)), 2);
+            ->sum(fn ($row) => $this->cashOrderGrossSalesBeforeSellerDiscount($row));
+        $netSales = $netBase
+            ->select($selectFields)
+            ->orderBy('mo.id')
+            ->lazy(250)
+            ->sum(fn ($row) => $this->cashOrderGrossSales($row));
+
+        return [
+            'gross_sales' => round((float) $grossSales, 2),
+            'net_sales' => round((float) $netSales, 2),
+        ];
     }
 
     private function hppAggregate(array $filters): array
