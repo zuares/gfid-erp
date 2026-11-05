@@ -1635,6 +1635,52 @@
         .an-revenue-panel > .an-modal-foot > .an-btn { min-width: 100%; }
     }
 
+    /* Simple KPI adapter: align revenue and fee summaries with Design System ds-kpi. */
+    .an-modal-summary.ds-grid,
+    .an-fee-analysis-summary.ds-grid { align-items: stretch; }
+    .an-modal-summary.ds-grid .ds-kpi,
+    .an-fee-analysis-summary.ds-grid .ds-kpi {
+        display: flex;
+        min-height: 104px;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: .9rem;
+        border: 1px solid var(--gf-color-line, #e4e7ec);
+        border-radius: var(--gf-radius-card, 16px);
+        background: var(--gf-color-surface, #fff);
+        box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(16, 24, 40, .04));
+    }
+    .an-modal-summary.ds-grid .ds-kpi small,
+    .an-fee-analysis-summary.ds-grid .ds-kpi small { color: var(--gf-color-muted, #667085); font-size: var(--an-type-caption, .68rem); font-weight: 700; line-height: 1.3; }
+    .an-modal-summary.ds-grid .ds-kpi strong,
+    .an-fee-analysis-summary.ds-grid .ds-kpi strong { display: block; margin: .48rem 0 .2rem; color: var(--gf-color-content, #101828); font-size: clamp(1.15rem, 1.65vw, 1.55rem); font-weight: 850; letter-spacing: -.06em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .an-modal-summary.ds-grid .ds-kpi p,
+    .an-fee-analysis-summary.ds-grid .ds-kpi p { min-height: 1.35em; margin: 0; color: var(--gf-color-success, #14945a); font-size: var(--an-type-caption, .66rem); font-weight: 700; line-height: 1.35; }
+    .an-modal-summary.ds-grid .ds-kpi p i,
+    .an-fee-analysis-summary.ds-grid .ds-kpi p i { margin-right: .16rem; }
+    .an-modal-summary.ds-grid .ds-kpi.an-modal-stat-fee,
+    .an-fee-analysis-summary.ds-grid .ds-kpi.an-modal-stat-fee { border-color: color-mix(in srgb, var(--gf-color-warning, #b7791f) 32%, var(--gf-color-line, #e4e7ec)); background: color-mix(in srgb, var(--gf-color-warning, #b7791f) 8%, var(--gf-color-surface, #fff)); }
+    .an-modal-summary.ds-grid .ds-kpi.an-modal-stat-settled,
+    .an-fee-analysis-summary.ds-grid .ds-kpi.an-modal-stat-settled { border-color: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 32%, var(--gf-color-line, #e4e7ec)); background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 8%, var(--gf-color-surface, #fff)); }
+    .an-modal-summary.ds-grid .ds-kpi.an-modal-stat-primary { border-color: color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 26%, var(--gf-color-line, #e4e7ec)); background: color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 6%, var(--gf-color-surface, #fff)); }
+    .an-modal-summary.ds-grid .ds-kpi.an-modal-stat-accent { border-color: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 32%, var(--gf-color-line, #e4e7ec)); background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 8%, var(--gf-color-surface, #fff)); }
+    body[data-theme="dark"] .an-modal-summary.ds-grid .ds-kpi,
+    body[data-theme="dark"] .an-fee-analysis-summary.ds-grid .ds-kpi { border-color: #334155; background: #1e293b; }
+    body[data-theme="dark"] .an-modal-summary.ds-grid .ds-kpi strong,
+    body[data-theme="dark"] .an-fee-analysis-summary.ds-grid .ds-kpi strong { color: #f8fafc; }
+    body[data-theme="dark"] .an-modal-summary.ds-grid .ds-kpi small,
+    body[data-theme="dark"] .an-fee-analysis-summary.ds-grid .ds-kpi small { color: #aab4c5; }
+    @media (max-width: 760px) {
+        .an-modal-summary.ds-grid,
+        .an-fee-analysis-summary.ds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+        .an-modal-summary.ds-grid .ds-kpi,
+        .an-fee-analysis-summary.ds-grid .ds-kpi { min-height: 96px; padding: .75rem; }
+    }
+    @media (max-width: 420px) {
+        .an-modal-summary.ds-grid,
+        .an-fee-analysis-summary.ds-grid { grid-template-columns: 1fr; }
+    }
+
     /* Design System tab hierarchy adapter. */
     .an-tabs-wrap {
         display: grid;
@@ -1717,6 +1763,124 @@
     #analyticsTabPanel .an-product-snapshot-content { margin-top: var(--gf-space-card, 16px); }
     #analyticsTabPanel .an-portfolio-overview-grid,
     #analyticsTabPanel .an-portfolio-ledger-grid { gap: var(--gf-space-card, 16px); }
+
+    /* Fee Analysis assembly: same section hierarchy as Finance Fee Analysis,
+       with the analytics data contract and Design System tokens. */
+    .an-fee-analysis { display: grid; gap: var(--gf-space-card, 16px); min-width: 0; }
+    .an-fee-analysis-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem 1.1rem; border: 1px solid #e0e2fb; border-radius: var(--gf-radius-card, 16px); background: linear-gradient(120deg, #f7f6ff 0%, #fff 56%, #effdff 100%); box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(15,23,42,.04)); }
+    .an-fee-analysis-head-copy { display: flex; align-items: flex-start; gap: .72rem; min-width: 0; }
+    .an-fee-analysis-icon { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: var(--gf-color-brand-strong, #4142bb); background: #e9e9ff; }
+    .an-fee-analysis-head h2 { margin: .18rem 0 0; color: var(--gf-color-content, #101828); font-size: clamp(1.05rem, 2vw, 1.35rem); font-weight: 820; letter-spacing: -.04em; }
+    .an-fee-analysis-head p { max-width: 640px; margin: .32rem 0 0; color: var(--gf-color-muted, #667085); font-size: var(--an-type-caption, .66rem); line-height: 1.45; }
+    .an-fee-analysis-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
+    .an-fee-analysis-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gf-space-card, 16px); min-width: 0; }
+    .an-fee-analysis-summary:empty { display: none; }
+    .an-fee-analysis-summary .an-modal-stat { min-width: 0; }
+    .an-fee-analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gf-space-card, 16px); min-width: 0; }
+    .an-fee-analysis-card { min-width: 0; overflow: hidden; border: 1px solid var(--gf-color-line, #e4e7ec); border-radius: var(--gf-radius-card, 16px); background: var(--gf-color-surface, #fff); box-shadow: var(--gf-shadow-sm, 0 1px 2px rgba(15,23,42,.04)); }
+    .an-fee-analysis-card-wide { grid-column: 1 / -1; }
+    .an-fee-analysis-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; min-height: 72px; padding: .9rem 1rem; border-bottom: 1px solid var(--gf-color-line, #e4e7ec); }
+    .an-fee-analysis-kicker { display: block; color: var(--gf-color-muted, #667085); font-size: .59rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .an-fee-analysis-card-head h3 { margin: .18rem 0 0; color: var(--gf-color-content, #101828); font-size: .82rem; font-weight: 820; letter-spacing: -.02em; }
+    .an-fee-analysis-count { flex: 0 0 auto; color: var(--gf-color-muted, #667085); font-size: .62rem; font-weight: 750; white-space: nowrap; }
+    .an-fee-analysis-head-metrics { display: flex; align-items: center; gap: .75rem; flex: 0 0 auto; }
+    .an-fee-composition-total { display: grid; justify-items: end; gap: .08rem; }
+    .an-fee-composition-total span, .an-fee-composition-total small { color: var(--gf-color-muted, #667085); font-size: .57rem; font-weight: 750; line-height: 1.25; }
+    .an-fee-composition-total strong { color: var(--gf-color-brand-strong, #4142bb); font-size: .76rem; font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .an-fee-composition-percent { color: var(--gf-color-muted, #667085) !important; font-size: .65rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .an-fee-analysis-table-wrap { min-width: 0; }
+    .an-fee-analysis-table { width: 100%; margin: 0; }
+    .an-fee-analysis-table th:last-child, .an-fee-analysis-table td:last-child { text-align: right; }
+    .an-fee-analysis-table td { vertical-align: middle; }
+    .an-fee-analysis-table td:nth-child(2) { color: var(--gf-color-muted, #667085); font-variant-numeric: tabular-nums; }
+    .an-fee-analysis-amount { color: var(--gf-color-content, #101828) !important; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .an-fee-order-table th:nth-child(n+3), .an-fee-order-table td:nth-child(n+3) { text-align: right; }
+    .an-fee-platform-amount { color: #087f86 !important; }
+    .an-fee-ads-amount { color: #a15c07 !important; }
+    .an-fee-ads-amount small { display: block; margin-top: .1rem; color: var(--gf-color-muted, #667085); font-size: .52rem; font-weight: 700; }
+    .an-fee-type-name { color: var(--gf-color-content, #101828); font-size: .7rem; font-weight: 800; }
+    .an-fee-burden-badge { display: inline-flex; align-items: center; justify-content: center; gap: .25rem; min-height: 22px; padding: 0 .48rem; border-radius: 999px; font-size: .58rem; font-weight: 800; white-space: nowrap; }
+    .an-fee-burden-badge-seller { color: var(--gf-color-brand-strong, #4142bb); background: #eeefff; }
+    .an-fee-burden-badge-platform { color: #087f86; background: #d9f7f7; }
+    .an-fee-store-table th:nth-child(n+2), .an-fee-store-table td:nth-child(n+2) { text-align: right; }
+    .an-fee-shipping-section { margin: .8rem; border: 1px solid #bcecef; border-radius: var(--gf-radius-control, 10px); background: linear-gradient(135deg, #f3feff 0%, #fff 72%); overflow: hidden; }
+    .an-fee-shipping-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .75rem .85rem .65rem; border-bottom: 1px solid #d9f7f7; }
+    .an-fee-shipping-section > header strong, .an-fee-shipping-section > header small { display: block; }
+    .an-fee-shipping-section > header strong { margin-top: .15rem; color: var(--gf-color-content, #101828); font-size: .76rem; font-weight: 820; }
+    .an-fee-shipping-section > header small { max-width: 560px; margin-top: .18rem; color: var(--gf-color-muted, #667085); font-size: .6rem; line-height: 1.4; }
+    .an-fee-shipping-chip { display: inline-flex; align-items: center; gap: .28rem; min-height: 24px; padding: 0 .48rem; border-radius: 999px; color: #087f86; background: #d9f7f7; font-size: .58rem; font-weight: 800; white-space: nowrap; }
+    .an-fee-shipping-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; padding: .7rem .85rem .85rem; }
+    .an-fee-shipping-metric { display: flex; align-items: center; justify-content: space-between; gap: .65rem; padding: .65rem .7rem; border: 1px solid var(--gf-color-line, #e4e7ec); border-radius: var(--gf-radius-control, 10px); background: var(--gf-color-surface, #fff); }
+    .an-fee-shipping-metric-head { display: flex; align-items: center; gap: .45rem; min-width: 0; }
+    .an-fee-shipping-metric-head > div { min-width: 0; }
+    .an-fee-shipping-icon { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: var(--gf-color-brand-strong, #4142bb); background: #eeefff; font-size: .75rem; }
+    .an-fee-shipping-metric-platform .an-fee-shipping-icon { color: #087f86; background: #d9f7f7; }
+    .an-fee-shipping-metric strong, .an-fee-shipping-metric small { display: block; }
+    .an-fee-shipping-metric strong { color: var(--gf-color-content, #101828); font-size: .66rem; font-weight: 800; }
+    .an-fee-shipping-metric small { margin-top: .1rem; color: var(--gf-color-muted, #667085); font-size: .57rem; }
+    .an-fee-shipping-metric > b { display: block; flex: 0 0 auto; color: var(--gf-color-content, #101828); font-size: .72rem; font-weight: 850; text-align: right; white-space: nowrap; }
+    .an-fee-shipping-metric > b small { display: block; margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: .54rem; font-weight: 700; }
+    .an-fee-shipping-metric-platform > b { color: #087f86; }
+    .an-fee-other-section { margin: .8rem; border: 1px solid #ead9b7; border-radius: var(--gf-radius-control, 10px); background: linear-gradient(135deg, #fffbf3 0%, #fff 72%); overflow: hidden; }
+    .an-fee-other-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .75rem .85rem .65rem; border-bottom: 1px solid #f3e7ca; }
+    .an-fee-other-section > header strong, .an-fee-other-section > header small { display: block; }
+    .an-fee-other-section > header strong { margin-top: .15rem; color: var(--gf-color-content, #101828); font-size: .76rem; font-weight: 820; }
+    .an-fee-other-section > header small { max-width: 560px; margin-top: .18rem; color: var(--gf-color-muted, #667085); font-size: .6rem; line-height: 1.4; }
+    .an-fee-other-chip { display: inline-flex; align-items: center; gap: .28rem; min-height: 24px; padding: 0 .48rem; border-radius: 999px; color: #9a6700; background: #fff0c7; font-size: .58rem; font-weight: 800; white-space: nowrap; }
+    .an-fee-other-total { display: flex; align-items: center; justify-content: space-between; gap: .65rem; padding: .75rem .85rem; }
+    .an-fee-other-total span, .an-fee-other-total small { display: block; }
+    .an-fee-other-total span { color: var(--gf-color-content, #101828); font-size: .66rem; font-weight: 800; }
+    .an-fee-other-total small { margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: .57rem; font-weight: 700; }
+    .an-fee-other-total > strong { color: #9a6700; font-size: .78rem; font-weight: 850; text-align: right; white-space: nowrap; }
+    .an-fee-other-total > strong small { color: var(--gf-color-muted, #667085); font-size: .54rem; }
+    .an-fee-analysis-burden-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; padding: .8rem; }
+    .an-fee-analysis-burden { min-width: 0; overflow: hidden; border: 1px solid var(--gf-color-line, #e4e7ec); border-radius: var(--gf-radius-control, 10px); background: var(--gf-color-surface-muted, #f8f9fc); }
+    .an-fee-analysis-burden header { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: .45rem; padding: .7rem .75rem; }
+    .an-fee-analysis-burden header > div { min-width: 0; }
+    .an-fee-analysis-burden header strong, .an-fee-analysis-burden header small { display: block; }
+    .an-fee-analysis-burden header strong { color: var(--gf-color-content, #101828); font-size: .68rem; font-weight: 800; }
+    .an-fee-analysis-burden header small { margin-top: .1rem; color: var(--gf-color-muted, #667085); font-size: .58rem; }
+    .an-fee-analysis-burden header b { color: var(--gf-color-content, #101828); font-size: .68rem; font-weight: 800; white-space: nowrap; }
+    .an-fee-analysis-burden-icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; color: var(--gf-color-brand-strong, #4142bb); background: #eeefff; font-size: .75rem; }
+    .an-fee-analysis-burden-platform .an-fee-analysis-burden-icon { color: #087f86; background: #d9f7f7; }
+    .an-fee-analysis-burden-platform header b { color: #087f86; }
+    .an-fee-analysis-burden .an-table-wrap { overflow-x: auto; }
+    .an-fee-analysis-burden .an-fee-analysis-table { min-width: 360px; background: var(--gf-color-surface, #fff); }
+    .an-fee-analysis-footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem 1rem; border-top: 1px solid var(--gf-color-line, #e4e7ec); }
+    .an-fee-analysis-footer .an-modal-pagination { display: grid; justify-items: center; gap: .08rem; min-width: 0; }
+    .an-fee-analysis-footer .an-modal-page-meta { color: var(--gf-color-muted, #667085); font-size: .6rem; }
+    @media (max-width: 760px) {
+        .an-fee-analysis-head { flex-direction: column; }
+        .an-fee-analysis-meta { justify-content: flex-start; }
+        .an-fee-analysis-head-metrics { width: 100%; justify-content: space-between; }
+        .an-fee-composition-total { justify-items: start; }
+        .an-fee-other-section { margin: .65rem; }
+        .an-fee-other-section > header { flex-direction: column; }
+        .an-fee-analysis-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .an-fee-analysis-grid { grid-template-columns: 1fr; }
+        .an-fee-analysis-card-wide { grid-column: auto; }
+        .an-fee-analysis-burden-grid { grid-template-columns: 1fr; padding: .65rem; }
+        .an-fee-shipping-section { margin: .65rem; }
+        .an-fee-shipping-section > header { flex-direction: column; }
+        .an-fee-shipping-grid { grid-template-columns: 1fr; }
+        .an-fee-analysis-table-wrap { overflow-x: auto; }
+        .an-fee-analysis-table { min-width: 540px; }
+        .an-fee-order-table { min-width: 0; }
+        .an-fee-order-table thead { display: none; }
+        .an-fee-order-table, .an-fee-order-table tbody, .an-fee-order-table tr, .an-fee-order-table td { display: block; width: 100%; }
+        .an-fee-order-table tr { padding: .7rem .85rem; border-bottom: 1px solid var(--gf-color-line, #e4e7ec); }
+        .an-fee-order-table tr:last-child { border-bottom: 0; }
+        .an-fee-order-table td { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; padding: .18rem 0; border: 0; text-align: right !important; }
+        .an-fee-order-table td::before { content: attr(data-label); color: var(--gf-color-muted, #667085); font-size: .62rem; font-weight: 750; text-align: left; }
+        .an-fee-order-table td:first-child { display: block; text-align: left !important; }
+        .an-fee-order-table td:first-child::before { display: none; }
+        .an-fee-order-table td:first-child .an-cash-meta { display: block; }
+        .an-fee-analysis-footer { align-items: stretch; }
+        .an-fee-analysis-footer .an-btn { min-height: 40px; }
+    }
+    body[data-theme="dark"] .an-fee-analysis-head { border-color: #334155; background: linear-gradient(120deg, #17173a 0%, #111827 58%, #0f2c32 100%); }
+    body[data-theme="dark"] .an-fee-analysis-card { border-color: #334155; background: #111827; }
+    body[data-theme="dark"] .an-fee-analysis-card-head, body[data-theme="dark"] .an-fee-analysis-footer { border-color: #334155; }
     @media (max-width: 760px) {
         .an-hero-controls { margin-bottom: var(--gf-space-section, 24px); }
         #analyticsTabPanel { gap: var(--gf-space-section, 24px); }
@@ -1765,6 +1929,7 @@
                 <button class="ds-tab-system-button an-tab is-active active" type="button" data-an-tab="overview" role="tab" id="analytics-tab-overview" aria-selected="true" aria-controls="analyticsTabPanel" tabindex="0"><i class="bi bi-grid-1x2" aria-hidden="true"></i>Ikhtisar</button>
                 <button class="ds-tab-system-button an-tab" type="button" data-an-tab="sales" role="tab" id="analytics-tab-sales" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i>Penjualan</button>
                 <button class="ds-tab-system-button an-tab" type="button" data-an-tab="revenue" role="tab" id="analytics-tab-revenue" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-cash-stack" aria-hidden="true"></i>Omzet, Pencairan &amp; Fee</button>
+                <button class="ds-tab-system-button an-tab" type="button" data-an-tab="fees" role="tab" id="analytics-tab-fees" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-receipt" aria-hidden="true"></i>Fee Marketplace</button>
                 <button class="ds-tab-system-button an-tab" type="button" data-an-tab="operations" role="tab" id="analytics-tab-operations" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-activity" aria-hidden="true"></i>Operasional</button>
                 <button class="ds-tab-system-button an-tab" type="button" data-an-tab="stores" role="tab" id="analytics-tab-stores" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-shop" aria-hidden="true"></i>Toko &amp; Biaya</button>
                 <button class="ds-tab-system-button an-tab" type="button" data-an-tab="products" role="tab" id="analytics-tab-products" aria-selected="false" aria-controls="analyticsTabPanel" tabindex="-1"><i class="bi bi-box-seam" aria-hidden="true"></i>Produk</button>
@@ -1775,6 +1940,7 @@
             @include('marketplace.partials._analytics_summary')
             @include('marketplace.partials._analytics_sales')
             @include('marketplace.partials._analytics_revenue')
+            @include('marketplace.partials._analytics_fees')
             @include('marketplace.partials._analytics_stores')
             @include('marketplace.partials._analytics_products')
             @include('marketplace.partials._analytics_cohort')
@@ -2187,8 +2353,9 @@
         analyticsAbortController = controller;
         const cashModalWasOpen = $('cashOrdersModal').classList.contains('is-open');
         const revenueTabWasActive = document.querySelector('[data-an-tab="revenue"]')?.classList.contains('active');
-        const revenueFeeTabWasActive = document.querySelector('[data-revenue-fee-tab].active') !== null;
-        if (revenueTabWasActive && !revenueFeeTabWasActive) cashFocus = 'combined';
+        const feesTabWasActive = document.querySelector('[data-an-tab="fees"]')?.classList.contains('active');
+        if (feesTabWasActive) cashFocus = 'fees';
+        else if (revenueTabWasActive) cashFocus = 'combined';
         if (!cashModalWasOpen) closeCashOrders();
         closeReturnOrders();
         cashPage = 1;
@@ -2206,7 +2373,7 @@
         cohortOptionsKey = null;
         productRequestToken++;
         productAbortController?.abort();
-        if (cashModalWasOpen || revenueTabWasActive) {
+        if (cashModalWasOpen || revenueTabWasActive || feesTabWasActive) {
             loadCashOrders();
             loadCashTabSummaries(cashSettlementTabs);
         }
@@ -2275,6 +2442,7 @@
         overview: { label: 'Detail Ikhtisar', items: [{ key: 'summary', label: 'Ringkasan', icon: 'bi-grid-1x2', target: 'anPulseGrid' }] },
         sales: { label: 'Detail Penjualan', items: [{ key: 'trend', label: 'Tren penjualan', icon: 'bi-graph-up-arrow', target: 'anSalesTrendChart' }, { key: 'daily', label: 'Rincian harian', icon: 'bi-table', target: 'anSalesDailyBody' }] },
         revenue: { label: 'Detail Omzet, Pencairan & Fee', items: [{ key: 'snapshot', label: 'Snapshot', icon: 'bi-grid-1x2', target: 'revenueOrdersSummary' }, { key: 'ledger', label: 'Detail transaksi', icon: 'bi-receipt', target: 'revenueOrdersBody' }] },
+        fees: { label: 'Detail Fee Marketplace', items: [{ key: 'ledger', label: 'Order cair', icon: 'bi-receipt', target: 'feeOrdersBody' }] },
         operations: { label: 'Detail Operasional', items: [{ key: 'funnel', label: 'Order funnel', icon: 'bi-filter', target: 'salesFunnel' }, { key: 'trend', label: 'Tren harian', icon: 'bi-graph-up-arrow', target: 'revenueChart' }] },
         stores: { label: 'Detail Toko & Biaya', items: [{ key: 'portfolio', label: 'Portfolio', icon: 'bi-shop-window', target: 'anStorePulse' }, { key: 'ledger', label: 'Store ledger', icon: 'bi-table', target: 'storeBody' }, { key: 'products', label: 'Produk', icon: 'bi-box-seam', target: 'anProductSnapshotList' }] },
         products: { label: 'Detail Produk', items: [{ key: 'portfolio', label: 'Portfolio', icon: 'bi-grid-1x2', target: 'anProductPulse' }, { key: 'ledger', label: 'Kinerja produk', icon: 'bi-table', target: 'bestProductBody' }, { key: 'attention', label: 'Perlu perhatian', icon: 'bi-exclamation-circle', target: 'worstProductBody' }] },
@@ -2349,6 +2517,13 @@
             if (needsReload && !cashLoading) { cashPage = 1; cashPayload = null; loadCashOrders(); }
             loadCashTabSummaries(cashSettlementTabs);
         }
+        if (button.dataset.anTab === 'fees') {
+            const needsReload = cashFocus !== 'fees' || cashSettlement !== 'settled' || !cashPayload;
+            cashFocus = 'fees';
+            cashSettlement = 'settled';
+            if (needsReload && !cashLoading) { cashPage = 1; cashPayload = null; loadCashOrders(); }
+            loadCashTabSummaries(cashSettlementTabs);
+        }
         });
         button.addEventListener('keydown', event => handleTabKeydown(event, '[data-an-tab]'));
     });
@@ -2394,32 +2569,15 @@
         cashPayload = null;
         loadCashOrders();
     }));
-    document.querySelectorAll('[data-revenue-fee-tab]').forEach(button => button.addEventListener('click', () => {
-        const needsReload = cashFocus !== 'fees' || cashSettlement !== 'settled' || !cashPayload;
-        cashFocus = 'fees';
-        if (!needsReload) return;
-        setCashSettlementTab('settled');
-        cashPage = 1;
-        cashPayload = null;
-        loadCashOrders();
-    }));
-    document.querySelectorAll('[data-revenue-settlement], [data-revenue-fee-tab]').forEach((button, index, buttons) => button.addEventListener('keydown', event => {
-        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-        event.preventDefault();
-        const nextIndex = event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-                ? buttons.length - 1
-                : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-        buttons[nextIndex].focus();
-        buttons[nextIndex].click();
-    }));
+    document.querySelectorAll('[data-revenue-settlement]').forEach(button => button.addEventListener('keydown', event => handleTabKeydown(event, '[data-revenue-settlement]')));
     document.querySelectorAll('[data-cash-close]').forEach(element => element.addEventListener('click', closeCashOrders));
     document.querySelectorAll('[data-return-close]').forEach(element => element.addEventListener('click', closeReturnOrders));
     $('cashOrdersPrev').addEventListener('click', () => { if (cashPage > 1) { cashPage -= 1; loadCashOrders(); } });
     $('cashOrdersNext').addEventListener('click', () => { const lastPage = Number(cashPayload?.meta?.last_page || 1); if (cashPage < lastPage) { cashPage += 1; loadCashOrders(); } });
     $('revenueOrdersPrev').addEventListener('click', () => { if (cashPage > 1) { cashPage -= 1; loadCashOrders(); } });
     $('revenueOrdersNext').addEventListener('click', () => { const lastPage = Number(cashPayload?.meta?.last_page || 1); if (cashPage < lastPage) { cashPage += 1; loadCashOrders(); } });
+    $('feeOrdersPrev').addEventListener('click', () => { if (cashPage > 1) { cashPage -= 1; loadCashOrders(); } });
+    $('feeOrdersNext').addEventListener('click', () => { const lastPage = Number(cashPayload?.meta?.last_page || 1); if (cashPage < lastPage) { cashPage += 1; loadCashOrders(); } });
     $('returnOrdersPrev').addEventListener('click', () => { if (returnPage > 1) { returnPage -= 1; loadReturnOrders(); } });
     $('returnOrdersNext').addEventListener('click', () => { const lastPage = Number(returnPayload?.meta?.last_page || 1); if (returnPage < lastPage) { returnPage += 1; loadReturnOrders(); } });
     document.querySelectorAll('[data-return-type]').forEach(button => button.addEventListener('click', () => {
@@ -2483,12 +2641,16 @@
     $('anStore').value = initialStore || '';
     const initialParams = new URLSearchParams(location.search);
     const initialView = initialParams.get('view') || initialParams.get('tab');
-    const normalizedInitialView = initialView === 'summary' ? 'overview' : (initialView === 'fees' ? 'revenue' : initialView);
+    const normalizedInitialView = initialView === 'summary' ? 'overview' : initialView;
     if (normalizedInitialView === 'revenue') {
         cashFocus = 'combined';
         cashSettlement = 'all';
     }
-    if (['overview', 'sales', 'revenue', 'operations', 'stores', 'products', 'cohort'].includes(normalizedInitialView)) activateTab(normalizedInitialView);
+    if (normalizedInitialView === 'fees') {
+        cashFocus = 'fees';
+        cashSettlement = 'settled';
+    }
+    if (['overview', 'sales', 'revenue', 'fees', 'operations', 'stores', 'products', 'cohort'].includes(normalizedInitialView)) activateTab(normalizedInitialView);
     load();
     if (normalizedInitialView === 'products') loadProducts();
 })();

@@ -4,7 +4,7 @@
 </section>
 
 <div class="an-tab-pane is-hidden" data-an-pane="stores">
-    <div class="an-kpis">
+    <div class="ds-grid ds-grid-4 an-kpis">
         <x-gf.comparison-kpi label="Total Order" value-id="kpiOrders" note-id="kpiOrdersNote" icon="bi-bag-check" info-id="kpiOrdersInfo" info-label="Penjelasan Total Order" tooltip="Order aktif yang sudah dibayar; belum bayar, batal, dan return/refund dikecualikan"><span title="Sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Belum cair"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span></x-gf.comparison-kpi>
         <x-gf.comparison-kpi class="kpi-cancelled" label="Dibatalkan" value-id="kpiCancelled" note-id="kpiCancelledNote" icon="bi-x-circle" info-id="kpiCancelledInfo" info-label="Penjelasan order dibatalkan" tooltip="Order batal dipisahkan dan tidak masuk omzet maupun estimasi profit"><span title="Nilai order batal"><i class="bi bi-x-circle" aria-hidden="true"></i> —</span> · tidak masuk omzet</x-gf.comparison-kpi>
         <x-gf.comparison-kpi label="Produk Terjual" value-id="kpiProductsSold" note-id="kpiProductsSoldNote" icon="bi-box-seam" info-id="kpiProductsSoldInfo" info-label="Penjelasan Produk Terjual" tooltip="Total unit · cair · pending · refund"><span title="Produk sudah cair"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> —</span> · <span title="Produk pending"><i class="bi bi-clock-history" aria-hidden="true"></i> —</span> · <span title="Produk refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> —</span></x-gf.comparison-kpi>
@@ -63,7 +63,7 @@
                         <div class="an-card-sub">Pengakuan order dan GMV pada periode berjalan; payout dan profit ditampilkan sebagai pencatatan biaya/pencairan.</div>
                     </div>
                 </div>
-                <div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order masuk</th><th>Selesai</th><th>Cancel</th><th>Refund</th><th>GMV akrual</th><th>Payout tercatat</th><th>Adm fee tercatat</th><th>Biaya iklan</th><th>Profit operasional tercatat</th></tr></thead><tbody id="storeBody"><tr><td colspan="10"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div>
+                <div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order masuk</th><th>Selesai</th><th>Cancel</th><th>Refund</th><th>GMV akrual</th><th>GMV belum cair</th><th>Payout tercatat</th><th>Adm fee tercatat</th><th>Biaya iklan</th><th>Profit operasional tercatat</th></tr></thead><tbody id="storeBody"><tr><td colspan="11"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div>
             </section>
             <section class="an-portfolio-subsection">
                 <div class="an-portfolio-subsection-head">

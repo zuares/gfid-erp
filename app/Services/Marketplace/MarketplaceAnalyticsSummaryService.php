@@ -487,6 +487,10 @@ class MarketplaceAnalyticsSummaryService
             ];
         })->values()->all();
 
+        $feeAnalysis = $perPage >= 50
+            ? $this->canonicalFeeAnalysis($filters, $settlement)
+            : ['totals' => [], 'types' => [], 'stores' => []];
+
         return [
             'data' => $data,
             'meta' => [
@@ -496,9 +500,9 @@ class MarketplaceAnalyticsSummaryService
                 'total' => $paginator->total(),
             ],
             'summary' => $this->cashAggregate($filters, $settlement, true),
-            'canonical_fee_totals' => $perPage >= 50
-                ? $this->canonicalFeeTotals($filters, $settlement)
-                : [],
+            'canonical_fee_totals' => $feeAnalysis['totals'],
+            'fee_by_type' => $feeAnalysis['types'],
+            'fee_by_store' => $feeAnalysis['stores'],
         ];
     }
 
@@ -507,7 +511,7 @@ class MarketplaceAnalyticsSummaryService
      * intentionally limited to the full-size revenue request; the eight small
      * tab-summary requests do not need to repeat the raw JSON scan.
      */
-    private function canonicalFeeTotals(array $filters, string $settlement): array
+    private function canonicalFeeAnalysis(array $filters, string $settlement): array
     {
         $base = match ($settlement) {
             'all' => $this->allCashBase($filters),
@@ -529,8 +533,13 @@ class MarketplaceAnalyticsSummaryService
         $base->whereNotNull('ms.id');
 
         $totals = [];
+        $burdenTotals = [];
+        $stores = [];
         $base
+            ->join('stores as fee_store', 'fee_store.id', '=', 'mo.store_id')
             ->select([
+                'mo.store_id',
+                'fee_store.name as fee_store_name',
                 'ms.commission_fee',
                 'ms.service_fee',
                 'ms.transaction_fee',
@@ -545,7 +554,7 @@ class MarketplaceAnalyticsSummaryService
             ])
             ->orderBy('ms.id')
             ->lazy(250)
-            ->each(function ($row) use (&$totals): void {
+            ->each(function ($row) use (&$totals, &$burdenTotals, &$stores): void {
                     $settlementModel = new MarketplaceOrderSettlement();
                     $settlementModel->setRawAttributes([
                         'commission_fee' => $row->commission_fee,
@@ -563,25 +572,89 @@ class MarketplaceAnalyticsSummaryService
 
                     foreach ($settlementModel->analyticsFeeBreakdown() as $item) {
                         $code = (string) ($item['code'] ?? 'other_fee');
+                        $burden = in_array((string) ($item['burden'] ?? ''), ['seller', 'platform'], true)
+                            ? (string) $item['burden']
+                            : ($code === 'shipping_subsidy' ? 'platform' : 'seller');
                         $totals[$code] ??= [
                             'code' => $code,
                             'label' => (string) ($item['label'] ?? $code),
                             'category' => (string) ($item['category'] ?? 'fee'),
                             'amount' => 0.0,
+                            'count' => 0,
                         ];
                         $totals[$code]['amount'] += (float) ($item['amount'] ?? 0);
+                        $totals[$code]['count']++;
+
+                        $burdenKey = $burden.'|'.$code;
+                        $burdenTotals[$burdenKey] ??= [
+                            'code' => $code,
+                            'label' => (string) ($item['label'] ?? $code),
+                            'category' => (string) ($item['category'] ?? 'fee'),
+                            'burden' => $burden,
+                            'amount' => 0.0,
+                            'count' => 0,
+                        ];
+                        $burdenTotals[$burdenKey]['amount'] += (float) ($item['amount'] ?? 0);
+                        $burdenTotals[$burdenKey]['count']++;
+
+                        $storeKey = (string) ($row->store_id ?? 'unknown');
+                        $storeKey = $storeKey.'|'.$burden;
+                        $stores[$storeKey] ??= [
+                            'store_id' => $row->store_id ?? 'unknown',
+                            'store_name' => (string) ($row->fee_store_name ?: 'Toko tidak diketahui'),
+                            'burden' => $burden,
+                            'cost_type' => 'fee',
+                            'amount' => 0.0,
+                            'count' => 0,
+                        ];
+                        $stores[$storeKey]['amount'] += (float) ($item['amount'] ?? 0);
+                        $stores[$storeKey]['count']++;
                     }
             });
 
-        return collect($totals)
-            ->map(function (array $item): array {
-                $item['amount'] = round((float) $item['amount'], 2);
-                return $item;
-            })
-            ->filter(fn (array $item): bool => $item['amount'] > 0)
-            ->sortByDesc('amount')
-            ->values()
-            ->all();
+        foreach ($this->adsStoreSummary($filters) as $adRow) {
+            $adCost = (float) ($adRow->ad_cost ?? 0);
+            if ($adCost <= 0) {
+                continue;
+            }
+
+            $storeKey = (string) ($adRow->store_id ?? 'unknown').'|ads';
+            $stores[$storeKey] = [
+                'store_id' => $adRow->store_id ?? 'unknown',
+                'store_name' => (string) ($adRow->store_name ?: 'Toko tidak diketahui'),
+                'burden' => 'seller',
+                'cost_type' => 'ads',
+                'source' => (string) ($adRow->ad_cost_source ?? 'none'),
+                'amount' => round($adCost, 2),
+                'count' => 0,
+            ];
+        }
+
+        $normalize = fn (array $item): array => array_merge($item, [
+            'amount' => round((float) $item['amount'], 2),
+            'count' => (int) $item['count'],
+        ]);
+
+        return [
+            'totals' => collect($totals)
+                ->map($normalize)
+                ->filter(fn (array $item): bool => $item['amount'] > 0)
+                ->sortByDesc('amount')
+                ->values()
+                ->all(),
+            'types' => collect($burdenTotals)
+                ->map($normalize)
+                ->filter(fn (array $item): bool => $item['amount'] > 0)
+                ->sortByDesc('amount')
+                ->values()
+                ->all(),
+            'stores' => collect($stores)
+                ->map($normalize)
+                ->filter(fn (array $item): bool => $item['amount'] > 0)
+                ->sortByDesc('amount')
+                ->values()
+                ->all(),
+        ];
     }
 
     private function cashOrderGrossSales($row): float
@@ -1483,7 +1556,6 @@ class MarketplaceAnalyticsSummaryService
 
         $row = $base
             ->selectRaw('COUNT(DISTINCT mo.id) AS cash_order_count')
-            ->selectRaw('SUM(COALESCE(NULLIF(ms.buyer_payment_amount, 0), NULLIF(mo.total_amount, 0), NULLIF(mo.total_paid_customer, 0), NULLIF(mo.subtotal_items, 0), 0)) AS cash_gross_sales')
             ->selectRaw('SUM(COALESCE(ms.final_income, 0)) AS cash_payout')
             ->selectRaw("SUM({$fees}) AS cash_marketplace_fees")
             ->selectRaw("SUM({$affiliateFees}) AS cash_affiliate_fees")
@@ -1494,12 +1566,12 @@ class MarketplaceAnalyticsSummaryService
             ->selectRaw('SUM(COALESCE(ms.escrow_tax, 0)) AS cash_escrow_tax')
             ->selectRaw('SUM(COALESCE(ms.drc_adjustable_refund, 0)) AS cash_refund')
             ->first();
-        $orderRevenue = $this->cashOrderRevenueAggregate($filters, $settlement, $includePreShipment);
+        $revenueTotals = $this->cashOrderRevenueAggregates($filters, $settlement, $includePreShipment);
 
         return [
             'cash_order_count' => (int) ($row->cash_order_count ?? 0),
-            'cash_gross_sales' => round((float) ($row->cash_gross_sales ?? 0), 2),
-            'cash_order_revenue' => $orderRevenue,
+            'cash_gross_sales' => $revenueTotals['gross_sales'],
+            'cash_order_revenue' => $revenueTotals['net_sales'],
             'cash_payout' => round((float) ($row->cash_payout ?? 0), 2),
             'cash_marketplace_fees' => round((float) ($row->cash_marketplace_fees ?? 0), 2),
             'cash_affiliate_fees' => round((float) ($row->cash_affiliate_fees ?? 0), 2),
@@ -1693,12 +1765,14 @@ class MarketplaceAnalyticsSummaryService
         $operational = $this->operationalStoreSummary($filters)->keyBy(fn ($row) => (string) $row->store_id);
         $ads = $this->adsStoreSummary($filters)->keyBy(fn ($row) => (string) $row->store_id);
         $returnRefunds = $this->returnRefundStoreSummary($filters);
+        $unsettled = $this->unsettledStoreSummary($filters);
         $ids = $financial->keys()->merge($operational->keys())->merge($ads->keys())->unique();
 
-        return $ids->map(function (string $id) use ($financial, $operational, $ads, $returnRefunds) {
+        return $ids->map(function (string $id) use ($financial, $operational, $ads, $returnRefunds, $unsettled) {
             $finance = $financial->get($id);
             $ops = $operational->get($id);
             $ad = $ads->get($id);
+            $pending = $unsettled->get($id, ['order_count' => 0, 'gmv' => 0.0]);
             $aggregate = $this->normalizeAggregate($finance);
 
             return $this->withRates($this->applyAdCost(array_merge([
@@ -1712,6 +1786,8 @@ class MarketplaceAnalyticsSummaryService
                 'cancelled_amount' => round((float) ($ops->cancelled_amount ?? 0), 2),
                 'return_refund_count' => (int) ($returnRefunds->get($id, 0)),
                 'gmv' => round((float) ($ops->gmv ?? 0), 2),
+                'unsettled_order_count' => (int) ($pending['order_count'] ?? 0),
+                'unsettled_gmv' => round((float) ($pending['gmv'] ?? 0), 2),
             ], $aggregate), [
                 'ad_cost_before_tax' => (float) ($ad->ad_cost_before_tax ?? 0),
                 'ad_cost_vat' => (float) ($ad->ad_cost_vat ?? 0),
@@ -2086,6 +2162,32 @@ class MarketplaceAnalyticsSummaryService
             ->selectRaw($this->operationalSelect(false))
             ->groupBy('mo.store_id', 'st.name')
             ->get();
+    }
+
+    private function unsettledStoreSummary(array $filters)
+    {
+        $rows = $this->unsettledOrdersBase($filters)
+            ->join('stores as st', 'st.id', '=', 'mo.store_id')
+            ->select([
+                'mo.store_id',
+                'mo.total_amount',
+                'mo.total_paid_customer',
+                'mo.subtotal_items',
+                'mo.raw_json as order_raw_json',
+                'ms.buyer_payment_amount',
+                'ms.seller_voucher',
+                'ms.raw_json as settlement_raw_json',
+            ])
+            ->get();
+
+        return $rows
+            ->groupBy(fn ($row): string => (string) $row->store_id)
+            ->map(function ($storeRows): array {
+                return [
+                    'order_count' => $storeRows->count(),
+                    'gmv' => round((float) $storeRows->sum(fn ($row): float => $this->cashOrderGrossSales($row)), 2),
+                ];
+            });
     }
 
     private function returnRefundStoreSummary(array $filters)

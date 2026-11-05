@@ -266,6 +266,41 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(1, $storeRow['return_refund_count']);
     }
 
+    public function test_store_performance_exposes_gmv_that_is_not_settled_yet(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-TIKTOK-UNSETTLED',
+            'name' => 'TikTok Unsettled Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = $this->order($store, 'TO_CONFIRM_RECEIVE', 150000);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 150000,
+            'final_income' => 0,
+            'settlement_time' => null,
+        ]);
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'platform' => 'tiktok',
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $storeRow = $summary['stores'][0];
+
+        $this->assertSame(1, $storeRow['unsettled_order_count']);
+        $this->assertSame(150000.0, (float) $storeRow['unsettled_gmv']);
+    }
+
     public function test_order_eligible_completed_and_cancelled_counts_are_scoped_to_active_platform_stores(): void
     {
         $shopee = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);

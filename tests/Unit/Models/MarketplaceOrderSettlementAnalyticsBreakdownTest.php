@@ -61,6 +61,25 @@ class MarketplaceOrderSettlementAnalyticsBreakdownTest extends TestCase
         $this->assertSame(6500.0, $this->amountFor($rows, 'shipping_subsidy'));
     }
 
+    public function test_shopee_breakdown_surfaces_raw_seller_protection_as_other_fee(): void
+    {
+        $settlement = new MarketplaceOrderSettlement();
+        $settlement->setRawAttributes([
+            'shipping_insurance_fee' => 0,
+            'raw_json' => [
+                'shipping_seller_protection_fee_amount' => 350,
+                'delivery_seller_protection_fee_premium_amount' => 125,
+            ],
+        ], true);
+
+        $rows = $settlement->analyticsFeeBreakdown();
+
+        $this->assertSame(475.0, array_sum(array_map(
+            fn (array $row): float => ($row['code'] ?? null) === 'other_fee' ? (float) $row['amount'] : 0.0,
+            $rows,
+        )));
+    }
+
     private function amountFor(array $rows, string $code): float
     {
         foreach ($rows as $row) {

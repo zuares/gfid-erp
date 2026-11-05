@@ -16,7 +16,7 @@
 </div>
 
 <div class="an-grid-secondary an-tab-pane" data-an-pane="overview">
-    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store performance accrual</div><div class="an-card-title">Performa toko akrual</div><div class="an-card-sub">Pengakuan order dan GMV pada periode berjalan; payout dan profit ditampilkan sebagai pencatatan biaya/pencairan.</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order masuk</th><th>Selesai</th><th>Cancel</th><th>Refund</th><th>GMV akrual</th><th>Payout tercatat</th><th>Adm fee tercatat</th><th>Biaya iklan</th><th>Profit operasional tercatat</th></tr></thead><tbody id="overviewStoreLedgerBody"><tr><td colspan="10"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div></div></section>
+    <section class="an-card"><div class="an-card-head"><div><div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store performance accrual</div><div class="an-card-title">Performa toko akrual</div><div class="an-card-sub">Pengakuan order dan GMV pada periode berjalan; payout dan profit ditampilkan sebagai pencatatan biaya/pencairan.</div></div></div><div class="an-card-body"><div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order masuk</th><th>Selesai</th><th>Cancel</th><th>Refund</th><th>GMV akrual</th><th>GMV belum cair</th><th>Payout tercatat</th><th>Adm fee tercatat</th><th>Biaya iklan</th><th>Profit operasional tercatat</th></tr></thead><tbody id="overviewStoreLedgerBody"><tr><td colspan="11"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div></div></section>
     <section class="an-card"><div class="an-card-head"><div><div class="an-card-title">Biaya marketplace</div><div class="an-card-sub">Fee estimasi mengikuti rate actual Unit economics; biaya settlement tetap tersedia untuk audit</div></div></div><div class="an-card-body"><div class="an-costs" id="overviewCostBody"><x-gf.state type="loading" title="Memuat…" /></div></div></section>
 </div>
 
@@ -72,7 +72,7 @@
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="return_refund"><span>Return / Refund</span><small data-cash-tab-kpi>—</small></button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-cash-settlement="unsettled"><span>Dana belum cair</span><small data-cash-tab-kpi>—</small></button>
         </div>
-        <div class="an-modal-summary" id="cashOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
+        <div class="an-modal-summary ds-grid ds-grid-4" id="cashOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
         <div class="an-modal-body" id="cashOrdersBody"><x-gf.state title="Pilih status pencairan" message="Pilih status pencairan untuk memuat order." /></div>
         <div class="an-modal-foot"><button class="an-btn" id="cashOrdersPrev" type="button" aria-label="Halaman sebelumnya">‹ Sebelumnya</button><div class="an-modal-pagination" aria-live="polite"><div><strong class="an-modal-page" id="cashOrdersPage">—</strong><small class="an-modal-page-meta" id="cashOrdersPageMeta">—</small></div></div><button class="an-btn" id="cashOrdersNext" type="button" aria-label="Halaman berikutnya">Berikutnya ›</button></div>
     </section>
@@ -93,7 +93,7 @@
             <button class="an-modal-tab active" type="button" role="tab" aria-selected="true" data-return-type="return_refund">Return / refund</button>
             <button class="an-modal-tab" type="button" role="tab" aria-selected="false" data-return-type="failed_delivery">Pengiriman gagal</button>
         </div>
-        <div class="an-modal-summary" id="returnOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
+        <div class="an-modal-summary ds-grid ds-grid-4" id="returnOrdersSummary"><x-gf.state type="loading" title="Memuat ringkasan…" /></div>
         <div class="an-modal-body" id="returnOrdersBody"><x-gf.state title="Pilih jenis exception" message="Pilih jenis exception untuk memuat data." /></div>
         <div class="an-modal-foot"><button class="an-btn" id="returnOrdersPrev" type="button">‹ Sebelumnya</button><span class="an-modal-page" id="returnOrdersPage">—</span><button class="an-btn" id="returnOrdersNext" type="button">Berikutnya ›</button></div>
     </section>

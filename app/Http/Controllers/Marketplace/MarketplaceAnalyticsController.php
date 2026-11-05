@@ -19,8 +19,13 @@ class MarketplaceAnalyticsController extends Controller
 {
     public function index(Request $request): \Illuminate\View\View
     {
-        $today = now()->toDateString();
-        $monthFrom = now()->startOfMonth()->toDateString();
+        $isFeeView = in_array($request->query('view', $request->query('tab')), ['fees'], true);
+        $hasExplicitDateRange = $request->filled('date_from') || $request->filled('date_to');
+        $defaultPeriod = $isFeeView && ! $hasExplicitDateRange ? now()->subMonthNoOverflow() : now();
+        $today = $isFeeView && ! $hasExplicitDateRange
+            ? $defaultPeriod->copy()->endOfMonth()->toDateString()
+            : now()->toDateString();
+        $monthFrom = $defaultPeriod->copy()->startOfMonth()->toDateString();
         $filters = [
             'date_from' => $request->query('date_from', $monthFrom),
             'date_to' => $request->query('date_to', $today),

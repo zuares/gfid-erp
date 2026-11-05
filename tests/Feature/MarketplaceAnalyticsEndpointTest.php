@@ -36,6 +36,8 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertSee('Dibatalkan')
             ->assertSee('Return / Refund')
             ->assertSee('Fee Marketplace')
+            ->assertSee('data-an-tab="fees"', false)
+            ->assertSee('feeOrdersBody', false)
             ->assertSee('Adm fee tercatat')
             ->assertSee('<th>Biaya iklan</th>', false);
 

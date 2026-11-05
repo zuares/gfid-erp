@@ -450,7 +450,7 @@ class MarketplaceOrderSettlement extends Model
      * reads the raw settlement snapshot and presents comparable categories
      * without counting aggregate TikTok fields together with their children.
      *
-     * @return array<int, array{code:string, label:string, amount:float, category:string, source?:string}>
+     * @return array<int, array{code:string, label:string, amount:float, category:string, burden:string, source?:string}>
      */
     public function analyticsFeeBreakdown(): array
     {
@@ -482,6 +482,7 @@ class MarketplaceOrderSettlement extends Model
                 'label' => $label,
                 'amount' => round($amount, 2),
                 'category' => $category,
+                'burden' => $code === 'shipping_subsidy' || $category === 'platform' ? 'platform' : 'seller',
             ];
             if ($source) {
                 $row['source'] = $source;
@@ -594,6 +595,15 @@ class MarketplaceOrderSettlement extends Model
         $push($rows, $seen, 'insurance_fee', 'Premi / Asuransi', $this->shipping_insurance_fee, 'fee', 'shipping_insurance_fee');
         $push($rows, $seen, 'tax', 'Pajak', $this->escrow_tax, 'tax', 'escrow_tax');
         $push($rows, $seen, 'other_fee', 'Premi', $raw['premi'] ?? null, 'fee', 'premi');
+
+        // Some Shopee settlement snapshots keep seller protection premiums in
+        // raw_json while the normalized insurance column is empty. Surface
+        // those charges as other fees so the analytics ledger does not omit
+        // them or mix them into the primary shipping charge.
+        if ((float) $this->shipping_insurance_fee <= 0) {
+            $push($rows, $seen, 'other_fee', 'Biaya Perlindungan Pengiriman', $raw['shipping_seller_protection_fee_amount'] ?? null, 'fee', 'shipping_seller_protection_fee_amount');
+            $push($rows, $seen, 'other_fee', 'Premi Perlindungan Pengiriman', $raw['delivery_seller_protection_fee_premium_amount'] ?? null, 'fee', 'delivery_seller_protection_fee_premium_amount');
+        }
 
         return $rows;
     }
