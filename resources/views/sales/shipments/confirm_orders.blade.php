@@ -1209,7 +1209,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                         <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Buat permintaan stok
                     </button>
                     <button type="button" class="sd-stock-bulk-action" data-stock-bulk-action="po" disabled>
-                        <i class="bi bi-receipt" aria-hidden="true"></i> Buat PO
+                        <i class="bi bi-receipt" aria-hidden="true"></i> Cek PO
                     </button>
                     <button type="button" class="sd-stock-bulk-action sd-stock-bulk-action--adjust" data-stock-bulk-action="adjust" disabled>
                         <i class="bi bi-sliders2-vertical" aria-hidden="true"></i> Koreksi persediaan
@@ -2219,7 +2219,7 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
     var stockSelectors = Array.from(document.querySelectorAll('[data-stock-select]'));
     var stockBulkActions = Array.from(document.querySelectorAll('[data-stock-bulk-action]'));
     var stockRequestCreateUrl = @json(route('rts.stock-requests.create'));
-    var stockPurchaseOrderUrl = @json(route('purchasing.purchase_orders.create'));
+    var stockPurchaseOrderUrl = @json(route('purchasing.purchase_orders.index'));
     var stockAdjustmentCreateUrl = @json(route('inventory.adjustments.manual.create'));
     var stockBulkWarehouseId = @json($stockWarehouseId ?? null);
 
@@ -2286,7 +2286,9 @@ body[data-theme="dark"] .sd-marketplace-sku-value {
                 target.searchParams.set('warehouse_id', String(stockBulkWarehouseId));
             }
 
-            target.searchParams.set('prefill', JSON.stringify(prefill));
+            if (action !== 'po') {
+                target.searchParams.set('prefill', JSON.stringify(prefill));
+            }
             window.location.assign(target.toString());
         });
     });
