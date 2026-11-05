@@ -487,6 +487,9 @@
     .an-revenue-fee-breakdown-kicker { color:var(--revenue-brand-strong); font-size:.55rem; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
     .an-revenue-fee-breakdown-head strong { display:block; margin-top:.12rem; color:var(--revenue-text); font-size:.76rem; font-weight:850; }
     .an-revenue-fee-breakdown-head small { max-width:220px; color:var(--revenue-muted); font-size:.57rem; font-weight:650; line-height:1.35; text-align:right; }
+    .an-revenue-fee-breakdown-total { flex:0 0 auto; text-align:right; }
+    .an-revenue-fee-breakdown-total strong { color:var(--revenue-text); font-size:.9rem; font-variant-numeric:tabular-nums; }
+    .an-revenue-fee-breakdown-total small { display:block; max-width:none; margin-top:.08rem; color:var(--revenue-brand-strong); font-weight:800; }
     .an-revenue-fee-breakdown .an-modal-fee-breakdown { margin:.55rem 0 .45rem; border-color:rgba(148,163,184,.35); background:rgba(255,255,255,.68); }
     body[data-theme="dark"] .an-revenue-fee-breakdown { border-color:rgba(129,140,248,.45); background:linear-gradient(180deg,rgba(49,46,129,.25) 0%,#0f172a 100%); }
     body[data-theme="dark"] .an-revenue-fee-breakdown .an-modal-fee-breakdown { background:#0f172a; }
@@ -1577,6 +1580,8 @@
     .an-revenue-fee-breakdown-head { align-items: center; margin: 0; }
     .an-revenue-fee-breakdown-head strong { display: block; margin: 0; font-size: var(--an-type-body); font-weight: 800; }
     .an-revenue-fee-breakdown-head small { display: block; margin-top: .12rem; color: var(--gf-color-muted, #667085); font-size: var(--an-type-caption); font-weight: 650; }
+    .an-revenue-fee-breakdown-total strong { font-size: var(--an-type-body); }
+    .an-revenue-fee-breakdown-total small { color: var(--gf-color-brand-strong, #4142bb); font-size: var(--an-type-caption); }
     .an-fee-burden-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin-top: .6rem; }
     .an-fee-burden { min-width: 0; padding: .65rem; border: 1px solid var(--gf-color-line, #e4e7ec); border-radius: var(--an-radius-control); background: var(--gf-color-surface, #fff); }
     .an-fee-burden-head { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: .42rem; }
@@ -1614,6 +1619,7 @@
         .an-revenue-summary .an-modal-stat { min-height: 96px; padding: .65rem; }
         .an-revenue-fee-breakdown-head { align-items: flex-start; flex-direction: column; gap: .25rem; }
         .an-revenue-fee-breakdown-head small { max-width: none; text-align: left; }
+        .an-revenue-fee-breakdown-total { width: 100%; text-align: left; }
         .an-fee-burden-grid { grid-template-columns: 1fr; }
         .an-revenue-body .an-modal-fee-breakdown { grid-template-columns: 1fr; }
         .an-revenue-panel > .an-modal-foot { flex-wrap: wrap; gap: .5rem; padding: .65rem; }
@@ -1789,11 +1795,15 @@
     let orders = [];
     let productsLoaded = false;
     let productsLoading = false;
+    let productRequestToken = 0;
+    let productAbortController = null;
     let productData = [];
     let adSpendBySku = {};
     let cashPage = 1;
     let cashPayload = null;
     let cashLoading = false;
+    let cashRequestToken = 0;
+    let cashAbortController = null;
     let cashSettlement = 'all';
     let cashFocus = 'payout';
     let cashTabSummaries = {};
@@ -1801,9 +1811,15 @@
     let returnPage = 1;
     let returnPayload = null;
     let returnLoading = false;
+    let returnRequestToken = 0;
+    let returnAbortController = null;
     let returnType = 'return_refund';
     let cohortPayload = null;
     let cohortLoading = false;
+    let cohortRequestToken = 0;
+    let cohortAbortController = null;
+    let cohortOptionsRequestToken = 0;
+    let cohortOptionsAbortController = null;
     let cohortOptionsKey = null;
     let revenueChartInstance = null;
     let cohortChartInstance = null;
@@ -1812,9 +1828,34 @@
     let chartRenderToken = 0;
     let cohortChartRenderToken = 0;
     let selectedPulseMetric = null;
+    let analyticsLoadToken = 0;
+    let analyticsAbortController = null;
     const APP_TIMEZONE = @json(config('app.timezone', 'Asia/Jakarta'));
     const from = () => $('anDateFrom').value;
     const to = () => $('anDateTo').value;
+    const dateRangeReady = () => Boolean(from() && to());
+    const isAbortError = error => error?.name === 'AbortError';
+    const cancelPendingAnalytics = () => {
+        analyticsLoadToken++;
+        analyticsAbortController?.abort();
+        analyticsAbortController = null;
+        cashRequestToken++;
+        cashAbortController?.abort();
+        cashAbortController = null;
+        cashLoading = false;
+        returnRequestToken++;
+        returnAbortController?.abort();
+        returnAbortController = null;
+        returnLoading = false;
+        productRequestToken++;
+        productAbortController?.abort();
+        productsLoading = false;
+        cohortRequestToken++;
+        cohortAbortController?.abort();
+        cohortOptionsRequestToken++;
+        cohortOptionsAbortController?.abort();
+        cohortLoading = false;
+    };
     const n = v => Number.parseFloat(v || 0) || 0;
     const status = o => String(o.order_status || o.status || '').toUpperCase();
     const completed = o => ['COMPLETED', 'DELIVERED', 'CLOSED'].includes(status(o));
@@ -2098,37 +2139,56 @@
     };
     async function loadStores() {
         if (storesLoaded) return stores;
-        stores = await api('/api/marketplace/stores?active_only=1').catch(() => []);
+        stores = await api('/api/marketplace/stores?active_only=0').catch(() => []);
         storesLoaded = true;
-        $('anPlatform').value = initialPlatform || selectedPlatform();
         fillStores();
         return stores;
     }
     async function loadProducts() {
-        if (productsLoaded || productsLoading) return;
+        if (productsLoaded || productsLoading || !dateRangeReady()) return;
+        const requestToken = ++productRequestToken;
+        productAbortController?.abort();
+        const controller = new AbortController();
+        productAbortController = controller;
         productsLoading = true;
         await loadStores();
+        if (requestToken !== productRequestToken) return;
         $('bestProductBody').innerHTML = `<tr><td colspan="10">${stateMarkup('loading', 'Memuat detail produk…')}</td></tr>`;
         try {
             const params = new URLSearchParams({ date_from: from(), date_to: to() });
             if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
             params.set('_ts', Date.now().toString());
-            const result = await api('/api/marketplace/analytics-products?' + params.toString(), { cache: 'no-store' });
+            const result = await api('/api/marketplace/analytics-products?' + params.toString(), { cache: 'no-store', signal: controller.signal });
+            if (requestToken !== productRequestToken) return;
             productData = result?.data || [];
             productsLoaded = true;
             renderProductSummary(productData);
         } catch (e) {
+            if (requestToken !== productRequestToken || isAbortError(e)) return;
             $('bestProductBody').innerHTML = `<tr><td colspan="9">${stateMarkup('error', 'Detail produk gagal dimuat')}</td></tr>`;
             if ($('anProductSnapshotList')) $('anProductSnapshotList').innerHTML = stateMarkup('error', 'Ringkasan produk gagal dimuat');
         } finally {
-            productsLoading = false;
+            if (requestToken === productRequestToken) {
+                productsLoading = false;
+                productAbortController = null;
+            }
         }
     }
     async function load() {
+        if (!dateRangeReady()) {
+            cancelPendingAnalytics();
+            setLoading('Pilih rentang tanggal lengkap terlebih dahulu…');
+            return;
+        }
+        const loadToken = ++analyticsLoadToken;
+        analyticsAbortController?.abort();
+        const controller = new AbortController();
+        analyticsAbortController = controller;
         const cashModalWasOpen = $('cashOrdersModal').classList.contains('is-open');
         const revenueTabWasActive = document.querySelector('[data-an-tab="revenue"]')?.classList.contains('active');
-        if (revenueTabWasActive) cashFocus = 'combined';
+        const revenueFeeTabWasActive = document.querySelector('[data-revenue-fee-tab].active') !== null;
+        if (revenueTabWasActive && !revenueFeeTabWasActive) cashFocus = 'combined';
         if (!cashModalWasOpen) closeCashOrders();
         closeReturnOrders();
         cashPage = 1;
@@ -2137,6 +2197,15 @@
         cashTabSummaryToken++;
         returnPage = 1;
         returnPayload = null;
+        cohortRequestToken++;
+        cohortAbortController?.abort();
+        cohortOptionsRequestToken++;
+        cohortOptionsAbortController?.abort();
+        cohortPayload = null;
+        cohortLoading = false;
+        cohortOptionsKey = null;
+        productRequestToken++;
+        productAbortController?.abort();
         if (cashModalWasOpen || revenueTabWasActive) {
             loadCashOrders();
             loadCashTabSummaries(cashSettlementTabs);
@@ -2154,7 +2223,8 @@
             if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
             try {
-                const kpiPayload = await api('/api/marketplace/analytics-kpis?' + params.toString(), { cache: 'no-store' });
+                const kpiPayload = await api('/api/marketplace/analytics-kpis?' + params.toString(), { cache: 'no-store', signal: controller.signal });
+                if (loadToken !== analyticsLoadToken) return;
                 summary = kpiPayload;
                 renderEnterprise();
                 setLoading('KPI utama siap · memuat detail analytics…');
@@ -2163,18 +2233,19 @@
             }
             const activeView = document.querySelector('[data-an-tab].active')?.dataset.anTab || 'overview';
             const storeSummaryPromise = ['overview', 'stores'].includes(activeView)
-                ? api('/api/marketplace/analytics-stores?' + params.toString(), { cache: 'no-store' })
+                ? api('/api/marketplace/analytics-stores?' + params.toString(), { cache: 'no-store', signal: controller.signal })
                     .then(payload => ({ ok: true, payload }))
                     .catch(error => ({ ok: false, error }))
                 : Promise.resolve({ ok: true, payload: null });
             const detailsPromise = Promise.all([
                 loadStores(),
-                api('/api/marketplace/analytics-summary?' + params.toString(), { cache: 'no-store' })
+                api('/api/marketplace/analytics-summary?' + params.toString(), { cache: 'no-store', signal: controller.signal })
                     .then(payload => ({ ok: true, payload }))
                     .catch(error => ({ ok: false, error })),
                 storeSummaryPromise,
             ]);
             const [storeRows, summaryResult, storeSummaryResult] = await detailsPromise;
+            if (loadToken !== analyticsLoadToken) return;
             if (!summaryResult.ok && !storeSummaryResult.ok) throw summaryResult.error;
             const summaryPayload = summaryResult.ok ? summaryResult.payload : { stores: [] };
             const fallbackStores = storeSummaryResult.ok ? (storeSummaryResult.payload?.stores || []) : [];
@@ -2187,12 +2258,14 @@
             $('bestProductBody').innerHTML = `<tr><td colspan="9">${stateMarkup('empty', 'Menunggu data produk', 'Buka tab Produk untuk memuat detail.')}</td></tr>`;
             if (document.querySelector('[data-an-tab="cohort"]')?.classList.contains('active')) await loadCohort();
         } catch (e) {
+            if (loadToken !== analyticsLoadToken || isAbortError(e)) return;
             console.error('Analytics summary load failed', e);
             summary = null;
             $('storeBody').innerHTML = `<tr><td colspan="8">${stateMarkup('error', 'Tidak dapat memuat ringkasan analytics')}</td></tr>`;
             $('overviewStoreLedgerBody').innerHTML = `<tr><td colspan="8">${stateMarkup('error', 'Tidak dapat memuat performa toko')}</td></tr>`;
             $('bestProductBody').innerHTML = `<tr><td colspan="9">${stateMarkup('error', 'Tidak dapat memuat data analytics')}</td></tr>`;
         } finally {
+            if (loadToken !== analyticsLoadToken) return;
             $('anRefresh').disabled = false;
             $('anRefresh').textContent = '↻ Refresh';
             document.querySelector('.an-shell')?.removeAttribute('aria-busy');
@@ -2280,7 +2353,8 @@
         button.addEventListener('keydown', event => handleTabKeydown(event, '[data-an-tab]'));
     });
     const syncUrl = () => { const params = new URLSearchParams({date_from:from(),date_to:to(),compare_mode:$('anCompare').value}); if (selectedPlatform()) params.set('platform', selectedPlatform()); if (selectedStore()) params.set('store_id', selectedStore()); const activeTab = document.querySelector('[data-an-tab].active')?.dataset.anTab; if (activeTab) params.set('view', activeTab); history.replaceState(null,'',location.pathname+'?'+params.toString()); };
-    $('anRefresh').addEventListener('click',load); $('anPlatform').addEventListener('change',()=>{ $('anStore').value = ''; fillStores(); syncUrl(); load(); }); $('anStore').addEventListener('change',()=>{syncUrl();load();}); $('anCompare').addEventListener('change',()=>{syncUrl();load();});
+    const refreshFromFilter = () => { syncUrl(); if (!dateRangeReady()) { cancelPendingAnalytics(); setLoading('Pilih tanggal akhir untuk menerapkan filter…'); return; } load(); };
+    $('anRefresh').addEventListener('click',load); $('anPlatform').addEventListener('change',()=>{ $('anStore').value = ''; fillStores(); refreshFromFilter(); }); $('anStore').addEventListener('change',refreshFromFilter); $('anCompare').addEventListener('change',refreshFromFilter);
     document.querySelectorAll('[data-open-products-tab]').forEach(button => button.addEventListener('click', () => { activateTab('products'); loadProducts(); }));
     const focusPulse = card => {
         if (!card) return;
@@ -2320,7 +2394,16 @@
         cashPayload = null;
         loadCashOrders();
     }));
-    document.querySelectorAll('[data-revenue-settlement]').forEach((button, index, buttons) => button.addEventListener('keydown', event => {
+    document.querySelectorAll('[data-revenue-fee-tab]').forEach(button => button.addEventListener('click', () => {
+        const needsReload = cashFocus !== 'fees' || cashSettlement !== 'settled' || !cashPayload;
+        cashFocus = 'fees';
+        if (!needsReload) return;
+        setCashSettlementTab('settled');
+        cashPage = 1;
+        cashPayload = null;
+        loadCashOrders();
+    }));
+    document.querySelectorAll('[data-revenue-settlement], [data-revenue-fee-tab]').forEach((button, index, buttons) => button.addEventListener('keydown', event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
         const nextIndex = event.key === 'Home'
@@ -2382,6 +2465,8 @@
             if (dates.length === 1) {
                 $('anDateFrom').value = fp.formatDate(dates[0], 'Y-m-d');
                 $('anDateTo').value = '';
+                cancelPendingAnalytics();
+                setLoading('Pilih tanggal akhir untuk menerapkan filter…');
                 fp.input.value = `${fp.formatDate(dates[0], 'j F Y')} …`;
                 return;
             }

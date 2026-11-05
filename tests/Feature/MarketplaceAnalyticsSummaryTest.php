@@ -6,6 +6,7 @@ use App\Models\Channel;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
+use App\Models\MarketplaceReturn;
 use App\Models\MarketplaceTikTokFinancialTransaction;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
@@ -220,6 +221,49 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame('platform_transaction_fallback', $storeRow['ad_cost_source']);
         $this->assertSame(100000.0, (float) $storeRow['ad_cost_before_tax']);
         $this->assertSame(11000.0, (float) $storeRow['ad_cost_vat']);
+    }
+
+    public function test_store_performance_separates_refund_from_actual_eligible_orders(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-TIKTOK-REFUND',
+            'name' => 'TikTok Refund Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = $this->order($store, 'COMPLETED', 100000);
+
+        MarketplaceReturn::create([
+            'store_id' => $store->id,
+            'return_sn' => 'RETURN-ANALYTICS-1',
+            'order_sn' => $order->channel_order_id,
+            'status' => 'ACCEPTED',
+            'amount_before_discount' => 100000,
+            'create_time' => \Carbon\Carbon::parse('2026-09-17 12:00:00')->timestamp,
+            'update_time' => \Carbon\Carbon::parse('2026-09-17 12:00:00')->timestamp,
+        ]);
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'platform' => 'tiktok',
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $current = $summary['current'];
+        $storeRow = $summary['stores'][0];
+
+        $this->assertSame(1, $current['placed_order_count']);
+        $this->assertSame(0, $current['order_total']);
+        $this->assertSame(0, $current['completed_count']);
+        $this->assertSame(1, $current['return_refund_order_count']);
+        $this->assertSame(1, $storeRow['placed_order_count']);
+        $this->assertSame(0, $storeRow['order_total']);
+        $this->assertSame(0, $storeRow['completed_count']);
+        $this->assertSame(1, $storeRow['return_refund_count']);
     }
 
     public function test_order_eligible_completed_and_cancelled_counts_are_scoped_to_active_platform_stores(): void

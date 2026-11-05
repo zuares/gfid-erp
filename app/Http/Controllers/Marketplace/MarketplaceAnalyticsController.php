@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
+use App\Models\Store;
 use App\Services\Marketplace\MarketplaceAnalyticsCashService;
 use App\Services\Marketplace\MarketplaceAnalyticsOverviewService;
 use App\Services\Marketplace\MarketplaceAnalyticsProductService;
@@ -12,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 
 class MarketplaceAnalyticsController extends Controller
 {
@@ -61,19 +63,19 @@ class MarketplaceAnalyticsController extends Controller
 
     public function products(Request $request, MarketplaceAnalyticsProductService $products): JsonResponse
     {
-        $filters = $request->validate([
+        $filters = $this->validateAnalyticsScope($request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
             'platform' => ['nullable', 'in:shopee,tiktok'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
-        ]);
+        ]));
 
         return $this->json(['data' => $products->products($filters)]);
     }
 
     public function cohort(Request $request, MarketplaceCohortService $cohort): JsonResponse
     {
-        $filters = $request->validate([
+        $filters = $this->validateAnalyticsScope($request->validate([
             'mode' => ['nullable', 'in:customer,product'],
             'group_by' => ['nullable', 'in:product,category'],
             'metric' => ['nullable', 'in:retention_pct,active_customers,orders,qty_sold,revenue,gross_profit,gross_margin_pct,net_profit'],
@@ -85,27 +87,27 @@ class MarketplaceAnalyticsController extends Controller
             'sku' => ['nullable', 'string', 'max:100'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
-        ]);
+        ]));
 
         return $this->json($cohort->cohort($filters));
     }
 
     public function cohortOptions(Request $request, MarketplaceCohortService $cohort): JsonResponse
     {
-        $filters = $request->validate([
+        $filters = $this->validateAnalyticsScope($request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
             'platform' => ['nullable', 'in:shopee,tiktok'],
             'marketplace' => ['nullable', 'string', 'max:100'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
-        ]);
+        ]));
 
         return $this->json($cohort->options($filters));
     }
 
     public function cashOrders(Request $request, MarketplaceAnalyticsCashService $cash): JsonResponse
     {
-        $filters = $request->validate([
+        $filters = $this->validateAnalyticsScope($request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
             'platform' => ['nullable', 'in:shopee,tiktok'],
             'date_from' => ['required', 'date'],
@@ -113,7 +115,7 @@ class MarketplaceAnalyticsController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
             'settlement' => ['nullable', 'in:all,settled,unsettled,shipped,warehouse,confirm,cancelled,return_refund'],
-        ]);
+        ]));
 
         return $this->json($cash->orders(
             $filters,
@@ -125,7 +127,7 @@ class MarketplaceAnalyticsController extends Controller
 
     public function returnOrders(Request $request, MarketplaceAnalyticsReturnService $returns): JsonResponse
     {
-        $filters = $request->validate([
+        $filters = $this->validateAnalyticsScope($request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
             'platform' => ['nullable', 'in:shopee,tiktok'],
             'date_from' => ['required', 'date'],
@@ -133,7 +135,7 @@ class MarketplaceAnalyticsController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
             'type' => ['nullable', 'in:return_refund,failed_delivery'],
-        ]);
+        ]));
 
         return $this->json($returns->orders(
             $filters,
@@ -145,13 +147,33 @@ class MarketplaceAnalyticsController extends Controller
 
     private function summaryFilters(Request $request): array
     {
-        return $request->validate([
+        return $this->validateAnalyticsScope($request->validate([
             'store_id' => ['nullable', 'integer', 'exists:stores,id'],
             'platform' => ['nullable', 'in:shopee,tiktok'],
             'date_from' => ['required', 'date'],
             'date_to' => ['required', 'date', 'after_or_equal:date_from'],
             'compare_mode' => ['nullable', 'in:prev_period,prev_month,prev_quarter,prev_year'],
-        ]);
+        ]));
+    }
+
+    private function validateAnalyticsScope(array $filters): array
+    {
+        $storeId = (int) ($filters['store_id'] ?? 0);
+        $platform = strtolower(trim((string) ($filters['platform'] ?? '')));
+
+        if ($storeId > 0 && $platform !== '') {
+            $storePlatform = strtolower(trim((string) Store::query()
+                ->with('channel:id,code')
+                ->find($storeId)?->channel?->code));
+
+            if ($storePlatform !== $platform) {
+                throw ValidationException::withMessages([
+                    'store_id' => 'Toko yang dipilih tidak sesuai dengan platform filter.',
+                ]);
+            }
+        }
+
+        return $filters;
     }
 
     private function cacheKey(string $scope, array $filters): string

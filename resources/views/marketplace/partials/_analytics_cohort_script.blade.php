@@ -36,21 +36,30 @@
         select.value = current;
     }
     async function loadCohortOptions(force = false) {
+        if (!dateRangeReady()) return;
         const key = [from(), to(), selectedPlatform(), selectedStore(), $('anCohortMarketplace').value].join('|');
         if (!force && cohortOptionsKey === key) return;
+        const requestToken = ++cohortOptionsRequestToken;
+        cohortOptionsAbortController?.abort();
+        const controller = new AbortController();
+        cohortOptionsAbortController = controller;
         const params = new URLSearchParams({ date_from: from(), date_to: to(), _ts: Date.now().toString() });
         if (selectedPlatform()) params.set('platform', selectedPlatform());
         if (selectedStore()) params.set('store_id', selectedStore());
         if ($('anCohortMarketplace').value) params.set('marketplace', $('anCohortMarketplace').value);
         try {
-            const result = await api('/api/marketplace/analytics-cohort-options?' + params.toString(), { cache:'no-store' });
+            const result = await api('/api/marketplace/analytics-cohort-options?' + params.toString(), { cache:'no-store', signal: controller.signal });
+            if (requestToken !== cohortOptionsRequestToken) return;
             cohortOptionsKey = key;
             setCohortSelectOptions('anCohortMarketplace', 'Semua marketplace', result?.marketplaces);
             setCohortSelectOptions('anCohortCategory', 'Semua kategori', result?.categories);
             setCohortSelectOptions('anCohortProduct', 'Semua produk', result?.products);
             setCohortSelectOptions('anCohortSku', 'Semua SKU', result?.skus);
         } catch (error) {
+            if (requestToken !== cohortOptionsRequestToken || isAbortError(error)) return;
             console.warn('Cohort filter options failed', error);
+        } finally {
+            if (requestToken === cohortOptionsRequestToken) cohortOptionsAbortController = null;
         }
     }
     const cohortFormat = (value, metric) => {
@@ -163,7 +172,11 @@
         document.body.classList.remove('an-modal-open');
     }
     async function loadCohort() {
-        if (cohortLoading) return;
+        if (!dateRangeReady()) return;
+        const requestToken = ++cohortRequestToken;
+        cohortAbortController?.abort();
+        const controller = new AbortController();
+        cohortAbortController = controller;
         cohortLoading = true;
         $('anCohortApply').disabled = true;
         $('anCohortApply').innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Memuat…';
@@ -171,11 +184,15 @@
         $('anCohortBody').innerHTML = `<tr><td colspan="8">${stateMarkup('loading', 'Memuat cohort…')}</td></tr>`;
         try {
             await loadCohortOptions();
-            cohortPayload = await api('/api/marketplace/analytics-cohort?' + cohortParams().toString(), { cache:'no-store' });
+            if (requestToken !== cohortRequestToken) return;
+            const payload = await api('/api/marketplace/analytics-cohort?' + cohortParams().toString(), { cache:'no-store', signal: controller.signal });
+            if (requestToken !== cohortRequestToken) return;
+            cohortPayload = payload;
             renderCohortKpis(cohortPayload);
             renderCohortTable(cohortPayload);
             renderCohortCharts(cohortPayload);
         } catch (error) {
+            if (requestToken !== cohortRequestToken || isAbortError(error)) return;
             console.error('Cohort load failed', error);
             cohortPayload = null;
             $('anCohortNote').textContent = 'Cohort gagal dimuat. Periksa filter atau log aplikasi.';
@@ -183,7 +200,9 @@
             $('anCohortCurveChart').innerHTML = stateMarkup('error', 'Grafik cohort gagal dimuat');
             $('anCohortDistributionChart').innerHTML = stateMarkup('error', 'Grafik cohort gagal dimuat');
         } finally {
+            if (requestToken !== cohortRequestToken) return;
             cohortLoading = false;
+            cohortAbortController = null;
             $('anCohortApply').disabled = false;
             $('anCohortApply').innerHTML = '<i class="bi bi-play-fill me-1"></i>Terapkan analisis';
         }

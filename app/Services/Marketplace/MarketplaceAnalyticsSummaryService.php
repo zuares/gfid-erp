@@ -382,7 +382,7 @@ class MarketplaceAnalyticsSummaryService
             'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
-            'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
+            'return_refund' => $this->returnRefundBase($filters),
             default => $this->cashBase($filters),
         };
 
@@ -516,7 +516,7 @@ class MarketplaceAnalyticsSummaryService
             'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
-            'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
+            'return_refund' => $this->returnRefundBase($filters),
             default => $this->cashBase($filters),
         };
         if (in_array($settlement, ['all', 'cancelled'], true)) {
@@ -737,6 +737,52 @@ class MarketplaceAnalyticsSummaryService
         };
     }
 
+    private function returnRefundBase(array $filters)
+    {
+        $status = "UPPER(COALESCE(NULLIF(mo.order_status, ''), mo.status, ''))";
+        $fromTimestamp = Carbon::parse($filters['date_from'])->startOfDay()->timestamp;
+        $toTimestamp = Carbon::parse($filters['date_to'])->endOfDay()->timestamp;
+
+        return DB::table('marketplace_orders as mo')
+            ->leftJoin('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+            ->whereNotNull('mo.ordered_at')
+            ->whereIn('mo.store_id', $filters['store_ids'])
+            ->where(function ($query) use ($status, $filters, $fromTimestamp, $toTimestamp): void {
+                $query->whereExists(function ($subQuery) use ($fromTimestamp, $toTimestamp): void {
+                    $subQuery->selectRaw('1')
+                        ->from('marketplace_returns as mr_event')
+                        ->whereColumn('mr_event.store_id', 'mo.store_id')
+                        ->where(function ($orderQuery): void {
+                            $orderQuery
+                                ->whereColumn('mr_event.order_sn', 'mo.channel_order_id')
+                                ->orWhereColumn('mr_event.order_sn', 'mo.external_order_id');
+                        })
+                        ->whereBetween('mr_event.create_time', [$fromTimestamp, $toTimestamp]);
+                })->orWhere(function ($financeQuery) use ($filters): void {
+                    $financeQuery
+                        ->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+                        ->whereExists(function ($channelQuery): void {
+                            $channelQuery->selectRaw('1')
+                                ->from('stores as refund_store')
+                                ->join('channels as refund_channel', 'refund_channel.id', '=', 'refund_store.channel_id')
+                                ->whereColumn('refund_store.id', 'mo.store_id')
+                                ->whereRaw('LOWER(refund_channel.code) = ?', ['tiktok']);
+                        })
+                        ->whereBetween(DB::raw('COALESCE(ms.settlement_time, mo.ordered_at)'), [
+                            $filters['date_from'].' 00:00:00',
+                            $filters['date_to'].' 23:59:59',
+                        ]);
+                })->orWhere(function ($statusQuery) use ($status, $filters): void {
+                    $statusQuery
+                        ->whereRaw("{$status} IN ('TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED')")
+                        ->whereBetween('mo.ordered_at', [
+                            $filters['date_from'].' 00:00:00',
+                            $filters['date_to'].' 23:59:59',
+                        ]);
+                });
+            });
+    }
+
     private function cashOrderRevenueAggregate(array $filters, string $settlement, bool $includePreShipment = false): float
     {
         $base = match ($settlement) {
@@ -746,7 +792,7 @@ class MarketplaceAnalyticsSummaryService
             'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
-            'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
+            'return_refund' => $this->returnRefundBase($filters),
             default => $this->cashBase($filters),
         };
         if (in_array($settlement, ['all', 'cancelled'], true)) {
@@ -1302,8 +1348,10 @@ class MarketplaceAnalyticsSummaryService
                 $query->join('channels as analytics_scope_channel', 'analytics_scope_channel.id', '=', 'analytics_scope_store.channel_id')
                     ->whereRaw('LOWER(analytics_scope_channel.code) = ?', [$platform]);
             })
-            ->where('analytics_scope_store.is_active', true)
-            ->when($storeId, fn ($query) => $query->where('analytics_scope_store.id', $storeId))
+            ->when($storeId,
+                fn ($query) => $query->where('analytics_scope_store.id', $storeId),
+                fn ($query) => $query->where('analytics_scope_store.is_active', true)
+            )
             ->pluck('analytics_scope_store.id')
             ->map(fn ($id): int => (int) $id)
             ->values()
@@ -1426,12 +1474,13 @@ class MarketplaceAnalyticsSummaryService
             'warehouse' => $this->cashStatusBase($filters, 'warehouse'),
             'confirm' => $this->cashStatusBase($filters, 'confirm'),
             'cancelled' => $this->cashStatusBase($filters, 'cancelled'),
-            'return_refund' => $this->cashStatusBase($filters, 'return_refund'),
+            'return_refund' => $this->returnRefundBase($filters),
             default => $this->cashBase($filters),
         };
-        if (in_array($settlement, ['all', 'cancelled'], true)) {
+        if ($settlement === 'all') {
             $base->whereRaw($this->isRevenueStatus());
         }
+
         $row = $base
             ->selectRaw('COUNT(DISTINCT mo.id) AS cash_order_count')
             ->selectRaw('SUM(COALESCE(NULLIF(ms.buyer_payment_amount, 0), NULLIF(mo.total_amount, 0), NULLIF(mo.total_paid_customer, 0), NULLIF(mo.subtotal_items, 0), 0)) AS cash_gross_sales')
@@ -1643,9 +1692,10 @@ class MarketplaceAnalyticsSummaryService
 
         $operational = $this->operationalStoreSummary($filters)->keyBy(fn ($row) => (string) $row->store_id);
         $ads = $this->adsStoreSummary($filters)->keyBy(fn ($row) => (string) $row->store_id);
+        $returnRefunds = $this->returnRefundStoreSummary($filters);
         $ids = $financial->keys()->merge($operational->keys())->merge($ads->keys())->unique();
 
-        return $ids->map(function (string $id) use ($financial, $operational, $ads) {
+        return $ids->map(function (string $id) use ($financial, $operational, $ads, $returnRefunds) {
             $finance = $financial->get($id);
             $ops = $operational->get($id);
             $ad = $ads->get($id);
@@ -1660,6 +1710,7 @@ class MarketplaceAnalyticsSummaryService
                 'completed_count' => (int) ($ops->completed_count ?? 0),
                 'cancelled_count' => (int) ($ops->cancelled_count ?? 0),
                 'cancelled_amount' => round((float) ($ops->cancelled_amount ?? 0), 2),
+                'return_refund_count' => (int) ($returnRefunds->get($id, 0)),
                 'gmv' => round((float) ($ops->gmv ?? 0), 2),
             ], $aggregate), [
                 'ad_cost_before_tax' => (float) ($ad->ad_cost_before_tax ?? 0),
@@ -2035,6 +2086,47 @@ class MarketplaceAnalyticsSummaryService
             ->selectRaw($this->operationalSelect(false))
             ->groupBy('mo.store_id', 'st.name')
             ->get();
+    }
+
+    private function returnRefundStoreSummary(array $filters)
+    {
+        $fromTimestamp = Carbon::parse($filters['date_from'])->startOfDay()->timestamp;
+        $toTimestamp = Carbon::parse($filters['date_to'])->endOfDay()->timestamp;
+        $keys = collect();
+
+        $returnRows = DB::table('marketplace_returns')
+            ->whereBetween('create_time', [$fromTimestamp, $toTimestamp])
+            ->whereIn('store_id', $filters['store_ids'])
+            ->get(['id', 'store_id', 'order_sn']);
+
+        foreach ($returnRows as $row) {
+            $orderKey = trim((string) ($row->order_sn ?? ''));
+            $keys->put($row->store_id.'|'.($orderKey !== '' ? $orderKey : 'return:'.$row->id), true);
+        }
+
+        $financeRows = DB::table('marketplace_orders as mo')
+            ->join('marketplace_order_settlements as ms', 'ms.order_id', '=', 'mo.id')
+            ->join('stores as st', 'st.id', '=', 'mo.store_id')
+            ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->whereIn('mo.store_id', $filters['store_ids'])
+            ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
+            ->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+            ->whereBetween(DB::raw('COALESCE(ms.settlement_time, mo.ordered_at)'), [
+                $filters['date_from'].' 00:00:00',
+                $filters['date_to'].' 23:59:59',
+            ])
+            ->get(['mo.store_id', 'mo.channel_order_id', 'mo.external_order_id']);
+
+        foreach ($financeRows as $row) {
+            $orderKey = trim((string) ($row->channel_order_id ?: $row->external_order_id ?: ''));
+            if ($orderKey !== '') {
+                $keys->put($row->store_id.'|'.$orderKey, true);
+            }
+        }
+
+        return $keys->keys()
+            ->map(fn (string $key): string => explode('|', $key, 2)[0])
+            ->countBy();
     }
 
     private function adsAggregate(array $filters): array

@@ -91,15 +91,28 @@
         if (sourcePrev && targetPrev) targetPrev.disabled = sourcePrev.disabled;
         if (sourceNext && targetNext) targetNext.disabled = sourceNext.disabled;
         document.querySelectorAll('[data-revenue-settlement]').forEach(button => {
-            const active = button.dataset.revenueSettlement === cashSettlement;
+            const active = cashFocus !== 'fees' && button.dataset.revenueSettlement === cashSettlement;
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
             button.tabIndex = active ? 0 : -1;
+        });
+        document.querySelectorAll('[data-revenue-fee-tab]').forEach(button => {
+            const active = cashFocus === 'fees';
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+            button.tabIndex = active ? 0 : -1;
+            const kpi = button.querySelector('[data-revenue-fee-kpi]');
+            if (kpi) {
+                kpi.textContent = cashTabSummaries.settled
+                    ? `\${Number(cashTabSummaries.settled.cash_order_count || 0).toLocaleString('id-ID')} order cair`
+                    : 'Memuat…';
+            }
         });
         renderCashTabSummaries();
     }
 
     async function loadCashTabSummaries(requestedSettlements = [cashSettlement]) {
+        if (!dateRangeReady()) return;
         const token = ++cashTabSummaryToken;
         renderCashTabSummaries();
         const settlements = [...new Set(requestedSettlements)]
@@ -166,6 +179,15 @@
         ].map(([code, label, category]) => [code, label, category, canonicalAmount(code)])
             .filter(([, , , amount]) => amount > 0)
             .map(([code, label, category, amount]) => ({ code, label, category, amount }));
+        const fallbackFeeItems = [
+            ['marketplace_fee', 'Fee marketplace', aggregate.cash_marketplace_fees, 'fee'],
+            ['affiliate_fee', 'Komisi Afiliasi / AMS', aggregate.cash_affiliate_fees, 'affiliate'],
+        ].filter(([, , amount]) => n(amount) > 0).map(([code, label, amount, category]) => ({ code, label, amount: n(amount), category }));
+        const feeItems = canonicalFeeItems.length > 0 ? canonicalFeeItems : fallbackFeeItems;
+        const totalFeeAmount = feeItems.reduce((sum, item) => sum + n(item.amount), 0);
+        const totalFeePercent = settledNetSales > 0
+            ? `\${(totalFeeAmount / settledNetSales * 100).toFixed(1)}% net sales cair`
+            : '—';
         const canonicalFeeCards = canonicalFeeItems.map(item => cashStat(item.label, money(item.amount), `${settledNetSalesPercent(item.amount)} · ${item.category === 'shipping' ? 'logistik' : 'fee'}`, item.category));
         const feeSummaryCards = canonicalFeeCards.length > 0 ? canonicalFeeCards : (isTikTokPlatform
             ? [
@@ -185,10 +207,12 @@
             cashStat('Net Sales', money(netSales), netSalesPercent(netSales), 'accent'),
             cashStat('Net Sales cair', money(settledNetSales), settledNetSalesPercent(settledNetSales), 'settled'),
             cashStat('Payout tercatat', money(aggregate.cash_payout), settledNetSalesPercent(aggregate.cash_payout), 'neutral'),
-            ...feeSummaryCards,
+            cashStat('Fee marketplace', money(totalFeeAmount), totalFeePercent, 'fee'),
             cashStat('Refund / adjustment', money(aggregate.cash_refund), settledNetSalesPercent(aggregate.cash_refund), 'neutral'),
         ].join('') : isFeeFocus ? [
-            ...feeSummaryCards,
+            cashStat('Net Sales cair', money(settledNetSales), settledNetSalesPercent(settledNetSales), 'settled'),
+            cashStat('Total fee marketplace', money(totalFeeAmount), totalFeePercent, 'fee'),
+            cashStat('Order cair', totalOrders, 'Settlement complete', 'neutral'),
         ].join('') : [
             cashStat('Gross Sales', money(grossSales), netSalesPercent(grossSales), 'primary'),
             cashStat('Net Sales', money(netSales), netSalesPercent(netSales), 'accent'),
@@ -200,11 +224,6 @@
         ].join('');
         cashTabSummaries[cashSettlement] = aggregate;
         renderCashTabSummaries();
-        const fallbackFeeItems = [
-            ['marketplace_fee', 'Fee marketplace', aggregate.cash_marketplace_fees, 'fee'],
-            ['affiliate_fee', 'Komisi Afiliasi / AMS', aggregate.cash_affiliate_fees, 'affiliate'],
-        ].filter(([, , amount]) => n(amount) > 0).map(([code, label, amount, category]) => ({ code, label, amount: n(amount), category }));
-        const feeItems = canonicalFeeItems.length > 0 ? canonicalFeeItems : fallbackFeeItems;
         const sellerFeeItems = feeItems.filter(item => item.code !== 'shipping_subsidy' && item.category !== 'platform');
         const platformFeeItems = feeItems.filter(item => item.code === 'shipping_subsidy' || item.category === 'platform');
         const feeBurdenSection = (title, subtitle, items, tone, icon, emptyLabel) => {
@@ -214,8 +233,8 @@
                 : `<div class="an-fee-burden-empty">${emptyLabel}</div>`;
             return `<section class="an-fee-burden an-fee-burden-${tone}" aria-label="${title}"><div class="an-fee-burden-head"><span class="an-fee-burden-icon" aria-hidden="true"><i class="bi ${icon}"></i></span><div><strong>${title}</strong><small>${subtitle}</small></div><b>${items.length ? money(total) : '—'}</b></div><div class="an-fee-burden-list">${rows}</div></section>`;
         };
-        const feeBreakdown = (isCombined || isFeeFocus)
-            ? `<section class="an-revenue-fee-breakdown" aria-label="Rincian fee marketplace"><div class="an-revenue-fee-breakdown-head"><div><strong>Fee marketplace</strong><small>Basis biaya: Net Sales Cair</small></div></div><div class="an-fee-burden-grid">${feeBurdenSection('Ditanggung penjual', `${sellerFeeItems.length} komponen`, sellerFeeItems, 'seller', 'bi-receipt', 'Tidak ada fee penjual')}${feeBurdenSection('Ditanggung platform', `${platformFeeItems.length} komponen`, platformFeeItems, 'platform', 'bi-building-check', 'Tidak ada subsidi platform')}</div></section>`
+        const feeBreakdown = isFeeFocus
+            ? `<section class="an-revenue-fee-breakdown" aria-label="Rincian fee marketplace"><div class="an-revenue-fee-breakdown-head"><div><strong>Fee marketplace</strong><small>Basis biaya: Net Sales Cair</small></div><div class="an-revenue-fee-breakdown-total"><strong>${money(totalFeeAmount)}</strong><small>${totalFeePercent}</small></div></div><div class="an-fee-burden-grid">${feeBurdenSection('Ditanggung penjual', `${sellerFeeItems.length} komponen`, sellerFeeItems, 'seller', 'bi-receipt', 'Tidak ada fee penjual')}${feeBurdenSection('Ditanggung platform', `${platformFeeItems.length} komponen`, platformFeeItems, 'platform', 'bi-building-check', 'Tidak ada subsidi platform')}</div></section>`
             : '';
         const renderRows = groupRows => groupRows.map(row => {
             const rowSettled = Boolean(row.settlement_time);
@@ -247,6 +266,10 @@
         syncRevenueOrdersView();
     }
     function closeCashOrders() {
+        cashRequestToken++;
+        cashAbortController?.abort();
+        cashAbortController = null;
+        cashLoading = false;
         $('cashOrdersModal').classList.remove('is-open');
         $('cashOrdersModal').setAttribute('aria-hidden', 'true');
         document.body.classList.remove('an-modal-open');
@@ -262,7 +285,11 @@
         });
     }
     async function loadCashOrders() {
-        if (cashLoading) return;
+        if (!dateRangeReady()) return;
+        const requestToken = ++cashRequestToken;
+        cashAbortController?.abort();
+        const controller = new AbortController();
+        cashAbortController = controller;
         cashLoading = true;
         $('cashOrdersBody').innerHTML = stateMarkup('loading', 'Memuat order…');
         $('revenueOrdersBody')?.setAttribute('aria-busy', 'true');
@@ -276,9 +303,12 @@
             const params = new URLSearchParams({ date_from: from(), date_to: to(), settlement: cashSettlement, page: String(cashPage), per_page: '50', _ts: Date.now().toString() });
             if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
-            cashPayload = await api('/api/marketplace/analytics-cash-orders?' + params.toString(), { cache: 'no-store' });
+            const payload = await api('/api/marketplace/analytics-cash-orders?' + params.toString(), { cache: 'no-store', signal: controller.signal });
+            if (requestToken !== cashRequestToken) return;
+            cashPayload = payload;
             renderCashOrders();
         } catch (e) {
+            if (requestToken !== cashRequestToken || isAbortError(e)) return;
             console.error('Cash order detail load failed', e);
             $('cashOrdersSummary').innerHTML = stateMarkup('error', 'Ringkasan order cair gagal dimuat');
             $('cashOrdersBody').innerHTML = stateMarkup('error', 'Detail order cair gagal dimuat');
@@ -286,7 +316,9 @@
             $('cashOrdersPageMeta').textContent = 'Coba lagi';
             syncRevenueOrdersView();
         } finally {
+            if (requestToken !== cashRequestToken) return;
             cashLoading = false;
+            cashAbortController = null;
             $('revenueOrdersBody')?.setAttribute('aria-busy', 'false');
             if (cashPayload) renderCashOrders();
             else syncRevenueOrdersView();
@@ -342,6 +374,10 @@
         $('returnOrdersNext').disabled = returnLoading || currentPage >= lastPage;
     }
     function closeReturnOrders() {
+        returnRequestToken++;
+        returnAbortController?.abort();
+        returnAbortController = null;
+        returnLoading = false;
         $('returnOrdersModal').classList.remove('is-open');
         $('returnOrdersModal').setAttribute('aria-hidden', 'true');
         document.body.classList.remove('an-modal-open');
@@ -355,7 +391,11 @@
         });
     }
     async function loadReturnOrders() {
-        if (returnLoading) return;
+        if (!dateRangeReady()) return;
+        const requestToken = ++returnRequestToken;
+        returnAbortController?.abort();
+        const controller = new AbortController();
+        returnAbortController = controller;
         returnLoading = true;
         $('returnOrdersBody').innerHTML = stateMarkup('loading', 'Memuat data return…');
         $('returnOrdersSummary').innerHTML = stateMarkup('loading', 'Memuat ringkasan…');
@@ -365,15 +405,20 @@
             const params = new URLSearchParams({ date_from: from(), date_to: to(), type: returnType, page: String(returnPage), per_page: '50', _ts: Date.now().toString() });
             if (selectedPlatform()) params.set('platform', selectedPlatform());
             if (selectedStore()) params.set('store_id', selectedStore());
-            returnPayload = await api('/api/marketplace/analytics-return-orders?' + params.toString(), { cache: 'no-store' });
+            const payload = await api('/api/marketplace/analytics-return-orders?' + params.toString(), { cache: 'no-store', signal: controller.signal });
+            if (requestToken !== returnRequestToken) return;
+            returnPayload = payload;
             renderReturnOrders();
         } catch (e) {
+            if (requestToken !== returnRequestToken || isAbortError(e)) return;
             console.error('Return detail load failed', e);
             $('returnOrdersSummary').innerHTML = stateMarkup('error', 'Ringkasan return gagal dimuat');
             $('returnOrdersBody').innerHTML = stateMarkup('error', 'Data return gagal dimuat');
             $('returnOrdersPage').textContent = '—';
         } finally {
+            if (requestToken !== returnRequestToken) return;
             returnLoading = false;
+            returnAbortController = null;
             if (returnPayload) renderReturnOrders();
         }
     }

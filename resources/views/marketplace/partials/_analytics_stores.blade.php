@@ -58,12 +58,12 @@
             <section class="an-portfolio-subsection an-portfolio-table-section">
                 <div class="an-portfolio-subsection-head">
                     <div>
-                        <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store ledger</div>
-                        <div class="an-card-title">Performa per toko</div>
-                        <div class="an-card-sub">Settlement complete, item valid, dan HPP tersedia.</div>
+                        <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store performance accrual</div>
+                        <div class="an-card-title">Performa toko akrual</div>
+                        <div class="an-card-sub">Pengakuan order dan GMV pada periode berjalan; payout dan profit ditampilkan sebagai pencatatan biaya/pencairan.</div>
                     </div>
                 </div>
-                <div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order eligible</th><th>Selesai</th><th>Cancel</th><th>Gross sales terverifikasi</th><th>Adm fee aktual</th><th>Biaya iklan</th><th>Profit operasional</th></tr></thead><tbody id="storeBody"><tr><td colspan="8"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div>
+                <div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order masuk</th><th>Selesai</th><th>Cancel</th><th>Refund</th><th>GMV akrual</th><th>Payout tercatat</th><th>Adm fee tercatat</th><th>Biaya iklan</th><th>Profit operasional tercatat</th></tr></thead><tbody id="storeBody"><tr><td colspan="10"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div>
             </section>
             <section class="an-portfolio-subsection">
                 <div class="an-portfolio-subsection-head">

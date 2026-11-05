@@ -35,7 +35,8 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertSee('Menunggu konfirmasi')
             ->assertSee('Dibatalkan')
             ->assertSee('Return / Refund')
-            ->assertSee('Adm fee aktual')
+            ->assertSee('Fee Marketplace')
+            ->assertSee('Adm fee tercatat')
             ->assertSee('<th>Biaya iklan</th>', false);
 
         $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?date_from=2099-01-01&date_to=2099-01-31');
@@ -263,6 +264,69 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             'date_to' => '2026-09-30',
             'settlement' => 'unsettled',
         ]))->assertOk()->assertJsonPath('meta.total', 4);
+    }
+
+    public function test_cash_orders_cancelled_tab_keeps_operational_count_without_counting_revenue(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-CANCELLED']);
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'CANCELLED-TEST',
+            'name' => 'Cancelled Test Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'CANCELLED-1',
+            'channel_order_id' => 'CANCELLED-1',
+            'order_status' => 'CANCELLED',
+            'status' => 'cancelled',
+            'total_amount' => 125000,
+            'total_paid_customer' => 125000,
+            'subtotal_items' => 125000,
+            'order_date' => '2026-09-20 10:00:00',
+            'ordered_at' => '2026-09-20 10:00:00',
+            'raw_json' => [],
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
+            'store_id' => $store->id,
+            'date_from' => '2026-09-01',
+            'date_to' => '2026-09-30',
+            'settlement' => 'cancelled',
+        ]));
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('summary.cash_order_count', 1)
+            ->assertJsonPath('summary.cash_gross_sales', 125000)
+            ->assertJsonPath('summary.cash_order_revenue', 0);
+    }
+
+    public function test_analytics_rejects_store_and_platform_mismatch(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-SCOPE']);
+        $shopee = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $shopee->id,
+            'code' => 'SCOPE-SHOPEE',
+            'name' => 'Scope Shopee',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/marketplace/analytics-kpis?' . http_build_query([
+                'store_id' => $store->id,
+                'platform' => 'tiktok',
+                'date_from' => '2026-09-01',
+                'date_to' => '2026-09-30',
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['store_id']);
     }
 
     public function test_tiktok_finance_refund_is_visible_without_marketplace_return_feed(): void

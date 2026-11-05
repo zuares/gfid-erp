@@ -6,8 +6,9 @@
         const current = selectedStore() || String(initialStore || '');
         const platform = selectedPlatform();
         const unique = new Map(stores
-            .filter(store => store && store.id && store.is_active !== false)
+            .filter(store => store && store.id)
             .filter(store => !platform || String(store.channel?.code || '').toLowerCase() === platform)
+            .filter(store => store.is_active !== false || String(store.id) === current)
             .map(store => [String(store.id), store.name || `Toko #${store.id}`]));
         $('anStore').innerHTML = '<option value="">Semua toko</option>' + [...unique.entries()]
             .sort((a,b) => a[1].localeCompare(b[1]))
@@ -416,15 +417,15 @@
     }
     function renderStorePerformance({ pulseId, costPulseId, ledgerBodyId }) {
         const list = summary?.stores || [];
-        const contributing = list.filter(store => Number(store.gross_sales || 0) > 0);
-        const totalGross = contributing.reduce((sum, store) => sum + Number(store.gross_sales || 0), 0);
-        const top = [...contributing].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0))[0];
+        const contributing = list.filter(store => Number(store.placed_order_count || 0) > 0 || Number(store.gmv || 0) > 0);
+        const totalGross = contributing.reduce((sum, store) => sum + Number(store.gmv || 0), 0);
+        const top = [...contributing].sort((a,b) => Number(b.gmv || 0) - Number(a.gmv || 0))[0];
         const bestMargin = [...contributing].sort((a,b) => Number(b.margin_pct || 0) - Number(a.margin_pct || 0))[0];
         const pulseElement = $(pulseId);
         if (pulseElement) {
             pulseElement.innerHTML = [
-                ['Toko berkontribusi', Number(contributing.length || 0).toLocaleString('id-ID'), 'dengan gross sales terverifikasi'],
-                ['Kontributor utama', top?.store_name || '—', top ? `${(Number(top.gross_sales || 0) / Math.max(totalGross,1) * 100).toFixed(1)}% gross sales` : '—'],
+                ['Toko aktif', Number(contributing.length || 0).toLocaleString('id-ID'), 'dengan order aktual pada periode'],
+                ['Kontributor utama', top?.store_name || '—', top ? `${(Number(top.gmv || 0) / Math.max(totalGross,1) * 100).toFixed(1)}% GMV akrual` : '—'],
                 ['Margin terbaik', bestMargin?.store_name || '—', bestMargin ? `${Number(bestMargin.margin_pct || 0).toFixed(1)}% profit operasional` : '—'],
             ].map(([label,value,note]) => `<div class="an-pulse"><div class="an-pulse-label">${label}</div><div class="an-pulse-value" style="font-size:${String(value).length > 16 ? '.78rem' : '1rem'}">${esc(value)}</div><div class="an-pulse-note">${note}</div></div>`).join('');
         }
@@ -432,16 +433,16 @@
         const costPulseElement = $(costPulseId);
         if (costPulseElement) {
             costPulseElement.innerHTML = [
-                ['Payout / gross sales', list.reduce((sum, store) => sum + Number(store.payout || 0), 0) / storeBase * 100],
-                ['Fee marketplace / gross sales', list.reduce((sum, store) => sum + Number(store.marketplace_fees || 0), 0) / storeBase * 100],
-                ['HPP / gross sales', list.reduce((sum, store) => sum + Number(store.hpp || 0), 0) / storeBase * 100],
-                ['Iklan / gross sales', list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0) / storeBase * 100],
-            ].map(([label,value]) => `<div class="an-health-row"><span>${label}<small>basis: gross sales terverifikasi</small></span><div class="an-health-track"><span style="width:${Math.min(100, Math.max(0, value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');
+                ['Payout / GMV akrual', list.reduce((sum, store) => sum + Number(store.payout || 0), 0) / storeBase * 100],
+                ['Fee marketplace / GMV akrual', list.reduce((sum, store) => sum + Number(store.marketplace_fees || 0), 0) / storeBase * 100],
+                ['HPP / GMV akrual', list.reduce((sum, store) => sum + Number(store.hpp || 0), 0) / storeBase * 100],
+                ['Iklan / GMV akrual', list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0) / storeBase * 100],
+            ].map(([label,value]) => `<div class="an-health-row"><span>${label}<small>basis: GMV akrual</small></span><div class="an-health-track"><span style="width:${Math.min(100, Math.max(0, value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');
         }
         const ledgerElement = $(ledgerBodyId);
         if (ledgerElement) {
-            const rows = [...list].sort((a,b) => Number(b.gross_sales || 0) - Number(a.gross_sales || 0));
-            ledgerElement.innerHTML = rows.length ? rows.map(store => `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.order_total || 0).toLocaleString('id-ID')}</td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.order_total)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(store.gross_sales)}<span class="an-table-subline">AOV financial-ready ${money(store.order_count ? store.gross_sales / store.order_count : 0)}</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">komisi platform actual</span></td><td style="font-weight:900;color:#b45309" title="${store.ad_cost_source === 'platform_transaction_fallback' ? 'Fallback dari mutasi transaksi platform' : 'Ads API / import'}">${money(store.ad_cost)}<span class="an-table-subline">${store.ad_cost_source === 'platform_transaction_fallback' ? 'mutasi platform aktual' : 'iklan incl. PPN'}</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Payout − HPP − iklan</span></td></tr>`).join('') : `<tr><td colspan="8">${stateMarkup('empty', 'Belum ada data toko siap profit', 'Belum ada toko yang memenuhi kriteria financial-ready.')}</td></tr>`;
+            const rows = [...list].sort((a,b) => Number(b.gmv || 0) - Number(a.gmv || 0));
+            ledgerElement.innerHTML = rows.length ? rows.map(store => `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.placed_order_count || 0).toLocaleString('id-ID')}</td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.placed_order_count)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.cancelled_count,store.placed_order_count)})</small></td><td style="color:${store.return_refund_count?'#b45309':'inherit'}">${Number(store.return_refund_count || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(store.gmv)}<span class="an-table-subline">GMV eligible akrual</span></td><td style="font-weight:900">${money(store.payout)}<span class="an-table-subline">settlement tercatat</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">komisi platform tercatat</span></td><td style="font-weight:900;color:#b45309" title="${store.ad_cost_source === 'platform_transaction_fallback' ? 'Fallback dari mutasi transaksi platform' : 'Ads API / import'}">${money(store.ad_cost)}<span class="an-table-subline">${store.ad_cost_source === 'platform_transaction_fallback' ? 'mutasi platform tercatat' : 'iklan incl. PPN'}</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Payout tercatat − HPP − iklan</span></td></tr>`).join('') : `<tr><td colspan="10">${stateMarkup('empty', 'Belum ada data performa toko', 'Belum ada order pada filter aktif.')}</td></tr>`;
         }
     }
     function renderMarketplaceCosts(targetId) {
