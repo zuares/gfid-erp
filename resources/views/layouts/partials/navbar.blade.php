@@ -248,16 +248,17 @@ if ($navShowBell) {
         margin-inline-start: auto;
     }
 
-    /* Bell menjadi action paling kanan pada mobile dan desktop. */
+    /* Notification tetap di kanan, dengan menu role/user menjadi action
+       paling ujung pada desktop. */
     .app-navbar .navbar-actions > #notifWrapper {
-        order: 5;
+        order: 4;
         position: relative;
     }
 
     .app-navbar .navbar-actions > .theme-toggle-btn { order: 1; }
     .app-navbar .navbar-actions > .mobile-logout-btn { order: 2; }
     .app-navbar .navbar-actions > .mobile-menu-btn { order: 3; }
-    .app-navbar .navbar-actions > .desktop-nav { order: 4; }
+    .app-navbar .navbar-actions > .desktop-nav { order: 5; }
 
     /* BRAND */
     .app-navbar .navbar-brand {
