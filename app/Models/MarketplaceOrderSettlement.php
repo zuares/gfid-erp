@@ -568,7 +568,7 @@ class MarketplaceOrderSettlement extends Model
 
             return abs((float) $value);
         };
-        $push = static function (array &$rows, array &$seen, string $code, string $label, mixed $value, string $category, ?string $source = null) use ($amountOf): void {
+        $push = static function (array &$rows, array &$seen, string $code, string $label, mixed $value, string $category, ?string $source = null, ?string $burden = null) use ($amountOf): void {
             $amount = $amountOf($value);
             if ($amount <= 0) {
                 return;
@@ -585,12 +585,9 @@ class MarketplaceOrderSettlement extends Model
                 'label' => $label,
                 'amount' => round($amount, 2),
                 'category' => $category,
-                // Shipping paid to the courier is tracked as a logistics cost,
-                // not as seller fee. It remains visible in the dedicated
-                // Ongkir & logistik section and in the order total.
-                'burden' => $code === 'shipping_subsidy' || $category === 'platform'
+                'burden' => $burden ?? ($code === 'shipping_subsidy' || $category === 'platform'
                     ? 'platform'
-                    : ($code === 'shipping_cost' ? 'logistics' : 'seller'),
+                    : ($code === 'shipping_cost' ? 'logistics' : 'seller')),
             ];
             if ($source) {
                 $row['source'] = $source;
@@ -647,7 +644,7 @@ class MarketplaceOrderSettlement extends Model
                 $push($rows, $seen, 'tax', 'Pajak', $value, 'tax', 'tiktok_fee_breakdown.taxes.'.(string) $key);
             }
 
-            $push($rows, $seen, 'shipping_cost', 'Biaya Logistik Seller · potongan settlement', $raw['shipping_cost_amount'] ?? null, 'shipping', 'shipping_cost_amount');
+            $push($rows, $seen, 'shipping_cost', 'Biaya Logistik Seller · potongan settlement', $raw['shipping_cost_amount'] ?? null, 'shipping', 'shipping_cost_amount', 'seller');
             $push($rows, $seen, 'shipping_subsidy', 'Subsidi / Potongan Ongkir', data_get($raw, 'tiktok_shipping_breakdown.shipping_fee_discount_amount'), 'shipping', 'tiktok_shipping_breakdown.shipping_fee_discount_amount');
             $tiktokShippingCost = $amountOf($raw['shipping_cost_amount'] ?? null);
             $tiktokShippingSubsidy = $amountOf(data_get($raw, 'tiktok_shipping_breakdown.shipping_fee_discount_amount'));

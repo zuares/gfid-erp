@@ -432,12 +432,16 @@ class MarketplaceAnalyticsSummaryService
             ->orderByDesc('mo.ordered_at')
             ->paginate($perPage, ['*'], 'page', $page);
 
+        $orderIds = collect($paginator->items())->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $internalCategoriesByOrder = $this->internalCategoriesByOrderIds($orderIds);
+        $internalItemQtyByOrder = $this->internalItemQtyByOrderIds($orderIds);
+
         $marketplaceFee = fn ($row): float => collect(self::MARKETPLACE_FEE_FIELDS)
             ->sum(fn (string $field) => (float) ($row->{$field} ?? 0));
         $affiliateFee = fn ($row): float => collect(self::AFFILIATE_FEE_FIELDS)
             ->sum(fn (string $field) => (float) ($row->{$field} ?? 0));
 
-        $data = collect($paginator->items())->map(function ($row) use ($marketplaceFee, $affiliateFee): array {
+        $data = collect($paginator->items())->map(function ($row) use ($marketplaceFee, $affiliateFee, $internalCategoriesByOrder, $internalItemQtyByOrder): array {
             $grossSales = $this->cashOrderGrossSales($row);
             $marketplaceFees = $marketplaceFee($row);
             $affiliateFees = $affiliateFee($row);
@@ -468,6 +472,9 @@ class MarketplaceAnalyticsSummaryService
                 'channel_order_id' => (string) ($row->channel_order_id ?: $row->external_order_id ?: "#{$row->id}"),
                 'store_id' => (int) $row->store_id,
                 'store_name' => (string) ($row->store_name ?: 'Tanpa toko'),
+                'internal_categories' => $internalCategoriesByOrder[(int) $row->id] ?? ['Belum termapping'],
+                'internal_category' => implode(', ', $internalCategoriesByOrder[(int) $row->id] ?? ['Belum termapping']),
+                'internal_item_qty' => $internalItemQtyByOrder[(int) $row->id] ?? 0,
                 'status' => (string) ($row->order_status ?: $row->status ?: '-'),
                 'status_group' => $statusGroup['key'],
                 'status_group_label' => $statusGroup['label'],
@@ -709,6 +716,117 @@ class MarketplaceAnalyticsSummaryService
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * Resolve the internal item categories for only the paginated orders shown
+     * in the drill-down. Both the canonical and legacy item foreign keys are
+     * supported because historical marketplace rows can use either one.
+     *
+     * @param  array<int, int>  $orderIds
+     * @return array<int, array<int, string>>
+     */
+    private function internalCategoriesByOrderIds(array $orderIds): array
+    {
+        $orderIds = collect($orderIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $categories = $orderIds->mapWithKeys(fn (int $id): array => [$id => []])->all();
+        if ($orderIds->isEmpty()) {
+            return $categories;
+        }
+
+        $items = DB::table('marketplace_order_items as oi')
+            ->leftJoin('items as i', function ($join): void {
+                $join->on('i.id', '=', 'oi.internal_item_id')
+                    ->orOn('i.id', '=', 'oi.item_id');
+            })
+            ->leftJoin('item_categories as ic', 'ic.id', '=', 'i.item_category_id')
+            ->where(function ($query) use ($orderIds): void {
+                $query->whereIn('oi.marketplace_order_id', $orderIds->all())
+                    ->orWhereIn('oi.order_id', $orderIds->all());
+            })
+            ->select([
+                'oi.marketplace_order_id',
+                'oi.order_id',
+                'ic.name as category_name',
+            ])
+            ->get();
+
+        foreach ($items as $item) {
+            $category = trim((string) ($item->category_name ?? ''));
+            if ($category === '') {
+                continue;
+            }
+
+            foreach (array_unique([(int) $item->marketplace_order_id, (int) $item->order_id]) as $orderId) {
+                if ($orderId <= 0 || ! array_key_exists($orderId, $categories)) {
+                    continue;
+                }
+
+                if (! in_array($category, $categories[$orderId], true)) {
+                    $categories[$orderId][] = $category;
+                }
+            }
+        }
+
+        foreach ($categories as $orderId => $orderCategories) {
+            if ($orderCategories === []) {
+                $categories[$orderId] = ['Belum termapping'];
+            }
+        }
+
+        return $categories;
+    }
+
+    /**
+     * Sum ordered quantities for the paginated drill-down rows. The query
+     * reads both canonical and legacy foreign keys, but each item row is
+     * counted only once.
+     *
+     * @param  array<int, int>  $orderIds
+     * @return array<int, int>
+     */
+    private function internalItemQtyByOrderIds(array $orderIds): array
+    {
+        $orderIds = collect($orderIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $quantities = $orderIds->mapWithKeys(fn (int $id): array => [$id => 0])->all();
+        if ($orderIds->isEmpty()) {
+            return $quantities;
+        }
+
+        $items = DB::table('marketplace_order_items as oi')
+            ->where(function ($query) use ($orderIds): void {
+                $query->whereIn('oi.marketplace_order_id', $orderIds->all())
+                    ->orWhereIn('oi.order_id', $orderIds->all());
+            })
+            ->select([
+                'oi.marketplace_order_id',
+                'oi.order_id',
+                'oi.qty',
+            ])
+            ->get();
+
+        foreach ($items as $item) {
+            $qty = max(0, (int) ($item->qty ?? 0));
+            foreach (array_unique([(int) $item->marketplace_order_id, (int) $item->order_id]) as $orderId) {
+                if ($orderId <= 0 || ! array_key_exists($orderId, $quantities)) {
+                    continue;
+                }
+
+                $quantities[$orderId] += $qty;
+            }
+        }
+
+        return $quantities;
     }
 
     private function cashOrderGrossSales($row): float

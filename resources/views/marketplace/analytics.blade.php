@@ -1829,7 +1829,6 @@
     .an-fee-affiliate-amount { color: #7c3aed; }
     .an-fee-logistics-amount { color: #087f86; }
     .an-fee-seller-logistics-amount { color: #0f766e; }
-    .an-fee-reversal-amount { color: var(--gf-color-danger, #d6455d) !important; }
     .an-fee-refund-row { background: color-mix(in srgb, var(--gf-color-danger, #d6455d) 3%, var(--gf-color-surface, #fff)); }
     .an-fee-refund-badge { display: inline-flex; align-items: center; gap: .25rem; margin-top: .28rem; padding: .18rem .38rem; border-radius: 999px; color: var(--gf-color-danger, #d6455d); background: color-mix(in srgb, var(--gf-color-danger, #d6455d) 10%, transparent); font-size: .57rem; font-weight: 800; line-height: 1.2; }
     .an-fee-refund-note { display: flex; align-items: flex-start; gap: .55rem; margin: .75rem; padding: .65rem .7rem; border: 1px solid color-mix(in srgb, var(--gf-color-danger, #d6455d) 22%, var(--gf-color-line, #e4e7ec)); border-radius: var(--gf-radius-control, 10px); color: var(--gf-color-danger, #d6455d); background: color-mix(in srgb, var(--gf-color-danger, #d6455d) 6%, var(--gf-color-surface, #fff)); }

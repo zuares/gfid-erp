@@ -221,6 +221,69 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertJsonPath('data.0.status_group_label', 'Menunggu konfirmasi');
     }
 
+    public function test_cash_orders_exposes_internal_item_category_in_fee_drilldown(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-CATEGORY']);
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'CATEGORY-TEST',
+            'name' => 'Category Test Store',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => 'CATEGORY-ORDER-1',
+            'channel_order_id' => 'CATEGORY-ORDER-1',
+            'order_status' => 'COMPLETED',
+            'status' => 'completed',
+            'total_amount' => 150000,
+            'total_paid_customer' => 150000,
+            'subtotal_items' => 150000,
+            'order_date' => '2026-09-20 10:00:00',
+            'ordered_at' => '2026-09-20 10:00:00',
+            'raw_json' => [],
+        ]);
+        $category = ItemCategory::create(['code' => 'OUTERWEAR', 'name' => 'Outerwear', 'active' => true]);
+        $item = Item::create([
+            'code' => 'JACKET-CATEGORY-1',
+            'name' => 'Jaket Category Test',
+            'unit' => 'pcs',
+            'type' => 'finished',
+            'item_category_id' => $category->id,
+            'active' => true,
+        ]);
+        MarketplaceOrderItem::create([
+            'order_id' => $order->id,
+            'internal_item_id' => $item->id,
+            'item_name_snapshot' => $item->name,
+            'qty' => 2,
+            'line_net_amount' => 150000,
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'settlement_time' => '2026-09-21 10:00:00',
+            'data_status' => 'complete',
+            'final_income' => 150000,
+            'raw_json' => ['source' => 'tiktok_finance_202501_order_statement_transactions'],
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
+                'store_id' => $store->id,
+                'date_from' => '2026-09-01',
+                'date_to' => '2026-09-30',
+                'settlement' => 'settled',
+            ]))
+            ->assertOk()
+            ->assertJsonPath('data.0.internal_category', 'Outerwear')
+            ->assertJsonPath('data.0.internal_categories.0', 'Outerwear')
+            ->assertJsonPath('data.0.internal_item_qty', 2);
+    }
+
     public function test_cash_orders_shipped_tab_includes_ready_to_ship_and_processed_orders(): void
     {
         $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-SHIPPED']);
@@ -338,7 +401,12 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
                 'settlement_time' => '2026-09-12 10:00:00',
                 'data_status' => 'complete',
                 'final_income' => 100000 - $commission,
-                'raw_json' => ['order_selling_price' => 100000],
+                'raw_json' => $store->id === $tiktokStore->id
+                    ? [
+                        'source' => 'tiktok_finance_202501_order_statement_transactions',
+                        'shipping_cost_amount' => -2500,
+                    ]
+                    : ['order_selling_price' => 100000],
             ]);
         }
 
@@ -350,6 +418,10 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
         $all = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?'.http_build_query($query));
         $all->assertOk()->assertJsonPath('meta.total', 2);
         $this->assertCount(2, $all->json('fee_by_store'));
+        $this->assertSame(2500.0, (float) collect($all->json('fee_by_type'))
+            ->where('code', 'shipping_cost')
+            ->where('burden', 'seller')
+            ->sum('amount'));
 
         $filtered = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?'.http_build_query(array_merge($query, [
             'platform' => 'shopee',

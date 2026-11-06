@@ -37,7 +37,7 @@ class MarketplaceOrderSettlementAnalyticsBreakdownTest extends TestCase
         $this->assertSame(1250.0, $this->amountFor($rows, 'order_processing_fee'));
         $this->assertSame(9945.0, $this->amountFor($rows, 'affiliate_fee'));
         $this->assertSame('affiliate', $this->categoryFor($rows, 'affiliate_fee'));
-        $this->assertSame('logistics', collect($rows)->firstWhere('code', 'shipping_cost')['burden']);
+        $this->assertSame('seller', collect($rows)->firstWhere('code', 'shipping_cost')['burden']);
         $this->assertSame(990.0, $this->amountFor($rows, 'shipping_difference'));
         $this->assertSame('seller', collect($rows)->firstWhere('code', 'shipping_difference')['burden']);
         $this->assertSame('Selisih Ongkir', collect($rows)->firstWhere('code', 'shipping_difference')['label']);
@@ -85,6 +85,7 @@ class MarketplaceOrderSettlementAnalyticsBreakdownTest extends TestCase
         )));
 
         $this->assertSame('Premi Shopee · potongan settlement', collect($rows)->firstWhere('code', 'insurance_fee')['label']);
+        $this->assertSame('seller', collect($rows)->firstWhere('code', 'insurance_fee')['burden']);
     }
 
     public function test_shopee_shipping_difference_is_a_seller_burden(): void
