@@ -415,7 +415,25 @@
         const score = inverse ? 100 - Number(value || 0) : Number(value || 0);
         return score >= 85 ? '' : (score >= 65 ? 'warn' : 'bad');
     }
-    function renderStorePerformance({ pulseId, costPulseId, ledgerBodyId }) {
+    function renderShippingPerformance() {
+        const element = $('anOverviewShippingPerformance');
+        if (!element) return;
+        const current = summary?.current || {};
+        const total = Number(current.placed_order_count ?? current.order_total ?? 0);
+        const items = [
+            ['Perlu dikirim', 'bi-box-seam', Number(current.ready_to_ship_count || 0), 'warn'],
+            ['Sedang dikirim', 'bi-truck', Number(current.in_transit_count || 0), ''],
+            ['Menunggu konfirmasi', 'bi-hourglass-split', Number(current.confirmation_count || 0), 'warn'],
+            ['Selesai', 'bi-check2-circle', Number(current.completed_count || 0), ''],
+            ['Dibatalkan', 'bi-x-circle', Number(current.cancelled_count || 0), 'danger'],
+            ['Refund', 'bi-arrow-counterclockwise', Number(current.return_refund_order_count ?? current.return_refund_count ?? 0), 'danger'],
+        ];
+        element.innerHTML = items.map(([label, icon, value, tone]) => {
+            const percentage = total > 0 ? value / total * 100 : 0;
+            return `<article class="an-shipping-card ${tone}" aria-label="${label}: ${value.toLocaleString('id-ID')} order, ${percentage.toFixed(1)}%"><div class="an-shipping-card-head"><span class="an-shipping-card-label"><i class="bi ${icon}" aria-hidden="true"></i>${label}</span><strong class="an-shipping-card-value">${value.toLocaleString('id-ID')}</strong></div><div class="an-shipping-track" aria-hidden="true"><span style="width:${Math.min(100, Math.max(0, percentage)).toFixed(1)}%"></span></div><div class="an-shipping-card-meta"><span>${percentage.toFixed(1)}% dari order masuk</span><span>Periode aktif</span></div></article>`;
+        }).join('');
+    }
+    function renderStorePerformance({ pulseId, costPulseId, ledgerBodyId, compactLedger = false }) {
         const list = summary?.stores || [];
         const contributing = list.filter(store => Number(store.placed_order_count || 0) > 0 || Number(store.gmv || 0) > 0);
         const totalGross = contributing.reduce((sum, store) => sum + Number(store.gmv || 0), 0);
@@ -442,7 +460,10 @@
         const ledgerElement = $(ledgerBodyId);
         if (ledgerElement) {
             const rows = [...list].sort((a,b) => Number(b.gmv || 0) - Number(a.gmv || 0));
-            ledgerElement.innerHTML = rows.length ? rows.map(store => `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.placed_order_count || 0).toLocaleString('id-ID')}</td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.placed_order_count)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.cancelled_count,store.placed_order_count)})</small></td><td style="color:${store.return_refund_count?'#b45309':'inherit'}">${Number(store.return_refund_count || 0).toLocaleString('id-ID')}</td><td style="font-weight:900">${money(store.gmv)}<span class="an-table-subline">GMV eligible akrual</span></td><td style="font-weight:900;color:#b45309">${money(store.unsettled_gmv)}<span class="an-table-subline">${Number(store.unsettled_order_count || 0).toLocaleString('id-ID')} order belum settlement final</span></td><td style="font-weight:900">${money(store.payout)}<span class="an-table-subline">settlement tercatat</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">komisi platform tercatat</span></td><td style="font-weight:900;color:#b45309" title="${store.ad_cost_source === 'platform_transaction_fallback' ? 'Fallback dari mutasi transaksi platform' : 'Ads API / import'}">${money(store.ad_cost)}<span class="an-table-subline">${store.ad_cost_source === 'platform_transaction_fallback' ? 'mutasi platform tercatat' : 'iklan incl. PPN'}</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Payout tercatat − HPP − iklan</span></td></tr>`).join('') : `<tr><td colspan="11">${stateMarkup('empty', 'Belum ada data performa toko', 'Belum ada order pada filter aktif.')}</td></tr>`;
+            ledgerElement.innerHTML = rows.length ? rows.map(store => {
+                const statusCells = compactLedger ? '' : `<td>${Number(store.shipping_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.shipping_count,store.placed_order_count)})</small></td><td>${Number(store.confirmation_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.confirmation_count,store.placed_order_count)})</small></td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.placed_order_count)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.cancelled_count,store.placed_order_count)})</small></td><td style="color:${store.return_refund_count?'#b45309':'inherit'}">${Number(store.return_refund_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.return_refund_count,store.placed_order_count)})</small></td>`;
+                return `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.placed_order_count || 0).toLocaleString('id-ID')}</td>${statusCells}<td style="font-weight:900">${money(store.gmv)}<span class="an-table-subline">Akrual</span></td><td style="font-weight:900;color:#b45309">${money(store.unsettled_gmv)}<span class="an-table-subline">${Number(store.unsettled_order_count || 0).toLocaleString('id-ID')} order</span></td><td style="font-weight:900;color:#b45309">${money(store.return_refund_amount)}<span class="an-table-subline">${Number(store.return_refund_count || 0).toLocaleString('id-ID')} order</span></td><td style="font-weight:900">${money(store.payout)}<span class="an-table-subline">Tercatat</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">Tercatat</span></td><td style="font-weight:900;color:#b45309" title="${store.ad_cost_source === 'platform_transaction_fallback' ? 'Fallback dari mutasi transaksi platform' : 'Ads API / import'}">${money(store.ad_cost)}<span class="an-table-subline">${store.ad_cost_source === 'platform_transaction_fallback' ? 'Mutasi' : 'Ads'}</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Profit operasi</span></td></tr>`;
+            }).join('') : `<tr><td colspan="${compactLedger ? 9 : 14}">${stateMarkup('empty', 'Belum ada data performa toko', 'Belum ada order pada filter aktif.')}</td></tr>`;
         }
     }
     function renderMarketplaceCosts(targetId) {
@@ -677,7 +698,7 @@
         $('anAlerts').innerHTML = alerts.map(([level,icon,title,note,action]) => `<div class="an-alert ${level}"><span class="an-alert-icon"><i class="bi ${icon}"></i></span><div><div class="an-alert-title">${title}</div><div class="an-alert-note">${note}</div></div><span class="an-alert-action">${action}</span></div>`).join('');
         const maxStore = Math.max(...topStores.map(store => Number(store.gross_sales || 0)), 1);
         $('anTopStores').innerHTML = topStores.length ? topStores.map(store => `<div class="an-contribution-row"><div><div class="an-contribution-name">${esc(store.store_name || 'Tanpa toko')}</div><div class="an-contribution-meta">${Number(store.order_count || 0).toLocaleString('id-ID')} order financial-ready · profit ${money(store.operating_profit)}</div><div class="an-contribution-bar"><span style="width:${Math.max(4, Number(store.gross_sales || 0) / maxStore * 100)}%"></span></div></div><div class="an-contribution-value">${money(store.gross_sales)}</div></div>`).join('') : stateMarkup('empty', 'Belum ada kontribusi toko', 'Belum ada kontribusi toko pada periode ini.');
-        renderStorePerformance({ pulseId: 'anOverviewStorePulse', costPulseId: 'anOverviewStoreCostPulse', ledgerBodyId: 'overviewStoreLedgerBody' });
+        renderStorePerformance({ pulseId: 'anOverviewStorePulse', costPulseId: 'anOverviewStoreCostPulse', ledgerBodyId: 'overviewStoreLedgerBody', compactLedger: true });
         const settledGross = Number(current.cash_order_revenue ?? current.cash_gross_sales ?? 0);
         const unsettledGross = Number(current.cash_unsettled_order_revenue ?? Math.max(0, Number(current.gmv || 0) - settledGross));
         const totalOmzet = settledGross + unsettledGross || Number(current.gmv || 0);

@@ -83,6 +83,9 @@ class MarketplaceFinancialDataQualityService
             'shipping_insurance_fee',
             'shipping_insurance',
             'insurance_fee',
+            'premi',
+            'delivery_seller_protection_fee_premium_amount',
+            'shipping_seller_protection_fee_amount',
         ],
         'activity_fee' => [
             'order_ams_commission_fee',

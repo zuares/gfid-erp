@@ -38,7 +38,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertSee('Fee Marketplace')
             ->assertSee('data-an-tab="fees"', false)
             ->assertSee('feeOrdersBody', false)
-            ->assertSee('Adm fee tercatat')
+            ->assertSee('Adm fee')
             ->assertSee('<th>Biaya iklan</th>', false);
 
         $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?date_from=2099-01-01&date_to=2099-01-31');
@@ -338,7 +338,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
                 'settlement_time' => '2026-09-12 10:00:00',
                 'data_status' => 'complete',
                 'final_income' => 100000 - $commission,
-                'raw_json' => [],
+                'raw_json' => ['order_selling_price' => 100000],
             ]);
         }
 
@@ -356,6 +356,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             'store_id' => $shopeeStore->id,
         ])));
         $filtered->assertOk()->assertJsonPath('meta.total', 1);
+        $filtered->assertJsonPath('data.0.net_sales', 100000);
         $this->assertSame(['Fee Filter Shopee'], collect($filtered->json('fee_by_store'))->pluck('store_name')->unique()->values()->all());
         $this->assertSame(10000.0, (float) collect($filtered->json('fee_by_type'))->firstWhere('code', 'platform_commission')['amount']);
     }
@@ -414,7 +415,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             'buyer_payment_amount' => 100000,
             'drc_adjustable_refund' => 70000,
             'final_income' => 30000,
-            'settlement_time' => '2026-10-07 10:00:00',
+            'settlement_time' => null,
             'data_status' => 'complete',
             'raw_json' => [
                 'source' => 'tiktok_finance_202501_order_statement_transactions',
@@ -438,6 +439,11 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('summary.cash_refund', 70000);
 
+        $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?'.$query.'&settlement=unsettled')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 0)
+            ->assertJsonPath('summary.cash_order_count', 0);
+
         $returns = $this->actingAs($user)->getJson('/api/marketplace/analytics-return-orders?'.$query);
         $returns->assertOk()
             ->assertJsonPath('meta.total', 1)
@@ -447,6 +453,69 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
         $this->actingAs($user)->getJson('/api/marketplace/analytics-kpis?'.$query)
             ->assertOk()
             ->assertJsonPath('current.return_refund_amount', 70000);
+    }
+
+    public function test_tiktok_return_requested_reversal_is_in_return_refund_without_fake_refund_amount(): void
+    {
+        $user = User::factory()->create(['role' => 'owner', 'employee_code' => 'ANALYTICS-TIKTOK-REVERSAL']);
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'TIKTOK-REVERSAL-TEST',
+            'name' => 'TikTok Reversal Test',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = MarketplaceOrder::create([
+            'store_id' => $store->id,
+            'external_order_id' => '586671188923679969',
+            'channel_order_id' => '586671188923679969',
+            'order_status' => 'COMPLETED',
+            'status' => 'completed',
+            'total_amount' => 102573,
+            'total_paid_customer' => 103599,
+            'subtotal_items' => 102573,
+            'order_date' => '2026-10-19 15:59:56',
+            'ordered_at' => '2026-10-19 15:59:56',
+            'raw_json' => [
+                'has_return_request' => true,
+                'dispute_reason' => 'Produk tidak sesuai deskripsi (BUYER)',
+            ],
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'drc_adjustable_refund' => 0,
+            'reversal_amount' => 70007,
+            'return_refund_status' => MarketplaceOrderSettlement::RETURN_STATUS_REVERSAL,
+            'reversal_source' => 'tiktok_finance_statement',
+            'final_income' => -70007,
+            'settlement_time' => '2026-10-29 08:22:32',
+            'data_status' => 'complete',
+            'raw_json' => [
+                'source' => 'tiktok_finance_202501_statement_transactions',
+                'revenue_amount' => '0',
+                'settlement_amount' => '-70007',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/marketplace/analytics-cash-orders?' . http_build_query([
+            'store_id' => $store->id,
+            'platform' => 'tiktok',
+            'date_from' => '2026-10-01',
+            'date_to' => '2026-10-31',
+            'settlement' => 'return_refund',
+        ]));
+
+        $response->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.channel_order_id', '586671188923679969')
+            ->assertJsonPath('data.0.status_group', 'return_refund')
+            ->assertJsonPath('data.0.return_refund_status', MarketplaceOrderSettlement::RETURN_STATUS_REVERSAL)
+            ->assertJsonPath('data.0.refund', 0)
+            ->assertJsonPath('data.0.reversal_amount', 70007)
+            ->assertJsonPath('summary.cash_refund', 0);
     }
 
     public function test_cash_orders_exposes_shopee_warehouse_tab_for_kilat_booking(): void

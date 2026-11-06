@@ -30,13 +30,17 @@ class MarketplaceOrderSettlementAnalyticsBreakdownTest extends TestCase
 
         $rows = $settlement->analyticsFeeBreakdown();
 
-        $this->assertSame(6, count($rows));
+        $this->assertSame(7, count($rows));
         $this->assertSame(2707.0, $this->amountFor($rows, 'platform_commission'));
         $this->assertSame(4677.0, $this->amountFor($rows, 'dynamic_commission'));
         $this->assertSame(2339.0, $this->amountFor($rows, 'program_service_fee'));
         $this->assertSame(1250.0, $this->amountFor($rows, 'order_processing_fee'));
         $this->assertSame(9945.0, $this->amountFor($rows, 'affiliate_fee'));
         $this->assertSame('affiliate', $this->categoryFor($rows, 'affiliate_fee'));
+        $this->assertSame('logistics', collect($rows)->firstWhere('code', 'shipping_cost')['burden']);
+        $this->assertSame(990.0, $this->amountFor($rows, 'shipping_difference'));
+        $this->assertSame('seller', collect($rows)->firstWhere('code', 'shipping_difference')['burden']);
+        $this->assertSame('Selisih Ongkir', collect($rows)->firstWhere('code', 'shipping_difference')['label']);
         $this->assertNotContains(21908.0, array_column($rows, 'amount'));
     }
 
@@ -58,10 +62,11 @@ class MarketplaceOrderSettlementAnalyticsBreakdownTest extends TestCase
         $this->assertSame(9253.0, $this->amountFor($rows, 'program_service_fee'));
         $this->assertSame(1250.0, $this->amountFor($rows, 'order_processing_fee'));
         $this->assertSame(6500.0, $this->amountFor($rows, 'shipping_cost'));
+        $this->assertSame('logistics', collect($rows)->firstWhere('code', 'shipping_cost')['burden']);
         $this->assertSame(6500.0, $this->amountFor($rows, 'shipping_subsidy'));
     }
 
-    public function test_shopee_breakdown_surfaces_raw_seller_protection_as_other_fee(): void
+    public function test_shopee_breakdown_surfaces_raw_premium_in_fee_composition(): void
     {
         $settlement = new MarketplaceOrderSettlement();
         $settlement->setRawAttributes([
@@ -75,9 +80,70 @@ class MarketplaceOrderSettlementAnalyticsBreakdownTest extends TestCase
         $rows = $settlement->analyticsFeeBreakdown();
 
         $this->assertSame(475.0, array_sum(array_map(
-            fn (array $row): float => ($row['code'] ?? null) === 'other_fee' ? (float) $row['amount'] : 0.0,
+            fn (array $row): float => ($row['code'] ?? null) === 'insurance_fee' ? (float) $row['amount'] : 0.0,
             $rows,
         )));
+
+        $this->assertSame('Premi Shopee · potongan settlement', collect($rows)->firstWhere('code', 'insurance_fee')['label']);
+    }
+
+    public function test_shopee_shipping_difference_is_a_seller_burden(): void
+    {
+        $settlement = new MarketplaceOrderSettlement();
+        $settlement->setRawAttributes([
+            'actual_shipping_fee' => 10000,
+            'shipping_fee_subsidy' => 7000,
+            'raw_json' => ['buyer_paid_shipping_fee' => 1000],
+        ], true);
+
+        $rows = $settlement->analyticsFeeBreakdown();
+        $difference = collect($rows)->firstWhere('code', 'shipping_difference');
+
+        $this->assertSame(2000.0, (float) $difference['amount']);
+        $this->assertSame('seller', $difference['burden']);
+        $this->assertSame('Selisih Ongkir', $difference['label']);
+    }
+
+    public function test_tiktok_negative_statement_with_return_request_is_classified_as_reversal_not_refund(): void
+    {
+        $classification = MarketplaceOrderSettlement::classifyTikTokReturnRefund(
+            [
+                'order_status' => 'COMPLETED',
+                'has_return_request' => true,
+                'dispute_reason' => 'Produk tidak sesuai deskripsi (BUYER)',
+            ],
+            [
+                'revenue_amount' => '0',
+                'settlement_amount' => '-70007',
+            ],
+            0,
+            -70007,
+        );
+
+        $this->assertSame(MarketplaceOrderSettlement::RETURN_STATUS_REVERSAL, $classification['status']);
+        $this->assertNull($classification['refund_source']);
+        $this->assertSame(70007.0, $classification['reversal_amount']);
+        $this->assertSame('tiktok_finance_statement', $classification['reversal_source']);
+    }
+
+    public function test_tiktok_refund_principal_wins_over_negative_settlement_classification(): void
+    {
+        $classification = MarketplaceOrderSettlement::classifyTikTokReturnRefund(
+            [
+                'order_status' => 'COMPLETED',
+                'has_return_request' => true,
+            ],
+            [
+                'revenue_amount' => '-100000',
+                'settlement_amount' => '-70007',
+            ],
+            100000,
+            -70007,
+        );
+
+        $this->assertSame(MarketplaceOrderSettlement::RETURN_STATUS_REFUNDED, $classification['status']);
+        $this->assertSame('tiktok_finance_revenue_breakdown', $classification['refund_source']);
+        $this->assertSame(0.0, $classification['reversal_amount']);
     }
 
     private function amountFor(array $rows, string $code): float

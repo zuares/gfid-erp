@@ -1,23 +1,4 @@
-<section class="an-fee-analysis an-tab-pane is-hidden" data-an-pane="fees" role="tabpanel" tabindex="-1" aria-labelledby="feeWorkspaceTitle">
-    <header class="an-fee-analysis-head">
-        <div class="an-fee-analysis-head-copy">
-            <span class="an-fee-analysis-icon" aria-hidden="true"><i class="bi bi-receipt"></i></span>
-            <div>
-                <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Fee ledger</div>
-                <h2 id="feeWorkspaceTitle">Fee Marketplace</h2>
-                <p>Bandingkan beban fee berdasarkan tipe, toko, dan order untuk menemukan kebocoran margin.</p>
-            </div>
-        </div>
-        <div class="an-fee-analysis-meta">
-            <span class="an-revenue-status"><i class="bi bi-check2-circle" aria-hidden="true"></i><span>Settlement complete</span></span>
-            <span class="an-revenue-period"><i class="bi bi-calendar3" aria-hidden="true"></i><span id="feeOrdersSubtitle">Periode aktif</span></span>
-        </div>
-    </header>
-
-    <div class="an-fee-analysis-summary ds-grid" id="feeOrdersSummary" aria-label="Ringkasan biaya marketplace">
-        <x-gf.state type="loading" title="Memuat ringkasan fee…" />
-    </div>
-
+<section class="an-fee-analysis an-tab-pane is-hidden" data-an-pane="fees" role="tabpanel" tabindex="-1" aria-label="Fee Marketplace">
     <div class="an-fee-analysis-grid">
         <article class="an-fee-analysis-card" aria-labelledby="feeByTypeTitle">
             <div class="an-fee-analysis-card-head">
@@ -32,6 +13,22 @@
                 </div>
             </div>
             <div class="an-fee-analysis-table-wrap" id="feeByTypeTable" aria-live="polite"><x-gf.state type="loading" title="Memuat tipe fee…" /></div>
+        </article>
+
+        <article class="an-fee-analysis-card" aria-labelledby="feePlatformTitle">
+            <div class="an-fee-analysis-card-head">
+                <div><span class="an-fee-analysis-kicker">Platform cost</span><h3 id="feePlatformTitle">Fee platform</h3></div>
+                <span class="an-fee-analysis-count" id="feePlatformCount">— komponen</span>
+            </div>
+            <div class="an-fee-analysis-table-wrap" id="feePlatformTable" aria-live="polite"><x-gf.state type="loading" title="Memuat fee platform…" /></div>
+        </article>
+
+        <article class="an-fee-analysis-card" aria-labelledby="feeShippingTitle">
+            <div class="an-fee-analysis-card-head">
+                <div><span class="an-fee-analysis-kicker">Logistics cost</span><h3 id="feeShippingTitle">Ongkir &amp; logistik</h3></div>
+                <span class="an-fee-analysis-count" id="feeShippingCount">— jenis biaya</span>
+            </div>
+            <div class="an-fee-analysis-table-wrap" id="feeShippingTable" aria-live="polite"><x-gf.state type="loading" title="Memuat ongkir dan logistik…" /></div>
         </article>
 
         <article class="an-fee-analysis-card" aria-labelledby="feeByStoreTitle">
@@ -56,3 +53,43 @@
         </article>
     </div>
 </section>
+
+<div class="an-modal" id="otherFeeModal" aria-hidden="true">
+    <div class="an-modal-backdrop" data-other-fee-close></div>
+    <section class="an-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="otherFeeTitle" aria-describedby="otherFeeSubtitle">
+        <div class="an-modal-head">
+            <div>
+                <div class="an-modal-eyebrow">Other cost</div>
+                <div class="an-modal-title" id="otherFeeTitle">Detail biaya lainnya</div>
+                <div class="an-modal-sub" id="otherFeeSubtitle">Periode aktif · payout sudah cair</div>
+            </div>
+            <button class="an-modal-close" type="button" data-other-fee-close aria-label="Tutup detail biaya lainnya">×</button>
+        </div>
+        <div class="an-modal-summary ds-grid" id="otherFeeSummary" aria-label="Ringkasan biaya lainnya"></div>
+        <div class="an-modal-body" id="otherFeeBody" aria-live="polite"></div>
+        <div class="an-modal-foot">
+            <span class="an-modal-sub">Tidak termasuk ongkir dan biaya platform yang sudah dipisahkan.</span>
+            <button class="an-btn" type="button" data-other-fee-close>Tutup</button>
+        </div>
+    </section>
+</div>
+
+<div class="an-modal" id="sellerFeeModal" aria-hidden="true">
+    <div class="an-modal-backdrop" data-seller-fee-close></div>
+    <section class="an-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="sellerFeeTitle" aria-describedby="sellerFeeSubtitle">
+        <div class="an-modal-head">
+            <div>
+                <div class="an-modal-eyebrow">Seller cost</div>
+                <div class="an-modal-title" id="sellerFeeTitle">Detail biaya Seller</div>
+                <div class="an-modal-sub" id="sellerFeeSubtitle">Pilih angka Seller untuk melihat komponennya</div>
+            </div>
+            <button class="an-modal-close" type="button" data-seller-fee-close aria-label="Tutup detail biaya Seller">×</button>
+        </div>
+        <div class="an-modal-summary ds-grid" id="sellerFeeSummary" aria-label="Ringkasan biaya Seller"></div>
+        <div class="an-modal-body" id="sellerFeeBody" aria-live="polite"></div>
+        <div class="an-modal-foot">
+            <span class="an-modal-sub">Selisih Ongkir = biaya kirim aktual − subsidi ongkir − ongkir dibayar pembeli.</span>
+            <button class="an-btn" type="button" data-seller-fee-close>Tutup</button>
+        </div>
+    </section>
+</div>

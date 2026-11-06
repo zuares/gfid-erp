@@ -5,6 +5,12 @@
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
     };
     const cashStatus = value => String(value || '—').replace(/_/g, ' ').toLowerCase();
+    const returnRefundStatusLabel = status => ({
+        return_requested: 'Return requested',
+        refunded: 'Refund',
+        settlement_reversal: 'Payout reversal',
+    }[String(status || '').toLowerCase()] || 'Refund');
+    const signedMoney = value => n(value) < 0 ? `−${money(Math.abs(n(value)))}` : money(value);
     const cashStatIcon = (label, tone) => {
         const text = String(label || '').toLowerCase();
         if (text.includes('refund') || text.includes('adjustment')) return 'bi-arrow-counterclockwise';
@@ -150,55 +156,190 @@
         const storeRows = Array.isArray(payload?.fee_by_store) ? payload.fee_by_store : [];
         const empty = (title, copy) => stateMarkup('empty', title, copy);
         const burdenBadge = burden => `<span class="an-fee-burden-badge an-fee-burden-badge-${burden}"><i class="bi ${burden === 'platform' ? 'bi-building-check' : 'bi-receipt'}" aria-hidden="true"></i>${burden === 'platform' ? 'Platform' : 'Seller'}</span>`;
-        const shippingCodes = ['shipping_cost', 'shipping_subsidy'];
+        const shippingCodes = ['shipping_cost', 'shipping_subsidy', 'shipping_other', 'shipping_difference'];
         const shippingRows = typeRows.filter(row => shippingCodes.includes(row.code));
         const otherRows = typeRows.filter(row => row.code === 'other_fee');
         const platformRows = typeRows.filter(row => row.burden === 'platform');
-        const sellerTypeRows = typeRows.filter(row => row.burden !== 'platform' && !shippingCodes.includes(row.code) && row.code !== 'other_fee');
-        const feeCompositionTotal = typeRows.reduce((sum, row) => sum + n(row.amount), 0);
-        const sellerFeeTotal = typeRows.filter(row => row.burden !== 'platform').reduce((sum, row) => sum + n(row.amount), 0);
+        const sellerTypeRows = typeRows.filter(row => row.burden === 'seller' && row.code !== 'other_fee' && !shippingCodes.includes(row.code));
+        const netSalesTotal = n(payload?.summary?.cash_order_revenue);
+        const sellerFeeTotal = typeRows.filter(row => row.burden === 'seller').reduce((sum, row) => sum + n(row.amount), 0);
         const platformFeeTotal = platformRows.reduce((sum, row) => sum + n(row.amount), 0);
         const otherFeeTotal = otherRows.reduce((sum, row) => sum + n(row.amount), 0);
-        const compositionPercent = amount => feeCompositionTotal > 0 ? `${(n(amount) / feeCompositionTotal * 100).toFixed(1)}%` : '—';
+        const netSalesPercent = amount => netSalesTotal > 0 ? `${(n(amount) / netSalesTotal * 100).toFixed(1)}%` : '—';
         const typeTable = sellerTypeRows.length
-            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table" aria-label="Fee seller berdasarkan tipe"><thead><tr><th>Fee seller</th><th>Beban</th><th>Count</th><th>Komposisi</th><th>Amount</th></tr></thead><tbody>${[...sellerTypeRows].sort((a, b) => n(b.amount) - n(a.amount)).map(row => `<tr><td data-label="Fee seller"><strong class="an-fee-type-name">${esc(row.label || '—')}</strong></td><td data-label="Beban">${burdenBadge('seller')}</td><td data-label="Count">${Number(row.count || 0).toLocaleString('id-ID')}</td><td data-label="Komposisi" class="an-fee-composition-percent">${compositionPercent(row.amount)}</td><td data-label="Amount" class="an-fee-analysis-amount">${money(row.amount)}</td></tr>`).join('')}</tbody></table></div>`
+            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table" aria-label="Fee seller berdasarkan tipe"><thead><tr><th>Fee seller</th><th>Beban</th><th>Count</th><th>% Net Sales</th><th>Amount</th></tr></thead><tbody>${[...sellerTypeRows].sort((a, b) => n(b.amount) - n(a.amount)).map(row => `<tr><td data-label="Fee seller"><strong class="an-fee-type-name">${esc(row.label || '—')}</strong></td><td data-label="Beban">${burdenBadge('seller')}</td><td data-label="Count">${Number(row.count || 0).toLocaleString('id-ID')}</td><td data-label="% Net Sales" class="an-fee-composition-percent">${netSalesPercent(row.amount)}</td><td data-label="Amount" class="an-fee-analysis-amount">${money(row.amount)}</td></tr>`).join('')}</tbody></table></div>`
             : empty('Belum ada tipe fee', 'Tidak ada fee pada periode dan filter aktif.');
-        const platformSection = `<section class="an-fee-platform-section" aria-label="Fee platform"><header><div><span class="an-fee-analysis-kicker">Platform cost</span><strong>Fee platform</strong><small>Biaya dan subsidi yang ditanggung platform, dipisahkan dari fee seller.</small></div><div class="an-fee-platform-total"><strong>${money(platformFeeTotal)}</strong><small>${compositionPercent(platformFeeTotal)} dari total fee</small></div></header>${platformRows.length ? `<div class="an-fee-platform-list">${[...platformRows].sort((a, b) => n(b.amount) - n(a.amount)).map(row => `<div><span>${esc(row.label || 'Fee platform')}<small>${Number(row.count || 0).toLocaleString('id-ID')} komponen</small></span><strong>${money(row.amount)}<small>${compositionPercent(row.amount)}</small></strong></div>`).join('')}</div>` : `<div class="an-fee-platform-empty">Tidak ada biaya platform pada periode dan filter aktif.</div>`}</section>`;
-        const shippingMetric = (code, title, burden, icon) => {
-            const row = shippingRows.find(item => item.code === code);
+        const platformSection = `<div class="an-fee-platform-content" aria-label="Rincian fee platform"><div class="an-fee-platform-summary"><div><span>Total fee platform</span><small>Biaya dan subsidi yang ditanggung platform</small></div><strong>${money(platformFeeTotal)}<small>${netSalesPercent(platformFeeTotal)} dari net sales</small></strong></div>${platformRows.length ? `<div class="an-fee-platform-list">${[...platformRows].sort((a, b) => n(b.amount) - n(a.amount)).map(row => `<div><span>${esc(row.label || 'Fee platform')}<small>${Number(row.count || 0).toLocaleString('id-ID')} komponen</small></span><strong>${money(row.amount)}<small>${netSalesPercent(row.amount)} dari net sales</small></strong></div>`).join('')}</div>` : `<div class="an-fee-platform-empty">Tidak ada biaya platform pada periode dan filter aktif.</div>`}</div>`;
+        const shippingMetric = row => {
+            const burden = row.burden === 'platform' ? 'platform' : (row.burden === 'logistics' ? 'logistics' : 'seller');
+            const icon = burden === 'platform' ? 'bi-building-check' : 'bi-truck';
             const amount = n(row?.amount);
-            return `<article class="an-fee-shipping-metric an-fee-shipping-metric-${burden}"><div class="an-fee-shipping-metric-head"><span class="an-fee-shipping-icon" aria-hidden="true"><i class="bi ${icon}"></i></span><div><strong>${title}</strong><small>${burden === 'platform' ? 'Dibebankan ke platform' : 'Dibebankan ke seller'} · ${Number(row?.count || 0).toLocaleString('id-ID')} komponen</small></div></div><b>${money(amount)}<small>${compositionPercent(amount)} dari total fee</small></b></article>`;
+            const burdenLabel = burden === 'platform' ? 'Dibebankan ke platform' : (burden === 'logistics' ? 'Biaya operasional logistik · bukan fee seller' : 'Dibebankan ke seller');
+            return `<article class="an-fee-shipping-metric an-fee-shipping-metric-${burden}"><div class="an-fee-shipping-metric-head"><span class="an-fee-shipping-icon" aria-hidden="true"><i class="bi ${icon}"></i></span><div><strong>${esc(row?.label || 'Biaya logistik')}</strong><small>${burdenLabel} · ${Number(row?.count || 0).toLocaleString('id-ID')} komponen</small></div></div><b>${money(amount)}<small>${netSalesPercent(amount)} dari net sales</small></b></article>`;
         };
-        const shippingSection = shippingRows.length
-            ? `<section class="an-fee-shipping-section" aria-label="Ongkir dan logistik"><header><div><span class="an-fee-analysis-kicker">Logistics cost</span><strong>Ongkir &amp; logistik</strong><small>Dipisahkan dari komposisi fee marketplace untuk membaca beban pengiriman dengan lebih jelas.</small></div><span class="an-fee-shipping-chip"><i class="bi bi-truck" aria-hidden="true"></i> ${shippingRows.length} komponen</span></header><div class="an-fee-shipping-grid">${shippingMetric('shipping_cost', 'Biaya kirim ke jasa kirim', 'seller', 'bi-truck')}${shippingMetric('shipping_subsidy', 'Subsidi / potongan ongkir', 'platform', 'bi-building-check')}</div></section>`
-            : '';
-        const otherSection = `<section class="an-fee-other-section" aria-label="Biaya lainnya"><header><div><span class="an-fee-analysis-kicker">Other cost</span><strong>Biaya lainnya</strong><small>${otherRows.length ? 'Biaya tambahan di luar fee utama dan ongkir.' : 'Belum ada biaya lainnya pada periode dan filter aktif.'}</small></div><span class="an-fee-other-chip"><i class="bi bi-plus-circle" aria-hidden="true"></i> ${otherRows.length} komponen</span></header><div class="an-fee-other-total"><div><span>Total biaya lainnya</span><small>${otherRows.length ? 'Dibebankan ke seller' : 'Tidak ada biaya tambahan tercatat'}</small></div><strong>${money(otherFeeTotal)}<small>${compositionPercent(otherFeeTotal)} dari total fee</small></strong></div></section>`;
+        const shippingTotal = shippingRows.filter(row => row.code !== 'shipping_difference').reduce((sum, row) => sum + n(row.amount), 0);
+        const shippingSection = `<div class="an-fee-shipping-content" aria-label="Ongkir dan logistik"><div class="an-fee-shipping-summary"><div><span>Total ongkir &amp; logistik</span><small>Biaya kirim dan subsidi; selisih ongkir ditampilkan terpisah sebagai beban Seller</small></div><strong>${money(shippingTotal)}<small>${netSalesPercent(shippingTotal)} dari net sales</small></strong></div>${shippingRows.length ? `<div class="an-fee-shipping-grid">${shippingRows.sort((a, b) => n(b.amount) - n(a.amount)).map(shippingMetric).join('')}</div>` : `<div class="an-fee-shipping-empty">Tidak ada biaya ongkir pada periode dan filter aktif.</div>`}</div>`;
+        const otherSection = `<section class="an-fee-other-section" aria-label="Biaya lainnya"><header><div><span class="an-fee-analysis-kicker">Other cost</span><strong>Biaya lainnya</strong><small>${otherRows.length ? 'Biaya tambahan di luar fee utama dan ongkir.' : 'Belum ada biaya lainnya pada periode dan filter aktif.'}</small></div><span class="an-fee-other-chip"><i class="bi bi-plus-circle" aria-hidden="true"></i> ${otherRows.length} komponen</span></header><button class="an-fee-other-total" type="button" data-open-other-fee aria-controls="otherFeeModal" aria-label="Lihat rincian biaya lainnya"><span><span>Total biaya lainnya</span><small>${otherRows.length ? 'Klik untuk melihat rincian biaya' : 'Buka untuk melihat status biaya lainnya'}</small></span><strong>${money(otherFeeTotal)}<small>${netSalesPercent(otherFeeTotal)} dari net sales</small></strong></button></section>`;
         const mergedStores = [...storeRows.reduce((map, row) => {
             const key = String(row.store_id || row.store_name || 'unknown');
-            const current = map.get(key) || { store_id: row.store_id, store_name: row.store_name || 'Toko tidak diketahui', count: 0, seller: 0, platform: 0, ads: 0, adSource: 'none' };
+            const current = map.get(key) || { store_id: row.store_id, store_name: row.store_name || 'Toko tidak diketahui', count: 0, seller: 0, affiliate: 0, platform: 0, ads: 0, adSource: 'none' };
             const amount = n(row.amount);
             if (row.cost_type === 'ads') {
                 current.ads += amount;
                 current.adSource = row.source || 'none';
+            } else if (row.fee_group === 'affiliate') {
+                current.count += Number(row.count || 0);
+                current.affiliate += amount;
             } else {
                 current.count += Number(row.count || 0);
                 current[row.burden === 'platform' ? 'platform' : 'seller'] += amount;
             }
             map.set(key, current);
             return map;
-        }, new Map()).values()].sort((a, b) => (b.seller + b.platform + b.ads) - (a.seller + a.platform + a.ads));
+        }, new Map()).values()].sort((a, b) => (b.seller + b.affiliate + b.platform + b.ads) - (a.seller + a.affiliate + a.platform + a.ads));
         const storeTable = mergedStores.length
-            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table an-fee-store-table" aria-label="Fee dan biaya iklan berdasarkan toko"><thead><tr><th>Store</th><th>Count</th><th>Seller fee</th><th>Platform</th><th>Biaya iklan</th><th>Total biaya</th></tr></thead><tbody>${mergedStores.map(row => `<tr><td data-label="Store"><strong class="an-fee-type-name">${esc(row.store_name)}</strong></td><td data-label="Count">${row.count.toLocaleString('id-ID')}</td><td data-label="Seller fee" class="an-fee-analysis-amount">${money(row.seller)}</td><td data-label="Platform" class="an-fee-analysis-amount an-fee-platform-amount">${money(row.platform)}</td><td data-label="Biaya iklan" class="an-fee-analysis-amount an-fee-ads-amount"><span>${money(row.ads)}</span>${row.ads > 0 ? `<small>${row.adSource === 'platform_transaction_fallback' ? 'Mutasi platform' : 'Ads Daily'}</small>` : ''}</td><td data-label="Total biaya" class="an-fee-analysis-amount">${money(row.seller + row.platform + row.ads)}</td></tr>`).join('')}</tbody></table></div>`
+            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table an-fee-store-table" aria-label="Fee, affiliate, dan biaya iklan berdasarkan toko"><thead><tr><th>Store</th><th>Count</th><th>Seller fee</th><th>Affiliate / AMS</th><th>Biaya iklan</th><th>Total biaya</th></tr></thead><tbody>${mergedStores.map(row => `<tr><td data-label="Store"><strong class="an-fee-type-name">${esc(row.store_name)}</strong></td><td data-label="Count">${row.count.toLocaleString('id-ID')}</td><td data-label="Seller fee" class="an-fee-analysis-amount">${money(row.seller)}</td><td data-label="Affiliate / AMS" class="an-fee-analysis-amount an-fee-affiliate-amount">${money(row.affiliate)}</td><td data-label="Biaya iklan" class="an-fee-analysis-amount an-fee-ads-amount"><span>${money(row.ads)}</span>${row.ads > 0 ? `<small>${row.adSource === 'platform_transaction_fallback' ? 'Mutasi platform' : 'Ads Daily'}</small>` : ''}</td><td data-label="Total biaya" class="an-fee-analysis-amount" title="Termasuk fee platform yang dipisahkan di section Fee platform">${money(row.seller + row.affiliate + row.platform + row.ads)}</td></tr>`).join('')}</tbody></table></div>`
             : empty('Belum ada toko', 'Tidak ada fee pada periode dan filter aktif.');
 
         $('feeByTypeTable')?.replaceChildren();
-        if ($('feeByTypeTable')) $('feeByTypeTable').innerHTML = `${typeTable}${platformSection}${shippingSection}${otherSection}`;
-        if ($('feeByTypeCount')) $('feeByTypeCount').textContent = `${new Set(sellerTypeRows.map(row => row.code)).size.toLocaleString('id-ID')} tipe seller + platform + ongkir + lainnya`;
+        if ($('feeByTypeTable')) $('feeByTypeTable').innerHTML = `${typeTable}${otherSection}`;
+        if ($('feeByTypeCount')) $('feeByTypeCount').textContent = `${new Set(sellerTypeRows.map(row => row.code)).size.toLocaleString('id-ID')} tipe seller + lainnya`;
+        if ($('feePlatformTable')) $('feePlatformTable').innerHTML = platformSection;
+        if ($('feePlatformCount')) $('feePlatformCount').textContent = `${platformRows.length.toLocaleString('id-ID')} komponen`;
+        if ($('feeShippingTable')) $('feeShippingTable').innerHTML = shippingSection;
+        if ($('feeShippingCount')) $('feeShippingCount').textContent = `${shippingRows.length.toLocaleString('id-ID')} jenis biaya`;
         if ($('feeByTypeSellerTotal')) $('feeByTypeSellerTotal').textContent = money(sellerFeeTotal);
-        if ($('feeByTypeSellerPercent')) $('feeByTypeSellerPercent').textContent = `${compositionPercent(sellerFeeTotal)} dari total fee`;
+        if ($('feeByTypeSellerPercent')) $('feeByTypeSellerPercent').textContent = `${netSalesPercent(sellerFeeTotal)} dari net sales`;
         if ($('feeByStoreTable')) $('feeByStoreTable').innerHTML = storeTable;
         if ($('feeByStoreCount')) $('feeByStoreCount').textContent = `${new Set(storeRows.map(row => row.store_id)).size.toLocaleString('id-ID')} toko`;
         if ($('feeByOrderCount')) $('feeByOrderCount').textContent = `${Number(payload?.meta?.total || 0).toLocaleString('id-ID')} order`;
+
+        const otherDetailRows = otherRows.flatMap(row => {
+            const details = Array.isArray(row.details) ? row.details : [];
+            return details.length ? details.map(detail => ({ ...detail, burden: row.burden || detail.burden || 'seller' })) : [row];
+        }).sort((a, b) => n(b.amount) - n(a.amount));
+        if ($('otherFeeSubtitle')) $('otherFeeSubtitle').textContent = `${from()} — ${to()} · payout sudah cair`;
+        if ($('otherFeeSummary')) $('otherFeeSummary').innerHTML = [
+            cashStat('Total biaya lainnya', money(otherFeeTotal), `${netSalesPercent(otherFeeTotal)} dari net sales`, 'fee'),
+            cashStat('Komponen', otherRows.reduce((sum, row) => sum + Number(row.count || 0), 0).toLocaleString('id-ID'), 'Settlement fee breakdown', 'neutral'),
+            cashStat('Beban', 'Seller', 'Dibebankan ke seller', 'primary'),
+            cashStat('Kategori', 'Biaya lainnya', 'Di luar fee utama dan ongkir', 'neutral'),
+        ].join('');
+        if ($('otherFeeBody')) $('otherFeeBody').innerHTML = otherDetailRows.length
+            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table an-other-fee-detail-table" aria-label="Rincian biaya lainnya"><thead><tr><th>Jenis biaya</th><th>Sumber data</th><th>Beban</th><th>Komponen</th><th>% Net Sales</th><th>Amount</th></tr></thead><tbody>${otherDetailRows.map(row => `<tr><td data-label="Jenis biaya"><strong class="an-fee-type-name">${esc(row.label || 'Biaya lainnya')}</strong></td><td data-label="Sumber data"><span class="an-fee-source-label">${esc(row.source || 'Settlement fee breakdown')}</span></td><td data-label="Beban">${burdenBadge(row.burden || 'seller')}</td><td data-label="Komponen">${Number(row.count || 0).toLocaleString('id-ID')}</td><td data-label="% Net Sales" class="an-fee-composition-percent">${netSalesPercent(row.amount)}</td><td data-label="Amount" class="an-fee-analysis-amount">${money(row.amount)}</td></tr>`).join('')}</tbody></table></div>`
+            : empty('Belum ada biaya lainnya', 'Tidak ada biaya tambahan pada periode dan filter aktif.');
+    }
+
+    function openOtherFeeModal() {
+        const modal = $('otherFeeModal');
+        if (!modal) return;
+        otherFeeModalTrigger = document.activeElement;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('an-modal-open');
+        modal.querySelector('[data-other-fee-close]')?.focus();
+    }
+
+    function closeOtherFeeModal() {
+        const modal = $('otherFeeModal');
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('an-modal-open');
+        otherFeeModalTrigger?.focus?.();
+        otherFeeModalTrigger = null;
+    }
+
+    const sellerFeeDetailSourceLabel = source => ({
+        commission_fee: 'Settlement marketplace',
+        service_fee: 'Settlement marketplace',
+        transaction_fee: 'Settlement marketplace',
+        seller_order_processing_fee: 'Settlement marketplace',
+        seller_transaction_fee: 'Settlement marketplace',
+        activity_fee: 'Affiliate / AMS',
+        shipping_cost_minus_subsidy: 'Biaya kirim aktual − subsidi ongkir',
+        shipping_cost_minus_subsidy_minus_buyer_shipping: 'Biaya kirim aktual − subsidi ongkir − ongkir dibayar pembeli',
+        fee_tax_amount: 'Settlement TikTok',
+    }[source] || source || 'Settlement fee breakdown');
+
+    const sellerFeeDetailRows = row => {
+        const breakdown = Array.isArray(row?.fee_breakdown) ? row.fee_breakdown : [];
+        const shippingCostFee = breakdown.filter(item => item.code === 'shipping_cost').reduce((sum, item) => sum + n(item.amount), 0);
+        const shippingSubsidyFee = breakdown.filter(item => item.code === 'shipping_subsidy').reduce((sum, item) => sum + n(item.amount), 0);
+        const derivedLogisticsFee = breakdown.filter(item => item.code === 'shipping_difference').reduce((sum, item) => sum + n(item.amount), 0);
+        const hasDerivedLogistics = breakdown.some(item => item.code === 'shipping_difference');
+        const isShopeeOrder = String(row?.platform || '').toLowerCase() === 'shopee' || selectedPlatform() === 'shopee';
+        const logisticsFee = hasDerivedLogistics
+            ? derivedLogisticsFee
+            : (isShopeeOrder ? 0 : Math.max(0, shippingCostFee - shippingSubsidyFee));
+        const rows = breakdown
+            .filter(item => item.burden === 'seller'
+                && item.code !== 'affiliate_fee'
+                && item.category !== 'affiliate'
+                && item.category !== 'shipping'
+                && item.code !== 'insurance_fee')
+            .map(item => ({
+                label: item.label || item.code || 'Biaya Seller',
+                source: sellerFeeDetailSourceLabel(item.source),
+                amount: n(item.amount),
+            }));
+
+        if (logisticsFee > 0) {
+            rows.push({
+                label: 'Selisih Ongkir',
+                source: selectedPlatform() === 'shopee'
+                    ? 'Biaya kirim aktual − subsidi ongkir − ongkir dibayar pembeli'
+                    : 'Biaya kirim aktual − subsidi ongkir',
+                amount: logisticsFee,
+            });
+        }
+
+        return rows.filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
+    };
+
+    function openSellerFeeModal(key) {
+        const row = sellerFeeDetailCache.get(String(key));
+        const modal = $('sellerFeeModal');
+        if (!row || !modal) return;
+
+        const detailRows = sellerFeeDetailRows(row);
+        const total = detailRows.reduce((sum, item) => sum + n(item.amount), 0);
+        const netSales = n(row.net_sales || row.gross_sales || row.cash_gross_sales);
+        const percent = netSales > 0 ? `${(total / netSales * 100).toFixed(1)}% dari net sales` : '—';
+        sellerFeeModalTrigger = document.activeElement;
+        $('sellerFeeTitle').textContent = `Detail biaya Seller · ${row.channel_order_id || 'Order'}`;
+        $('sellerFeeSubtitle').textContent = `${row.store_name || 'Tanpa toko'} · ${dateTime(row.ordered_at)}`;
+        $('sellerFeeSummary').innerHTML = [
+            cashStat('Total biaya Seller', money(total), percent, 'fee'),
+            cashStat('Net Sales', money(netSales), 'Basis persentase', 'accent'),
+            cashStat('Komponen', detailRows.length.toLocaleString('id-ID'), 'Rincian settlement', 'neutral'),
+            cashStat('Beban', 'Seller', 'Dibebankan ke seller', 'primary'),
+        ].join('');
+        const refundAmount = n(row.refund);
+        const reversalAmount = n(row.reversal_amount);
+        const returnRefundStatus = String(row.return_refund_status || '').toLowerCase();
+        const hasReturnRefundState = ['return_requested', 'refunded', 'settlement_reversal'].includes(returnRefundStatus);
+        const isReturnRefundOrder = hasReturnRefundState || row.status_group === 'return_refund' || refundAmount > 0;
+        const refundNote = isReturnRefundOrder
+            ? `<div class="an-fee-refund-note"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span><strong>${esc(returnRefundStatusLabel(returnRefundStatus))}</strong><small>${refundAmount > 0 ? 'Nominal refund ditampilkan terpisah.' : 'Nominal refund belum tersedia; adjustment payout tetap dipisahkan.'} ${reversalAmount > 0 ? `Reversal settlement ${money(reversalAmount)}.` : ''} Selisih ongkir tetap dihitung sebagai beban Seller.</small></span></div>`
+            : '';
+        $('sellerFeeBody').innerHTML = `${refundNote}${detailRows.length
+            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table" aria-label="Rincian biaya Seller"><thead><tr><th>Komponen</th><th>Sumber</th><th>% Net Sales</th><th>Amount</th></tr></thead><tbody>${detailRows.map(item => `<tr><td data-label="Komponen"><strong class="an-fee-type-name">${esc(item.label)}</strong></td><td data-label="Sumber"><span class="an-fee-source-label">${esc(item.source)}</span></td><td data-label="% Net Sales" class="an-fee-composition-percent">${netSales > 0 ? `${(item.amount / netSales * 100).toFixed(1)}%` : '—'}</td><td data-label="Amount" class="an-fee-analysis-amount">${money(item.amount)}</td></tr>`).join('')}</tbody></table></div>`
+            : `<div class="an-fee-platform-empty">Tidak ada rincian biaya Seller pada order ini.</div>`}`;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('an-modal-open');
+        modal.querySelector('[data-seller-fee-close]')?.focus();
+    }
+
+    function closeSellerFeeModal() {
+        const modal = $('sellerFeeModal');
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('an-modal-open');
+        sellerFeeModalTrigger?.focus?.();
+        sellerFeeModalTrigger = null;
     }
 
     function renderCashOrders() {
@@ -266,8 +407,8 @@
             .filter(item => item.cost_type === 'ads')
             .reduce((sum, item) => sum + n(item.amount), 0);
         const totalCostAmount = totalFeeAmount + adCostAmount;
-        const feeCompositionPercent = amount => totalFeeAmount > 0 ? `${(n(amount) / totalFeeAmount * 100).toFixed(1)}% dari total fee` : 'Tidak ada fee tercatat';
-        const totalCostPercent = amount => totalCostAmount > 0 ? `${(n(amount) / totalCostAmount * 100).toFixed(1)}% dari total biaya` : 'Tidak ada biaya tercatat';
+        const feeCompositionPercent = amount => settledNetSales > 0 ? `${(n(amount) / settledNetSales * 100).toFixed(1)}% dari net sales cair` : 'Net Sales cair tidak tersedia';
+        const totalCostPercent = amount => settledNetSales > 0 ? `${(n(amount) / settledNetSales * 100).toFixed(1)}% dari net sales cair` : 'Net Sales cair tidak tersedia';
         const totalFeePercent = settledNetSales > 0
             ? `${(totalFeeAmount / settledNetSales * 100).toFixed(1)}% net sales cair`
             : '—';
@@ -332,18 +473,47 @@
             ? ['completed', 'warehouse', 'shipped', 'confirm', 'return_refund', 'cancelled', 'other'].map(key => ({ key, label: rows.find(row => row.status_group === key)?.status_group_label || key, rows: rows.filter(row => row.status_group === key) })).filter(group => group.rows.length)
             : [{ key: 'flat', label: '', rows }];
         const table = groups.length ? groups.map(group => `<section class="an-cash-group">${renderTable(group.rows, isAll ? group.label : '')}</section>`).join('') : stateMarkup('empty', 'Belum ada order', 'Tidak ada order pada periode ini.');
+        sellerFeeDetailCache = new Map();
         const feeOrderTable = rows.length
-            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table an-fee-order-table" aria-label="Fee berdasarkan order"><thead><tr><th>Order</th><th>Toko</th><th>Seller</th><th>Platform</th><th>Fee rate</th><th>Total fee</th></tr></thead><tbody>${rows.map(row => {
+            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table an-fee-order-table" aria-label="Fee, dana cair, adjustment payout, selisih ongkir, premi, refund, dan afiliasi berdasarkan order"><thead><tr><th>Order</th><th>Toko</th><th>Net Sales</th><th>Dana cair</th><th>Adjustment payout</th><th>Selisih ongkir</th><th>Premi Shopee</th><th>Refund</th><th>Seller</th><th>Affiliate / AMS</th><th>Platform</th><th>Fee rate</th><th>Total fee</th></tr></thead><tbody>${rows.map((row, rowIndex) => {
                 const breakdown = Array.isArray(row.fee_breakdown) ? row.fee_breakdown : [];
-                const sellerFee = breakdown.filter(item => item.burden !== 'platform').reduce((sum, item) => sum + n(item.amount), 0);
+                const affiliateFee = breakdown.filter(item => item.code === 'affiliate_fee' || item.category === 'affiliate').reduce((sum, item) => sum + n(item.amount), 0);
+                const shippingCostFee = breakdown.filter(item => item.code === 'shipping_cost').reduce((sum, item) => sum + n(item.amount), 0);
+                const shippingSubsidyFee = breakdown.filter(item => item.code === 'shipping_subsidy').reduce((sum, item) => sum + n(item.amount), 0);
+                const derivedLogisticsFee = breakdown.filter(item => item.code === 'shipping_difference').reduce((sum, item) => sum + n(item.amount), 0);
+                const hasDerivedLogistics = breakdown.some(item => item.code === 'shipping_difference');
+                const isShopeeOrder = String(row.platform || '').toLowerCase() === 'shopee' || selectedPlatform() === 'shopee';
+                const logisticsFee = hasDerivedLogistics
+                    ? derivedLogisticsFee
+                    : (isShopeeOrder ? 0 : Math.max(0, shippingCostFee - shippingSubsidyFee));
+                const premiumFee = breakdown.filter(item => item.code === 'insurance_fee').reduce((sum, item) => sum + n(item.amount), 0);
+                const sellerFee = breakdown.filter(item => item.burden === 'seller' && item.code !== 'affiliate_fee' && item.category !== 'affiliate' && (item.category !== 'shipping' || item.code === 'shipping_difference') && item.code !== 'insurance_fee' && item.code !== 'shipping_difference').reduce((sum, item) => sum + n(item.amount), 0);
                 const platformFee = breakdown.filter(item => item.burden === 'platform').reduce((sum, item) => sum + n(item.amount), 0);
-                const fee = sellerFee + platformFee || n(row.total_fees);
-                const sellerAmount = sellerFee || Math.max(0, fee - platformFee);
-                const sellerPercent = fee > 0 ? `${(sellerAmount / fee * 100).toFixed(1)}% dari fee` : '—';
-                const platformPercent = fee > 0 ? `${(platformFee / fee * 100).toFixed(1)}% dari fee` : '—';
-                const grossSales = n(row.gross_sales || row.cash_gross_sales);
-                const feeRate = grossSales > 0 ? `${(fee / grossSales * 100).toFixed(1)}%` : '—';
-                return `<tr><td data-label="Order"><strong class="an-cash-order">${esc(row.channel_order_id)}</strong><span class="an-cash-meta">Order ${esc(dateTime(row.ordered_at))}</span></td><td data-label="Toko">${esc(row.store_name || 'Tanpa toko')}</td><td data-label="Seller" class="an-fee-analysis-amount"><span>${money(sellerAmount)}</span><small class="an-fee-order-percent">${sellerPercent}</small></td><td data-label="Platform" class="an-fee-analysis-amount an-fee-platform-amount"><span>${money(platformFee)}</span><small class="an-fee-order-percent">${platformPercent}</small></td><td data-label="Fee rate" class="an-fee-composition-percent">${feeRate}<small class="an-fee-order-percent">dari omzet</small></td><td data-label="Total fee" class="an-fee-analysis-amount">${money(fee)}</td></tr>`;
+                const sellerAmount = sellerFee + logisticsFee;
+                const fee = sellerAmount + premiumFee + affiliateFee + platformFee || n(row.total_fees);
+                const netSales = n(row.net_sales || row.gross_sales || row.cash_gross_sales);
+                const cashPayout = n(row.cash_payout);
+                const refundAmount = n(row.refund);
+                const reversalAmount = n(row.reversal_amount);
+                const returnRefundStatus = String(row.return_refund_status || '').toLowerCase();
+                const hasReturnRefundState = ['return_requested', 'refunded', 'settlement_reversal'].includes(returnRefundStatus);
+                const sellerPercent = netSales > 0 ? `${(sellerAmount / netSales * 100).toFixed(1)}% dari net sales` : '—';
+                const logisticsPercent = netSales > 0 ? `${(logisticsFee / netSales * 100).toFixed(1)}% dari net sales` : '—';
+                const premiumPercent = netSales > 0 ? `${(premiumFee / netSales * 100).toFixed(1)}% dari net sales` : '—';
+                const affiliatePercent = netSales > 0 ? `${(affiliateFee / netSales * 100).toFixed(1)}% dari net sales` : '—';
+                const platformPercent = netSales > 0 ? `${(platformFee / netSales * 100).toFixed(1)}% dari net sales` : '—';
+                const feeRate = netSales > 0 ? `${(fee / netSales * 100).toFixed(1)}%` : '—';
+                const sellerDetailKey = String(rowIndex);
+                sellerFeeDetailCache.set(sellerDetailKey, row);
+        const isRefundRow = row.status_group === 'return_refund' || hasReturnRefundState || refundAmount > 0;
+                const logisticsNote = logisticsFee > 0
+                    ? `${logisticsPercent} · beban Seller`
+                    : (isShopeeOrder ? 'Biaya kirim − subsidi − ongkir pembeli' : 'Biaya kirim − subsidi');
+        const refundBadge = isRefundRow ? `<span class="an-fee-refund-badge"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> ${esc(returnRefundStatusLabel(returnRefundStatus))}</span>` : '';
+        const refundNote = refundAmount > 0 ? 'Nominal refund' : (isRefundRow ? 'Nominal refund belum tersedia' : '');
+        const reversalNote = reversalAmount > 0 ? 'Reversal settlement' : '';
+                const sellerNote = logisticsFee > 0 ? `${sellerPercent} · ongkir beban Seller · Detail` : `${sellerPercent} · Detail`;
+        return `<tr class="${isRefundRow ? 'an-fee-refund-row' : ''}"><td data-label="Order"><strong class="an-cash-order">${esc(row.channel_order_id)}</strong><span class="an-cash-meta">Order ${esc(dateTime(row.ordered_at))}</span>${refundBadge}</td><td data-label="Toko">${esc(row.store_name || 'Tanpa toko')}</td><td data-label="Net Sales" class="an-fee-analysis-amount">${money(netSales)}</td><td data-label="Dana cair" class="an-fee-analysis-amount an-fee-payout-amount">${cashPayout !== 0 ? signedMoney(cashPayout) : '—'}</td><td data-label="Adjustment payout" class="an-fee-analysis-amount an-fee-reversal-amount">${reversalAmount > 0 ? `−${money(reversalAmount)}` : '—'}<small class="an-fee-order-percent">${reversalNote}</small></td><td data-label="Selisih ongkir" class="an-fee-analysis-amount an-fee-logistics-amount"><span>${logisticsFee > 0 ? money(logisticsFee) : '—'}</span><small class="an-fee-order-percent">${logisticsNote}</small></td><td data-label="Premi Shopee" class="an-fee-analysis-amount an-fee-premium-amount"><span>${premiumFee > 0 ? money(premiumFee) : '—'}</span><small class="an-fee-order-percent">${premiumFee > 0 ? premiumPercent : 'Potongan settlement'}</small></td><td data-label="Refund" class="an-fee-analysis-amount an-fee-refund-amount">${refundAmount > 0 ? `−${money(refundAmount)}` : '—'}<small class="an-fee-order-percent">${refundNote}</small></td><td data-label="Seller" class="an-fee-analysis-amount"><button class="an-fee-seller-detail-trigger" type="button" data-open-seller-fee="${sellerDetailKey}" aria-controls="sellerFeeModal" aria-label="Lihat rincian biaya Seller untuk order ${esc(row.channel_order_id)}"><span>${money(sellerAmount)}</span><small class="an-fee-order-percent">${sellerNote}</small></button></td><td data-label="Affiliate / AMS" class="an-fee-analysis-amount an-fee-affiliate-amount"><span>${money(affiliateFee)}</span><small class="an-fee-order-percent">${affiliatePercent}</small></td><td data-label="Platform" class="an-fee-analysis-amount an-fee-platform-amount"><span>${money(platformFee)}</span><small class="an-fee-order-percent">${platformPercent}</small></td><td data-label="Fee rate" class="an-fee-composition-percent">${feeRate}<small class="an-fee-order-percent">dari net sales</small></td><td data-label="Total fee" class="an-fee-analysis-amount">${money(fee)}</td></tr>`;
             }).join('')}</tbody></table></div>`
             : stateMarkup('empty', 'Belum ada order', 'Tidak ada order pada periode ini.');
         const body = isFeeFocus
@@ -466,7 +636,7 @@
             cashStat('Kategori', isFailed ? 'Pengiriman gagal' : 'Return / refund'),
             cashStat('Basis data', isFailed ? 'RTS / status gagal' : 'Marketplace returns'),
         ].join('');
-        $('returnOrdersBody').innerHTML = rows.length ? `<div class="an-table-wrap"><table class="an-table an-cash-table an-exception-table" aria-label="Daftar return dan refund"><thead><tr><th>Referensi</th><th>Order &amp; toko</th><th>Status</th><th>Nilai kasus</th><th>Waktu</th></tr></thead><tbody>${rows.map(row => { const kindLabel = row.kind === 'failed_delivery' ? 'Pengiriman gagal' : (row.kind === 'refund' ? 'Refund' : 'Return + refund'); const kindClass = row.kind === 'failed_delivery' ? '' : 'return'; const statusClass = row.kind === 'failed_delivery' ? 'failed' : 'return'; return `<tr><td data-label="Referensi"><div class="an-cash-order">${esc(row.reference)}</div><span class="an-exception-kind ${kindClass}">${kindLabel}</span><span class="an-cash-meta">${esc(row.reason || '—')}</span></td><td data-label="Order &amp; toko"><div class="an-cash-order">${esc(row.order_sn)}</div><span class="an-cash-meta">${esc(row.store_name)}</span></td><td data-label="Status"><span class="an-cash-status ${statusClass}">${esc(cashStatus(row.status))}</span>${row.tracking_number ? `<span class="an-cash-meta">AWB ${esc(row.tracking_number)}</span>` : ''}</td><td data-label="Nilai kasus" class="an-cash-money fee">${money(row.amount)}</td><td data-label="Waktu"><span class="an-cash-meta">${esc(dateTime(row.event_time))}</span></td></tr>`; }).join('')}</tbody></table></div>` : stateMarkup('empty', 'Belum ada data exception', `Belum ada data ${isFailed ? 'pengiriman gagal eksplisit' : 'return / refund'} pada periode ini.`);
+        $('returnOrdersBody').innerHTML = rows.length ? `<div class="an-table-wrap"><table class="an-table an-cash-table an-exception-table" aria-label="Daftar return dan refund"><thead><tr><th>Referensi</th><th>Order &amp; toko</th><th>Status</th><th>Nilai kasus</th><th>Waktu</th></tr></thead><tbody>${rows.map(row => { const kindLabel = row.kind === 'failed_delivery' ? 'Pengiriman gagal' : (row.kind === 'reversal' ? 'Payout reversal' : (row.kind === 'refund' ? 'Refund' : 'Return + refund')); const kindClass = row.kind === 'failed_delivery' ? '' : 'return'; const statusClass = row.kind === 'failed_delivery' ? 'failed' : 'return'; return `<tr><td data-label="Referensi"><div class="an-cash-order">${esc(row.reference)}</div><span class="an-exception-kind ${kindClass}">${kindLabel}</span><span class="an-cash-meta">${esc(row.reason || '—')}</span></td><td data-label="Order &amp; toko"><div class="an-cash-order">${esc(row.order_sn)}</div><span class="an-cash-meta">${esc(row.store_name)}</span></td><td data-label="Status"><span class="an-cash-status ${statusClass}">${esc(cashStatus(row.status))}</span>${row.tracking_number ? `<span class="an-cash-meta">AWB ${esc(row.tracking_number)}</span>` : ''}</td><td data-label="Nilai kasus" class="an-cash-money fee">${money(row.amount)}</td><td data-label="Waktu"><span class="an-cash-meta">${esc(dateTime(row.event_time))}</span></td></tr>`; }).join('')}</tbody></table></div>` : stateMarkup('empty', 'Belum ada data exception', `Belum ada data ${isFailed ? 'pengiriman gagal eksplisit' : 'return / refund'} pada periode ini.`);
         const currentPage = Number(meta.current_page || returnPage);
         const lastPage = Number(meta.last_page || 1);
         $('returnOrdersPage').textContent = `Halaman ${currentPage} / ${lastPage}`;

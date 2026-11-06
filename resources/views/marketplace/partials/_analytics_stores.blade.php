@@ -63,7 +63,7 @@
                         <div class="an-card-sub">Pengakuan order dan GMV pada periode berjalan; payout dan profit ditampilkan sebagai pencatatan biaya/pencairan.</div>
                     </div>
                 </div>
-                <div class="an-table-wrap"><table class="an-table"><thead><tr><th>Toko</th><th>Order masuk</th><th>Selesai</th><th>Cancel</th><th>Refund</th><th>GMV akrual</th><th>GMV belum cair</th><th>Payout tercatat</th><th>Adm fee tercatat</th><th>Biaya iklan</th><th>Profit operasional tercatat</th></tr></thead><tbody id="storeBody"><tr><td colspan="11"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div>
+                <div class="an-table-wrap"><table class="an-table an-store-accrual-table"><thead><tr><th>Toko</th><th>Order</th><th>Dikirim</th><th>Konfirmasi</th><th>Selesai</th><th>Batal</th><th>Refund order</th><th>GMV</th><th>Belum cair</th><th>Refund</th><th>Payout</th><th>Adm fee</th><th>Iklan</th><th>Profit</th></tr></thead><tbody id="storeBody"><tr><td colspan="14"><x-gf.state type="loading" title="Memuat…" /></td></tr></tbody></table></div>
             </section>
             <section class="an-portfolio-subsection">
                 <div class="an-portfolio-subsection-head">

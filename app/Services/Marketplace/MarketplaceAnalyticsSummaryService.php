@@ -388,6 +388,7 @@ class MarketplaceAnalyticsSummaryService
 
         $paginator = $base
             ->join('stores as st', 'st.id', '=', 'mo.store_id')
+            ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->select([
                 'mo.id',
                 'mo.channel_order_id',
@@ -402,6 +403,7 @@ class MarketplaceAnalyticsSummaryService
                 'mo.raw_json as order_raw_json',
                 'mo.store_id',
                 'st.name as store_name',
+                'ch.code as platform',
                 'ms.data_status',
                 'ms.settlement_time',
                 'ms.buyer_payment_amount',
@@ -409,6 +411,10 @@ class MarketplaceAnalyticsSummaryService
                 'ms.raw_json as settlement_raw_json',
                 'ms.final_income',
                 'ms.drc_adjustable_refund',
+                'ms.return_refund_status',
+                'ms.refund_source',
+                'ms.reversal_amount',
+                'ms.reversal_source',
                 'ms.commission_fee',
                 'ms.service_fee',
                 'ms.transaction_fee',
@@ -465,11 +471,17 @@ class MarketplaceAnalyticsSummaryService
                 'status' => (string) ($row->order_status ?: $row->status ?: '-'),
                 'status_group' => $statusGroup['key'],
                 'status_group_label' => $statusGroup['label'],
+                'platform' => (string) ($row->platform ?? ''),
+                'return_refund_status' => (string) ($row->return_refund_status ?: MarketplaceOrderSettlement::RETURN_STATUS_NONE),
+                'refund_source' => (string) ($row->refund_source ?? ''),
+                'reversal_amount' => round((float) ($row->reversal_amount ?? 0), 2),
+                'reversal_source' => (string) ($row->reversal_source ?? ''),
                 'payment_method' => $this->cashPaymentMethod($row),
                 'settlement_status' => (string) ($row->data_status ?: 'not_settled'),
                 'ordered_at' => $row->ordered_at,
                 'settlement_time' => $row->settlement_time,
                 'gross_sales' => round($grossSales, 2),
+                'net_sales' => round($grossSales, 2),
                 'buyer_payment_amount' => round($buyerPayment, 2),
                 'cash_payout' => round((float) ($row->final_income ?? 0), 2),
                 'marketplace_fee' => round($marketplaceFees, 2),
@@ -572,18 +584,23 @@ class MarketplaceAnalyticsSummaryService
 
                     foreach ($settlementModel->analyticsFeeBreakdown() as $item) {
                         $code = (string) ($item['code'] ?? 'other_fee');
-                        $burden = in_array((string) ($item['burden'] ?? ''), ['seller', 'platform'], true)
+                        $burden = in_array((string) ($item['burden'] ?? ''), ['seller', 'platform', 'logistics'], true)
                             ? (string) $item['burden']
                             : ($code === 'shipping_subsidy' ? 'platform' : 'seller');
-                        $totals[$code] ??= [
-                            'code' => $code,
-                            'label' => (string) ($item['label'] ?? $code),
-                            'category' => (string) ($item['category'] ?? 'fee'),
-                            'amount' => 0.0,
-                            'count' => 0,
-                        ];
-                        $totals[$code]['amount'] += (float) ($item['amount'] ?? 0);
-                        $totals[$code]['count']++;
+                        // Selisih ongkir adalah derived seller burden. Jangan
+                        // masukkan ke canonical totals karena shipping_cost
+                        // dan shipping_subsidy sudah menjadi sumber totalnya.
+                        if ($code !== 'shipping_difference') {
+                            $totals[$code] ??= [
+                                'code' => $code,
+                                'label' => (string) ($item['label'] ?? $code),
+                                'category' => (string) ($item['category'] ?? 'fee'),
+                                'amount' => 0.0,
+                                'count' => 0,
+                            ];
+                            $totals[$code]['amount'] += (float) ($item['amount'] ?? 0);
+                            $totals[$code]['count']++;
+                        }
 
                         $burdenKey = $burden.'|'.$code;
                         $burdenTotals[$burdenKey] ??= [
@@ -593,16 +610,40 @@ class MarketplaceAnalyticsSummaryService
                             'burden' => $burden,
                             'amount' => 0.0,
                             'count' => 0,
+                            'details' => [],
                         ];
                         $burdenTotals[$burdenKey]['amount'] += (float) ($item['amount'] ?? 0);
                         $burdenTotals[$burdenKey]['count']++;
+                        if ($code === 'other_fee') {
+                            $detailSource = (string) ($item['source'] ?? 'settlement_fee_breakdown');
+                            $detailKey = $detailSource.'|'.(string) ($item['label'] ?? $code);
+                            $burdenTotals[$burdenKey]['details'][$detailKey] ??= [
+                                'code' => $code,
+                                'label' => (string) ($item['label'] ?? $code),
+                                'source' => $detailSource,
+                                'amount' => 0.0,
+                                'count' => 0,
+                            ];
+                            $burdenTotals[$burdenKey]['details'][$detailKey]['amount'] += (float) ($item['amount'] ?? 0);
+                            $burdenTotals[$burdenKey]['details'][$detailKey]['count']++;
+                        }
 
-                        $storeKey = (string) ($row->store_id ?? 'unknown');
-                        $storeKey = $storeKey.'|'.$burden;
+                        $feeGroup = $code === 'affiliate_fee' || (string) ($item['category'] ?? '') === 'affiliate'
+                            ? 'affiliate'
+                            : $burden;
+
+                        // Ongkir memiliki section tersendiri. Jangan campurkan
+                        // biaya kirim ke performa fee per toko atau Seller fee.
+                        if ($feeGroup === 'logistics') {
+                            continue;
+                        }
+
+                        $storeKey = (string) ($row->store_id ?? 'unknown').'|'.$feeGroup;
                         $stores[$storeKey] ??= [
                             'store_id' => $row->store_id ?? 'unknown',
                             'store_name' => (string) ($row->fee_store_name ?: 'Toko tidak diketahui'),
                             'burden' => $burden,
+                            'fee_group' => $feeGroup,
                             'cost_type' => 'fee',
                             'amount' => 0.0,
                             'count' => 0,
@@ -623,6 +664,7 @@ class MarketplaceAnalyticsSummaryService
                 'store_id' => $adRow->store_id ?? 'unknown',
                 'store_name' => (string) ($adRow->store_name ?: 'Toko tidak diketahui'),
                 'burden' => 'seller',
+                'fee_group' => 'ads',
                 'cost_type' => 'ads',
                 'source' => (string) ($adRow->ad_cost_source ?? 'none'),
                 'amount' => round($adCost, 2),
@@ -630,10 +672,22 @@ class MarketplaceAnalyticsSummaryService
             ];
         }
 
-        $normalize = fn (array $item): array => array_merge($item, [
-            'amount' => round((float) $item['amount'], 2),
-            'count' => (int) $item['count'],
-        ]);
+        $normalize = function (array $item): array {
+            $details = collect((array) ($item['details'] ?? []))
+                ->map(fn (array $detail): array => array_merge($detail, [
+                    'amount' => round((float) ($detail['amount'] ?? 0), 2),
+                    'count' => (int) ($detail['count'] ?? 0),
+                ]))
+                ->sortByDesc('amount')
+                ->values()
+                ->all();
+
+            return array_merge($item, [
+                'amount' => round((float) $item['amount'], 2),
+                'count' => (int) $item['count'],
+                'details' => $details,
+            ]);
+        };
 
         return [
             'totals' => collect($totals)
@@ -784,7 +838,8 @@ class MarketplaceAnalyticsSummaryService
     {
         $status = strtoupper(trim((string) ($row->order_status ?: $row->status ?: '')));
 
-        if ((int) ($row->has_return_refund ?? 0) === 1
+        if (in_array((string) ($row->return_refund_status ?? ''), MarketplaceOrderSettlement::RETURN_REFUND_STATUSES, true)
+            || (int) ($row->has_return_refund ?? 0) === 1
             || in_array($status, ['TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED'], true)) {
             return ['key' => 'return_refund', 'label' => 'Return / Refund'];
         }
@@ -862,7 +917,10 @@ class MarketplaceAnalyticsSummaryService
                         ->whereBetween('mr_event.create_time', [$fromTimestamp, $toTimestamp]);
                 })->orWhere(function ($financeQuery) use ($filters): void {
                     $financeQuery
-                        ->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+                        ->where(function ($query): void {
+                            $query->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+                                ->orWhereIn('ms.return_refund_status', MarketplaceOrderSettlement::RETURN_REFUND_STATUSES);
+                        })
                         ->whereExists(function ($channelQuery): void {
                             $channelQuery->selectRaw('1')
                                 ->from('stores as refund_store')
@@ -1284,7 +1342,10 @@ class MarketplaceAnalyticsSummaryService
                 ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
                 ->whereIn('mo.store_id', $filters['store_ids'])
                 ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
-                ->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+                        ->where(function ($query): void {
+                            $query->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+                                ->orWhereIn('ms.return_refund_status', MarketplaceOrderSettlement::RETURN_REFUND_STATUSES);
+                        })
                 ->whereBetween(DB::raw('COALESCE(ms.settlement_time, mo.ordered_at)'), [
                     $filters['date_from'].' 00:00:00',
                     $filters['date_to'].' 23:59:59',
@@ -1301,6 +1362,8 @@ class MarketplaceAnalyticsSummaryService
                     'ms.id as settlement_id',
                     'ms.settlement_time',
                     'ms.drc_adjustable_refund',
+                    'ms.return_refund_status',
+                    'ms.reversal_amount',
                 ])
                 ->orderByDesc('ms.settlement_time')
                 ->orderByDesc('mo.ordered_at')
@@ -1318,9 +1381,11 @@ class MarketplaceAnalyticsSummaryService
                     'store_id' => (int) $row->store_id,
                     'store_name' => (string) ($row->store_name ?: 'Tanpa toko'),
                     'status' => (string) ($row->order_status ?: $row->status ?: '—'),
-                    'kind' => 'refund',
-                    'reason' => 'TikTok Finance refund adjustment',
-                    'amount' => round(abs((float) $row->drc_adjustable_refund), 2),
+                    'kind' => (string) $row->return_refund_status === MarketplaceOrderSettlement::RETURN_STATUS_REVERSAL ? 'reversal' : 'refund',
+                    'reason' => (string) $row->return_refund_status === MarketplaceOrderSettlement::RETURN_STATUS_REVERSAL
+                        ? 'TikTok Finance settlement reversal'
+                        : 'TikTok Finance refund adjustment',
+                    'amount' => round(max(abs((float) $row->drc_adjustable_refund), (float) ($row->reversal_amount ?? 0)), 2),
                     'tracking_number' => '',
                     'event_time' => $row->settlement_time ?: $row->ordered_at,
                     'updated_at' => $row->settlement_time ?: $row->ordered_at,
@@ -1702,7 +1767,10 @@ class MarketplaceAnalyticsSummaryService
             ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereIn('mo.store_id', $filters['store_ids'])
             ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
-            ->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+            ->where(function ($query): void {
+                $query->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+                    ->orWhereIn('ms.return_refund_status', MarketplaceOrderSettlement::RETURN_REFUND_STATUSES);
+            })
             ->whereBetween(DB::raw('COALESCE(ms.settlement_time, mo.ordered_at)'), [
                 $filters['date_from'].' 00:00:00',
                 $filters['date_to'].' 23:59:59',
@@ -1807,13 +1875,19 @@ class MarketplaceAnalyticsSummaryService
         $ads = $this->adsStoreSummary($filters)->keyBy(fn ($row) => (string) $row->store_id);
         $returnRefunds = $this->returnRefundStoreSummary($filters);
         $unsettled = $this->unsettledStoreSummary($filters);
-        $ids = $financial->keys()->merge($operational->keys())->merge($ads->keys())->unique();
+        $ids = $financial->keys()
+            ->merge($operational->keys())
+            ->merge($ads->keys())
+            ->merge($returnRefunds->keys())
+            ->merge($unsettled->keys())
+            ->unique();
 
         return $ids->map(function (string $id) use ($financial, $operational, $ads, $returnRefunds, $unsettled) {
             $finance = $financial->get($id);
             $ops = $operational->get($id);
             $ad = $ads->get($id);
             $pending = $unsettled->get($id, ['order_count' => 0, 'gmv' => 0.0]);
+            $returnRefund = $returnRefunds->get($id, ['count' => 0, 'amount' => 0.0]);
             $aggregate = $this->normalizeAggregate($finance);
 
             return $this->withRates($this->applyAdCost(array_merge([
@@ -1821,11 +1895,16 @@ class MarketplaceAnalyticsSummaryService
                 'store_name' => $finance?->store_name ?? $ops?->store_name ?? $ad?->store_name ?? 'Tanpa toko',
                 'placed_order_count' => (int) ($ops->placed_order_count ?? 0),
                 'order_total' => (int) ($ops->order_total ?? 0),
+                'ready_to_ship_count' => (int) ($ops->ready_to_ship_count ?? 0),
+                'in_transit_count' => (int) ($ops->in_transit_count ?? 0),
+                'shipping_count' => (int) ($ops->shipping_count ?? 0),
+                'confirmation_count' => (int) ($ops->confirmation_count ?? 0),
                 'shipped_count' => (int) ($ops->shipped_count ?? 0),
                 'completed_count' => (int) ($ops->completed_count ?? 0),
                 'cancelled_count' => (int) ($ops->cancelled_count ?? 0),
                 'cancelled_amount' => round((float) ($ops->cancelled_amount ?? 0), 2),
-                'return_refund_count' => (int) ($returnRefunds->get($id, 0)),
+                'return_refund_count' => (int) ($returnRefund['count'] ?? 0),
+                'return_refund_amount' => round((float) ($returnRefund['amount'] ?? 0), 2),
                 'gmv' => round((float) ($ops->gmv ?? 0), 2),
                 'unsettled_order_count' => (int) ($pending['order_count'] ?? 0),
                 'unsettled_gmv' => round((float) ($pending['gmv'] ?? 0), 2),
@@ -1847,6 +1926,10 @@ class MarketplaceAnalyticsSummaryService
         return [
             'placed_order_count' => (int) ($row->placed_order_count ?? 0),
             'order_total' => (int) ($row->order_total ?? 0),
+            'ready_to_ship_count' => (int) ($row->ready_to_ship_count ?? 0),
+            'in_transit_count' => (int) ($row->in_transit_count ?? 0),
+            'shipping_count' => (int) ($row->shipping_count ?? 0),
+            'confirmation_count' => (int) ($row->confirmation_count ?? 0),
             'shipped_count' => (int) ($row->shipped_count ?? 0),
             'completed_count' => (int) ($row->completed_count ?? 0),
             'cancelled_count' => (int) ($row->cancelled_count ?? 0),
@@ -2235,16 +2318,21 @@ class MarketplaceAnalyticsSummaryService
     {
         $fromTimestamp = Carbon::parse($filters['date_from'])->startOfDay()->timestamp;
         $toTimestamp = Carbon::parse($filters['date_to'])->endOfDay()->timestamp;
-        $keys = collect();
+        $seen = [];
+        $summary = [];
 
         $returnRows = DB::table('marketplace_returns')
             ->whereBetween('create_time', [$fromTimestamp, $toTimestamp])
             ->whereIn('store_id', $filters['store_ids'])
-            ->get(['id', 'store_id', 'order_sn']);
+            ->get(['id', 'store_id', 'order_sn', 'amount_before_discount']);
 
         foreach ($returnRows as $row) {
             $orderKey = trim((string) ($row->order_sn ?? ''));
-            $keys->put($row->store_id.'|'.($orderKey !== '' ? $orderKey : 'return:'.$row->id), true);
+            $key = $row->store_id.'|'.($orderKey !== '' ? $orderKey : 'return:'.$row->id);
+            $seen[$key] = [
+                'store_id' => (int) $row->store_id,
+                'amount' => 0.0,
+            ];
         }
 
         $financeRows = DB::table('marketplace_orders as mo')
@@ -2253,23 +2341,78 @@ class MarketplaceAnalyticsSummaryService
             ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereIn('mo.store_id', $filters['store_ids'])
             ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
-            ->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+            ->where(function ($query): void {
+                $query->whereRaw('ABS(COALESCE(ms.drc_adjustable_refund, 0)) > 0')
+                    ->orWhereIn('ms.return_refund_status', MarketplaceOrderSettlement::RETURN_REFUND_STATUSES);
+            })
             ->whereBetween(DB::raw('COALESCE(ms.settlement_time, mo.ordered_at)'), [
                 $filters['date_from'].' 00:00:00',
                 $filters['date_to'].' 23:59:59',
             ])
-            ->get(['mo.store_id', 'mo.channel_order_id', 'mo.external_order_id']);
+            ->get([
+                'mo.store_id',
+                'mo.channel_order_id',
+                'mo.external_order_id',
+                'ms.drc_adjustable_refund as settlement_refund_amount',
+            ]);
 
         foreach ($financeRows as $row) {
             $orderKey = trim((string) ($row->channel_order_id ?: $row->external_order_id ?: ''));
             if ($orderKey !== '') {
-                $keys->put($row->store_id.'|'.$orderKey, true);
+                $key = $row->store_id.'|'.$orderKey;
+                if (! isset($seen[$key])) {
+                    $seen[$key] = [
+                        'store_id' => (int) $row->store_id,
+                        'amount' => 0.0,
+                    ];
+                }
             }
         }
 
-        return $keys->keys()
-            ->map(fn (string $key): string => explode('|', $key, 2)[0])
-            ->countBy();
+        foreach ($returnRows->groupBy(function ($row): string {
+            $orderKey = trim((string) ($row->order_sn ?? ''));
+
+            return $row->store_id.'|'.($orderKey !== '' ? $orderKey : 'return:'.$row->id);
+        }) as $key => $rows) {
+            $settlement = $financeRows->first(function ($row) use ($key): bool {
+                foreach ([(string) $row->channel_order_id, (string) $row->external_order_id] as $orderKey) {
+                    if (trim($orderKey) !== '' && $row->store_id.'|'.trim($orderKey) === $key) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+            $settlementAmount = abs((float) ($settlement->settlement_refund_amount ?? 0));
+            $seen[$key]['amount'] = $settlementAmount > 0
+                ? $settlementAmount
+                : (float) $rows->sum(fn ($row): float => (float) ($row->amount_before_discount ?? 0));
+        }
+
+        foreach ($financeRows as $row) {
+            $orderKey = trim((string) ($row->channel_order_id ?: $row->external_order_id ?: ''));
+            if ($orderKey === '') {
+                continue;
+            }
+
+            $key = $row->store_id.'|'.$orderKey;
+            $seen[$key]['amount'] = max(
+                (float) ($seen[$key]['amount'] ?? 0),
+                abs((float) ($row->settlement_refund_amount ?? 0))
+            );
+        }
+
+        foreach ($seen as $row) {
+            $storeId = (string) $row['store_id'];
+            $summary[$storeId] ??= ['count' => 0, 'amount' => 0.0];
+            $summary[$storeId]['count']++;
+            $summary[$storeId]['amount'] += (float) $row['amount'];
+        }
+
+        return collect($summary)->map(fn (array $row): array => [
+            'count' => (int) $row['count'],
+            'amount' => round((float) $row['amount'], 2),
+        ]);
     }
 
     private function adsAggregate(array $filters): array
@@ -2607,6 +2750,10 @@ class MarketplaceAnalyticsSummaryService
         return implode(', ', [
             'COUNT(DISTINCT mo.id) AS placed_order_count',
             'SUM(CASE WHEN '.$this->isRevenueStatus().' THEN 1 ELSE 0 END) AS order_total',
+            "SUM(CASE WHEN {$status} IN ('READY_TO_SHIP', 'PROCESSED') THEN 1 ELSE 0 END) AS ready_to_ship_count",
+            "SUM(CASE WHEN {$status} IN ('SHIPPED', 'READY_TO_HANDOVER') THEN 1 ELSE 0 END) AS in_transit_count",
+            "SUM(CASE WHEN {$status} IN ('READY_TO_SHIP', 'PROCESSED', 'SHIPPED', 'READY_TO_HANDOVER') THEN 1 ELSE 0 END) AS shipping_count",
+            "SUM(CASE WHEN {$status} = 'TO_CONFIRM_RECEIVE' THEN 1 ELSE 0 END) AS confirmation_count",
             "SUM(CASE WHEN {$status} IN ('SHIPPED', 'READY_TO_HANDOVER', 'TO_CONFIRM_RECEIVE', 'COMPLETED') THEN 1 ELSE 0 END) AS shipped_count",
             // Keep completed orders on the same eligible/revenue basis as order_total.
             "SUM(CASE WHEN {$status} = 'COMPLETED' AND ({$this->isRevenueStatus()}) THEN 1 ELSE 0 END) AS completed_count",
@@ -2632,12 +2779,15 @@ class MarketplaceAnalyticsSummaryService
 
     private function returnRefundExistsSql(): string
     {
+        $statuses = "'".implode("', '", MarketplaceOrderSettlement::RETURN_REFUND_STATUSES)."'";
+
         return '(EXISTS (SELECT 1 FROM marketplace_returns AS mr_status'
             .' WHERE mr_status.store_id = mo.store_id'
             .' AND (mr_status.order_sn = mo.channel_order_id OR mr_status.order_sn = mo.external_order_id))'
             .' OR EXISTS (SELECT 1 FROM marketplace_order_settlements AS ms_refund'
             .' WHERE ms_refund.order_id = mo.id'
-            .' AND ABS(COALESCE(ms_refund.drc_adjustable_refund, 0)) > 0))';
+            .' AND (ABS(COALESCE(ms_refund.drc_adjustable_refund, 0)) > 0'
+            .' OR ms_refund.return_refund_status IN ('.$statuses.'))))';
     }
 
     /**

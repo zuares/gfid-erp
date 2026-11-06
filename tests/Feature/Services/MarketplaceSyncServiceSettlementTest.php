@@ -1065,6 +1065,27 @@ class MarketplaceSyncServiceSettlementTest extends TestCase
         ]);
     }
 
+    public function test_premi_shopee_dari_delivery_protection_dipetakan_ke_shipping_insurance_fee(): void
+    {
+        $order = $this->createOrder();
+
+        $this->mockDriver(function (MockInterface $mock) use ($order) {
+            $mock->shouldReceive('getEscrowDetail')
+                ->once()
+                ->andReturn($this->escrowResponse($this->realisticIncomeFields([
+                    'delivery_seller_protection_fee_premium_amount' => 199,
+                    'order_sn' => $order->channel_order_id,
+                ])));
+        });
+
+        app(MarketplaceSyncService::class)->syncSettlements($this->store);
+
+        $this->assertDatabaseHas('marketplace_order_settlements', [
+            'channel_order_id' => $order->channel_order_id,
+            'shipping_insurance_fee' => '199.00',
+        ]);
+    }
+
     // ── 9. escrow_amount tetap dipetakan ke final_income (regresi, fixture baru) ──
     public function test_escrow_amount_tetap_dipetakan_ke_final_income()
     {

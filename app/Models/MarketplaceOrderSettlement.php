@@ -7,6 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MarketplaceOrderSettlement extends Model
 {
+    public const RETURN_STATUS_NONE = 'none';
+    public const RETURN_STATUS_REQUESTED = 'return_requested';
+    public const RETURN_STATUS_REFUNDED = 'refunded';
+    public const RETURN_STATUS_REVERSAL = 'settlement_reversal';
+
+    public const RETURN_REFUND_STATUSES = [
+        self::RETURN_STATUS_REQUESTED,
+        self::RETURN_STATUS_REFUNDED,
+        self::RETURN_STATUS_REVERSAL,
+    ];
+
     protected $fillable = [
         'store_id',
         'order_id',
@@ -35,6 +46,10 @@ class MarketplaceOrderSettlement extends Model
         // Campaign & lainnya
         'activity_fee',
         'drc_adjustable_refund',
+        'return_refund_status',
+        'refund_source',
+        'reversal_amount',
+        'reversal_source',
         'escrow_tax',
 
         // Biaya iklan (manual / import)
@@ -50,6 +65,8 @@ class MarketplaceOrderSettlement extends Model
         'data_status',
         'data_quality_flags',
         'data_checked_at',
+        'refund_detected_at',
+        'source_transaction_id',
     ];
 
     protected $casts = [
@@ -67,6 +84,7 @@ class MarketplaceOrderSettlement extends Model
         'shipping_insurance_fee' => 'decimal:2',
         'activity_fee'           => 'decimal:2',
         'drc_adjustable_refund'  => 'decimal:2',
+        'reversal_amount'        => 'decimal:2',
         'escrow_tax'             => 'decimal:2',
         'ad_cost'                => 'decimal:2',
         'final_income'           => 'decimal:2',
@@ -75,6 +93,7 @@ class MarketplaceOrderSettlement extends Model
         'raw_json'               => 'array',
         'data_quality_flags'     => 'array',
         'data_checked_at'        => 'datetime',
+        'refund_detected_at'     => 'datetime',
     ];
 
     public function store(): BelongsTo
@@ -145,6 +164,90 @@ class MarketplaceOrderSettlement extends Model
         $raw = $this->raw_json;
 
         return is_array($raw) ? self::tiktokRefundAmountFromPayload($raw) : 0.0;
+    }
+
+    /**
+     * Classify TikTok return/refund evidence without mistaking a negative
+     * settlement for the refund principal. A statement can contain shipping
+     * and fee reversals while the actual refund amount is still unavailable.
+     *
+     * @return array{status:string,refund_source:?string,reversal_amount:float,reversal_source:?string,detected:bool}
+     */
+    public static function classifyTikTokReturnRefund(
+        array $orderRaw,
+        array $financeRaw,
+        float $refundAmount,
+        float $settlementAmount,
+    ): array {
+        $bool = static function (mixed $value): bool {
+            if (is_bool($value)) {
+                return $value;
+            }
+
+            return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'y'], true);
+        };
+
+        $orderStatus = strtoupper(trim((string) (
+            data_get($orderRaw, 'order_status')
+            ?? data_get($orderRaw, 'status')
+            ?? ''
+        )));
+        $hasReturnRequest = $bool(data_get($orderRaw, 'has_return_request'))
+            || $bool(data_get($orderRaw, 'has_return'))
+            || in_array($orderStatus, ['TO_RETURN', 'RETURNING', 'RETURNED', 'REFUND', 'REFUNDED'], true);
+        $disputeReason = trim((string) (
+            data_get($orderRaw, 'dispute_reason')
+            ?? data_get($orderRaw, 'cancel_reason')
+            ?? ''
+        ));
+        $buyerInitiated = strtoupper(trim((string) data_get($orderRaw, 'cancellation_initiator'))) === 'BUYER';
+        $hasReturnEvidence = $hasReturnRequest || ($buyerInitiated && $disputeReason !== '');
+        $revenueValue = data_get($financeRaw, 'revenue_amount');
+        $isPureSettlementReversal = $revenueValue === null
+            || $revenueValue === ''
+            || (is_numeric($revenueValue) && abs((float) $revenueValue) < 0.01);
+        $reversalAmount = $hasReturnEvidence && $settlementAmount < 0 && $isPureSettlementReversal
+            ? round(abs($settlementAmount), 2)
+            : 0.0;
+        $reversalSource = $reversalAmount > 0 ? 'tiktok_finance_statement' : null;
+
+        if ($refundAmount > 0 || in_array($orderStatus, ['REFUND', 'REFUNDED'], true)) {
+            return [
+                'status' => self::RETURN_STATUS_REFUNDED,
+                'refund_source' => $refundAmount > 0 ? 'tiktok_finance_revenue_breakdown' : 'marketplace_order_status',
+                'reversal_amount' => $reversalAmount,
+                'reversal_source' => $reversalSource,
+                'detected' => true,
+            ];
+        }
+
+        if ($reversalAmount > 0) {
+            return [
+                'status' => self::RETURN_STATUS_REVERSAL,
+                'refund_source' => null,
+                'reversal_amount' => $reversalAmount,
+                'reversal_source' => $reversalSource,
+                'detected' => true,
+            ];
+        }
+
+        if ($hasReturnEvidence) {
+            return [
+                'status' => self::RETURN_STATUS_REQUESTED,
+                'refund_source' => null,
+                'reversal_amount' => 0.0,
+                'reversal_source' => null,
+                'detected' => true,
+            ];
+        }
+
+        return [
+            'status' => self::RETURN_STATUS_NONE,
+            'refund_source' => null,
+            'reversal_amount' => 0.0,
+            'reversal_source' => null,
+            'detected' => false,
+        ];
     }
 
     /**
@@ -482,7 +585,12 @@ class MarketplaceOrderSettlement extends Model
                 'label' => $label,
                 'amount' => round($amount, 2),
                 'category' => $category,
-                'burden' => $code === 'shipping_subsidy' || $category === 'platform' ? 'platform' : 'seller',
+                // Shipping paid to the courier is tracked as a logistics cost,
+                // not as seller fee. It remains visible in the dedicated
+                // Ongkir & logistik section and in the order total.
+                'burden' => $code === 'shipping_subsidy' || $category === 'platform'
+                    ? 'platform'
+                    : ($code === 'shipping_cost' ? 'logistics' : 'seller'),
             ];
             if ($source) {
                 $row['source'] = $source;
@@ -539,8 +647,19 @@ class MarketplaceOrderSettlement extends Model
                 $push($rows, $seen, 'tax', 'Pajak', $value, 'tax', 'tiktok_fee_breakdown.taxes.'.(string) $key);
             }
 
-            $push($rows, $seen, 'shipping_cost', 'Biaya Layanan Logistik', $raw['shipping_cost_amount'] ?? null, 'shipping', 'shipping_cost_amount');
+            $push($rows, $seen, 'shipping_cost', 'Biaya Logistik Seller · potongan settlement', $raw['shipping_cost_amount'] ?? null, 'shipping', 'shipping_cost_amount');
             $push($rows, $seen, 'shipping_subsidy', 'Subsidi / Potongan Ongkir', data_get($raw, 'tiktok_shipping_breakdown.shipping_fee_discount_amount'), 'shipping', 'tiktok_shipping_breakdown.shipping_fee_discount_amount');
+            $tiktokShippingCost = $amountOf($raw['shipping_cost_amount'] ?? null);
+            $tiktokShippingSubsidy = $amountOf(data_get($raw, 'tiktok_shipping_breakdown.shipping_fee_discount_amount'));
+            $push(
+                $rows,
+                $seen,
+                'shipping_difference',
+                'Selisih Ongkir',
+                max(0, $tiktokShippingCost - $tiktokShippingSubsidy),
+                'shipping',
+                'shipping_cost_minus_subsidy'
+            );
 
             if ($rows === []) {
                 $push($rows, $seen, 'platform_commission', 'Komisi Platform', $this->commission_fee, 'fee', 'commission_fee');
@@ -592,17 +711,40 @@ class MarketplaceOrderSettlement extends Model
         $push($rows, $seen, 'affiliate_fee', 'Komisi Afiliasi / AMS', $this->activity_fee, 'affiliate', 'activity_fee');
         $push($rows, $seen, 'shipping_cost', 'Biaya Kirim ke Jasa Kirim', $this->actual_shipping_fee ?: $this->shipping_cost_amount, 'shipping', 'actual_shipping_fee');
         $push($rows, $seen, 'shipping_subsidy', 'Subsidi / Potongan Ongkir', $this->shipping_fee_subsidy, 'shipping', 'shipping_fee_subsidy');
-        $push($rows, $seen, 'insurance_fee', 'Premi / Asuransi', $this->shipping_insurance_fee, 'fee', 'shipping_insurance_fee');
+        $shippingCostAmount = $amountOf($this->actual_shipping_fee ?: $this->shipping_cost_amount);
+        $shippingSubsidyAmount = $amountOf($this->shipping_fee_subsidy);
+        $buyerShippingValue = data_get($raw, 'buyer_paid_shipping_fee')
+            ?? data_get($raw, 'customer_paid_shipping_fee_amount')
+            ?? data_get($raw, 'income_details.buyer_paid_shipping_fee')
+            ?? data_get($raw, 'income_details.customer_paid_shipping_fee_amount');
+        $buyerShippingAmount = $amountOf($buyerShippingValue);
+        $push(
+            $rows,
+            $seen,
+            'shipping_difference',
+            'Selisih Ongkir',
+            max(0, $shippingCostAmount - $shippingSubsidyAmount - $buyerShippingAmount),
+            'shipping',
+            'shipping_cost_minus_subsidy_minus_buyer_shipping'
+        );
+        $push($rows, $seen, 'insurance_fee', 'Premi Shopee · potongan settlement', $this->shipping_insurance_fee, 'fee', 'shipping_insurance_fee');
         $push($rows, $seen, 'tax', 'Pajak', $this->escrow_tax, 'tax', 'escrow_tax');
-        $push($rows, $seen, 'other_fee', 'Premi', $raw['premi'] ?? null, 'fee', 'premi');
-
-        // Some Shopee settlement snapshots keep seller protection premiums in
-        // raw_json while the normalized insurance column is empty. Surface
-        // those charges as other fees so the analytics ledger does not omit
-        // them or mix them into the primary shipping charge.
         if ((float) $this->shipping_insurance_fee <= 0) {
-            $push($rows, $seen, 'other_fee', 'Biaya Perlindungan Pengiriman', $raw['shipping_seller_protection_fee_amount'] ?? null, 'fee', 'shipping_seller_protection_fee_amount');
-            $push($rows, $seen, 'other_fee', 'Premi Perlindungan Pengiriman', $raw['delivery_seller_protection_fee_premium_amount'] ?? null, 'fee', 'delivery_seller_protection_fee_premium_amount');
+            $premiumValue = $raw['premi'] ?? null;
+            $premiumSource = $premiumValue !== null && $premiumValue !== '' ? 'premi' : null;
+            if ($premiumSource === null) {
+                $premiumSources = ['delivery_seller_protection_fee_premium_amount', 'shipping_seller_protection_fee_amount'];
+                $premiumValues = array_filter(
+                    array_map(static fn (string $key): mixed => $raw[$key] ?? null, $premiumSources),
+                    static fn (mixed $value): bool => $value !== null && $value !== ''
+                );
+                if ($premiumValues !== []) {
+                    $premiumValue = array_sum(array_map(static fn (mixed $value): float => (float) $value, $premiumValues));
+                    $premiumSource = implode('+', $premiumSources);
+                }
+            }
+
+            $push($rows, $seen, 'insurance_fee', 'Premi Shopee · potongan settlement', $premiumValue, 'fee', $premiumSource);
         }
 
         return $rows;

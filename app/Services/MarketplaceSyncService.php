@@ -1246,6 +1246,19 @@ class MarketplaceSyncService
         ];
 
         $settlementAmount = $amount($data['settlement_amount'] ?? 0);
+        $orderRaw = is_array($order->raw_json) ? $order->raw_json : [];
+        $returnRefundClassification = MarketplaceOrderSettlement::classifyTikTokReturnRefund(
+            $orderRaw,
+            $data,
+            $refundAmount,
+            $settlementAmount,
+        );
+        $sourceTransactionId = trim((string) (
+            $data['statement_transaction_id']
+            ?? $data['transaction_id']
+            ?? data_get($data, 'tiktok_statement.statement_transaction_id')
+            ?? ''
+        ));
         $raw = array_merge((array) $order->settlement?->raw_json, [
             'source' => $source,
             'order_id' => $orderId,
@@ -1262,6 +1275,13 @@ class MarketplaceSyncService
             'tiktok_fee_breakdown' => $tiktokFeeBreakdown,
             'tiktok_shipping_breakdown' => $shippingAmounts,
             'sku_transactions' => $skuTransactions,
+            'tiktok_return_refund' => [
+                'status' => $returnRefundClassification['status'],
+                'refund_source' => $returnRefundClassification['refund_source'],
+                'reversal_amount' => $returnRefundClassification['reversal_amount'],
+                'reversal_source' => $returnRefundClassification['reversal_source'],
+                'has_return_request' => (bool) data_get($orderRaw, 'has_return_request', false),
+            ],
         ]);
         foreach ([
             'statement_id',
@@ -1326,6 +1346,14 @@ class MarketplaceSyncService
             'shipping_cost_amount' => $shippingCostAmount,
             'shipping_fee_subsidy' => $this->nn($this->decimalValue($shippingAmounts['shipping_fee_discount_amount'])),
             'drc_adjustable_refund' => $this->nn($this->decimalValue($refundAmount)),
+            'return_refund_status' => $returnRefundClassification['status'],
+            'refund_source' => $returnRefundClassification['refund_source'],
+            'reversal_amount' => $this->nn($this->decimalValue($returnRefundClassification['reversal_amount'])),
+            'reversal_source' => $returnRefundClassification['reversal_source'],
+            'refund_detected_at' => $returnRefundClassification['detected']
+                ? ($order->settlement?->refund_detected_at ?? now())
+                : null,
+            'source_transaction_id' => $sourceTransactionId !== '' ? $sourceTransactionId : null,
             'final_income' => $this->nn($this->decimalValue($settlementAmount)),
             'settlement_time' => $settlementTime,
             'raw_json' => $raw,
@@ -1340,6 +1368,7 @@ class MarketplaceSyncService
                 'reason' => $hasStatement ? null : 'tiktok_order_not_settled',
                 'settlement_time_source' => $statementTimeSource,
                 'settlement_time_precision' => $statementTimePrecision,
+                'return_refund_status' => $returnRefundClassification['status'],
             ],
             'data_checked_at' => now(),
         ])->save();
@@ -2077,6 +2106,136 @@ class MarketplaceSyncService
             } catch (\Throwable $e) {
                 $stats['errors']++;
                 Log::warning('[TikTok Finance] Gagal backfill refund', [
+                    'store_id' => $store->id,
+                    'order_id' => $settlement->channel_order_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Classify historical TikTok Finance rows as return requested, refunded,
+     * or settlement reversal. This deliberately does not turn a negative
+     * settlement into refund principal; the reversal amount is stored apart.
+     *
+     * @return array{scanned:int,candidates:int,updated:int,unchanged:int,reversal_total:float,errors:int,examples:array<int,array<string,mixed>>}
+     */
+    public function backfillTikTokReturnRefundStates(
+        Store $store,
+        bool $apply = false,
+        int $limit = 5000,
+    ): array {
+        $store->loadMissing('channel');
+        $channel = strtolower(trim((string) ($store->channel?->code ?? '')));
+        if (! in_array($channel, ['tiktok', 'ttk', 'tkt', 'tt'], true)) {
+            return [
+                'scanned' => 0,
+                'candidates' => 0,
+                'updated' => 0,
+                'unchanged' => 0,
+                'reversal_total' => 0.0,
+                'errors' => 1,
+                'examples' => [],
+            ];
+        }
+
+        $stats = [
+            'scanned' => 0,
+            'candidates' => 0,
+            'updated' => 0,
+            'unchanged' => 0,
+            'reversal_total' => 0.0,
+            'errors' => 0,
+            'examples' => [],
+        ];
+
+        // Keep the backfill safe to run from the normal 128 MB CLI process.
+        // lazyById eager-loads the related order per chunk instead of holding
+        // every raw TikTok payload in memory at once.
+        $settlements = MarketplaceOrderSettlement::query()
+            ->with('order')
+            ->where('store_id', $store->id)
+            ->lazyById(250);
+
+        foreach ($settlements as $settlement) {
+            if ($stats['scanned'] >= max(1, $limit)) {
+                break;
+            }
+            $stats['scanned']++;
+
+            $raw = is_array($settlement->raw_json) ? $settlement->raw_json : [];
+            $source = strtolower((string) ($raw['source'] ?? ''));
+            if (! str_starts_with($source, 'tiktok_finance_')) {
+                continue;
+            }
+
+            $orderRaw = is_array($settlement->order?->raw_json) ? $settlement->order->raw_json : [];
+            $settlementAmount = is_numeric($raw['settlement_amount'] ?? null)
+                ? (float) $raw['settlement_amount']
+                : (float) ($settlement->final_income ?? 0);
+            $refundAmount = abs((float) ($settlement->drc_adjustable_refund ?? 0));
+            $classification = MarketplaceOrderSettlement::classifyTikTokReturnRefund(
+                $orderRaw,
+                $raw,
+                $refundAmount,
+                $settlementAmount,
+            );
+            $sourceTransactionId = trim((string) (
+                data_get($raw, 'tiktok_statement.statement_transaction_id')
+                ?? data_get($raw, 'statement_transaction_id')
+                ?? ''
+            ));
+            $same = (string) ($settlement->return_refund_status ?: MarketplaceOrderSettlement::RETURN_STATUS_NONE) === $classification['status']
+                && abs((float) $settlement->reversal_amount - $classification['reversal_amount']) < 0.01
+                && (string) ($settlement->source_transaction_id ?? '') === $sourceTransactionId;
+            $stats['reversal_total'] = round($stats['reversal_total'] + $classification['reversal_amount'], 2);
+
+            if ($same) {
+                $stats['unchanged']++;
+                continue;
+            }
+
+            $stats['candidates']++;
+            if (count($stats['examples']) < 20) {
+                $stats['examples'][] = [
+                    'settlement_id' => $settlement->id,
+                    'order_id' => $settlement->channel_order_id,
+                    'old_status' => $settlement->return_refund_status ?: MarketplaceOrderSettlement::RETURN_STATUS_NONE,
+                    'new_status' => $classification['status'],
+                    'reversal_amount' => $classification['reversal_amount'],
+                ];
+            }
+
+            if (! $apply) {
+                continue;
+            }
+
+            try {
+                $raw['tiktok_return_refund'] = [
+                    'status' => $classification['status'],
+                    'refund_source' => $classification['refund_source'],
+                    'reversal_amount' => $classification['reversal_amount'],
+                    'reversal_source' => $classification['reversal_source'],
+                    'backfilled_at' => now()->toIso8601String(),
+                ];
+                $settlement->return_refund_status = $classification['status'];
+                $settlement->refund_source = $classification['refund_source'];
+                $settlement->reversal_amount = $this->nn($this->decimalValue($classification['reversal_amount']));
+                $settlement->reversal_source = $classification['reversal_source'];
+                $settlement->refund_detected_at = $classification['detected']
+                    ? ($settlement->refund_detected_at ?: now())
+                    : null;
+                $settlement->source_transaction_id = $sourceTransactionId !== '' ? $sourceTransactionId : null;
+                $settlement->raw_json = $raw;
+                $settlement->data_checked_at = now();
+                $settlement->save();
+                $stats['updated']++;
+            } catch (\Throwable $e) {
+                $stats['errors']++;
+                Log::warning('[TikTok Finance] Gagal backfill status return/refund', [
                     'store_id' => $store->id,
                     'order_id' => $settlement->channel_order_id,
                     'error' => $e->getMessage(),
@@ -4140,7 +4299,13 @@ class MarketplaceSyncService
             'shipping_fee_subsidy'  => $val('shipping_fee_subsidy', $this->decimalValue($income['shopee_shipping_rebate'] ?? $income['shipping_fee_rebate'] ?? null)),
             'reverse_shipping_fee'  => $val('reverse_shipping_fee', $this->decimalValue($income['reverse_shipping_fee'] ?? null)),
             'shipping_insurance_fee' => $val('shipping_insurance_fee', $this->decimalValue(
-                $income['shipping_insurance_fee'] ?? $income['shipping_insurance'] ?? $income['insurance_fee'] ?? null
+                $income['shipping_insurance_fee']
+                    ?? $income['shipping_insurance']
+                    ?? $income['insurance_fee']
+                    ?? $income['premi']
+                    ?? $income['delivery_seller_protection_fee_premium_amount']
+                    ?? $income['shipping_seller_protection_fee_amount']
+                    ?? null
             )),
 
             // Campaign & lainnya — activity_fee = AMS commission SAJA (lihat docblock).
