@@ -260,6 +260,7 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
             'item_name_snapshot' => $item->name,
             'qty' => 2,
             'line_net_amount' => 150000,
+            'hpp_snapshot' => 40000,
         ]);
         MarketplaceOrderSettlement::create([
             'store_id' => $store->id,
@@ -279,9 +280,18 @@ class MarketplaceAnalyticsEndpointTest extends TestCase
                 'settlement' => 'settled',
             ]))
             ->assertOk()
-            ->assertJsonPath('data.0.internal_category', 'Outerwear')
-            ->assertJsonPath('data.0.internal_categories.0', 'Outerwear')
-            ->assertJsonPath('data.0.internal_item_qty', 2);
+            ->assertJsonPath('data.0.internal_category', 'OUTERWEAR')
+            ->assertJsonPath('data.0.internal_categories.0', 'OUTERWEAR')
+            ->assertJsonPath('data.0.internal_item_qty', 2)
+            ->assertJsonPath('data.0.cogs', 80000)
+            ->assertJsonPath('data.0.gross_profit', 70000)
+            ->assertJsonPath('data.0.margin_before_ads', 46.67)
+            ->assertJsonPath('data.0.target_net_margin', 15)
+            ->assertJsonPath('data.0.bep_ad_budget', 70000)
+            ->assertJsonPath('data.0.bep_acos', 46.67)
+            ->assertJsonPath('data.0.bep_roas', 2.14)
+            ->assertJsonPath('data.0.target_ad_budget', 47500)
+            ->assertJsonPath('data.0.target_roas', 3.16);
     }
 
     public function test_cash_orders_shipped_tab_includes_ready_to_ship_and_processed_orders(): void

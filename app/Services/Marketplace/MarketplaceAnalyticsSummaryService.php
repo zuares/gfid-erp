@@ -21,6 +21,12 @@ class MarketplaceAnalyticsSummaryService
 
     private const ADS_VAT_RATE = 0.11;
 
+    /**
+     * Minimum net margin to preserve after marketplace costs and ads.
+     * Returned as a percentage in the drill-down payload.
+     */
+    private const TARGET_NET_MARGIN_RATE = 0.15;
+
     private const SHOPEE_AD_CHARGE_TYPES = [
         '450',
         'paid_ads_charge',
@@ -435,16 +441,24 @@ class MarketplaceAnalyticsSummaryService
         $orderIds = collect($paginator->items())->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $internalCategoriesByOrder = $this->internalCategoriesByOrderIds($orderIds);
         $internalItemQtyByOrder = $this->internalItemQtyByOrderIds($orderIds);
+        $internalItemCogsByOrder = $this->internalItemCogsByOrderIds($orderIds);
 
         $marketplaceFee = fn ($row): float => collect(self::MARKETPLACE_FEE_FIELDS)
             ->sum(fn (string $field) => (float) ($row->{$field} ?? 0));
         $affiliateFee = fn ($row): float => collect(self::AFFILIATE_FEE_FIELDS)
             ->sum(fn (string $field) => (float) ($row->{$field} ?? 0));
 
-        $data = collect($paginator->items())->map(function ($row) use ($marketplaceFee, $affiliateFee, $internalCategoriesByOrder, $internalItemQtyByOrder): array {
+        $data = collect($paginator->items())->map(function ($row) use ($marketplaceFee, $affiliateFee, $internalCategoriesByOrder, $internalItemQtyByOrder, $internalItemCogsByOrder): array {
             $grossSales = $this->cashOrderGrossSales($row);
             $marketplaceFees = $marketplaceFee($row);
             $affiliateFees = $affiliateFee($row);
+            $cashPayout = round((float) ($row->final_income ?? 0), 2);
+            $cogs = round((float) ($internalItemCogsByOrder[(int) $row->id] ?? 0), 2);
+            $grossProfit = round($cashPayout - $cogs, 2);
+            $targetNetMargin = self::TARGET_NET_MARGIN_RATE * 100;
+            $targetNetMarginAmount = $cashPayout > 0 ? $cashPayout * self::TARGET_NET_MARGIN_RATE : 0.0;
+            $breakEvenAdBudget = round(max(0, $grossProfit), 2);
+            $targetAdBudget = round(max(0, $grossProfit - $targetNetMarginAmount), 2);
             $statusGroup = $this->cashOrderStatusGroup($row);
             $settlement = new MarketplaceOrderSettlement();
             $settlement->setRawAttributes([
@@ -490,7 +504,16 @@ class MarketplaceAnalyticsSummaryService
                 'gross_sales' => round($grossSales, 2),
                 'net_sales' => round($grossSales, 2),
                 'buyer_payment_amount' => round($buyerPayment, 2),
-                'cash_payout' => round((float) ($row->final_income ?? 0), 2),
+                'cash_payout' => $cashPayout,
+                'cogs' => $cogs,
+                'gross_profit' => $grossProfit,
+                'margin_before_ads' => $cashPayout > 0 ? round(($grossProfit / $cashPayout) * 100, 2) : null,
+                'target_net_margin' => $targetNetMargin,
+                'bep_ad_budget' => $breakEvenAdBudget,
+                'bep_acos' => $cashPayout > 0 ? round(($breakEvenAdBudget / $cashPayout) * 100, 2) : null,
+                'bep_roas' => $breakEvenAdBudget > 0 ? round($cashPayout / $breakEvenAdBudget, 2) : null,
+                'target_ad_budget' => $targetAdBudget,
+                'target_roas' => $targetAdBudget > 0 ? round($cashPayout / $targetAdBudget, 2) : null,
                 'marketplace_fee' => round($marketplaceFees, 2),
                 'affiliate_fee' => round($affiliateFees, 2),
                 'commission_fee' => round((float) ($row->commission_fee ?? 0), 2),
@@ -752,12 +775,12 @@ class MarketplaceAnalyticsSummaryService
             ->select([
                 'oi.marketplace_order_id',
                 'oi.order_id',
-                'ic.name as category_name',
+                'ic.code as category_code',
             ])
             ->get();
 
         foreach ($items as $item) {
-            $category = trim((string) ($item->category_name ?? ''));
+            $category = trim((string) ($item->category_code ?? ''));
             if ($category === '') {
                 continue;
             }
@@ -827,6 +850,65 @@ class MarketplaceAnalyticsSummaryService
         }
 
         return $quantities;
+    }
+
+    /**
+     * Sum the internal item cost for only the paginated drill-down rows.
+     * HPP snapshots are stored per unit; when a line total snapshot exists,
+     * prefer that total to avoid multiplying it twice.
+     *
+     * @param  array<int, int>  $orderIds
+     * @return array<int, float>
+     */
+    private function internalItemCogsByOrderIds(array $orderIds): array
+    {
+        $orderIds = collect($orderIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $cogs = $orderIds->mapWithKeys(fn (int $id): array => [$id => 0.0])->all();
+        if ($orderIds->isEmpty()) {
+            return $cogs;
+        }
+
+        $items = DB::table('marketplace_order_items as oi')
+            ->where(function ($query) use ($orderIds): void {
+                $query->whereIn('oi.marketplace_order_id', $orderIds->all())
+                    ->orWhereIn('oi.order_id', $orderIds->all());
+            })
+            ->select([
+                'oi.marketplace_order_id',
+                'oi.order_id',
+                'oi.qty',
+                'oi.hpp_snapshot',
+                'oi.hpp_total_snapshot',
+            ])
+            ->get();
+
+        foreach ($items as $item) {
+            $qty = max(0, (int) ($item->qty ?? 0));
+            $hppTotalSnapshot = (float) ($item->hpp_total_snapshot ?? 0);
+            $hppSnapshot = (float) ($item->hpp_snapshot ?? 0);
+            $lineCogs = $hppTotalSnapshot > 0 ? $hppTotalSnapshot : ($hppSnapshot * $qty);
+
+            if ($lineCogs <= 0) {
+                continue;
+            }
+
+            foreach (array_unique([(int) $item->marketplace_order_id, (int) $item->order_id]) as $orderId) {
+                if ($orderId <= 0 || ! array_key_exists($orderId, $cogs)) {
+                    continue;
+                }
+
+                $cogs[$orderId] += $lineCogs;
+            }
+        }
+
+        return collect($cogs)
+            ->map(fn (float $amount): float => round($amount, 2))
+            ->all();
     }
 
     private function cashOrderGrossSales($row): float

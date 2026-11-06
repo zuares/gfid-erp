@@ -1823,6 +1823,11 @@
     .an-fee-analysis-table td { vertical-align: middle; }
     .an-fee-analysis-table td:nth-child(2) { color: var(--gf-color-muted, #667085); font-variant-numeric: tabular-nums; }
     .an-fee-analysis-amount { color: var(--gf-color-content, #101828) !important; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .an-fee-profit-guardrail { display: flex; align-items: center; justify-content: space-between; gap: .85rem; margin: .75rem; padding: .7rem .8rem; border: 1px solid color-mix(in srgb, var(--gf-color-brand, #5b5bd6) 18%, var(--gf-color-line, #e4e7ec)); border-radius: var(--gf-radius-control, 10px); background: color-mix(in srgb, var(--gf-color-brand, #5b5bd6) 5%, var(--gf-color-surface, #fff)); }
+    .an-fee-profit-guardrail > div { min-width: 0; }
+    .an-fee-profit-guardrail strong, .an-fee-profit-guardrail small { display: block; }
+    .an-fee-profit-guardrail strong { color: var(--gf-color-content, #101828); font-size: .66rem; font-weight: 820; }
+    .an-fee-profit-guardrail small { margin-top: .14rem; color: var(--gf-color-muted, #667085); font-size: .58rem; line-height: 1.4; }
     .an-fee-order-table th:nth-child(n+3), .an-fee-order-table td:nth-child(n+3) { text-align: right; }
     .an-fee-payout-amount { color: var(--gf-color-success, #14945a); }
     .an-fee-refund-amount { color: var(--gf-color-danger, #d6455d); }
@@ -1941,6 +1946,7 @@
         .an-fee-analysis-grid { grid-template-columns: 1fr; }
         .an-fee-analysis-card-wide { grid-column: auto; }
         .an-fee-analysis-burden-grid { grid-template-columns: 1fr; padding: .65rem; }
+        .an-fee-profit-guardrail { align-items: flex-start; flex-direction: column; margin: .65rem; }
         .an-fee-shipping-section { margin: .65rem; }
         .an-fee-shipping-section > header { flex-direction: column; }
         .an-fee-shipping-grid { grid-template-columns: 1fr; }

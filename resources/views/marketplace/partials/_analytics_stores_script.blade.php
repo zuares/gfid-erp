@@ -4,6 +4,12 @@
         const date = /^\d{10,13}$/.test(raw) ? new Date(Number(raw) * (raw.length === 10 ? 1000 : 1)) : new Date(raw.replace(' ', 'T'));
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
     };
+    const dateShort = value => {
+        if (!value) return '—';
+        const raw = String(value);
+        const date = /^\d{10,13}$/.test(raw) ? new Date(Number(raw) * (raw.length === 10 ? 1000 : 1)) : new Date(raw.replace(' ', 'T'));
+        return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('id-ID', {weekday:'short', day:'2-digit', month:'short'}).replace(/\./g, '');
+    };
     const cashStatus = value => String(value || '—').replace(/_/g, ' ').toLowerCase();
     const returnRefundStatusLabel = status => ({
         return_requested: 'Return requested',
@@ -501,8 +507,9 @@
             : [{ key: 'flat', label: '', rows }];
         const table = groups.length ? groups.map(group => `<section class="an-cash-group">${renderTable(group.rows, isAll ? group.label : '')}</section>`).join('') : stateMarkup('empty', 'Belum ada order', 'Tidak ada order pada periode ini.');
         sellerFeeDetailCache = new Map();
+        const feeProfitGuardrail = `<div class="an-fee-profit-guardrail" role="note"><div><strong>Target margin bersih 15%</strong><small>Margin minimum setelah marketplace cost dan iklan.</small></div><div><strong>Target ROAS</strong><small>ROAS minimum agar target margin 15% tercapai; BEP tetap menunjukkan batas impas.</small></div></div>`;
         const feeOrderTable = rows.length
-            ? `<div class="an-table-wrap"><table class="an-table an-fee-analysis-table an-fee-order-table" aria-label="Beban Seller berdasarkan order"><thead><tr><th>Order &amp; Toko</th><th>Kategori Internal</th><th>Qty Item</th><th>Net Sales</th><th>Dana cair</th><th>Beban Seller</th><th>Affiliate / AMS</th><th>Refund / reversal</th><th>Selisih ongkir</th></tr></thead><tbody>${rows.map((row, rowIndex) => {
+            ? `${feeProfitGuardrail}<div class="an-table-wrap"><table class="an-table an-fee-analysis-table an-fee-order-table" aria-label="Beban Seller berdasarkan order"><thead><tr><th>Order &amp; Toko</th><th>Kode Kategori Internal</th><th>Qty Item</th><th>Net Sales</th><th>Dana cair</th><th>COGS</th><th>Gross Profit</th><th>Margin Before Ads</th><th>Target Margin</th><th>Target ROAS</th><th>BEP ACOS</th><th>BEP ROAS</th><th>Beban Seller</th><th>Affiliate / AMS</th><th>Refund / reversal</th><th>Selisih ongkir</th></tr></thead><tbody>${rows.map((row, rowIndex) => {
                 const breakdown = Array.isArray(row.fee_breakdown) ? row.fee_breakdown : [];
                 const affiliateFee = breakdown.filter(item => item.code === 'affiliate_fee' || item.category === 'affiliate').reduce((sum, item) => sum + n(item.amount), 0);
                 const shippingCostFee = breakdown.filter(item => item.code === 'shipping_cost').reduce((sum, item) => sum + n(item.amount), 0);
@@ -521,6 +528,16 @@
                 const sellerAmount = sellerFee + premiumFee + (sellerShippingCost > 0 ? sellerShippingCost : logisticsFee);
                 const netSales = n(row.net_sales || row.gross_sales || row.cash_gross_sales);
                 const cashPayout = n(row.cash_payout);
+                const cogs = n(row.cogs);
+                const grossProfit = Number.isFinite(Number(row.gross_profit)) ? n(row.gross_profit) : cashPayout - cogs;
+                const marginBeforeAdsValue = Number.isFinite(Number(row.margin_before_ads)) ? n(row.margin_before_ads) : (cashPayout > 0 ? (grossProfit / cashPayout) * 100 : null);
+                const targetNetMarginValue = Number.isFinite(Number(row.target_net_margin)) ? n(row.target_net_margin) : 15;
+                const targetNetMarginAmount = cashPayout > 0 ? cashPayout * (targetNetMarginValue / 100) : 0;
+                const breakEvenAdBudget = Number.isFinite(Number(row.bep_ad_budget)) ? n(row.bep_ad_budget) : Math.max(0, grossProfit);
+                const bepAcosValue = Number.isFinite(Number(row.bep_acos)) ? n(row.bep_acos) : (cashPayout > 0 ? (breakEvenAdBudget / cashPayout) * 100 : null);
+                const bepRoasValue = Number.isFinite(Number(row.bep_roas)) ? n(row.bep_roas) : (breakEvenAdBudget > 0 ? cashPayout / breakEvenAdBudget : null);
+                const targetAdBudget = Number.isFinite(Number(row.target_ad_budget)) ? n(row.target_ad_budget) : Math.max(0, grossProfit - targetNetMarginAmount);
+                const targetRoasValue = Number.isFinite(Number(row.target_roas)) ? n(row.target_roas) : (targetAdBudget > 0 ? cashPayout / targetAdBudget : null);
                 const internalCategory = String(row.internal_category || (Array.isArray(row.internal_categories) ? row.internal_categories.join(', ') : '') || 'Belum termapping');
                 const internalItemQty = Number(row.internal_item_qty || 0);
                 const refundAmount = n(row.refund);
@@ -529,7 +546,7 @@
                 const hasReturnRefundState = ['return_requested', 'refunded', 'settlement_reversal'].includes(returnRefundStatus);
                 const sellerPercent = netSales > 0 ? `${(sellerAmount / netSales * 100).toFixed(1)}% dari net sales` : '—';
                 const logisticsPercent = netSales > 0 ? `${(logisticsFee / netSales * 100).toFixed(1)}% dari net sales` : '—';
-                const affiliatePercent = netSales > 0 ? `${(affiliateFee / netSales * 100).toFixed(1)}% dari net sales` : '—';
+                const affiliatePercent = netSales > 0 ? `${(affiliateFee / netSales * 100).toFixed(1)}%` : '—';
                 const sellerDetailKey = String(rowIndex);
                 sellerFeeDetailCache.set(sellerDetailKey, row);
         const isRefundRow = row.status_group === 'return_refund' || hasReturnRefundState || refundAmount > 0;
@@ -538,11 +555,16 @@
                     : (isShopeeOrder ? 'Biaya kirim − subsidi − ongkir pembeli' : 'Biaya kirim − subsidi');
         const refundBadge = isRefundRow ? `<span class="an-fee-refund-badge"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> ${esc(returnRefundStatusLabel(returnRefundStatus))}</span>` : '';
         const refundDisplay = [
-            refundAmount > 0 ? `<span>−${money(refundAmount)}</span><small class="an-fee-order-percent">Nominal refund</small>` : '',
-            reversalAmount > 0 ? `<span>−${money(reversalAmount)}</span><small class="an-fee-order-percent">Payout reversal</small>` : '',
-        ].filter(Boolean).join('') || (isRefundRow ? '<span>—</span><small class="an-fee-order-percent">Nominal refund belum tersedia</small>' : '—');
-                const sellerNote = logisticsFee > 0 ? `${sellerPercent} · ongkir beban Seller · Detail` : `${sellerPercent} · Detail`;
-        return `<tr class="${isRefundRow ? 'an-fee-refund-row' : ''}"><td data-label="Order &amp; Toko"><strong class="an-cash-order">${esc(row.channel_order_id)}</strong><span class="an-cash-meta">${esc(row.store_name || 'Tanpa toko')} · ${esc(dateTime(row.ordered_at))}</span>${refundBadge}</td><td data-label="Kategori Internal"><span class="an-fee-type-name">${esc(internalCategory)}</span></td><td data-label="Qty Item" class="an-fee-analysis-amount">${internalItemQty > 0 ? internalItemQty.toLocaleString('id-ID') : '—'}</td><td data-label="Net Sales" class="an-fee-analysis-amount">${money(netSales)}</td><td data-label="Dana cair" class="an-fee-analysis-amount an-fee-payout-amount">${cashPayout !== 0 ? signedMoney(cashPayout) : '—'}</td><td data-label="Beban Seller" class="an-fee-analysis-amount"><button class="an-fee-seller-detail-trigger" type="button" data-open-seller-fee="${sellerDetailKey}" aria-controls="sellerFeeModal" aria-label="Lihat rincian beban Seller untuk order ${esc(row.channel_order_id)}"><span>${money(sellerAmount)}</span><small class="an-fee-order-percent">${sellerNote}</small></button></td><td data-label="Affiliate / AMS" class="an-fee-analysis-amount an-fee-affiliate-amount"><span>${money(affiliateFee)}</span><small class="an-fee-order-percent">${affiliatePercent}</small></td><td data-label="Refund / reversal" class="an-fee-analysis-amount an-fee-refund-amount">${refundDisplay}</td><td data-label="Selisih ongkir" class="an-fee-analysis-amount an-fee-logistics-amount"><span>${logisticsFee > 0 ? money(logisticsFee) : '—'}</span><small class="an-fee-order-percent">${logisticsNote}</small></td></tr>`;
+            refundAmount > 0 ? `<span>−${money(refundAmount)}</span><small class="an-fee-order-percent">Refund</small>` : '',
+            reversalAmount > 0 ? `<span>−${money(reversalAmount)}</span><small class="an-fee-order-percent">Reversal</small>` : '',
+        ].filter(Boolean).join('') || (isRefundRow ? '<span>—</span><small class="an-fee-order-percent">Refund belum tersedia</small>' : '—');
+                const sellerNote = logisticsFee > 0 ? `${sellerPercent} · Ongkir · Detail` : `${sellerPercent} · Buka rincian`;
+        const grossProfitDisplay = cashPayout !== 0 || cogs > 0 ? signedMoney(grossProfit) : '—';
+        const marginBeforeAdsDisplay = marginBeforeAdsValue !== null && cashPayout > 0 ? `${marginBeforeAdsValue.toFixed(1)}%` : '—';
+        const bepAcosDisplay = bepAcosValue !== null && cashPayout > 0 ? `${bepAcosValue.toFixed(1)}%` : '—';
+        const bepRoasDisplay = bepRoasValue !== null && bepRoasValue > 0 ? `${bepRoasValue.toFixed(2)}x` : '—';
+        const targetRoasDisplay = targetRoasValue !== null && targetRoasValue > 0 ? `${targetRoasValue.toFixed(2)}x` : '—';
+        return `<tr class="${isRefundRow ? 'an-fee-refund-row' : ''}"><td data-label="Order &amp; Toko"><strong class="an-cash-order">${esc(row.channel_order_id)}</strong><span class="an-cash-meta">${esc(row.store_name || 'Tanpa toko')} · Order: ${esc(dateShort(row.ordered_at))}</span><span class="an-cash-meta">Cair: ${esc(row.settlement_time ? dateShort(row.settlement_time) : 'Belum cair')}</span>${refundBadge}</td><td data-label="Kode Kategori Internal"><span class="an-fee-type-name">${esc(internalCategory)}</span></td><td data-label="Qty Item" class="an-fee-analysis-amount">${internalItemQty > 0 ? internalItemQty.toLocaleString('id-ID') : '—'}</td><td data-label="Net Sales" class="an-fee-analysis-amount">${money(netSales)}</td><td data-label="Dana cair" class="an-fee-analysis-amount an-fee-payout-amount">${cashPayout !== 0 ? signedMoney(cashPayout) : '—'}</td><td data-label="COGS" class="an-fee-analysis-amount"><span>${cogs > 0 ? money(cogs) : '—'}</span><small class="an-fee-order-percent">HPP item × qty</small></td><td data-label="Gross Profit" class="an-fee-analysis-amount"><span>${grossProfitDisplay}</span><small class="an-fee-order-percent">Dana cair − COGS</small></td><td data-label="Margin Before Ads" class="an-fee-analysis-amount"><span>${marginBeforeAdsDisplay}</span><small class="an-fee-order-percent">Gross profit / dana cair</small></td><td data-label="Target Margin" class="an-fee-analysis-amount"><span>${targetNetMarginValue.toFixed(1)}%</span><small class="an-fee-order-percent">Minimum bersih</small></td><td data-label="Target ROAS" class="an-fee-analysis-amount"><span>${targetRoasDisplay}</span><small class="an-fee-order-percent">Agar margin 15% tercapai</small></td><td data-label="BEP ACOS" class="an-fee-analysis-amount"><span>${bepAcosDisplay}</span><small class="an-fee-order-percent">Batas iklan / dana cair</small></td><td data-label="BEP ROAS" class="an-fee-analysis-amount"><span>${bepRoasDisplay}</span><small class="an-fee-order-percent">Impas / laba 0%</small></td><td data-label="Beban Seller" class="an-fee-analysis-amount"><button class="an-fee-seller-detail-trigger" type="button" data-open-seller-fee="${sellerDetailKey}" aria-controls="sellerFeeModal" aria-label="Lihat rincian beban Seller untuk order ${esc(row.channel_order_id)}"><span>${money(sellerAmount)}</span><small class="an-fee-order-percent">${sellerNote}</small></button></td><td data-label="Affiliate / AMS" class="an-fee-analysis-amount an-fee-affiliate-amount"><span>${money(affiliateFee)}</span><small class="an-fee-order-percent">${affiliatePercent}</small></td><td data-label="Refund / reversal" class="an-fee-analysis-amount an-fee-refund-amount">${refundDisplay}</td><td data-label="Selisih ongkir" class="an-fee-analysis-amount an-fee-logistics-amount"><span>${logisticsFee > 0 ? money(logisticsFee) : '—'}</span><small class="an-fee-order-percent">${logisticsNote}</small></td></tr>`;
             }).join('')}</tbody></table></div>`
             : stateMarkup('empty', 'Belum ada order', 'Tidak ada order pada periode ini.');
         const body = isFeeFocus
