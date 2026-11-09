@@ -226,6 +226,7 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(1, $storeRow['order_total']);
         $this->assertSame(100000.0, (float) $storeRow['gross_sales']);
         $this->assertSame(7500.0, (float) $storeRow['admin_fee_actual']);
+        $this->assertSame(7.5, (float) $summary['current']['marketplace_fee_rate_on_gmv']);
     }
 
     public function test_store_ledger_uses_platform_ad_mutation_when_ads_daily_is_empty(): void

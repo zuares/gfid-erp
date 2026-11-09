@@ -46,6 +46,8 @@
         const hppShipped = Number(current.hpp_shipped ?? 0);
         const actualFee = Number(current.cash_marketplace_fees ?? current.marketplace_fees_actual ?? 0);
         const actualFeeRate = settledOrderRevenue > 0 ? actualFee / settledOrderRevenue : 0;
+        const gmvRevenue = Number(current.gmv || orderRevenue || 0);
+        const actualFeeRateOnGmv = gmvRevenue > 0 ? actualFee / gmvRevenue : 0;
         const effectiveFeeRate = actualFeeRate > 0 ? actualFeeRate : 0.21;
         const estimatedFee = Number(current.marketplace_fee_estimate ?? orderRevenue * effectiveFeeRate);
         const netSettledBeforeRefund = Math.max(0, settledOrderRevenue - actualFee);
@@ -60,7 +62,7 @@
             ['bi-shield-check', 'Asuransi', Number(current.cash_shipping_insurance_fee || 0)],
             ['bi-bank', 'Pajak escrow', Number(current.cash_escrow_tax || 0)],
         ];
-        const feeRateBase = settledOrderRevenue;
+        const feeRateBase = gmvRevenue;
         const feeComposition = actualFee > 0 && feeRateBase > 0
             ? feeComponents.filter(([, , value]) => value > 0).map(([icon, label, value]) => `<span title="${label}"><i class="bi ${icon}" aria-hidden="true"></i> ${(value / feeRateBase * 100).toFixed(1)}%</span>`).join(' · ')
             : 'komposisi belum tersedia';
@@ -120,7 +122,7 @@
         $('kpiCancelledInfo').dataset.tooltip = `${cancelledCount.toLocaleString('id-ID')} order batal · nilai ${money(cancelledAmount)} · tidak masuk omzet/profit`;
         $('kpiRefundInfo').dataset.tooltip = `${returnRefundCount.toLocaleString('id-ID')} order · nilai ${money(returnRefundAmount)} · tidak masuk omzet/profit`;
         $('kpiRevenueInfo').dataset.tooltip = `Omzet order berbayar ${money(netOrderRevenue)} · order belum bayar, batal ${money(cancelledAmount)} dan refund ${money(returnRefundAmount)} dikecualikan`;
-        $('kpiAdminFeeInfo').dataset.tooltip = `Total ${money(estimatedFee)} · rate ${(effectiveFeeRate * 100).toFixed(1)}% · ${feeCompositionText}`;
+        $('kpiAdminFeeInfo').dataset.tooltip = `Total ${money(estimatedFee)} · rate ${(actualFeeRateOnGmv * 100).toFixed(1)}% dari GMV · ${feeCompositionText}`;
         $('kpiEstimatedCashInfo').dataset.tooltip = `Total ${money(estimatedPayout)} · cair ${money(netSettled)} · est. belum ${money(estimatedUnsettledNet)} · batal/refund dikecualikan`;
         $('kpiHppInfo').dataset.tooltip = `Total ${money(hppTotal)} · cair ${money(hppSettled)} · belum ${money(hppUnsettled)} · return ${money(hppReturnRefund)}`;
         $('kpiGrossProfitInfo').dataset.tooltip = `Laba ${money(grossProfit)} · net ${money(estimatedPayout)} · HPP ${money(hppTotal)}`;
@@ -452,7 +454,7 @@
         if (costPulseElement) {
             costPulseElement.innerHTML = [
                 ['Payout / GMV akrual', list.reduce((sum, store) => sum + Number(store.payout || 0), 0) / storeBase * 100],
-                ['Fee marketplace / GMV akrual', list.reduce((sum, store) => sum + Number(store.marketplace_fees || 0), 0) / storeBase * 100],
+                ['Fee marketplace / GMV', list.reduce((sum, store) => sum + Number(store.marketplace_fees || 0), 0) / storeBase * 100],
                 ['HPP / GMV akrual', list.reduce((sum, store) => sum + Number(store.hpp || 0), 0) / storeBase * 100],
                 ['Iklan / GMV akrual', list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0) / storeBase * 100],
             ].map(([label,value]) => `<div class="an-health-row"><span>${label}<small>basis: GMV akrual</small></span><div class="an-health-track"><span style="width:${Math.min(100, Math.max(0, value))}%"></span></div><strong>${Number(value || 0).toFixed(1)}%</strong></div>`).join('');
@@ -469,9 +471,10 @@
     function renderMarketplaceCosts(targetId) {
         const current = summary?.current || {};
         const orderRevenue = Number(current.cash_order_revenue || 0) + Number(current.cash_unsettled_order_revenue || 0);
-        const base = Math.max(orderRevenue || Number(current.gmv || current.gross_sales || 0), 1);
+        const base = Math.max(Number(current.gmv || orderRevenue || current.gross_sales || 0), 1);
+        const feeEstimate = Number(current.marketplace_fee_estimate || 0);
         const rows = [
-            [`Fee marketplace (estimasi ${(Number(current.marketplace_fee_estimate_rate || 0)).toFixed(1)}% actual)`, current.marketplace_fee_estimate],
+            [`Fee marketplace (estimasi ${(feeEstimate / base * 100).toFixed(1)}% dari GMV)`, feeEstimate],
             ['Refund / adjustment', current.return_refund_amount ?? current.refund],
             ['Biaya iklan (incl. PPN 11%)', current.ad_cost],
             ['HPP total', current.hpp_total ?? current.hpp],
@@ -486,6 +489,7 @@
         const actualCashFee = Number(current.cash_marketplace_fees ?? current.marketplace_fees_actual ?? 0);
         const actualAffiliateFee = Number(current.cash_affiliate_fees ?? current.affiliate_fees_actual ?? 0);
         const grossOrderRevenue = Number(current.cash_order_revenue || 0) + Number(current.cash_unsettled_order_revenue || 0) || Number(current.gmv || 0);
+        const gmvRevenue = Number(current.gmv || grossOrderRevenue || 0);
         const settledOrderRevenue = Number(current.cash_order_revenue || 0);
         const unsettledOrderRevenue = Number(current.cash_unsettled_order_revenue || 0);
         const netOrderRevenue = Math.max(0, Number(current.net_order_revenue ?? grossOrderRevenue));
@@ -541,7 +545,9 @@
         const previousPendingPayout = Math.max(0, previousEstimatedPayout - previousCashPayout);
         const payoutRealization = estimatedPayout > 0 ? cashPayout / estimatedPayout * 100 : 0;
         const pendingPayoutRate = estimatedPayout > 0 ? pendingPayout / estimatedPayout * 100 : 0;
-        const recordedFeeRate = settledOrderRevenue > 0 ? recordedMarketplaceFee / settledOrderRevenue * 100 : 0;
+        const recordedFeeRate = gmvRevenue > 0
+            ? Number(current.marketplace_fee_rate_on_gmv ?? (recordedMarketplaceFee / gmvRevenue * 100))
+            : 0;
         const adCostRate = netOrderRevenue > 0 ? adCost / netOrderRevenue * 100 : 0;
         const settledProfitMargin = settledOrderRevenue > 0 ? settledProfit / settledOrderRevenue * 100 : 0;
         const estimatedUnsettledProfitMargin = unsettledOrderRevenue > 0 ? estimatedUnsettledProfit / unsettledOrderRevenue * 100 : 0;
@@ -620,8 +626,8 @@
         const decisionRecordedFeeChange = decisionChange(recordedMarketplaceFee, previousActualCashFee, true);
         const decisionAdCostChange = decisionChange(adCost, previousAdCost, true);
         const netProfitChange = decisionChange(estimatedNetProfit, previousEstimatedNetProfit);
-        const recordedFeeNote = settledOrderRevenue > 0
-            ? `${recordedFeeRate.toFixed(1)}% dari omzet cair`
+        const recordedFeeNote = gmvRevenue > 0
+            ? `${recordedFeeRate.toFixed(1)}% dari GMV`
             : 'Belum tercatat';
         const returnRefundRate = placedOrders > 0 ? returnRefundOrders / placedOrders * 100 : 0;
         const total = Math.max(Number(quality.total || 0), 1);
@@ -706,7 +712,7 @@
         const unsettledPct = totalOmzet > 0 ? unsettledGross / totalOmzet * 100 : 0;
         const economicsBase = totalOmzet || cashPayout;
         const cashEconomicsBase = cashPayout;
-        const feeEconomicsBase = Number(current.cash_order_revenue || 0);
+        const feeEconomicsBase = gmvRevenue;
         const rawHppTotal = Number(current.hpp_total ?? current.hpp ?? 0);
         const rawHppSettled = Number(current.hpp_settled ?? 0);
         const rawHppUnsettled = Number(current.hpp_unsettled ?? Math.max(0, rawHppTotal - rawHppSettled));
@@ -722,10 +728,10 @@
         const economics = [
             ['Omzet', totalOmzet, 100, '#16a34a'],
             ['Return / refund', returnRefundAmount, economicsBase ? returnRefundAmount / economicsBase * 100 : 0, '#dc2626'],
-            ['Fee marketplace actual · omzet marketplace', actualCashFee, feeEconomicsBase ? actualCashFee / feeEconomicsBase * 100 : 0, '#d97706'],
+            ['Fee marketplace actual · GMV', actualCashFee, feeEconomicsBase ? actualCashFee / feeEconomicsBase * 100 : 0, '#d97706'],
             ['Affiliate / AMS actual · omzet cair', actualAffiliateFee, cashEconomicsBase ? actualAffiliateFee / cashEconomicsBase * 100 : 0, '#a855f7'],
             ['HPP', hppTotal, hppTotal > 0 ? 100 : 0, '#64748b'],
             ['Biaya iklan incl. PPN 11%', Number(current.ad_cost || 0), economicsBase ? Number(current.ad_cost || 0) / economicsBase * 100 : 0, '#dc2626'],
         ];
-        $('anEconomics').innerHTML = economics.map(([label,amount,rate,color], index) => { const isOmzet = index === 0; const isReturn = index === 1; const isFee = index === 2; const isAffiliate = index === 3; const isHpp = index === 4; const interactive = isOmzet || isReturn || isFee; const progress = isOmzet ? `<div class="an-omzet-progress"><span class="an-omzet-progress-settled" style="width:${settledPct}%"></span><span class="an-omzet-progress-unsettled" style="width:${unsettledPct}%"></span></div><div class="an-omzet-progress-meta"><span>Cair ${money(settledGross)}</span><span>Belum cair ${money(unsettledGross)}</span></div>` : (isHpp ? `<div class="an-omzet-progress"><span class="an-omzet-progress-settled" style="width:${hppSettledPct}%"></span><span class="an-omzet-progress-unsettled" style="width:${hppUnsettledPct}%"></span><span class="an-hpp-progress-return" style="width:${Math.min(100, Math.max(0, hppReturnRefundPct))}%"></span></div><div class="an-omzet-progress-meta an-hpp-progress-meta"><span>HPP cair ${money(hppSettled)} · ${hppSettledPct.toFixed(1)}%</span><span>HPP belum cair ${money(hppUnsettled)} · ${hppUnsettledPct.toFixed(1)}%</span><span>Return/refund ${money(hppReturnRefund)} · ${hppReturnRefundPct.toFixed(1)}%</span></div>` : `<div class="an-contribution-bar"><span style="width:${Math.min(100, Math.max(0, rate))}%;background:${color}"></span></div>`); const actionAttrs = isOmzet ? 'role="button" tabindex="0" aria-controls="cashOrdersModal" aria-label="Lihat status pencairan order" data-open-cash-orders' : (isReturn ? 'role="button" tabindex="0" aria-controls="returnOrdersModal" aria-label="Lihat return dan pengiriman gagal" data-open-return-orders' : (isFee ? 'role="button" tabindex="0" aria-controls="cashOrdersModal" aria-label="Lihat rincian fee marketplace" data-open-fee-orders' : '')); const actionHint = interactive ? '<span class="an-economics-action">Lihat detail</span>' : ''; const basisLabel = isFee ? 'omzet order' : (isAffiliate ? 'omzet cair' : 'total omzet'); return `<div class="an-contribution-row an-economics-row ${interactive ? 'an-economics-clickable' : ''}" ${actionAttrs}><div class="an-economics-copy"><div class="an-contribution-name">${label}</div>${progress}</div><div class="an-contribution-value an-economics-value">${money(amount)}<span class="an-table-subline">${isOmzet ? 'total omzet' : isHpp ? '100.0% dari total HPP' : `${rate.toFixed(1)}% dari ${basisLabel}`}${actionHint}</span></div></div>`; }).join('');
+        $('anEconomics').innerHTML = economics.map(([label,amount,rate,color], index) => { const isOmzet = index === 0; const isReturn = index === 1; const isFee = index === 2; const isAffiliate = index === 3; const isHpp = index === 4; const interactive = isOmzet || isReturn || isFee; const progress = isOmzet ? `<div class="an-omzet-progress"><span class="an-omzet-progress-settled" style="width:${settledPct}%"></span><span class="an-omzet-progress-unsettled" style="width:${unsettledPct}%"></span></div><div class="an-omzet-progress-meta"><span>Cair ${money(settledGross)}</span><span>Belum cair ${money(unsettledGross)}</span></div>` : (isHpp ? `<div class="an-omzet-progress"><span class="an-omzet-progress-settled" style="width:${hppSettledPct}%"></span><span class="an-omzet-progress-unsettled" style="width:${hppUnsettledPct}%"></span><span class="an-hpp-progress-return" style="width:${Math.min(100, Math.max(0, hppReturnRefundPct))}%"></span></div><div class="an-omzet-progress-meta an-hpp-progress-meta"><span>HPP cair ${money(hppSettled)} · ${hppSettledPct.toFixed(1)}%</span><span>HPP belum cair ${money(hppUnsettled)} · ${hppUnsettledPct.toFixed(1)}%</span><span>Return/refund ${money(hppReturnRefund)} · ${hppReturnRefundPct.toFixed(1)}%</span></div>` : `<div class="an-contribution-bar"><span style="width:${Math.min(100, Math.max(0, rate))}%;background:${color}"></span></div>`); const actionAttrs = isOmzet ? 'role="button" tabindex="0" aria-controls="cashOrdersModal" aria-label="Lihat status pencairan order" data-open-cash-orders' : (isReturn ? 'role="button" tabindex="0" aria-controls="returnOrdersModal" aria-label="Lihat return dan pengiriman gagal" data-open-return-orders' : (isFee ? 'role="button" tabindex="0" aria-controls="cashOrdersModal" aria-label="Lihat rincian fee marketplace" data-open-fee-orders' : '')); const actionHint = interactive ? '<span class="an-economics-action">Lihat detail</span>' : ''; const basisLabel = isFee ? 'GMV' : (isAffiliate ? 'omzet cair' : 'total omzet'); return `<div class="an-contribution-row an-economics-row ${interactive ? 'an-economics-clickable' : ''}" ${actionAttrs}><div class="an-economics-copy"><div class="an-contribution-name">${label}</div>${progress}</div><div class="an-contribution-value an-economics-value">${money(amount)}<span class="an-table-subline">${isOmzet ? 'total omzet' : isHpp ? '100.0% dari total HPP' : `${rate.toFixed(1)}% dari ${basisLabel}`}${actionHint}</span></div></div>`; }).join('');
     }

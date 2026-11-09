@@ -3091,6 +3091,7 @@ class MarketplaceAnalyticsSummaryService
         // marketplace order revenue—not the final payout after deductions.
         $marketplaceRevenue = (float) ($aggregate['cash_order_revenue'] ?? 0);
         $actualMarketplaceFee = (float) ($aggregate['cash_marketplace_fees'] ?? 0);
+        $gmv = max(0, (float) ($aggregate['gmv'] ?? $grossOrderRevenue));
         // Projected payout follows the same operational scope as Dana belum
         // cair, including READY_TO_SHIP and PROCESSED orders.
         $hpp = array_key_exists('hpp_shipped', $aggregate)
@@ -3124,6 +3125,9 @@ class MarketplaceAnalyticsSummaryService
             'gross_order_revenue' => round($grossOrderRevenue, 2),
             'net_order_revenue' => round($netOrderRevenue, 2),
             'marketplace_fee_estimate_rate' => round($feeRate * 100, 2),
+            'marketplace_fee_rate_on_gmv' => $gmv > 0
+                ? round(($actualMarketplaceFee / $gmv) * 100, 2)
+                : 0.0,
             'marketplace_fee_estimate' => round($estimatedFee, 2),
             'marketplace_fee_estimate_on_payout' => round($estimatedFee, 2),
             'marketplace_fee_estimate_on_cash' => round($estimatedFee, 2),
