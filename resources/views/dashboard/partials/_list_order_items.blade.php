@@ -105,7 +105,7 @@
                             <th scope="col" class="numeric">No</th>
                             <th scope="col">Kode item internal</th>
                             <th scope="col" class="numeric">Permintaan</th>
-                            <th scope="col" class="numeric ditem-mobile-secondary">Stok FG/RTS</th>
+                            <th scope="col" class="numeric ditem-mobile-secondary">Stok Tersedia</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok produksi</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok WIP</th>
                             <th scope="col" class="numeric">Selisih kurang</th>
@@ -157,7 +157,7 @@
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="numeric ditem-gap ditem-category-total">
-                                        <span class="ditem-category-gap-value {{ $categoryGapState }}" title="Selisih stok FG/RTS dikurangi permintaan kategori">
+                                        <span class="ditem-category-gap-value {{ $categoryGapState }}" title="Selisih stok tersedia dikurangi permintaan kategori">
                                             {{ $categoryGap === null ? '—' : $qty($categoryGap) }}
                                         </span>
                                     </td>

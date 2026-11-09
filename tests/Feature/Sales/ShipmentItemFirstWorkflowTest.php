@@ -716,6 +716,7 @@ class ShipmentItemFirstWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Repeat order pesanan hari ini')
             ->assertSee('Permintaan belum dikirim per item internal')
+            ->assertSee('Stok Tersedia')
             ->assertSee('<details class="dpanel shipment-accordion">', false)
             ->assertSee('<summary class="dpanel-head">', false)
             ->assertSee('repeat-buyer')
