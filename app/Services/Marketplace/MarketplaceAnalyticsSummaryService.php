@@ -3148,11 +3148,11 @@ class MarketplaceAnalyticsSummaryService
         $marketplaceRevenue = (float) ($aggregate['cash_order_revenue'] ?? 0);
         $actualMarketplaceFee = (float) ($aggregate['cash_marketplace_fees'] ?? 0);
         $gmv = max(0, (float) ($aggregate['gmv'] ?? $grossOrderRevenue));
-        // Projected payout follows the same operational scope as Dana belum
-        // cair, including READY_TO_SHIP and PROCESSED orders.
-        $hpp = array_key_exists('hpp_shipped', $aggregate)
-            ? (float) $aggregate['hpp_shipped']
-            : (float) ($aggregate['hpp_total'] ?? $aggregate['hpp'] ?? 0);
+        // Estimated payout includes every revenue-eligible order in the
+        // period, so estimated net profit must use the total HPP for that
+        // same scope. HPP shipped is an operational subset and would omit
+        // eligible orders such as PAID/processing orders from the estimate.
+        $hpp = (float) ($aggregate['hpp_total'] ?? $aggregate['hpp'] ?? 0);
         $adCost = (float) ($aggregate['ad_cost'] ?? 0);
         $feeRate = $marketplaceRevenue > 0 && $actualMarketplaceFee > 0
             ? $actualMarketplaceFee / $marketplaceRevenue

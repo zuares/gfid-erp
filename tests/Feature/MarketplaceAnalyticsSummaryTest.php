@@ -364,6 +364,54 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame('settlement_fallback', $adFee['source'] ?? null);
     }
 
+    public function test_estimated_net_profit_includes_hpp_for_all_eligible_orders(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-ESTIMATED-NET-PROFIT',
+            'name' => 'Estimated Net Profit',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = $this->order($store, 'PAID', 100000);
+
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'item_name' => 'Produk estimasi profit',
+            'item_sku' => 'ESTIMATED-NET-PROFIT-001',
+            'qty' => 1,
+            'price' => 100000,
+            'hpp_snapshot' => 40000,
+            'data_status' => 'valid',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 100000,
+            'final_income' => 0,
+            'settlement_time' => null,
+        ]);
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'platform' => 'tiktok',
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $current = $summary['current'];
+
+        $this->assertSame(40000.0, (float) $current['hpp_total']);
+        $this->assertSame(0.0, (float) $current['hpp_shipped']);
+        $this->assertSame(79000.0, (float) $current['estimated_payout']);
+        $this->assertSame(39000.0, (float) $current['estimated_net_profit']);
+        $this->assertSame((float) $current['estimated_profit'], (float) $current['estimated_net_profit']);
+    }
+
     public function test_store_performance_separates_refund_from_actual_eligible_orders(): void
     {
         $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
