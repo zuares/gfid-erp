@@ -2620,12 +2620,20 @@ class MarketplaceAnalyticsSummaryService
         $facts = $this->adsFacts($filters);
         $beforeTax = (float) collect($facts)
             ->sum(fn (array $row): float => (float) ($row['spend'] ?? 0));
+        $sources = collect($facts)->pluck('source')->filter()->unique()->values();
+        $hasSettlementFallback = $sources->contains('settlement_fallback');
+        $hasPerformanceSource = $sources->contains(fn (string $source): bool => $source !== 'settlement_fallback');
+        $source = $beforeTax > 0
+            ? ($hasSettlementFallback
+                ? ($hasPerformanceSource ? 'ads_api_or_import_with_settlement_fallback' : 'settlement_fallback')
+                : 'ads_api_or_import')
+            : 'none';
 
         return [
             'ad_cost_before_tax' => round($beforeTax, 2),
             'ad_cost_vat' => round($beforeTax * self::ADS_VAT_RATE, 2),
             'ad_cost' => round($beforeTax * (1 + self::ADS_VAT_RATE), 2),
-            'ad_cost_source' => $beforeTax > 0 ? 'ads_api_or_import' : 'none',
+            'ad_cost_source' => $source,
             'ad_cost_is_estimate' => false,
         ];
     }
@@ -2651,9 +2659,21 @@ class MarketplaceAnalyticsSummaryService
 
     private function adsStoreSummary(array $filters)
     {
-        $spendByStore = collect($this->adsFacts($filters))
+        $adsFacts = collect($this->adsFacts($filters));
+        $spendByStore = $adsFacts
             ->groupBy('store_id')
             ->map(fn ($rows): float => (float) $rows->sum(fn (array $row): float => (float) ($row['spend'] ?? 0)));
+        $sourceByStore = $adsFacts
+            ->groupBy('store_id')
+            ->map(function ($rows): string {
+                $sources = $rows->pluck('source')->filter()->unique();
+                $hasSettlementFallback = $sources->contains('settlement_fallback');
+                $hasPerformanceSource = $sources->contains(fn (string $source): bool => $source !== 'settlement_fallback');
+
+                return $hasSettlementFallback
+                    ? ($hasPerformanceSource ? 'ads_api_or_import_with_settlement_fallback' : 'settlement_fallback')
+                    : 'ads_api_or_import';
+            });
 
         $platformTransactionSpend = $this->platformTransactionAdSpendByStore($filters);
 
@@ -2669,7 +2689,7 @@ class MarketplaceAnalyticsSummaryService
         return DB::table('stores as st')
             ->whereIn('st.id', $storeIds->all())
             ->get(['st.id as store_id', 'st.name as store_name'])
-            ->map(function ($row) use ($spendByStore, $platformTransactionSpend) {
+            ->map(function ($row) use ($spendByStore, $sourceByStore, $platformTransactionSpend) {
                 $storeId = (int) $row->store_id;
                 $adsDailyBeforeTax = (float) ($spendByStore->get($storeId) ?? 0);
                 $platformTransactionCost = (float) ($platformTransactionSpend->get($storeId) ?? 0);
@@ -2678,7 +2698,7 @@ class MarketplaceAnalyticsSummaryService
                     $row->ad_cost_before_tax = round($adsDailyBeforeTax, 2);
                     $row->ad_cost_vat = round($adsDailyBeforeTax * self::ADS_VAT_RATE, 2);
                     $row->ad_cost = round($adsDailyBeforeTax * (1 + self::ADS_VAT_RATE), 2);
-                    $row->ad_cost_source = 'ads_api_or_import';
+                    $row->ad_cost_source = (string) ($sourceByStore->get($storeId) ?? 'ads_api_or_import');
 
                     return $row;
                 }
@@ -2818,8 +2838,9 @@ class MarketplaceAnalyticsSummaryService
      * Ads API facts take precedence. Imported income reports (including
      * TikTok advertising deductions) fill the gap when a store/day has no
      * positive API spend, matching AdsDashboardService's source policy.
-     * TikTok Finance cash-out is deliberately excluded: it is a cash-control
-     * source and must not be promoted to ad-delivery cost automatically.
+     * For TikTok, settlement.ad_cost is the next fallback because Finance
+     * already normalizes the actual GMV Max advertising deduction there.
+     * TikTok Finance cash-out remains a final store-ledger fallback only.
      *
      * @return array<int, array{store_id: int, date: string, spend: float}>
      */
@@ -2842,16 +2863,50 @@ class MarketplaceAnalyticsSummaryService
                 ->get();
         }
 
+        $settlementRows = collect();
+        if (Schema::hasTable('marketplace_order_settlements')
+            && Schema::hasColumn('marketplace_order_settlements', 'ad_cost')) {
+            $settlementRows = DB::table('marketplace_order_settlements as ms')
+                ->join('marketplace_orders as mo', 'mo.id', '=', 'ms.order_id')
+                ->join('stores as st', 'st.id', '=', 'ms.store_id')
+                ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
+                ->whereIn('ms.store_id', $filters['store_ids'])
+                ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
+                ->whereRaw('COALESCE(mo.ordered_at, mo.order_date) IS NOT NULL')
+                ->whereBetween(DB::raw('COALESCE(mo.ordered_at, mo.order_date)'), [
+                    $filters['date_from'].' 00:00:00',
+                    $filters['date_to'].' 23:59:59',
+                ])
+                ->where('ms.ad_cost', '>', 0)
+                ->selectRaw('ms.store_id, DATE(COALESCE(mo.ordered_at, mo.order_date)) AS date, COALESCE(SUM(ms.ad_cost), 0) AS spend')
+                ->groupBy('ms.store_id', DB::raw('DATE(COALESCE(mo.ordered_at, mo.order_date))'))
+                ->get();
+        }
+
         $apiByKey = $apiRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
         $importedByKey = $importedRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
+        $settlementByKey = $settlementRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
         $facts = [];
 
-        foreach ($apiByKey->keys()->merge($importedByKey->keys())->unique() as $key) {
+        foreach ($apiByKey->keys()->merge($importedByKey->keys())->merge($settlementByKey->keys())->unique() as $key) {
             $api = $apiByKey->get($key);
             $imported = $importedByKey->get($key);
-            $spend = $api && (float) ($api->spend ?? 0) > 0
-                ? (float) $api->spend
-                : (float) ($imported->spend ?? 0);
+            $settlement = $settlementByKey->get($key);
+            $apiSpend = (float) ($api->spend ?? 0);
+            $importedSpend = (float) ($imported->spend ?? 0);
+            $settlementSpend = (float) ($settlement->spend ?? 0);
+            $source = 'ads_api_or_import';
+            $spend = $apiSpend > 0
+                ? $apiSpend
+                : ($importedSpend > 0
+                    ? $importedSpend
+                    // settlement.ad_cost already includes the TikTok ad tax;
+                    // normalize it to the before-tax basis used by Ads Daily.
+                    : ($settlementSpend > 0 ? $settlementSpend / (1 + self::ADS_VAT_RATE) : 0));
+
+            if ($apiSpend <= 0 && $importedSpend <= 0 && $settlementSpend > 0) {
+                $source = 'settlement_fallback';
+            }
 
             if ($spend <= 0) {
                 continue;
@@ -2862,6 +2917,7 @@ class MarketplaceAnalyticsSummaryService
                 'store_id' => (int) $storeId,
                 'date' => $date,
                 'spend' => $spend,
+                'source' => $source,
             ];
         }
 

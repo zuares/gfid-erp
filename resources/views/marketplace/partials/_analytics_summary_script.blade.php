@@ -21,7 +21,11 @@
         const adCost = Number(current.ad_cost ?? current.ads_spend ?? 0);
         const adCostBeforeTax = Number(current.ad_cost_before_tax ?? 0);
         const adCostVat = Number(current.ad_cost_vat ?? Math.max(0, adCost - adCostBeforeTax));
-        const adCostSource = current.ad_cost_source === 'ads_api_or_import' ? 'Ads API / import' : 'Belum ada biaya iklan aktual';
+        const adCostSource = ({
+            ads_api_or_import: 'Ads API / import',
+            settlement_fallback: 'Settlement TikTok',
+            ads_api_or_import_with_settlement_fallback: 'Ads + fallback settlement',
+        })[current.ad_cost_source] || 'Belum ada biaya iklan aktual';
         const settledOrderRevenue = Number(current.cash_order_revenue || 0);
         const unsettledOrderRevenue = Number(current.cash_unsettled_order_revenue || 0);
         const orderRevenue = settledOrderRevenue + unsettledOrderRevenue || Number(current.gmv || 0);
@@ -464,7 +468,21 @@
             const rows = [...list].sort((a,b) => Number(b.gmv || 0) - Number(a.gmv || 0));
             ledgerElement.innerHTML = rows.length ? rows.map(store => {
                 const statusCells = compactLedger ? '' : `<td>${Number(store.shipping_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.shipping_count,store.placed_order_count)})</small></td><td>${Number(store.confirmation_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.confirmation_count,store.placed_order_count)})</small></td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.placed_order_count)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.cancelled_count,store.placed_order_count)})</small></td><td style="color:${store.return_refund_count?'#b45309':'inherit'}">${Number(store.return_refund_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.return_refund_count,store.placed_order_count)})</small></td>`;
-                return `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.placed_order_count || 0).toLocaleString('id-ID')}</td>${statusCells}<td style="font-weight:900">${money(store.gmv)}<span class="an-table-subline">Akrual</span></td><td style="font-weight:900;color:#b45309">${money(store.unsettled_gmv)}<span class="an-table-subline">${Number(store.unsettled_order_count || 0).toLocaleString('id-ID')} order</span></td><td style="font-weight:900;color:#b45309">${money(store.return_refund_amount)}<span class="an-table-subline">${Number(store.return_refund_count || 0).toLocaleString('id-ID')} order</span></td><td style="font-weight:900">${money(store.payout)}<span class="an-table-subline">Tercatat</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">Tercatat</span></td><td style="font-weight:900;color:#b45309" title="${store.ad_cost_source === 'platform_transaction_fallback' ? 'Fallback dari mutasi transaksi platform' : 'Ads API / import'}">${money(store.ad_cost)}<span class="an-table-subline">${store.ad_cost_source === 'platform_transaction_fallback' ? 'Mutasi' : 'Ads'}</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Profit operasi</span></td></tr>`;
+                const adSourceLabel = store.ad_cost_source === 'platform_transaction_fallback'
+                    ? 'Mutasi'
+                    : store.ad_cost_source === 'settlement_fallback'
+                        ? 'Settlement'
+                        : store.ad_cost_source === 'ads_api_or_import_with_settlement_fallback'
+                            ? 'Ads + settlement'
+                            : 'Ads';
+                const adSourceTitle = store.ad_cost_source === 'platform_transaction_fallback'
+                    ? 'Fallback dari mutasi transaksi platform'
+                    : store.ad_cost_source === 'settlement_fallback'
+                        ? 'Fallback dari biaya iklan settlement TikTok'
+                        : store.ad_cost_source === 'ads_api_or_import_with_settlement_fallback'
+                            ? 'Ads API / import dengan fallback settlement TikTok'
+                            : 'Ads API / import';
+                return `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.placed_order_count || 0).toLocaleString('id-ID')}</td>${statusCells}<td style="font-weight:900">${money(store.gmv)}<span class="an-table-subline">Akrual</span></td><td style="font-weight:900;color:#b45309">${money(store.unsettled_gmv)}<span class="an-table-subline">${Number(store.unsettled_order_count || 0).toLocaleString('id-ID')} order</span></td><td style="font-weight:900;color:#b45309">${money(store.return_refund_amount)}<span class="an-table-subline">${Number(store.return_refund_count || 0).toLocaleString('id-ID')} order</span></td><td style="font-weight:900">${money(store.payout)}<span class="an-table-subline">Tercatat</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">Tercatat</span></td><td style="font-weight:900;color:#b45309" title="${adSourceTitle}">${money(store.ad_cost)}<span class="an-table-subline">${adSourceLabel}</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Profit operasi</span></td></tr>`;
             }).join('') : `<tr><td colspan="${compactLedger ? 9 : 14}">${stateMarkup('empty', 'Belum ada data performa toko', 'Belum ada order pada filter aktif.')}</td></tr>`;
         }
     }

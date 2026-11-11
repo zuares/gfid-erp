@@ -268,6 +268,51 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(11000.0, (float) $storeRow['ad_cost_vat']);
     }
 
+    public function test_tiktok_ad_cost_falls_back_to_settlement_ad_cost_when_ads_daily_is_empty(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-TIKTOK-SETTLEMENT-ADS',
+            'name' => 'TikTok Settlement Ads',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = $this->order($store, 'COMPLETED', 200000);
+        $order->update(['financial_data_status' => MarketplaceFinancialDataQualityService::ORDER_READY]);
+
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 200000,
+            'final_income' => 178000,
+            'ad_cost' => 111000,
+            'settlement_time' => '2026-09-17 12:00:00',
+            'data_status' => MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE,
+        ]);
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'platform' => 'tiktok',
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $current = $summary['current'];
+        $storeRow = $summary['stores'][0];
+        $dailyRow = $summary['daily'][0];
+
+        $this->assertSame(111000.0, (float) $current['ad_cost']);
+        $this->assertSame(100000.0, (float) $current['ad_cost_before_tax']);
+        $this->assertSame(11000.0, (float) $current['ad_cost_vat']);
+        $this->assertSame('settlement_fallback', $current['ad_cost_source']);
+        $this->assertSame(111000.0, (float) $storeRow['ad_cost']);
+        $this->assertSame('settlement_fallback', $storeRow['ad_cost_source']);
+        $this->assertSame(111000.0, (float) $dailyRow['ad_cost']);
+    }
+
     public function test_store_performance_separates_refund_from_actual_eligible_orders(): void
     {
         $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
