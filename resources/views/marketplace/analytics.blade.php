@@ -220,7 +220,7 @@
     .an-portfolio-ledger-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(280px,.55fr); gap:.75rem; margin-top:.75rem; }
     .an-portfolio-subsection { min-width:0; padding:.75rem; border:1px solid var(--dsh-border); border-radius:12px; background:var(--hero-bg,#fbfcfe); }
     .an-portfolio-subsection-head { display:flex; align-items:flex-start; justify-content:space-between; gap:.65rem; margin-bottom:.65rem; }
-    .an-portfolio-subsection .an-pulse-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .an-portfolio-subsection .an-pulse-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
     .an-portfolio-table-section { overflow:hidden; }
     .an-portfolio-table-section .an-table-wrap { margin:0 -.75rem -.75rem; border-top:1px solid var(--dsh-border); border-radius:0; }
     .an-product-snapshot-content { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.42fr); gap:.75rem; margin-top:.75rem; }

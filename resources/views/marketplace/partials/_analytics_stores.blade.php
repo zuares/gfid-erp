@@ -36,8 +36,8 @@
                 <div class="an-portfolio-subsection-head">
                     <div>
                         <div class="an-section-kicker"><span class="an-section-kicker-dot"></span>Store performance</div>
-                        <div class="an-card-title">Ranking toko</div>
-                        <div class="an-card-sub">Gross sales dan profit operasional terverifikasi.</div>
+                        <div class="an-card-title">KPI &amp; ranking toko</div>
+                        <div class="an-card-sub">GMV, adm fee, biaya iklan, profit, dan posisi toko pada periode aktif.</div>
                     </div>
                 </div>
                 <div class="an-pulse-grid" id="anStorePulse"><x-gf.state type="loading" title="Memuat…" /></div>

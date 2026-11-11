@@ -446,12 +446,19 @@
     function renderStorePerformance({ pulseId, costPulseId, ledgerBodyId, compactLedger = false }) {
         const list = summary?.stores || [];
         const contributing = list.filter(store => Number(store.placed_order_count || 0) > 0 || Number(store.gmv || 0) > 0);
-        const totalGross = contributing.reduce((sum, store) => sum + Number(store.gmv || 0), 0);
+        const totalGross = list.reduce((sum, store) => sum + Number(store.gmv || 0), 0);
+        const totalAdminFee = list.reduce((sum, store) => sum + Number(store.admin_fee_actual || 0), 0);
+        const totalAdCost = list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0);
+        const totalProfit = list.reduce((sum, store) => sum + Number(store.operating_profit || 0), 0);
         const top = [...contributing].sort((a,b) => Number(b.gmv || 0) - Number(a.gmv || 0))[0];
         const bestMargin = [...contributing].sort((a,b) => Number(b.margin_pct || 0) - Number(a.margin_pct || 0))[0];
         const pulseElement = $(pulseId);
         if (pulseElement) {
             pulseElement.innerHTML = [
+                ['GMV portofolio', money(totalGross), 'GMV akrual periode aktif'],
+                ['Adm fee', money(totalAdminFee), `${totalGross > 0 ? (totalAdminFee / totalGross * 100).toFixed(1) : '0.0'}% dari GMV`],
+                ['Biaya iklan', money(totalAdCost), `${totalGross > 0 ? (totalAdCost / totalGross * 100).toFixed(1) : '0.0'}% dari GMV`],
+                ['Profit operasional', money(totalProfit), `${totalGross > 0 ? (totalProfit / totalGross * 100).toFixed(1) : '0.0'}% margin`],
                 ['Toko aktif', Number(contributing.length || 0).toLocaleString('id-ID'), 'dengan order aktual pada periode'],
                 ['Kontributor utama', top?.store_name || '—', top ? `${(Number(top.gmv || 0) / Math.max(totalGross,1) * 100).toFixed(1)}% GMV akrual` : '—'],
                 ['Margin terbaik', bestMargin?.store_name || '—', bestMargin ? `${Number(bestMargin.margin_pct || 0).toFixed(1)}% profit operasional` : '—'],
