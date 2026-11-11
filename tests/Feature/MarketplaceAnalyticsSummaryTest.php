@@ -313,6 +313,57 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(111000.0, (float) $dailyRow['ad_cost']);
     }
 
+    public function test_tiktok_settlement_ad_cost_is_used_by_product_and_fee_tabs(): void
+    {
+        $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-TIKTOK-TABS',
+            'name' => 'TikTok Other Tabs',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $order = $this->order($store, 'COMPLETED', 200000);
+        $order->update(['financial_data_status' => MarketplaceFinancialDataQualityService::ORDER_READY]);
+
+        MarketplaceOrderItem::create([
+            'marketplace_order_id' => $order->id,
+            'order_id' => $order->id,
+            'item_name' => 'Produk TikTok Ads',
+            'item_sku' => 'TIKTOK-ADS-001',
+            'qty' => 1,
+            'price' => 200000,
+            'hpp_snapshot' => 50000,
+            'data_status' => 'valid',
+        ]);
+        MarketplaceOrderSettlement::create([
+            'store_id' => $store->id,
+            'order_id' => $order->id,
+            'channel_order_id' => $order->channel_order_id,
+            'buyer_payment_amount' => 200000,
+            'final_income' => 178000,
+            'ad_cost' => 111000,
+            'settlement_time' => '2026-09-17 12:00:00',
+            'data_status' => MarketplaceFinancialDataQualityService::SETTLEMENT_COMPLETE,
+        ]);
+
+        $filters = [
+            'platform' => 'tiktok',
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+        ];
+        $service = app(MarketplaceAnalyticsSummaryService::class);
+        $products = $service->products($filters);
+        $fees = $service->cashOrders($filters, 1, 50, 'settled');
+        $adFee = collect($fees['fee_by_store'])->firstWhere('cost_type', 'ads');
+
+        $this->assertSame(111000.0, (float) $products[0]['ad_cost']);
+        $this->assertSame(111000.0, (float) $products[0]['ad_cost_settlement']);
+        $this->assertSame(111000.0, (float) ($adFee['amount'] ?? 0));
+        $this->assertSame('settlement_fallback', $adFee['source'] ?? null);
+    }
+
     public function test_store_performance_separates_refund_from_actual_eligible_orders(): void
     {
         $channel = Channel::create(['code' => 'tiktok', 'name' => 'TikTok Shop']);
