@@ -2620,14 +2620,7 @@ class MarketplaceAnalyticsSummaryService
         $facts = $this->adsFacts($filters);
         $beforeTax = (float) collect($facts)
             ->sum(fn (array $row): float => (float) ($row['spend'] ?? 0));
-        $sources = collect($facts)->pluck('source')->filter()->unique()->values();
-        $hasSettlementFallback = $sources->contains('settlement_fallback');
-        $hasPerformanceSource = $sources->contains(fn (string $source): bool => $source !== 'settlement_fallback');
-        $source = $beforeTax > 0
-            ? ($hasSettlementFallback
-                ? ($hasPerformanceSource ? 'ads_api_or_import_with_settlement_fallback' : 'settlement_fallback')
-                : 'ads_api_or_import')
-            : 'none';
+        $source = $this->resolveAdCostSource(collect($facts), $beforeTax);
 
         return [
             'ad_cost_before_tax' => round($beforeTax, 2),
@@ -2636,6 +2629,44 @@ class MarketplaceAnalyticsSummaryService
             'ad_cost_source' => $source,
             'ad_cost_is_estimate' => false,
         ];
+    }
+
+    private function resolveAdCostSource($facts, float $beforeTax): string
+    {
+        if ($beforeTax <= 0) {
+            return 'none';
+        }
+
+        $sources = collect($facts)->pluck('source')->filter()->unique();
+        $hasSettlementFallback = $sources->contains('settlement_fallback');
+        $hasPlatformFallback = $sources->contains('platform_transaction_fallback');
+        $hasPerformanceSource = $sources->contains(fn (string $source): bool => $source === 'ads_api_or_import');
+
+        if ($hasPerformanceSource) {
+            if ($hasSettlementFallback && $hasPlatformFallback) {
+                return 'ads_api_or_import_with_settlement_and_platform_fallback';
+            }
+            if ($hasSettlementFallback) {
+                return 'ads_api_or_import_with_settlement_fallback';
+            }
+            if ($hasPlatformFallback) {
+                return 'ads_api_or_import_with_platform_fallback';
+            }
+
+            return 'ads_api_or_import';
+        }
+
+        if ($hasSettlementFallback && $hasPlatformFallback) {
+            return 'settlement_with_platform_fallback';
+        }
+        if ($hasSettlementFallback) {
+            return 'settlement_fallback';
+        }
+        if ($hasPlatformFallback) {
+            return 'platform_transaction_fallback';
+        }
+
+        return 'ads_api_or_import';
     }
 
     private function adsDaily(array $filters): array
@@ -2665,15 +2696,10 @@ class MarketplaceAnalyticsSummaryService
             ->map(fn ($rows): float => (float) $rows->sum(fn (array $row): float => (float) ($row['spend'] ?? 0)));
         $sourceByStore = $adsFacts
             ->groupBy('store_id')
-            ->map(function ($rows): string {
-                $sources = $rows->pluck('source')->filter()->unique();
-                $hasSettlementFallback = $sources->contains('settlement_fallback');
-                $hasPerformanceSource = $sources->contains(fn (string $source): bool => $source !== 'settlement_fallback');
-
-                return $hasSettlementFallback
-                    ? ($hasPerformanceSource ? 'ads_api_or_import_with_settlement_fallback' : 'settlement_fallback')
-                    : 'ads_api_or_import';
-            });
+            ->map(fn ($rows): string => $this->resolveAdCostSource(
+                $rows,
+                (float) $rows->sum(fn (array $row): float => (float) ($row['spend'] ?? 0)),
+            ));
 
         $platformTransactionSpend = $this->platformTransactionAdSpendByStore($filters);
 
@@ -2840,7 +2866,8 @@ class MarketplaceAnalyticsSummaryService
      * positive API spend, matching AdsDashboardService's source policy.
      * For TikTok, settlement.ad_cost is the next fallback because Finance
      * already normalizes the actual GMV Max advertising deduction there.
-     * TikTok Finance cash-out remains a final store-ledger fallback only.
+     * TikTok wallet ad mutations are the final fallback on the same
+     * store/day grain, so KPI, daily, and store views use one source policy.
      *
      * @return array<int, array{store_id: int, date: string, spend: float}>
      */
@@ -2883,18 +2910,23 @@ class MarketplaceAnalyticsSummaryService
                 ->get();
         }
 
+        $platformRows = collect($this->platformTransactionAdFacts($filters));
+
         $apiByKey = $apiRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
         $importedByKey = $importedRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
         $settlementByKey = $settlementRows->keyBy(fn ($row): string => ((int) $row->store_id).'|'.substr((string) $row->date, 0, 10));
+        $platformByKey = $platformRows->keyBy(fn (array $row): string => ((int) $row['store_id']).'|'.substr((string) $row['date'], 0, 10));
         $facts = [];
 
-        foreach ($apiByKey->keys()->merge($importedByKey->keys())->merge($settlementByKey->keys())->unique() as $key) {
+        foreach ($apiByKey->keys()->merge($importedByKey->keys())->merge($settlementByKey->keys())->merge($platformByKey->keys())->unique() as $key) {
             $api = $apiByKey->get($key);
             $imported = $importedByKey->get($key);
             $settlement = $settlementByKey->get($key);
+            $platform = $platformByKey->get($key);
             $apiSpend = (float) ($api->spend ?? 0);
             $importedSpend = (float) ($imported->spend ?? 0);
             $settlementSpend = (float) ($settlement->spend ?? 0);
+            $platformSpend = (float) ($platform['spend'] ?? 0);
             $source = 'ads_api_or_import';
             $spend = $apiSpend > 0
                 ? $apiSpend
@@ -2902,10 +2934,14 @@ class MarketplaceAnalyticsSummaryService
                     ? $importedSpend
                     // settlement.ad_cost already includes the TikTok ad tax;
                     // normalize it to the before-tax basis used by Ads Daily.
-                    : ($settlementSpend > 0 ? $settlementSpend / (1 + self::ADS_VAT_RATE) : 0));
+                    : ($settlementSpend > 0
+                        ? $settlementSpend / (1 + self::ADS_VAT_RATE)
+                        : ($platformSpend > 0 ? $platformSpend : 0)));
 
             if ($apiSpend <= 0 && $importedSpend <= 0 && $settlementSpend > 0) {
                 $source = 'settlement_fallback';
+            } elseif ($apiSpend <= 0 && $importedSpend <= 0 && $settlementSpend <= 0 && $platformSpend > 0) {
+                $source = 'platform_transaction_fallback';
             }
 
             if ($spend <= 0) {
@@ -2922,6 +2958,47 @@ class MarketplaceAnalyticsSummaryService
         }
 
         return $facts;
+    }
+
+    /**
+     * Return TikTok wallet ad charges on the same store/day grain as Ads
+     * Daily, so the fallback can feed the KPI and daily chart as well as the
+     * store ledger.
+     *
+     * Wallet amounts include tax, while ads facts use the before-tax basis.
+     * Normalize here and let adsAggregate add the VAT once at the boundary.
+     *
+     * @return array<int, array{store_id:int,date:string,spend:float}>
+     */
+    private function platformTransactionAdFacts(array $filters): array
+    {
+        $tiktokStoreIds = DB::table('stores as st')
+            ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
+            ->whereIn('st.id', $filters['store_ids'])
+            ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
+            ->pluck('st.id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        if ($tiktokStoreIds === []) {
+            return [];
+        }
+
+        return $this->tiktokWalletAdCost
+            ->storeDaily($tiktokStoreIds, null, $filters['date_from'], $filters['date_to'])
+            ->map(function (float $cost, string $key): array {
+                [$date, $storeId] = explode('|', $key, 2);
+
+                return [
+                    'store_id' => (int) $storeId,
+                    'date' => $date,
+                    'spend' => round(max($cost, 0) / (1 + self::ADS_VAT_RATE), 2),
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['spend'] > 0)
+            ->values()
+            ->all();
     }
 
     private function operationalBase(array $filters)

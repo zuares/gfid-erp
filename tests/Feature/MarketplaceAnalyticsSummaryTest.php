@@ -254,18 +254,22 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
 
         $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
             'platform' => 'tiktok',
-            'store_id' => $store->id,
             'date_from' => '2026-09-17',
             'date_to' => '2026-09-17',
             'compare_mode' => 'prev_period',
         ]);
 
+        $current = $summary['current'];
         $storeRow = $summary['stores'][0];
 
+        $this->assertSame(111000.0, (float) $current['ad_cost']);
+        $this->assertSame('platform_transaction_fallback', $current['ad_cost_source']);
         $this->assertSame(111000.0, (float) $storeRow['ad_cost']);
         $this->assertSame('platform_transaction_fallback', $storeRow['ad_cost_source']);
         $this->assertSame(100000.0, (float) $storeRow['ad_cost_before_tax']);
         $this->assertSame(11000.0, (float) $storeRow['ad_cost_vat']);
+        $dailyRow = $summary['daily'][0];
+        $this->assertSame(111000.0, (float) $dailyRow['ad_cost']);
     }
 
     public function test_tiktok_ad_cost_falls_back_to_settlement_ad_cost_when_ads_daily_is_empty(): void

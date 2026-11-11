@@ -25,6 +25,10 @@
             ads_api_or_import: 'Ads API / import',
             settlement_fallback: 'Settlement TikTok',
             ads_api_or_import_with_settlement_fallback: 'Ads + fallback settlement',
+            platform_transaction_fallback: 'Mutasi platform',
+            ads_api_or_import_with_platform_fallback: 'Ads + fallback mutasi',
+            settlement_with_platform_fallback: 'Settlement + fallback mutasi',
+            ads_api_or_import_with_settlement_and_platform_fallback: 'Ads + settlement + mutasi',
         })[current.ad_cost_source] || 'Belum ada biaya iklan aktual';
         const settledOrderRevenue = Number(current.cash_order_revenue || 0);
         const unsettledOrderRevenue = Number(current.cash_unsettled_order_revenue || 0);
@@ -468,20 +472,22 @@
             const rows = [...list].sort((a,b) => Number(b.gmv || 0) - Number(a.gmv || 0));
             ledgerElement.innerHTML = rows.length ? rows.map(store => {
                 const statusCells = compactLedger ? '' : `<td>${Number(store.shipping_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.shipping_count,store.placed_order_count)})</small></td><td>${Number(store.confirmation_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.confirmation_count,store.placed_order_count)})</small></td><td>${Number(store.completed_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.completed_count,store.placed_order_count)})</small></td><td style="color:${store.cancelled_count?'#dc2626':'inherit'}">${Number(store.cancelled_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.cancelled_count,store.placed_order_count)})</small></td><td style="color:${store.return_refund_count?'#b45309':'inherit'}">${Number(store.return_refund_count || 0).toLocaleString('id-ID')} <small style="color:#94a3b8">(${pct(store.return_refund_count,store.placed_order_count)})</small></td>`;
-                const adSourceLabel = store.ad_cost_source === 'platform_transaction_fallback'
-                    ? 'Mutasi'
-                    : store.ad_cost_source === 'settlement_fallback'
-                        ? 'Settlement'
-                        : store.ad_cost_source === 'ads_api_or_import_with_settlement_fallback'
-                            ? 'Ads + settlement'
-                            : 'Ads';
-                const adSourceTitle = store.ad_cost_source === 'platform_transaction_fallback'
-                    ? 'Fallback dari mutasi transaksi platform'
-                    : store.ad_cost_source === 'settlement_fallback'
-                        ? 'Fallback dari biaya iklan settlement TikTok'
-                        : store.ad_cost_source === 'ads_api_or_import_with_settlement_fallback'
-                            ? 'Ads API / import dengan fallback settlement TikTok'
-                            : 'Ads API / import';
+                const adSourceLabel = ({
+                    platform_transaction_fallback: 'Mutasi',
+                    settlement_fallback: 'Settlement',
+                    ads_api_or_import_with_settlement_fallback: 'Ads + settlement',
+                    ads_api_or_import_with_platform_fallback: 'Ads + mutasi',
+                    settlement_with_platform_fallback: 'Settlement + mutasi',
+                    ads_api_or_import_with_settlement_and_platform_fallback: 'Ads + settlement + mutasi',
+                })[store.ad_cost_source] || 'Ads';
+                const adSourceTitle = ({
+                    platform_transaction_fallback: 'Fallback dari mutasi transaksi platform',
+                    settlement_fallback: 'Fallback dari biaya iklan settlement TikTok',
+                    ads_api_or_import_with_settlement_fallback: 'Ads API / import dengan fallback settlement TikTok',
+                    ads_api_or_import_with_platform_fallback: 'Ads API / import dengan fallback mutasi platform',
+                    settlement_with_platform_fallback: 'Settlement TikTok dengan fallback mutasi platform',
+                    ads_api_or_import_with_settlement_and_platform_fallback: 'Ads API / import dengan fallback settlement TikTok dan mutasi platform',
+                })[store.ad_cost_source] || 'Ads API / import';
                 return `<tr><td style="text-align:left;font-weight:850;color:#0f172a">${esc(store.store_name || 'Tanpa toko')}</td><td>${Number(store.placed_order_count || 0).toLocaleString('id-ID')}</td>${statusCells}<td style="font-weight:900">${money(store.gmv)}<span class="an-table-subline">Akrual</span></td><td style="font-weight:900;color:#b45309">${money(store.unsettled_gmv)}<span class="an-table-subline">${Number(store.unsettled_order_count || 0).toLocaleString('id-ID')} order</span></td><td style="font-weight:900;color:#b45309">${money(store.return_refund_amount)}<span class="an-table-subline">${Number(store.return_refund_count || 0).toLocaleString('id-ID')} order</span></td><td style="font-weight:900">${money(store.payout)}<span class="an-table-subline">Tercatat</span></td><td style="font-weight:900;color:#b45309">${money(store.admin_fee_actual)}<span class="an-table-subline">Tercatat</span></td><td style="font-weight:900;color:#b45309" title="${adSourceTitle}">${money(store.ad_cost)}<span class="an-table-subline">${adSourceLabel}</span></td><td style="font-weight:900;color:${store.operating_profit>=0?'#15803d':'#dc2626'}">${money(store.operating_profit)}<span class="an-table-subline">Profit operasi</span></td></tr>`;
             }).join('') : `<tr><td colspan="${compactLedger ? 9 : 14}">${stateMarkup('empty', 'Belum ada data performa toko', 'Belum ada order pada filter aktif.')}</td></tr>`;
         }
