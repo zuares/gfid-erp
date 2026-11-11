@@ -450,6 +450,7 @@
         const totalAdminFee = list.reduce((sum, store) => sum + Number(store.admin_fee_actual || 0), 0);
         const totalAdCost = list.reduce((sum, store) => sum + Number(store.ad_cost || 0), 0);
         const totalProfit = list.reduce((sum, store) => sum + Number(store.operating_profit || 0), 0);
+        const lossMakingStores = contributing.filter(store => Number(store.operating_profit || 0) < 0);
         const top = [...contributing].sort((a,b) => Number(b.gmv || 0) - Number(a.gmv || 0))[0];
         const bestMargin = [...contributing].sort((a,b) => Number(b.margin_pct || 0) - Number(a.margin_pct || 0))[0];
         const pulseElement = $(pulseId);
@@ -462,6 +463,7 @@
                 ['Toko aktif', Number(contributing.length || 0).toLocaleString('id-ID'), 'dengan order aktual pada periode'],
                 ['Kontributor utama', top?.store_name || '—', top ? `${(Number(top.gmv || 0) / Math.max(totalGross,1) * 100).toFixed(1)}% GMV akrual` : '—'],
                 ['Margin terbaik', bestMargin?.store_name || '—', bestMargin ? `${Number(bestMargin.margin_pct || 0).toFixed(1)}% profit operasional` : '—'],
+                ['Toko rugi', Number(lossMakingStores.length || 0).toLocaleString('id-ID'), 'profit operasional negatif'],
             ].map(([label,value,note]) => `<div class="an-pulse"><div class="an-pulse-label">${label}</div><div class="an-pulse-value" style="font-size:${String(value).length > 16 ? '.78rem' : '1rem'}">${esc(value)}</div><div class="an-pulse-note">${note}</div></div>`).join('');
         }
         const storeBase = Math.max(totalGross, 1);
