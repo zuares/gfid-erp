@@ -135,6 +135,25 @@
         color: var(--sv-danger); font-size: .74rem;
     }
     .sv-feedback.is-visible { display: block; }
+    .sv-attention {
+        display: flex; align-items: center; gap: .7rem; margin-bottom: .75rem; padding: .7rem .8rem;
+        border: 1px solid color-mix(in srgb, var(--sv-warning) 32%, var(--sv-line));
+        border-radius: var(--sv-radius-control); background: color-mix(in srgb, var(--sv-warning) 8%, var(--sv-surface));
+        color: var(--sv-content);
+    }
+    .sv-attention-icon {
+        display: grid; width: 2rem; height: 2rem; flex: 0 0 auto; place-items: center;
+        border-radius: .6rem; background: color-mix(in srgb, var(--sv-warning) 16%, var(--sv-surface));
+        color: var(--sv-warning); font-size: .9rem;
+    }
+    .sv-attention-copy { display: grid; gap: .12rem; min-width: 0; }
+    .sv-attention-copy strong { color: var(--sv-content); font-size: .75rem; line-height: 1.3; }
+    .sv-attention-copy span { color: var(--sv-muted); font-size: .68rem; line-height: 1.35; }
+    .sv-attention-count {
+        min-width: 1.8rem; margin-left: auto; padding: .25rem .45rem; border-radius: 999px;
+        background: color-mix(in srgb, var(--sv-warning) 14%, var(--sv-surface)); color: var(--sv-warning);
+        font-size: .72rem; font-weight: 850; text-align: center; font-variant-numeric: tabular-nums;
+    }
     .sv-panel { overflow: hidden; }
     .sv-panel-head { display: grid; gap: .7rem; padding: .9rem; border-bottom: 1px solid var(--sv-line); background: var(--sv-surface); }
     .sv-panel-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; min-width: 0; }
@@ -553,6 +572,24 @@
     <div class="sv-feedback" id="svFilterFeedback" role="alert" aria-live="assertive"></div>
 
     <div class="sv-dashboard-content" id="svDashboardContent">
+        @if($variants->isNotEmpty())
+            <div class="sv-attention" data-stock-attention role="status" aria-live="polite">
+                <span class="sv-attention-icon" aria-hidden="true"><i class="bi bi-bell-fill"></i></span>
+                <span class="sv-attention-copy">
+                    @if($stockScope === 'marketplace_empty')
+                        <strong>Ada variant yang siap diperbarui</strong>
+                        <span>Stok internal tersedia, tetapi stok marketplace masih kosong.</span>
+                    @elseif($stockScope === 'internal_empty_marketplace_stock')
+                        <strong>Ada variant yang perlu diaudit</strong>
+                        <span>Stok internal kosong, sementara marketplace masih memiliki stok.</span>
+                    @else
+                        <strong>Ada variant yang perlu ditindaklanjuti</strong>
+                        <span>Periksa hasil filter untuk memperbarui atau mengaudit stok variant.</span>
+                    @endif
+                </span>
+                <span class="sv-attention-count" data-attention-count>{{ number_format($variants->count(), 0, ',', '.') }}</span>
+            </div>
+        @endif
         <section class="sv-panel" aria-live="polite" aria-label="Daftar variant stok kosong">
             <div class="sv-panel-head">
                 <div class="sv-panel-title-row">
@@ -867,6 +904,13 @@
             productGroup.remove();
         }
         showEmpty();
+        const attention = document.querySelector('[data-stock-attention]');
+        const remainingRows = document.querySelectorAll('[data-stock-row]').length;
+        if (attention && remainingRows === 0) {
+            attention.remove();
+        } else {
+            attention?.querySelector('[data-attention-count]')?.replaceChildren(document.createTextNode(remainingRows.toLocaleString('id-ID')));
+        }
     };
     const bindProductDialogs = () => {
         document.querySelectorAll('[data-variant-dialog-trigger]').forEach(trigger => {
@@ -924,7 +968,7 @@
                 const isInternalEmptyAudit = row.dataset.stockScope === 'internal_empty_marketplace_stock';
                 status.textContent = 'Stok berhasil dikirim.';
                 status.className = 'sv-status ok';
-                showSaveFeedback('Stok berhasil dikirim ke marketplace.', 'success');
+                showSaveFeedback(`${form.dataset.variantName || 'Variant'}: stok ${stock.toLocaleString('id-ID')} berhasil dikirim ke marketplace.`, 'success');
                 row.dataset.currentStock = String(stock);
                 const mpStockVal = row.querySelector('[data-mp-stock-val]');
                 if (mpStockVal) {

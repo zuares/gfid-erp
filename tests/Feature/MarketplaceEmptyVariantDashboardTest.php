@@ -70,6 +70,8 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertSee('sv-product-group-body', false)
             ->assertSee('aria-haspopup="dialog"', false)
             ->assertSee('data-mp-stock-val', false)
+            ->assertSee('data-stock-attention', false)
+            ->assertSee('Ada variant yang siap diperbarui')
             ->assertDontSee('Stok saat ini:', false)
             ->assertSee('Hitam / M')
             ->assertSee('JACKET-BLK-M')
@@ -248,6 +250,7 @@ class MarketplaceEmptyVariantDashboardTest extends TestCase
             ->assertDontSee('Toko Status Inactive')
             ->assertSee('Variant Audit Terhubung')
             ->assertSee('Stok tidak sinkron')
+            ->assertSee('Ada variant yang perlu diaudit')
             ->assertSee('data-stock-scope="internal_empty_marketplace_stock"', false)
             ->assertDontSee('Variant Tidak Terhubung')
             ->assertDontSee('Variant Nonaktif');
