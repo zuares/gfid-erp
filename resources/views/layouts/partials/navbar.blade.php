@@ -13,10 +13,11 @@ $navPendingCount = 0;
 $navPendingItems = [];
 
 if ($navShowBell) {
-    $navCacheKey = 'navbar_notif_owner_v5_' . (int) $navUser->id;
+    $navCacheKey = 'navbar_notif_owner_v6_' . (int) $navUser->id;
     $navPending  = Cache::remember($navCacheKey, now()->addSeconds(20), function () use ($navIsOwner) {
         $todayStart = today()->startOfDay();
         $todayEnd   = today()->endOfDay();
+        $marketplaceVariantStock = app(\App\Services\Marketplace\MarketplaceVariantStockSummaryService::class)->summary();
 
         $grnDrafts = \App\Models\PurchaseReceipt::where('status', 'draft')
             ->orderByDesc('id')
@@ -88,6 +89,7 @@ if ($navShowBell) {
             'cutting_qc_owner_reviews' => $cuttingQcOwnerReviews,
             'shipment_deletion_requests' => $shipmentDeletionRequests,
             'inventory_adjustment_requests' => $inventoryAdjustmentRequests,
+            'marketplace_variant_stock' => $marketplaceVariantStock,
             'crm_aging'      => $crmAgingCount,
             'crm_new_orders' => $crmNewOrders,
             'crm_prospects'  => $crmProspects,
@@ -140,6 +142,37 @@ if ($navShowBell) {
                 'icon'  => '✂️',
             ];
         }
+    }
+
+    $marketplaceVariantStock = $navPending['marketplace_variant_stock'] ?? [];
+    $marketplaceEmptyVariants = (int) ($marketplaceVariantStock['marketplace_zero_internal_available'] ?? 0);
+    $internalEmptyMarketplaceStock = (int) ($marketplaceVariantStock['internal_empty_marketplace_stock'] ?? 0);
+
+    if ($marketplaceEmptyVariants > 0) {
+        $navPendingItems[] = [
+            'type' => 'marketplace_empty_variants',
+            'read_key' => 'marketplace_empty_variants:'.$marketplaceEmptyVariants,
+            'label' => $marketplaceEmptyVariants.' variant stok marketplace kosong',
+            'sub' => 'Stok internal tersedia · siap diperbarui',
+            'url' => route('marketplace.products.empty-variants', [
+                'stock_scope' => 'marketplace_empty',
+                'stock_status' => 'zero',
+            ]),
+            'icon' => '🔄',
+        ];
+    }
+
+    if ($internalEmptyMarketplaceStock > 0) {
+        $navPendingItems[] = [
+            'type' => 'marketplace_internal_stock_audit',
+            'read_key' => 'marketplace_internal_stock_audit:'.$internalEmptyMarketplaceStock,
+            'label' => $internalEmptyMarketplaceStock.' variant perlu audit stok',
+            'sub' => 'Stok internal kosong · marketplace masih ada stok',
+            'url' => route('marketplace.products.empty-variants', [
+                'stock_scope' => 'internal_empty_marketplace_stock',
+            ]),
+            'icon' => '⚠️',
+        ];
     }
 
     // ── CRM items ─────────────────────────────────────────────────────────────

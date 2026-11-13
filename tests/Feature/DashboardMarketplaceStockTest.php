@@ -50,6 +50,8 @@ class DashboardMarketplaceStockTest extends TestCase
                 ->assertSee('Stok marketplace')
                 ->assertSee('Stok MP 0 · Internal Ada')
                 ->assertSee('Stok Kosong tapi di Marketplace Ada Stok')
+                ->assertSee('1 variant stok marketplace kosong')
+                ->assertSee('1 variant perlu audit stok')
                 ->assertSee('marketplace/products/empty-variants?stock_scope=marketplace_empty&amp;stock_status=zero', false)
                 ->assertSee('marketplace/products/empty-variants?stock_scope=internal_empty_marketplace_stock', false);
         }
@@ -58,7 +60,9 @@ class DashboardMarketplaceStockTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertDontSee('Stok MP 0 · Internal Ada')
-            ->assertDontSee('Stok Kosong tapi di Marketplace Ada Stok');
+            ->assertDontSee('Stok Kosong tapi di Marketplace Ada Stok')
+            ->assertDontSee('variant stok marketplace kosong')
+            ->assertDontSee('variant perlu audit stok');
     }
 
     /** @return array{Store, Item, Item} */
