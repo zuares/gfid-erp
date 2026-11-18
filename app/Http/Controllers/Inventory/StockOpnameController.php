@@ -936,7 +936,7 @@ class StockOpnameController extends Controller
      */
     public function reopen(StockOpname $stockOpname)
     {
-        if (! $stockOpname->canReopen()) {
+        if ($stockOpname->adjustment()->exists() || ! $stockOpname->canReopen()) {
             return back()
                 ->with('status', 'error')
                 ->with('message', 'Dokumen tidak bisa direopen.');

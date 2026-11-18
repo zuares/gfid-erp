@@ -135,7 +135,9 @@ Route::middleware(['web', 'auth', 'access:inventory'])->group(function () {
             Route::post('/{stockOpname}/reset-lines', [StockOpnameController::class, 'resetLines'])->name('reset_lines');
             Route::post('/{stockOpname}/reset-all-lines', [StockOpnameController::class, 'resetAllLines'])->name('reset_all_lines');
 
-            Route::post('/{stockOpname}/reopen', [StockOpnameController::class, 'reopen'])->name('reopen');
+            Route::post('/{stockOpname}/reopen', [StockOpnameController::class, 'reopen'])
+                ->middleware('role:owner')
+                ->name('reopen');
             Route::post('/{stockOpname}/cancel', [\App\Http\Controllers\Inventory\StockOpnameController::class, 'cancel'])
                 ->name('cancel');
 

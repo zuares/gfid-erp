@@ -74,3 +74,68 @@ it('allows admin to create a stock opname but not finalize it', function () {
     expect($opname->fresh()->status)->toBe(StockOpname::STATUS_REVIEWED)
         ->and($opname->adjustment()->exists())->toBeFalse();
 });
+
+it('allows only the owner to reopen a reviewed stock opname and keeps counted quantities', function () {
+    $owner = User::factory()->create([
+        'employee_code' => 'SO-OWNER-REOPEN',
+        'role' => 'owner',
+    ]);
+    $admin = User::factory()->create([
+        'employee_code' => 'SO-ADMIN-REOPEN',
+        'role' => 'admin',
+    ]);
+    $warehouse = Warehouse::create([
+        'code' => 'SO-REOPEN-WH',
+        'name' => 'Stock opname reopen warehouse',
+        'type' => 'internal',
+        'active' => true,
+    ]);
+    $item = Item::create([
+        'code' => 'SO-REOPEN-ITEM',
+        'name' => 'Stock opname reopen item',
+        'unit' => 'pcs',
+        'type' => 'material',
+        'hpp' => 100,
+        'active' => true,
+    ]);
+    $opname = StockOpname::create([
+        'code' => 'SO-REOPEN-REVIEWED',
+        'date' => now()->toDateString(),
+        'snapshot_at' => now(),
+        'warehouse_id' => $warehouse->id,
+        'type' => StockOpname::TYPE_PERIODIC,
+        'status' => StockOpname::STATUS_REVIEWED,
+        'created_by' => $owner->id,
+        'reviewed_by' => $admin->id,
+        'reviewed_at' => now(),
+    ]);
+    $line = StockOpnameLine::create([
+        'stock_opname_id' => $opname->id,
+        'item_id' => $item->id,
+        'system_qty' => 10,
+        'physical_qty' => 9,
+        'difference_qty' => -1,
+        'is_counted' => true,
+        'unit_cost' => 100,
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('inventory.stock_opnames.reopen', $opname))
+        ->assertForbidden();
+
+    expect($opname->fresh()->status)->toBe(StockOpname::STATUS_REVIEWED);
+
+    $this->actingAs($owner)
+        ->get(route('inventory.stock_opnames.show', $opname))
+        ->assertOk()
+        ->assertSee('Buka Kembali Counting');
+
+    $this->actingAs($owner)
+        ->post(route('inventory.stock_opnames.reopen', $opname))
+        ->assertRedirect();
+
+    expect($opname->fresh()->status)->toBe(StockOpname::STATUS_COUNTING)
+        ->and($opname->fresh()->reviewed_by)->toBeNull()
+        ->and($opname->fresh()->reviewed_at)->toBeNull()
+        ->and($line->fresh()->physical_qty)->toBe('9.000');
+});

@@ -113,6 +113,11 @@
             ? $opname->canFinalize()
             : $opname->status === StockOpname::STATUS_REVIEWED);
 
+    $canReopen = !$isCancelled
+        && !$adjustment
+        && method_exists($opname, 'canReopen')
+        && $opname->canReopen();
+
     $canMarkReviewed =
         !$isCancelled &&
         !$adjustment &&
@@ -395,6 +400,14 @@
                 @if($adjustment && $canSeeAccountingLink && $adjustment->standaloneJournal)
                     <a href="{{ route('standalone-accounting.journals.show', $adjustment->standaloneJournal) }}" class="btn btn-sm btn-outline-primary mt-1">Jurnal Akuntansi Baru →</a>
                 @endif
+            @endif
+
+            @if($canReopen)
+                <form action="{{ route('inventory.stock_opnames.reopen', $opname) }}" method="POST" class="mt-1"
+                      onsubmit="return confirm('Buka kembali counting? Hasil hitung yang sudah ada tetap dipertahankan.');">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Buka Kembali Counting</button>
+                </form>
             @endif
 
             {{-- ✅ NEW: Cancel button --}}
