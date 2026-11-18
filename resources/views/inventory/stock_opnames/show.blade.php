@@ -266,6 +266,28 @@
     body[data-theme=dark] .table thead th{ background:#0f172a !important; color:#e5e7eb; }
 
     .table tbody td{ padding:.42rem .5rem; font-size:.78rem; white-space:nowrap; vertical-align:middle; }
+    .so-focus-col{ min-width:92px; }
+    .so-focus-col.so-focus-physical{ border-left:2px solid color-mix(in srgb, var(--gf-color-accent, #13b8c4) 58%, transparent); }
+    .so-focus-col.so-focus-diff{ border-left:1px solid color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 24%, transparent); }
+    .so-focus-physical-cell{ background:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 6%, transparent); border-left:2px solid color-mix(in srgb, var(--gf-color-accent, #13b8c4) 42%, transparent) !important; }
+    .so-focus-diff-cell{ background:color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 5%, transparent); }
+    .so-focus-number{ display:inline-block; min-width:4ch; font-size:.96rem; font-weight:950; letter-spacing:-.02em; }
+    .so-focus-diff-badge{ display:inline-flex; align-items:center; justify-content:center; min-width:72px; padding:.22rem .42rem; border:1px solid transparent; border-radius:8px; font-size:.86rem; font-weight:950; }
+    .so-focus-diff-badge.diff-danger{ color:var(--gf-color-danger, #b91c1c); background:color-mix(in srgb, var(--gf-color-danger, #dc2626) 11%, transparent); border-color:color-mix(in srgb, var(--gf-color-danger, #dc2626) 24%, transparent); }
+    .so-focus-diff-badge.diff-warning{ color:#854d0e; background:color-mix(in srgb, var(--gf-color-warning, #f59e0b) 15%, transparent); border-color:color-mix(in srgb, var(--gf-color-warning, #f59e0b) 28%, transparent); }
+    .so-focus-diff-badge.diff-success{ color:var(--gf-color-success, #15803d); background:color-mix(in srgb, var(--gf-color-success, #16a34a) 11%, transparent); border-color:color-mix(in srgb, var(--gf-color-success, #16a34a) 24%, transparent); }
+    .so-reference-cell{ color:var(--gf-color-muted, rgba(100,116,139,1)); }
+    .so-focus-strip{ display:flex; align-items:center; justify-content:space-between; gap:.7rem; margin-top:.6rem; padding:.55rem .65rem; border:1px solid color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 18%, transparent); border-radius:10px; background:linear-gradient(90deg, color-mix(in srgb, var(--gf-color-accent, #13b8c4) 8%, transparent), color-mix(in srgb, var(--gf-color-brand, #5b5ce2) 6%, transparent)); }
+    .so-focus-strip-title{ display:flex; align-items:baseline; gap:.42rem; min-width:0; }
+    .so-focus-strip-title .kicker{ color:var(--gf-color-muted, rgba(100,116,139,1)); font-size:.6rem; font-weight:900; letter-spacing:.07em; text-transform:uppercase; }
+    .so-focus-strip-title strong{ color:var(--gf-color-content, #101828); font-size:.82rem; }
+    .so-focus-strip-guide{ display:flex; align-items:center; gap:.5rem; color:var(--gf-color-muted, rgba(100,116,139,1)); font-size:.66rem; font-weight:800; white-space:nowrap; }
+    .so-focus-strip-guide span{ display:inline-flex; align-items:center; gap:.22rem; }
+    .so-focus-strip-guide i{ width:7px; height:7px; border-radius:999px; display:inline-block; }
+    .so-focus-strip-guide .physical i{ background:var(--gf-color-accent, #13b8c4); }
+    .so-focus-strip-guide .difference i{ background:var(--gf-color-brand, #5b5ce2); }
+    body[data-theme=dark] .so-focus-strip-title strong{ color:#f8fafc; }
+    body[data-theme=dark] .so-focus-strip{ background:linear-gradient(90deg, rgba(19,184,196,.10), rgba(91,92,226,.12)); }
     .col-notes-compact{ max-width:240px; }
     .col-notes-compact .note-text{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; line-height:1.2; }
     .hpp-inline-form{ display:flex; align-items:center; justify-content:flex-end; gap:.25rem; min-width:155px; }
@@ -293,6 +315,8 @@
 
     .m-badges{ margin-top:.30rem; display:flex; flex-wrap:wrap; gap:.30rem; }
     .mini-badge{ display:inline-flex; align-items:center; gap:.28rem; padding:.10rem .42rem; border-radius:999px; font-size:.64rem; font-weight:900; border:1px solid rgba(148,163,184,.22); background:rgba(15,23,42,.02); color:rgba(71,85,105,1); white-space:nowrap; }
+    .so-mobile-focus-badge{ color:var(--gf-color-content, #101828); background:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 10%, transparent); border-color:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 30%, transparent); }
+    .so-mobile-focus-badge .v{ font-size:.72rem; }
     .tone-danger{ background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.20); color:#b91c1c; }
     .tone-success{ background:rgba(22,163,74,.14); border-color:rgba(22,163,74,.22); color:#15803d; }
     .tone-warning{ background:rgba(234,179,8,.16); border-color:rgba(234,179,8,.26); color:#854d0e; }
@@ -318,6 +342,9 @@
         .so-mini-kpi{ padding:.36rem .38rem; }
         .so-mini-kpi .val{ font-size:.78rem; }
         .so-sort-btn .arr{ font-size:.8em; }
+        .so-focus-strip{ align-items:flex-start; flex-direction:column; gap:.3rem; }
+        .so-focus-strip-guide{ white-space:normal; }
+        .so-focus-number{ font-size:.9rem; }
     }
 </style>
 @endpush
@@ -644,6 +671,18 @@
                 </div>
             </form>
 
+            <div class="so-focus-strip" aria-label="Fokus pemeriksaan stock opname">
+                <div class="so-focus-strip-title">
+                    <span class="kicker">Fokus pemeriksaan</span>
+                    <strong>Stok fisik &amp; selisih</strong>
+                </div>
+                <div class="so-focus-strip-guide" aria-hidden="true">
+                    <span class="physical"><i></i>Fisik</span>
+                    <span class="difference"><i></i>Selisih</span>
+                    <span>Stok = acuan sistem</span>
+                </div>
+            </div>
+
             {{-- DESKTOP TABLE --}}
             <div class="table-wrap" id="so-show-table-wrap">
                 <table class="table table-sm mb-0 align-middle">
@@ -655,19 +694,19 @@
                                 Item <span class="arr">{{ ($filters['sort'] ?? 'item') === 'item' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
                             </button>
                         </th>
-                        <th class="text-end">
-                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'system') is-active @endif" data-sort="system">
-                                Stok <span class="arr">{{ ($filters['sort'] ?? '') === 'system' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
-                            </button>
-                        </th>
-                        <th class="text-end">
+                        <th class="text-end so-focus-col so-focus-physical">
                             <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'physical') is-active @endif" data-sort="physical">
                                 Fisik <span class="arr">{{ ($filters['sort'] ?? '') === 'physical' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
                             </button>
                         </th>
-                        <th class="text-end">
+                        <th class="text-end so-focus-col so-focus-diff">
                             <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'diff') is-active @endif" data-sort="diff">
                                 Selisih <span class="arr">{{ ($filters['sort'] ?? '') === 'diff' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
+                            </button>
+                        </th>
+                        <th class="text-end">
+                            <button type="button" class="so-sort-btn js-so-sort @if(($filters['sort'] ?? '') === 'system') is-active @endif" data-sort="system">
+                                Stok <span class="arr">{{ ($filters['sort'] ?? '') === 'system' && ($filters['dir'] ?? 'asc') === 'desc' ? '↓' : '↑' }}</span>
                             </button>
                         </th>
                         <th class="text-end">HPP</th>
@@ -713,21 +752,21 @@
                                 <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
                                 <div class="meta">{{ $line->item?->name ?? '' }}</div>
                             </td>
-                            <td class="text-end text-mono">{{ number_format($system, 2) }}</td>
-                            <td class="text-end text-mono">
+                            <td class="text-end text-mono so-focus-physical-cell">
                                 @if ($physical !== null && $counted)
-                                    {{ number_format($physical, 2) }}
+                                    <span class="so-focus-number">{{ number_format($physical, 2) }}</span>
                                 @else
                                     <span class="meta">-</span>
                                 @endif
                             </td>
-                            <td class="text-end text-mono {{ $diff !== null ? $tone : '' }}">
+                            <td class="text-end text-mono so-focus-diff-cell">
                                 @if ($diff !== null)
-                                    {{ $diff > 0 ? '+' : '' }}{{ number_format($diff, 2) }}
+                                    <span class="so-focus-diff-badge {{ $tone }}">{{ $diff > 0 ? '+' : '' }}{{ number_format($diff, 2) }}</span>
                                 @else
                                     <span class="meta">-</span>
                                 @endif
                             </td>
+                            <td class="text-end text-mono so-reference-cell">{{ number_format($system, 2) }}</td>
                             <td class="text-end">
                                 @if (!$costMissing)
                                     <div class="text-mono fw-semibold">Rp {{ number_format($unitCost, 0, ',', '.') }}</div>
@@ -822,13 +861,13 @@
                                 @endif
 
                                 <div class="m-badges">
-                                    <span class="mini-badge"><span class="k">Sys</span><span class="v">{{ number_format($system, 2) }}</span></span>
-                                    <span class="mini-badge"><span class="k">F</span><span class="v">{{ $physical !== null && $counted ? number_format($physical, 2) : '-' }}</span></span>
+                                    <span class="mini-badge so-mobile-focus-badge"><span class="k">Fisik</span><span class="v">{{ $physical !== null && $counted ? number_format($physical, 2) : '-' }}</span></span>
+                                    <span class="mini-badge"><span class="k">Stok</span><span class="v">{{ number_format($system, 2) }}</span></span>
                                     <span class="mini-badge {{ $costMissing ? 'tone-danger' : '' }}"><span class="k">HPP</span><span class="v">{{ $costMissing ? '-' : number_format($unitCost, 0, ',', '.') }}</span></span>
-                                    <span class="mini-badge"><span class="k">Nilai</span><span class="v">{{ $physicalValue !== null ? number_format($physicalValue, 0, ',', '.') : '-' }}</span></span>
+                                    <span class="mini-badge"><span class="k">Nilai Fisik</span><span class="v">{{ $physicalValue !== null ? number_format($physicalValue, 0, ',', '.') : '-' }}</span></span>
 
                                     <span class="mini-badge {{ $tone }}">
-                                        <span class="k">Rp</span>
+                                        <span class="k">Selisih Rp</span>
                                         <span class="v">
                                             @if ($value !== null)
                                                 {{ $value > 0 ? '+' : '-' }}{{ number_format(abs($value), 0, ',', '.') }}
@@ -1146,9 +1185,9 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="fw-semibold">${itemCode}</div>
     <div class="meta">${itemName}</div>
   </td>
-  <td class="text-end text-mono">${sys}</td>
-  <td class="text-end text-mono">${fisik}</td>
-  <td class="text-end text-mono ${tone}">${diff}</td>
+  <td class="text-end text-mono so-focus-physical-cell">${fisik === '<span class="meta">-</span>' ? fisik : `<span class="so-focus-number">${fisik}</span>`}</td>
+  <td class="text-end text-mono so-focus-diff-cell">${diff === '<span class="meta">-</span>' ? diff : `<span class="so-focus-diff-badge ${tone}">${diff}</span>`}</td>
+  <td class="text-end text-mono so-reference-cell">${sys}</td>
   <td class="text-end">${hpp}</td>
   <td class="text-end text-mono">${physicalValue}</td>
   <td class="text-end text-mono ${tone}">${val}</td>
@@ -1206,11 +1245,11 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="m-item-title">${itemCode}</div>
     ${itemName ? `<div class="m-item-sub">${itemName}</div>` : ``}
     <div class="m-badges">
-      <span class="mini-badge"><span class="k">Sys</span><span class="v">${sys}</span></span>
-      <span class="mini-badge"><span class="k">F</span><span class="v">${fisik}</span></span>
+      <span class="mini-badge so-mobile-focus-badge"><span class="k">Fisik</span><span class="v">${fisik}</span></span>
+      <span class="mini-badge"><span class="k">Stok</span><span class="v">${sys}</span></span>
       <span class="mini-badge ${(!unitCost || unitCost <= 0) ? 'tone-danger' : ''}"><span class="k">HPP</span><span class="v">${hpp}</span></span>
-      <span class="mini-badge"><span class="k">Nilai</span><span class="v">${physicalValue}</span></span>
-      <span class="mini-badge ${tone}"><span class="k">Rp</span><span class="v">${val}</span></span>
+      <span class="mini-badge"><span class="k">Nilai Fisik</span><span class="v">${physicalValue}</span></span>
+      <span class="mini-badge ${tone}"><span class="k">Selisih Rp</span><span class="v">${val}</span></span>
     </div>
     ${hppForm}
   </td>
