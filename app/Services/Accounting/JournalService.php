@@ -1207,7 +1207,7 @@ class JournalService
         $rawCostForOutput = min($rawCost, $outputCost);
         $availableValueAddedCost = round($outputCost - $rawCostForOutput, 2);
 
-        if ($outputCost <= 0 || $rawCost <= 0) {
+        if ($outputCost <= 0) {
             return null;
         }
 
