@@ -188,6 +188,31 @@ class CuttingQcPilotLifecycleTest extends TestCase
         $this->assertEqualsWithDelta(1000, (float) $standalonePayroll, 0.01);
     }
 
+    public function test_qc_journal_posts_available_output_when_output_cost_is_below_raw_cost(): void
+    {
+        [$owner, $job, $bundle] = $this->makePostedCuttingJob();
+
+        $wipWarehouse = Warehouse::query()->where('code', 'WIP-CUT')->firstOrFail();
+        InventoryMutation::create([
+            'date' => '2026-10-27',
+            'warehouse_id' => $wipWarehouse->id,
+            'item_id' => $bundle->finished_item_id,
+            'qty_change' => 10,
+            'direction' => 'in',
+            'source_type' => JournalService::SRC_CUTTING_WIP,
+            'source_id' => $job->id,
+            'unit_cost' => 5,
+            'total_cost' => 50,
+            'cutting_job_bundle_id' => $bundle->id,
+        ]);
+
+        $journal = app(JournalService::class)->postCuttingWip($job->fresh(), '2026-10-27');
+
+        $this->assertNotNull($journal);
+        $this->assertEqualsWithDelta(50, (float) $journal->lines()->sum('debit'), 0.01);
+        $this->assertEqualsWithDelta(50, (float) $journal->lines()->sum('credit'), 0.01);
+    }
+
     public function test_resaving_posted_qc_with_changed_qty_is_rejected(): void
     {
         config(['accounting.standalone_dual_posting_production_cutting_enabled' => true]);

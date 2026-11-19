@@ -1200,9 +1200,14 @@ class JournalService
         $okCost = $this->netProductionOutputAmount(self::SRC_CUTTING_WIP, (int) $job->id);
         $rejectCost = $this->netProductionOutputAmount('cutting_reject', (int) $job->id);
         $outputCost = round($okCost + $rejectCost, 2);
-        $availableValueAddedCost = round($outputCost - $rawCost, 2);
+        // QC dapat diposting bertahap atau membawa cost legacy yang lebih
+        // besar dari output yang sedang dipindahkan. Alokasikan bahan hanya
+        // sebesar nilai output saat ini; sisa bahan tetap berada di WIP dan
+        // dapat dialokasikan pada posting QC berikutnya.
+        $rawCostForOutput = min($rawCost, $outputCost);
+        $availableValueAddedCost = round($outputCost - $rawCostForOutput, 2);
 
-        if ($outputCost <= 0 || $rawCost <= 0 || $availableValueAddedCost < -0.01) {
+        if ($outputCost <= 0 || $rawCost <= 0) {
             return null;
         }
 
@@ -1225,10 +1230,9 @@ class JournalService
             ->sum('debit');
         $postedWageForOutput = min(max($postedWage, 0), max($availableValueAddedCost, 0));
         $laborCost = round(max($availableValueAddedCost - $postedWageForOutput, 0), 2);
-        $wipCredit = round($rawCost + $postedWageForOutput, 2);
+        $wipCredit = round($rawCostForOutput + $postedWageForOutput, 2);
 
         if (abs($availableValueAddedCost) <= 0.01) {
-            $rawCost = $outputCost;
             $wipCredit = $outputCost;
             $laborCost = 0.0;
         }
