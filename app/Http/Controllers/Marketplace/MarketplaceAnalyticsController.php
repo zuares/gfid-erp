@@ -170,8 +170,11 @@ class MarketplaceAnalyticsController extends Controller
             $storePlatform = strtolower(trim((string) Store::query()
                 ->with('channel:id,code')
                 ->find($storeId)?->channel?->code));
+            $platformCodes = $platform === 'shopee'
+                ? ['shopee', 'shp']
+                : ['tiktok', 'ttk', 'tkt', 'tt'];
 
-            if ($storePlatform !== $platform) {
+            if (! in_array($storePlatform, $platformCodes, true)) {
                 throw ValidationException::withMessages([
                     'store_id' => 'Toko yang dipilih tidak sesuai dengan platform filter.',
                 ]);

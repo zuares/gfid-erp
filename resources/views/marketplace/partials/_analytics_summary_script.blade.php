@@ -5,9 +5,10 @@
     function fillStores() {
         const current = selectedStore() || String(initialStore || '');
         const platform = selectedPlatform();
+        const platformCodes = platform === 'shopee' ? ['shopee', 'shp'] : ['tiktok', 'ttk', 'tkt', 'tt'];
         const unique = new Map(stores
             .filter(store => store && store.id)
-            .filter(store => !platform || String(store.channel?.code || '').toLowerCase() === platform)
+            .filter(store => !platform || platformCodes.includes(String(store.channel?.code || '').toLowerCase()))
             .filter(store => store.is_active !== false || String(store.id) === current)
             .map(store => [String(store.id), store.name || `Toko #${store.id}`]));
         $('anStore').innerHTML = '<option value="">Semua toko</option>' + [...unique.entries()]

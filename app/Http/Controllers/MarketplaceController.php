@@ -144,9 +144,12 @@ class MarketplaceController extends Controller
             'active_only' => ['nullable', 'boolean'],
             'platform' => ['nullable', 'in:shopee,tiktok'],
         ]);
+        $platformCodes = ($filters['platform'] ?? null) === 'shopee'
+            ? ['shopee', 'shp']
+            : ['tiktok', 'ttk', 'tkt', 'tt'];
         $stores = Store::with(['channel', 'defaultWarehouse'])
             ->when((bool) ($filters['active_only'] ?? false), fn ($query) => $query->where('is_active', true))
-            ->when($filters['platform'] ?? null, fn ($query, $platform) => $query->whereHas('channel', fn ($channel) => $channel->whereRaw('LOWER(code) = ?', [$platform])))
+            ->when($filters['platform'] ?? null, fn ($query) => $query->whereHas('channel', fn ($channel) => $channel->whereIn(DB::raw('LOWER(code)'), $platformCodes)))
             ->latest()
             ->get()
             ->map(fn (Store $store) => [

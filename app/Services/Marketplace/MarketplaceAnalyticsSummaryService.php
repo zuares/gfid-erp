@@ -21,6 +21,10 @@ class MarketplaceAnalyticsSummaryService
 
     private const ADS_VAT_RATE = 0.11;
 
+    private const SHOPEE_CHANNEL_CODES = ['shopee', 'shp'];
+
+    private const TIKTOK_CHANNEL_CODES = ['tiktok', 'ttk', 'tkt', 'tt'];
+
     /**
      * Minimum net margin to preserve after marketplace costs and ads.
      * Returned as a percentage in the drill-down payload.
@@ -1725,7 +1729,10 @@ class MarketplaceAnalyticsSummaryService
         $storeScope = DB::table('stores as analytics_scope_store')
             ->when($platform, function ($query) use ($platform) {
                 $query->join('channels as analytics_scope_channel', 'analytics_scope_channel.id', '=', 'analytics_scope_store.channel_id')
-                    ->whereRaw('LOWER(analytics_scope_channel.code) = ?', [$platform]);
+                    ->whereIn(
+                        DB::raw('LOWER(analytics_scope_channel.code)'),
+                        $platform === 'shopee' ? self::SHOPEE_CHANNEL_CODES : self::TIKTOK_CHANNEL_CODES,
+                    );
             })
             ->when($storeId,
                 fn ($query) => $query->where('analytics_scope_store.id', $storeId),
@@ -2759,7 +2766,7 @@ class MarketplaceAnalyticsSummaryService
 
         $spendByStore = collect();
         $tiktokStoreIds = $storePlatforms
-            ->filter(fn (string $platform): bool => $platform === 'tiktok')
+            ->filter(fn (string $platform): bool => in_array($platform, self::TIKTOK_CHANNEL_CODES, true))
             ->keys()
             ->map(fn ($id): int => (int) $id)
             ->values()
@@ -2780,7 +2787,7 @@ class MarketplaceAnalyticsSummaryService
         }
 
         $shopeeStoreIds = $storePlatforms
-            ->filter(fn (string $platform): bool => $platform === 'shopee')
+            ->filter(fn (string $platform): bool => in_array($platform, self::SHOPEE_CHANNEL_CODES, true))
             ->keys()
             ->map(fn ($id): int => (int) $id)
             ->values()
@@ -2903,7 +2910,7 @@ class MarketplaceAnalyticsSummaryService
                 ->join('stores as st', 'st.id', '=', 'ms.store_id')
                 ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
                 ->whereIn('ms.store_id', $filters['store_ids'])
-                ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
+                ->whereIn(DB::raw('LOWER(ch.code)'), self::TIKTOK_CHANNEL_CODES)
                 ->whereRaw('COALESCE(mo.ordered_at, mo.order_date) IS NOT NULL')
                 ->whereBetween(DB::raw('COALESCE(mo.ordered_at, mo.order_date)'), [
                     $filters['date_from'].' 00:00:00',
@@ -2919,7 +2926,7 @@ class MarketplaceAnalyticsSummaryService
         $shopeeStoreIds = DB::table('stores as st')
             ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereIn('st.id', $filters['store_ids'])
-            ->whereRaw('LOWER(ch.code) = ?', ['shopee'])
+            ->whereIn(DB::raw('LOWER(ch.code)'), self::SHOPEE_CHANNEL_CODES)
             ->pluck('st.id')
             ->map(fn ($id): int => (int) $id)
             ->all();
@@ -3009,7 +3016,7 @@ class MarketplaceAnalyticsSummaryService
         $tiktokStoreIds = DB::table('stores as st')
             ->join('channels as ch', 'ch.id', '=', 'st.channel_id')
             ->whereIn('st.id', $filters['store_ids'])
-            ->whereRaw('LOWER(ch.code) = ?', ['tiktok'])
+            ->whereIn(DB::raw('LOWER(ch.code)'), self::TIKTOK_CHANNEL_CODES)
             ->pluck('st.id')
             ->map(fn ($id): int => (int) $id)
             ->values()
@@ -3035,7 +3042,7 @@ class MarketplaceAnalyticsSummaryService
         }
 
         $shopeeStoreIds = $storePlatforms
-            ->filter(fn (string $platform): bool => $platform === 'shopee')
+            ->filter(fn (string $platform): bool => in_array($platform, self::SHOPEE_CHANNEL_CODES, true))
             ->keys()
             ->map(fn ($id): int => (int) $id)
             ->values()

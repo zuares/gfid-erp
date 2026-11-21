@@ -276,7 +276,7 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
 
     public function test_shopee_ad_cost_uses_wallet_mutation_for_kpi_and_daily_fallback(): void
     {
-        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $channel = Channel::create(['code' => 'SHP', 'name' => 'Shopee']);
         $store = Store::create([
             'channel_id' => $channel->id,
             'code' => 'ANALYTICS-SHOPEE-ADS-FALLBACK',
