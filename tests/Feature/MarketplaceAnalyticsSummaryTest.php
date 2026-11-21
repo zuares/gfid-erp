@@ -7,11 +7,13 @@ use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceOrderItem;
 use App\Models\MarketplaceOrderSettlement;
 use App\Models\MarketplaceReturn;
+use App\Models\MarketplaceShopeeWalletTransaction;
 use App\Models\MarketplaceTikTokFinancialTransaction;
 use App\Models\Store;
 use App\Services\Marketplace\MarketplaceFinancialDataQualityService;
 use App\Services\Marketplace\MarketplaceAnalyticsSummaryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class MarketplaceAnalyticsSummaryTest extends TestCase
@@ -270,6 +272,88 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(11000.0, (float) $storeRow['ad_cost_vat']);
         $dailyRow = $summary['daily'][0];
         $this->assertSame(111000.0, (float) $dailyRow['ad_cost']);
+    }
+
+    public function test_shopee_ad_cost_uses_wallet_mutation_for_kpi_and_daily_fallback(): void
+    {
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-SHOPEE-ADS-FALLBACK',
+            'name' => 'Shopee Ads Fallback',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        MarketplaceShopeeWalletTransaction::create([
+            'store_id' => $store->id,
+            'external_transaction_id' => 'SP-ADS-FALLBACK-1',
+            'transaction_type' => '450',
+            'amount' => -111000,
+            'currency' => 'IDR',
+            'money_flow' => 'MONEY_OUT',
+            'transaction_created_at' => '2026-09-17 12:00:00',
+            'source_payload' => [],
+        ]);
+        DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-09-17',
+            'spend' => 222000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'platform' => 'shopee',
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $current = $summary['current'];
+        $storeRow = $summary['stores'][0];
+        $dailyRow = $summary['daily'][0];
+
+        $this->assertSame(111000.0, (float) $current['ad_cost']);
+        $this->assertSame(100000.0, (float) $current['ad_cost_before_tax']);
+        $this->assertSame(11000.0, (float) $current['ad_cost_vat']);
+        $this->assertSame('platform_transaction_fallback', $current['ad_cost_source']);
+        $this->assertSame(111000.0, (float) $storeRow['ad_cost']);
+        $this->assertSame('platform_transaction_fallback', $storeRow['ad_cost_source']);
+        $this->assertSame(111000.0, (float) $dailyRow['ad_cost']);
+    }
+
+    public function test_shopee_ad_cost_does_not_fallback_to_ads_daily_without_wallet_mutation(): void
+    {
+        $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
+        $store = Store::create([
+            'channel_id' => $channel->id,
+            'code' => 'ANALYTICS-SHOPEE-ADS-STRICT',
+            'name' => 'Shopee Ads Strict',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        DB::table('marketplace_ads_dailies')->insert([
+            'store_id' => $store->id,
+            'date' => '2026-09-17',
+            'spend' => 222000,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $summary = app(MarketplaceAnalyticsSummaryService::class)->summary([
+            'platform' => 'shopee',
+            'store_id' => $store->id,
+            'date_from' => '2026-09-17',
+            'date_to' => '2026-09-17',
+            'compare_mode' => 'prev_period',
+        ]);
+
+        $this->assertSame(0.0, (float) $summary['current']['ad_cost']);
+        $this->assertSame('none', $summary['current']['ad_cost_source']);
+        $this->assertSame([], $summary['daily']);
     }
 
     public function test_tiktok_ad_cost_falls_back_to_settlement_ad_cost_when_ads_daily_is_empty(): void
