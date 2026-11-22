@@ -313,6 +313,12 @@
     .m-item-title{ font-weight:900; line-height:1.12; word-break:break-word; }
     .m-item-sub{ font-size:.76rem; color:rgba(100,116,139,1); margin-top:.08rem; word-break:break-word; }
 
+    .so-item-code{ position:relative; display:inline-block; max-width:100%; font-weight:900; cursor:help; outline:none; }
+    .so-item-code::after{ content:attr(data-tooltip); position:absolute; left:0; top:calc(100% + .35rem); z-index:20; width:max-content; max-width:min(280px,70vw); padding:.35rem .5rem; border-radius:7px; background:#0f172a; color:#f8fafc; font-size:.72rem; line-height:1.25; font-weight:700; white-space:normal; box-shadow:0 8px 20px rgba(15,23,42,.18); opacity:0; pointer-events:none; transform:translateY(-2px); transition:opacity .12s ease, transform .12s ease; }
+    .so-item-code:hover::after,.so-item-code:focus-visible::after{ opacity:1; transform:translateY(0); }
+    .badge-auto-zeroed{ display:inline-flex; align-items:center; margin-left:.35rem; padding:.1rem .4rem; border-radius:999px; background:rgba(14,165,233,.14); color:#075985; font-size:.62rem; font-weight:900; white-space:nowrap; }
+    body[data-theme=dark] .badge-auto-zeroed{ background:rgba(56,189,248,.18); color:#bae6fd; }
+
     .m-badges{ margin-top:.30rem; display:flex; flex-wrap:wrap; gap:.30rem; }
     .mini-badge{ display:inline-flex; align-items:center; gap:.28rem; padding:.10rem .42rem; border-radius:999px; font-size:.64rem; font-weight:900; border:1px solid rgba(148,163,184,.22); background:rgba(15,23,42,.02); color:rgba(71,85,105,1); white-space:nowrap; }
     .so-mobile-focus-badge{ color:var(--gf-color-content, #101828); background:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 10%, transparent); border-color:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 30%, transparent); }
@@ -402,7 +408,7 @@
 
                     @if($canMarkReviewed)
                         <form action="{{ route('inventory.stock_opnames.update', $opname) }}" method="POST"
-                              onsubmit="return confirm('Tandai selesai hitung? Pastikan semua Qty Fisik sudah terisi.');"
+                              onsubmit="return confirm('Tandai selesai hitung? Item yang belum diisi akan otomatis menjadi 0 dan diberi tanda Default 0.');"
                               class="d-inline">
                             @csrf
                             @method('PUT')
@@ -725,6 +731,7 @@
                             $system = (float) ($line->system_qty ?? 0);
                             $physical = $line->physical_qty !== null ? (float) $line->physical_qty : null;
                             $counted = (bool) ($line->is_counted ?? false);
+                            $isAutoZeroed = (bool) ($line->is_auto_zeroed ?? false);
 
                             $diff = null;
                             if ($counted && $physical !== null) {
@@ -749,12 +756,18 @@
                         <tr>
                             <td>{{ $i + 1 }}</td>
                             <td>
-                                <div class="fw-semibold">{{ $line->item?->code ?? '-' }}</div>
-                                <div class="meta">{{ $line->item?->name ?? '' }}</div>
+                                <span class="so-item-code" tabindex="0"
+                                    title="{{ $line->item?->name ?? '' }}"
+                                    data-tooltip="{{ $line->item?->name ?? 'Nama item tidak tersedia' }}">
+                                    {{ $line->item?->code ?? '-' }}
+                                </span>
                             </td>
                             <td class="text-end text-mono so-focus-physical-cell">
                                 @if ($physical !== null && $counted)
                                     <span class="so-focus-number">{{ number_format($physical, 2) }}</span>
+                                    @if ($isAutoZeroed)
+                                        <span class="badge-auto-zeroed">Default 0</span>
+                                    @endif
                                 @else
                                     <span class="meta">-</span>
                                 @endif
@@ -831,6 +844,7 @@
                             $system = (float) ($line->system_qty ?? 0);
                             $physical = $line->physical_qty !== null ? (float) $line->physical_qty : null;
                             $counted = (bool) ($line->is_counted ?? false);
+                            $isAutoZeroed = (bool) ($line->is_auto_zeroed ?? false);
 
                             $diff = null;
                             if ($counted && $physical !== null) {
@@ -855,13 +869,17 @@
                         <tr>
                             <td class="text-mono">{{ $i + 1 }}</td>
                             <td>
-                                <div class="m-item-title">{{ $line->item?->code ?? '-' }}</div>
-                                @if ($line->item?->name)
-                                    <div class="m-item-sub">{{ $line->item->name }}</div>
-                                @endif
+                                <span class="m-item-title so-item-code" tabindex="0"
+                                    title="{{ $line->item?->name ?? '' }}"
+                                    data-tooltip="{{ $line->item?->name ?? 'Nama item tidak tersedia' }}">
+                                    {{ $line->item?->code ?? '-' }}
+                                </span>
 
                                 <div class="m-badges">
                                     <span class="mini-badge so-mobile-focus-badge"><span class="k">Fisik</span><span class="v">{{ $physical !== null && $counted ? number_format($physical, 2) : '-' }}</span></span>
+                                    @if ($isAutoZeroed)
+                                        <span class="mini-badge tone-warning"><span class="k">Tanda</span><span class="v">Default 0</span></span>
+                                    @endif
                                     <span class="mini-badge"><span class="k">Stok</span><span class="v">{{ number_format($system, 2) }}</span></span>
                                     <span class="mini-badge {{ $costMissing ? 'tone-danger' : '' }}"><span class="k">HPP</span><span class="v">{{ $costMissing ? '-' : number_format($unitCost, 0, ',', '.') }}</span></span>
                                     <span class="mini-badge"><span class="k">Nilai Fisik</span><span class="v">{{ $physicalValue !== null ? number_format($physicalValue, 0, ',', '.') : '-' }}</span></span>
@@ -1143,6 +1161,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const itemName = escapeHtml(r.item_name);
             const notes = escapeHtml(r.notes);
             const setCostUrl = escapeHtml(r.set_cost_url || '#');
+            const itemLabel = `<span class="so-item-code" tabindex="0" title="${itemName}" data-tooltip="${itemName || 'Nama item tidak tersedia'}">${itemCode}</span>`;
+            const autoZeroBadge = r.is_auto_zeroed ? `<span class="badge-auto-zeroed">Default 0</span>` : '';
 
             const sys = fmt2(r.system_qty);
 
@@ -1182,10 +1202,9 @@ document.addEventListener('DOMContentLoaded', function () {
 <tr>
   <td>${r.no}</td>
   <td>
-    <div class="fw-semibold">${itemCode}</div>
-    <div class="meta">${itemName}</div>
+    ${itemLabel}
   </td>
-  <td class="text-end text-mono so-focus-physical-cell">${fisik === '<span class="meta">-</span>' ? fisik : `<span class="so-focus-number">${fisik}</span>`}</td>
+  <td class="text-end text-mono so-focus-physical-cell">${fisik === '<span class="meta">-</span>' ? fisik : `<span class="so-focus-number">${fisik}</span>${autoZeroBadge}`}</td>
   <td class="text-end text-mono so-focus-diff-cell">${diff === '<span class="meta">-</span>' ? diff : `<span class="so-focus-diff-badge ${tone}">${diff}</span>`}</td>
   <td class="text-end text-mono so-reference-cell">${sys}</td>
   <td class="text-end">${hpp}</td>
@@ -1224,6 +1243,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const unitCost = (r.unit_cost === null || r.unit_cost === undefined) ? null : Number(r.unit_cost);
             const hpp = unitCost && unitCost > 0 ? fmt0abs(unitCost) : '-';
             const physicalValue = (r.physical_value === null || r.physical_value === undefined) ? '-' : fmt0abs(r.physical_value);
+            const itemLabel = `<span class="m-item-title so-item-code" tabindex="0" title="${itemName}" data-tooltip="${itemName || 'Nama item tidak tersedia'}">${itemCode}</span>`;
+            const autoZeroBadge = r.is_auto_zeroed ? `<span class="mini-badge tone-warning"><span class="k">Tanda</span><span class="v">Default 0</span></span>` : '';
             const hppForm = (!unitCost || unitCost <= 0) && canSetUnitCost
                 ? `<form method="POST" action="${setCostUrl}" class="hpp-inline-form mt-2" style="justify-content:flex-start;">
                     <input type="hidden" name="_token" value="${csrf}">
@@ -1242,10 +1263,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <tr>
   <td class="text-mono">${r.no}</td>
   <td>
-    <div class="m-item-title">${itemCode}</div>
-    ${itemName ? `<div class="m-item-sub">${itemName}</div>` : ``}
+    ${itemLabel}
     <div class="m-badges">
       <span class="mini-badge so-mobile-focus-badge"><span class="k">Fisik</span><span class="v">${fisik}</span></span>
+      ${autoZeroBadge}
       <span class="mini-badge"><span class="k">Stok</span><span class="v">${sys}</span></span>
       <span class="mini-badge ${(!unitCost || unitCost <= 0) ? 'tone-danger' : ''}"><span class="k">HPP</span><span class="v">${hpp}</span></span>
       <span class="mini-badge"><span class="k">Nilai Fisik</span><span class="v">${physicalValue}</span></span>

@@ -17,6 +17,7 @@ class StockOpnameLine extends Model
         'physical_qty',
         'difference_qty',
         'is_counted',
+        'is_auto_zeroed',
         'notes',
         'unit_cost', // ⭐ penting untuk mode opening (HPP per item)
     ];
@@ -27,6 +28,7 @@ class StockOpnameLine extends Model
         'difference_qty' => 'decimal:3',
         'unit_cost' => 'decimal:4',
         'is_counted' => 'boolean',
+        'is_auto_zeroed' => 'boolean',
     ];
 
     /**

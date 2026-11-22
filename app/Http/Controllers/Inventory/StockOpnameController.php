@@ -352,6 +352,7 @@ class StockOpnameController extends Controller
                 'system_qty' => $systemQty,
                 'physical_qty' => $physicalQty,
                 'diff_qty' => $diff,
+                'is_auto_zeroed' => (bool) ($line->is_auto_zeroed ?? false),
                 'tone' => $tone,
                 'line_id' => $line->id,
                 'unit_cost' => $unitCost > 0 ? $unitCost : null,
@@ -427,14 +428,13 @@ class StockOpnameController extends Controller
      * Update hasil counting (physical_qty / unit_cost / notes).
      *
      * PERIODIK:
-     * - Baris yang tidak diisi tetap physical_qty = null, is_counted = false.
-     * - Tidak ada auto-fill 0 saat simpan / selesai hitung.
+     * - Simpan biasa mempertahankan baris kosong sebagai belum dihitung.
+     * - Saat menandai selesai, baris kosong otomatis menjadi 0 dan diberi penanda.
      *
      * OPENING:
      * - Baris yang tidak diisi tetap physical_qty = null, is_counted = false.
      *
-     * JUGA dipakai oleh:
-     * - tombol "Simpan & Selesai Hitung" di SHOW (mark_reviewed = 1, tanpa kirim lines).
+     * JUGA dipakai oleh tombol "Simpan & Selesai Hitung" di SHOW.
      */
     public function update(Request $request, StockOpname $stockOpname): RedirectResponse
     {
@@ -490,6 +490,7 @@ class StockOpnameController extends Controller
 
                 if (array_key_exists('physical_qty', $data)) {
                     $systemQty = (float) ($line->system_qty ?? 0);
+                    $wasAutoZeroed = (bool) ($line->is_auto_zeroed ?? false);
 
                     // normalize physical qty
                     $rawPhysical = $data['physical_qty'];
@@ -508,6 +509,10 @@ class StockOpnameController extends Controller
                     $line->physical_qty = $physicalQty;
                     $line->difference_qty = $difference;
                     $line->is_counted = $isCounted;
+                    // Pertahankan penanda saat baris auto-zero dibuka kembali tanpa perubahan.
+                    $line->is_auto_zeroed = $wasAutoZeroed
+                        && $physicalQty !== null
+                        && abs($physicalQty) < 0.0000001;
                 }
 
                 $line->notes = $data['notes'] ?? $line->notes;
@@ -541,6 +546,7 @@ class StockOpnameController extends Controller
                             $line->physical_qty = 0;
                             $line->difference_qty = 0 - (float) ($line->system_qty ?? 0);
                             $line->is_counted = true;
+                            $line->is_auto_zeroed = true;
 
                             if ($line->unit_cost === null || (float) $line->unit_cost <= 0) {
                                 $fallback = $this->resolveMasterUnitCost($line->item);
@@ -723,6 +729,7 @@ class StockOpnameController extends Controller
                 $existingLine->physical_qty = $physicalQty;
                 $existingLine->difference_qty = $difference;
                 $existingLine->is_counted = $isCounted;
+                $existingLine->is_auto_zeroed = false;
                 // Jangan timpa HPP lama dengan NULL; gunakan HPP master sebagai fallback.
                 $existingLine->unit_cost = $unitCost !== null ? (float) $unitCost : $existingLine->unit_cost;
                 $existingLine->notes = $notes ?? $existingLine->notes;
@@ -752,6 +759,7 @@ class StockOpnameController extends Controller
                 $line->physical_qty = $physicalQty;
                 $line->difference_qty = $difference;
                 $line->is_counted = $isCounted;
+                $line->is_auto_zeroed = false;
                 $line->unit_cost = $unitCost;
                 $line->notes = $notes;
                 $line->save();
