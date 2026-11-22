@@ -316,8 +316,9 @@
     .so-item-code{ position:relative; display:inline-block; max-width:100%; font-weight:900; cursor:help; outline:none; }
     .so-item-code::after{ content:attr(data-tooltip); position:absolute; left:0; top:calc(100% + .35rem); z-index:20; width:max-content; max-width:min(280px,70vw); padding:.35rem .5rem; border-radius:7px; background:#0f172a; color:#f8fafc; font-size:.72rem; line-height:1.25; font-weight:700; white-space:normal; box-shadow:0 8px 20px rgba(15,23,42,.18); opacity:0; pointer-events:none; transform:translateY(-2px); transition:opacity .12s ease, transform .12s ease; }
     .so-item-code:hover::after,.so-item-code:focus-visible::after{ opacity:1; transform:translateY(0); }
-    .badge-auto-zeroed{ display:inline-flex; align-items:center; margin-left:.35rem; padding:.1rem .4rem; border-radius:999px; background:rgba(14,165,233,.14); color:#075985; font-size:.62rem; font-weight:900; white-space:nowrap; }
-    body[data-theme=dark] .badge-auto-zeroed{ background:rgba(56,189,248,.18); color:#bae6fd; }
+    .badge-auto-zeroed{ display:inline-flex; align-items:center; gap:.18rem; margin-left:.25rem; padding:.06rem .3rem; border:1px solid color-mix(in srgb, var(--gf-color-accent, #13b8c4) 28%, transparent); border-radius:999px; background:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 10%, transparent); color:var(--gf-color-content, #101828); font-size:.58rem; line-height:1.15; font-weight:800; white-space:nowrap; vertical-align:middle; }
+    .mini-badge.badge-auto-zeroed{ margin-left:0; }
+    body[data-theme=dark] .badge-auto-zeroed{ background:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 18%, transparent); color:#bae6fd; }
 
     .m-badges{ margin-top:.30rem; display:flex; flex-wrap:wrap; gap:.30rem; }
     .mini-badge{ display:inline-flex; align-items:center; gap:.28rem; padding:.10rem .42rem; border-radius:999px; font-size:.64rem; font-weight:900; border:1px solid rgba(148,163,184,.22); background:rgba(15,23,42,.02); color:rgba(71,85,105,1); white-space:nowrap; }
@@ -892,7 +893,7 @@
                                 <div class="m-badges">
                                     <span class="mini-badge so-mobile-focus-badge"><span class="k">Fisik</span><span class="v">{{ $physical !== null && ($counted || $isPendingDefaultZero) ? number_format($physical, 2) : '-' }}</span></span>
                                     @if ($isDefaultZero)
-                                        <span class="mini-badge tone-warning"><span class="k">Tanda</span><span class="v">Default 0</span></span>
+                                        <span class="mini-badge badge-auto-zeroed">Default 0</span>
                                     @endif
                                     <span class="mini-badge"><span class="k">Stok</span><span class="v">{{ number_format($system, 2) }}</span></span>
                                     <span class="mini-badge {{ $costMissing ? 'tone-danger' : '' }}"><span class="k">HPP</span><span class="v">{{ $costMissing ? '-' : number_format($unitCost, 0, ',', '.') }}</span></span>
@@ -1258,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const hpp = unitCost && unitCost > 0 ? fmt0abs(unitCost) : '-';
             const physicalValue = (r.physical_value === null || r.physical_value === undefined) ? '-' : fmt0abs(r.physical_value);
             const itemLabel = `<span class="m-item-title so-item-code" tabindex="0" title="${itemName}" data-tooltip="${itemName || 'Nama item tidak tersedia'}">${itemCode}</span>`;
-            const autoZeroBadge = r.is_default_zero ? `<span class="mini-badge tone-warning"><span class="k">Tanda</span><span class="v">Default 0</span></span>` : '';
+            const autoZeroBadge = r.is_default_zero ? `<span class="mini-badge badge-auto-zeroed">Default 0</span>` : '';
             const hppForm = (!unitCost || unitCost <= 0) && canSetUnitCost
                 ? `<form method="POST" action="${setCostUrl}" class="hpp-inline-form mt-2" style="justify-content:flex-start;">
                     <input type="hidden" name="_token" value="${csrf}">

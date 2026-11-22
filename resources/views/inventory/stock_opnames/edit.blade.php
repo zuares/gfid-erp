@@ -236,13 +236,17 @@
         .badge-auto-zeroed {
             display: inline-flex;
             align-items: center;
-            gap: .35rem;
+            gap: .18rem;
             border-radius: 999px;
-            padding: .1rem .55rem;
-            font-size: .72rem;
+            padding: .06rem .3rem;
+            border: 1px solid color-mix(in srgb, var(--gf-color-accent, #13b8c4) 28%, transparent);
+            font-size: .58rem;
+            line-height: 1.15;
             font-weight: 800;
-            background: rgba(14, 165, 233, .14);
-            color: #075985;
+            background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 10%, transparent);
+            color: var(--gf-color-content, #101828);
+            white-space: nowrap;
+            vertical-align: middle;
         }
 
         .so-item-code {
@@ -284,7 +288,7 @@
         }
 
         body[data-theme="dark"] .badge-auto-zeroed {
-            background: rgba(56, 189, 248, .18);
+            background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 18%, transparent);
             color: #bae6fd;
         }
 
