@@ -2894,13 +2894,11 @@ class MarketplaceAnalyticsSummaryService
     /**
      * Return one authoritative ad-spend fact per store/day.
      *
-     * Shopee wallet mutations are the only advertising source for Shopee
-     * store/days. If a Shopee mutation has not synced yet, keep the cost at
-     * zero instead of substituting Ads Daily/API data.
-     * Ads API facts take precedence for other platforms. Imported income
-     * reports (including TikTok advertising deductions) fill the gap when a
-     * store/day has no positive API spend, matching AdsDashboardService's
-     * source policy.
+     * Ads Daily/API facts take precedence for Shopee and other platforms.
+     * Shopee wallet mutations fill the gap when a store/day has no positive
+     * Ads Daily spend. Imported income reports (including TikTok advertising
+     * deductions) fill the gap when a store/day has no positive API spend,
+     * matching AdsDashboardService's source policy.
      * For TikTok, settlement.ad_cost is the next fallback because Finance
      * already normalizes the actual GMV Max advertising deduction there.
      * TikTok wallet ad mutations are the final fallback on the same store/day
@@ -2978,8 +2976,12 @@ class MarketplaceAnalyticsSummaryService
             $isShopeeStore = isset($shopeeStoreLookup[(int) $storeId]);
             $source = 'ads_api_or_import';
             if ($isShopeeStore) {
-                $spend = $platformSpend > 0 ? $platformSpend : 0;
-                $source = $platformSpend > 0 ? 'platform_transaction_fallback' : 'none';
+                $spend = $apiSpend > 0
+                    ? $apiSpend
+                    : ($importedSpend > 0 ? $importedSpend : $platformSpend);
+                $source = ($apiSpend > 0 || $importedSpend > 0)
+                    ? 'ads_api_or_import'
+                    : ($platformSpend > 0 ? 'platform_transaction_fallback' : 'none');
             } else {
                 $spend = $platformMutationIsPrimary && $platformSpend > 0
                     ? $platformSpend
