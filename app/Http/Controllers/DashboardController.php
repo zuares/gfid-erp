@@ -816,6 +816,8 @@ class DashboardController extends Controller
                             'wip_sew_qty' => $item['wip_sew_qty'] ?? null,
                             'wip_fin_qty' => $item['wip_fin_qty'] ?? null,
                             'wip_pack_qty' => $item['wip_pack_qty'] ?? null,
+                            'sewing_qty' => $item['wip_sew_qty'] ?? null,
+                            'not_sewn_qty' => $item['wip_cut_qty'] ?? null,
                             'mapped' => $internalItemId > 0,
                         ];
                     }

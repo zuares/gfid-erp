@@ -40,6 +40,12 @@
                             'stock_known' => true,
                             'production_stock' => 0,
                             'production_known' => true,
+                            'wip_stock' => 0,
+                            'wip_known' => true,
+                            'sewing' => 0,
+                            'sewing_known' => true,
+                            'not_sewn' => 0,
+                            'not_sewn_known' => true,
                             'gap' => 0,
                         ];
                         $summary['demand'] += (float) ($summaryRow['demand_qty'] ?? 0);
@@ -70,6 +76,18 @@
                             $summary['wip_stock'] = ($summary['wip_stock'] ?? 0) + $wipStock;
                             $summaryWipStock += $wipStock;
                         }
+                        if (($summaryRow['sewing_qty'] ?? null) === null) {
+                            $summary['sewing_known'] = false;
+                        } else {
+                            $sewingQty = (float) $summaryRow['sewing_qty'];
+                            $summary['sewing'] = ($summary['sewing'] ?? 0) + $sewingQty;
+                        }
+                        if (($summaryRow['not_sewn_qty'] ?? null) === null) {
+                            $summary['not_sewn_known'] = false;
+                        } else {
+                            $notSewnQty = (float) $summaryRow['not_sewn_qty'];
+                            $summary['not_sewn'] = ($summary['not_sewn'] ?? 0) + $notSewnQty;
+                        }
                         $categorySummaries[$summaryCategory] = $summary;
                     }
                     $summaryGapState = !$summaryGapKnown ? 'unknown' : ($summaryGap < 0 ? 'short' : 'safe');
@@ -98,6 +116,10 @@
                         <strong>{{ $summaryWipKnown ? $qty($summaryWipStock) . ' pcs' : '—' }}</strong>
                     </div>
                 </div>
+                <div class="ditem-legend" role="note">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    <span><strong>Selisih kurang</strong> = stok tersedia dikurangi permintaan. Angka negatif berarti jumlah yang masih kurang.</span>
+                </div>
                 <table class="ditem-table">
                     <caption class="visually-hidden">{{ $title }}</caption>
                     <thead>
@@ -105,10 +127,12 @@
                             <th scope="col" class="numeric">No</th>
                             <th scope="col">Kode item internal</th>
                             <th scope="col" class="numeric">Permintaan</th>
+                            <th scope="col" class="numeric">Sedang jahit</th>
+                            <th scope="col" class="numeric">Belum jahit</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok Tersedia</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok produksi</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok WIP</th>
-                            <th scope="col" class="numeric">Selisih kurang</th>
+                            <th scope="col" class="numeric" title="Stok tersedia dikurangi permintaan">Selisih kurang</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -120,6 +144,8 @@
                             @php
                                 $category = $row['category'] ?? 'Tanpa kategori';
                                 $demand = (float) ($row['demand_qty'] ?? 0);
+                                $sewingQty = $row['sewing_qty'] ?? null;
+                                $notSewnQty = $row['not_sewn_qty'] ?? null;
                                 $stock = $row['stock_qty'] ?? null;
                                 $productionStock = $row['production_stock_qty'] ?? null;
                                 $wipStock = $row['wip_stock_qty'] ?? null;
@@ -142,6 +168,10 @@
                                         'production_known' => false,
                                         'wip_stock' => 0,
                                         'wip_known' => false,
+                                        'sewing' => 0,
+                                        'sewing_known' => false,
+                                        'not_sewn' => 0,
+                                        'not_sewn_known' => false,
                                         'gap' => 0,
                                     ];
                                     $categoryGap = $categorySummary['stock_known'] ? $categorySummary['gap'] : null;
@@ -153,6 +183,8 @@
                                     <td></td>
                                     <td><span class="ditem-category-name"><i class="bi bi-tag"></i> {{ $category }}</span></td>
                                     <td class="numeric ditem-category-total" title="Total permintaan kategori">{{ $qty($categorySummary['demand']) }} pcs</td>
+                                    <td class="numeric ditem-category-total">{{ $categorySummary['sewing_known'] ? $qty($categorySummary['sewing']) . ' pcs' : '—' }}</td>
+                                    <td class="numeric ditem-category-total">{{ $categorySummary['not_sewn_known'] ? $qty($categorySummary['not_sewn']) . ' pcs' : '—' }}</td>
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
@@ -176,6 +208,14 @@
                                     <div class="ditem-code">{{ $row['code'] ?: 'Belum mapping' }}</div>
                                 </td>
                                 <td class="numeric ditem-demand">{{ $qty($demand) }} pcs</td>
+                                <td class="numeric ditem-sewing {{ $sewingQty !== null && $sewingQty > 0 ? 'has-stock' : '' }}"
+                                    title="Stok WIP-SEW, sedang dikerjakan penjahit">
+                                    {{ $sewingQty === null ? '—' : $qty($sewingQty) . ' pcs' }}
+                                </td>
+                                <td class="numeric ditem-not-sewn {{ $notSewnQty !== null && $notSewnQty > 0 ? 'has-stock' : '' }}"
+                                    title="Stok WIP-CUT, sudah dipotong tetapi belum masuk proses jahit">
+                                    {{ $notSewnQty === null ? '—' : $qty($notSewnQty) . ' pcs' }}
+                                </td>
                                 <td class="numeric ditem-stock ditem-mobile-secondary {{ $short ? 'short' : '' }}">
                                     {{ $stock === null ? '—' : $qty($stock) . ' pcs' }}
                                 </td>
