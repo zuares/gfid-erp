@@ -1516,7 +1516,7 @@
                                             <input type="checkbox" class="form-check-input row-check"
                                                 data-row-index="{{ $idx }}">
                                         @endif
-                                        <span class="small text-muted">{{ $loop->iteration }}</span>
+                                        <span class="small text-muted bundle-row-number">{{ $loop->iteration }}</span>
                                     </div>
                                 </td>
 
@@ -1621,7 +1621,7 @@
                                     <div class="mobile-row-header">
                                         <div class="mobile-row-header-left">
                                             <div class="mobile-row-header-topline">
-                                                <span class="row-index">#{{ $loop->iteration }}</span>
+                                                <span class="row-index bundle-row-number">#{{ $loop->iteration }}</span>
                                                 <span class="item-code mono">
                                                     {{ $b->finishedItem?->code ?? '-' }}
                                                 </span>
@@ -2441,6 +2441,7 @@
             function applyRowVisibility() {
                 const term = normalizeText(searchInput?.value || '');
                 const itemCodeFilter = normalizeText(state.activeItemCode);
+                let visibleIndex = 0;
 
                 rowsArr.forEach(row => {
                     const bundle = normalizeText(row.dataset.bundleCode);
@@ -2461,6 +2462,15 @@
                     }
 
                     row.style.display = visible ? '' : 'none';
+
+                    if (visible) {
+                        visibleIndex++;
+                        row.querySelectorAll('.bundle-row-number').forEach(numberEl => {
+                            numberEl.textContent = numberEl.classList.contains('row-index')
+                                ? `#${visibleIndex}`
+                                : visibleIndex;
+                        });
+                    }
                 });
             }
 
