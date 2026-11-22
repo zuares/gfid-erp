@@ -288,12 +288,36 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         MarketplaceShopeeWalletTransaction::create([
             'store_id' => $store->id,
             'external_transaction_id' => 'SP-ADS-FALLBACK-1',
-            'transaction_type' => '450',
+            'transaction_type' => 'SPM_DEDUCT',
             'amount' => -111000,
             'currency' => 'IDR',
             'money_flow' => 'MONEY_OUT',
             'transaction_created_at' => '2026-09-17 12:00:00',
             'source_payload' => [],
+        ]);
+        DB::table('marketplace_ad_wallet_transactions')->insert([
+            [
+                'store_id' => $store->id,
+                'external_transaction_id' => 'SP-ADS-FALLBACK-1',
+                'transaction_type' => 'SPM_DEDUCT',
+                'amount' => -111000,
+                'money_flow' => 'MONEY_OUT',
+                'transaction_created_at' => '2026-09-17 12:00:00',
+                'source_payload' => json_encode([]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'store_id' => $store->id,
+                'external_transaction_id' => 'SP-ADS-FALLBACK-LEGACY-ONLY',
+                'transaction_type' => 'SPM_DEDUCT',
+                'amount' => -222000,
+                'money_flow' => 'MONEY_OUT',
+                'transaction_created_at' => '2026-09-17 13:00:00',
+                'source_payload' => json_encode([]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ]);
         DB::table('marketplace_ads_dailies')->insert([
             'store_id' => $store->id,
@@ -315,13 +339,13 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $storeRow = $summary['stores'][0];
         $dailyRow = $summary['daily'][0];
 
-        $this->assertSame(111000.0, (float) $current['ad_cost']);
-        $this->assertSame(100000.0, (float) $current['ad_cost_before_tax']);
-        $this->assertSame(11000.0, (float) $current['ad_cost_vat']);
+        $this->assertSame(333000.0, (float) $current['ad_cost']);
+        $this->assertSame(300000.0, (float) $current['ad_cost_before_tax']);
+        $this->assertSame(33000.0, (float) $current['ad_cost_vat']);
         $this->assertSame('platform_transaction_fallback', $current['ad_cost_source']);
-        $this->assertSame(111000.0, (float) $storeRow['ad_cost']);
+        $this->assertSame(333000.0, (float) $storeRow['ad_cost']);
         $this->assertSame('platform_transaction_fallback', $storeRow['ad_cost_source']);
-        $this->assertSame(111000.0, (float) $dailyRow['ad_cost']);
+        $this->assertSame(333000.0, (float) $dailyRow['ad_cost']);
     }
 
     public function test_shopee_ad_cost_does_not_fallback_to_ads_daily_without_wallet_mutation(): void

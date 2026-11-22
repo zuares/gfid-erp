@@ -5,6 +5,7 @@ namespace App\Services\Marketplace;
 use App\Models\MarketplaceOrderSettlement;
 use App\Services\Marketplace\TikTokShop\TikTokWalletAdCostService;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -35,6 +36,9 @@ class MarketplaceAnalyticsSummaryService
         '450',
         'paid_ads_charge',
         'paid-ads-charge',
+        'SPM_DEDUCT',
+        'spm_deduct',
+        'spm-deduct',
     ];
 
     private const SHOPEE_AD_REFUND_TYPES = [
@@ -2805,25 +2809,15 @@ class MarketplaceAnalyticsSummaryService
             return [];
         }
 
-        $preferred = $this->aggregateShopeeAdMutations(
-            'marketplace_shopee_wallet_transactions',
-            $storeIds,
-            $dateFrom,
-            $dateTo,
-        );
-        $legacy = $this->aggregateShopeeAdMutations(
-            'marketplace_ad_wallet_transactions',
+        $spendByStore = $this->aggregateShopeeAdMutations(
             $storeIds,
             $dateFrom,
             $dateTo,
         );
 
         $result = [];
-        foreach ($storeIds as $storeId) {
+        foreach ($spendByStore as $storeId => $spend) {
             $storeId = (int) $storeId;
-            $spend = array_key_exists($storeId, $preferred)
-                ? $preferred[$storeId]
-                : ($legacy[$storeId] ?? 0.0);
             if ((float) $spend > 0) {
                 $result[$storeId] = round((float) $spend, 2);
             }
@@ -2832,22 +2826,9 @@ class MarketplaceAnalyticsSummaryService
         return $result;
     }
 
-    private function aggregateShopeeAdMutations(string $table, array $storeIds, string $dateFrom, string $dateTo): array
+    private function aggregateShopeeAdMutations(array $storeIds, string $dateFrom, string $dateTo): array
     {
-        if (! Schema::hasTable($table)) {
-            return [];
-        }
-
-        $rows = DB::table($table)
-            ->whereIn('store_id', $storeIds)
-            ->whereBetween('transaction_created_at', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])
-            ->where(function ($query): void {
-                $query
-                    ->whereIn('transaction_type', array_merge(self::SHOPEE_AD_CHARGE_TYPES, self::SHOPEE_AD_REFUND_TYPES))
-                    ->orWhereRaw("LOWER(transaction_type) LIKE '%paid%ads%charge%'")
-                    ->orWhereRaw("LOWER(transaction_type) LIKE '%paid%ads%refund%'");
-            })
-            ->get(['store_id', 'transaction_type', 'amount']);
+        $rows = $this->shopeeAdMutationRows($storeIds, $dateFrom, $dateTo);
 
         return $rows
             ->groupBy('store_id')
@@ -2866,6 +2847,51 @@ class MarketplaceAnalyticsSummaryService
     }
 
     /**
+     * Read both Shopee wallet stores and deduplicate by provider transaction
+     * ID. The two sync paths can overlap, while either table can also contain
+     * transactions that the other path has not backfilled yet.
+     *
+     * @return Collection<int, object>
+     */
+    private function shopeeAdMutationRows(array $storeIds, string $dateFrom, string $dateTo): Collection
+    {
+        $rows = collect();
+        foreach (['marketplace_shopee_wallet_transactions', 'marketplace_ad_wallet_transactions'] as $table) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+
+            $tableRows = DB::table($table)
+                ->whereIn('store_id', $storeIds)
+                ->whereBetween('transaction_created_at', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])
+                ->where(function ($query): void {
+                    $query
+                        ->whereIn('transaction_type', array_merge(self::SHOPEE_AD_CHARGE_TYPES, self::SHOPEE_AD_REFUND_TYPES))
+                        ->orWhereRaw("LOWER(transaction_type) LIKE '%paid%ads%charge%'")
+                        ->orWhereRaw("LOWER(transaction_type) LIKE '%paid%ads%refund%'");
+                })
+                ->get(['id', 'store_id', 'external_transaction_id', 'transaction_created_at', 'transaction_type', 'amount']);
+
+            $rows = $rows->concat($tableRows->map(function ($row) use ($table) {
+                $row->source_table = $table;
+
+                return $row;
+            }));
+        }
+
+        return $rows
+            ->unique(function ($row): string {
+                $externalId = trim((string) ($row->external_transaction_id ?? ''));
+                if ($externalId !== '') {
+                    return (int) $row->store_id.'|'.$externalId;
+                }
+
+                return (string) $row->source_table.'|'.(int) $row->id;
+            })
+            ->values();
+    }
+
+    /**
      * Return one authoritative ad-spend fact per store/day.
      *
      * Shopee wallet mutations are the only advertising source for Shopee
@@ -2877,9 +2903,9 @@ class MarketplaceAnalyticsSummaryService
      * source policy.
      * For TikTok, settlement.ad_cost is the next fallback because Finance
      * already normalizes the actual GMV Max advertising deduction there.
-     * TikTok and Shopee wallet ad mutations are the final fallback on the
-     * same store/day grain, so KPI, daily, and store views use one source
-     * policy.
+     * TikTok wallet ad mutations are the final fallback on the same store/day
+     * grain. Shopee wallet mutations are authoritative for Shopee, so KPI,
+     * daily, and store views use the same source policy.
      *
      * @return array<int, array{store_id: int, date: string, spend: float}>
      */
@@ -3066,9 +3092,9 @@ class MarketplaceAnalyticsSummaryService
      * Wallet amounts include tax, so convert the net actual deduction to the
      * before-tax basis used by Ads Daily before adsAggregate adds VAT.
      *
-     * The new Shopee wallet table is preferred per store/day. Legacy rows are
-     * only used for keys that have no row in the new table, preventing a
-     * migration overlap from double-counting the same mutation.
+     * Both Shopee wallet tables are read and deduplicated by provider
+     * transaction ID. This keeps legacy-only rows during the migration while
+     * preventing the same mutation from being counted twice.
      *
      * @return array<int, array{store_id:int,date:string,spend:float}>
      */
@@ -3078,24 +3104,14 @@ class MarketplaceAnalyticsSummaryService
             return [];
         }
 
-        $preferred = $this->aggregateShopeeAdMutationsByDate(
-            'marketplace_shopee_wallet_transactions',
-            $storeIds,
-            $dateFrom,
-            $dateTo,
-        );
-        $legacy = $this->aggregateShopeeAdMutationsByDate(
-            'marketplace_ad_wallet_transactions',
+        $spendByDate = $this->aggregateShopeeAdMutationsByDate(
             $storeIds,
             $dateFrom,
             $dateTo,
         );
 
         $rows = [];
-        foreach (array_unique(array_merge(array_keys($preferred), array_keys($legacy))) as $key) {
-            $actualCost = array_key_exists($key, $preferred)
-                ? (float) $preferred[$key]
-                : (float) ($legacy[$key] ?? 0);
+        foreach ($spendByDate as $key => $actualCost) {
             $spend = round(max($actualCost, 0) / (1 + self::ADS_VAT_RATE), 2);
 
             if ($spend <= 0) {
@@ -3114,22 +3130,9 @@ class MarketplaceAnalyticsSummaryService
         return $rows;
     }
 
-    private function aggregateShopeeAdMutationsByDate(string $table, array $storeIds, string $dateFrom, string $dateTo): array
+    private function aggregateShopeeAdMutationsByDate(array $storeIds, string $dateFrom, string $dateTo): array
     {
-        if (! Schema::hasTable($table)) {
-            return [];
-        }
-
-        $rows = DB::table($table)
-            ->whereIn('store_id', $storeIds)
-            ->whereBetween('transaction_created_at', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])
-            ->where(function ($query): void {
-                $query
-                    ->whereIn('transaction_type', array_merge(self::SHOPEE_AD_CHARGE_TYPES, self::SHOPEE_AD_REFUND_TYPES))
-                    ->orWhereRaw("LOWER(transaction_type) LIKE '%paid%ads%charge%'")
-                    ->orWhereRaw("LOWER(transaction_type) LIKE '%paid%ads%refund%'");
-            })
-            ->get(['store_id', 'transaction_created_at', 'transaction_type', 'amount']);
+        $rows = $this->shopeeAdMutationRows($storeIds, $dateFrom, $dateTo);
 
         return $rows
             ->filter(fn ($row): bool => filled($row->transaction_created_at))
