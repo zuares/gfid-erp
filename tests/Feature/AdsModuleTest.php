@@ -681,6 +681,32 @@ class AdsModuleTest extends TestCase
         $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
 
         $this->assertFalse($service->syncCampaignDailyPerformance($store, '2026-07-30', '2026-07-30', $run));
+
+        $this->assertSame(1, $run->total_requests);
+        $this->assertSame('CPC unavailable', data_get($run->metadata, 'component_errors.CPC.0.message'));
+        $this->assertSame('get_product_campaign_daily_performance', data_get($run->metadata, 'component_errors.CPC.0.endpoint'));
+    }
+
+    public function test_cpc_exception_counts_attempt_and_records_diagnostic(): void
+    {
+        $store = $this->createStore('CPCEXCEPTION');
+        MarketplaceAdCampaign::create([
+            'store_id' => $store->id,
+            'channel_campaign_id' => '12345',
+        ]);
+
+        $api = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsApiService::class)->makePartial();
+        $api->shouldReceive('getCampaignDailyPerformance')
+            ->once()
+            ->andThrow(new \RuntimeException('upstream connection failed'));
+
+        $service = new \App\Services\Marketplace\Ads\ShopeeAdsSyncService($api);
+        $run = MarketplaceAdsSyncRun::create(['store_id' => $store->id, 'sync_type' => 'test']);
+
+        $this->assertFalse($service->syncCampaignDailyPerformance($store, '2026-07-30', '2026-07-30', $run));
+
+        $this->assertSame(1, $run->total_requests);
+        $this->assertSame('upstream connection failed', data_get($run->metadata, 'component_errors.CPC.0.message'));
     }
 
     public function test_gms_api_error_is_reported_to_caller()
@@ -716,7 +742,15 @@ class AdsModuleTest extends TestCase
         $service->shouldReceive('syncBalance')->once();
         $service->shouldReceive('syncCampaignsAndSettings')->once();
         $service->shouldReceive('syncShopDailyPerformance')->once();
-        $service->shouldReceive('syncCampaignDailyPerformance')->once()->andReturn(false);
+        $service->shouldReceive('syncCampaignDailyPerformance')->once()->andReturnUsing(function ($store, $from, $to, $run) {
+            $run->metadata = [
+                'component_errors' => [
+                    'CPC' => [['message' => 'campaign endpoint unavailable']],
+                ],
+            ];
+
+            return false;
+        });
         $service->shouldReceive('syncGmsDailyPerformance')->once()->andReturn(true);
 
         $job = new ShopeeAdsSyncJob($store, Carbon::parse('2026-07-30'), Carbon::parse('2026-07-30'));
@@ -725,6 +759,35 @@ class AdsModuleTest extends TestCase
         $run = MarketplaceAdsSyncRun::latest()->first();
         $this->assertEquals('partial_success', $run->status);
         $this->assertStringContainsString('CPC', $run->error_message);
+        $this->assertStringContainsString('campaign endpoint unavailable', $run->error_message);
+    }
+
+    public function test_sync_counters_survive_cancel_status_checks(): void
+    {
+        $store = $this->createStore('COUNTERS');
+        \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:' . $store->id);
+        \Illuminate\Support\Facades\Cache::forget('marketplace:ads_sync_progress:all');
+
+        $service = \Mockery::mock(\App\Services\Marketplace\Ads\ShopeeAdsSyncService::class);
+        $service->shouldReceive('syncBalance')->once()->andReturnUsing(function ($store, $run) {
+            $run->total_requests++;
+        });
+        $service->shouldReceive('syncCampaignsAndSettings')->once()->andReturnUsing(function ($store, $run) {
+            $run->total_requests++;
+        });
+        $service->shouldReceive('syncShopDailyPerformance')->once()->andReturnUsing(function ($store, $from, $to, $run) {
+            $run->total_requests++;
+            $run->total_updated++;
+        });
+        $service->shouldReceive('syncCampaignDailyPerformance')->once()->andReturn(true);
+        $service->shouldReceive('syncGmsDailyPerformance')->once()->andReturn(true);
+
+        $job = new ShopeeAdsSyncJob($store, Carbon::parse('2026-07-30'), Carbon::parse('2026-07-30'));
+        $job->handle($service);
+
+        $run = MarketplaceAdsSyncRun::latest()->first();
+        $this->assertSame(3, $run->total_requests);
+        $this->assertSame(1, $run->total_updated);
     }
 
     // 13. API error membuat sync run failed

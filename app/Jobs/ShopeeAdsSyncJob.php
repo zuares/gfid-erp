@@ -8,12 +8,13 @@ use App\Services\Marketplace\Ads\ShopeeAdsSyncService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 
-class ShopeeAdsSyncJob implements ShouldQueue
+class ShopeeAdsSyncJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -22,6 +23,7 @@ class ShopeeAdsSyncJob implements ShouldQueue
     // tiap release memakai Retry-After dari Shopee + backoff di bawah.
     public $tries = 10;
     public $backoff = [30, 60, 120, 300, 600];
+    public $uniqueFor = 2100; // Selaras dengan umur lock WithoutOverlapping.
     
     public function __construct(Store $store, Carbon $dateFrom, Carbon $dateTo, bool $isHourly = false, bool $skipMeta = false)
     {
@@ -33,6 +35,22 @@ class ShopeeAdsSyncJob implements ShouldQueue
         $this->skipMeta = $skipMeta;
         // Queue prioritas: jangan antre di belakang ratusan job download resi.
         $this->onQueue('ads');
+    }
+
+    /**
+     * Jangan antrekan sync identik untuk toko dan rentang yang sama.
+     * skipMeta sengaja tidak menjadi bagian key: chunk backfill berbeda
+     * rentang tanggalnya, sedangkan job identik tetap harus dideduplikasi.
+     */
+    public function uniqueId(): string
+    {
+        return implode(':', [
+            'shopee-ads',
+            $this->storeId,
+            $this->dateFrom->toDateString(),
+            $this->dateTo->toDateString(),
+            $this->isHourly ? 'hourly' : 'daily',
+        ]);
     }
 
     public function middleware()
@@ -82,6 +100,10 @@ class ShopeeAdsSyncJob implements ShouldQueue
 
         // Helper: simpan counter database dan perbarui cache progress UI
         $updateUIProgress = function ($percent, $label) use ($run) {
+            // Counter dikumpulkan di object run oleh service. Simpan di setiap
+            // checkpoint agar angka tidak hilang bila job berhenti di tengah.
+            $run->save();
+
             $payload = \Illuminate\Support\Facades\Cache::get('marketplace:ads_sync_progress:' . $this->store->id) ?? [];
             
             $totalJobs = $payload['total_jobs'] ?? 1;
@@ -211,6 +233,23 @@ class ShopeeAdsSyncJob implements ShouldQueue
             $finalMessage = empty($allComponentFailures)
                 ? null
                 : 'Komponen sinkronisasi gagal: ' . implode(', ', $allComponentFailures);
+
+            $componentErrors = is_array($run->metadata)
+                ? data_get($run->metadata, 'component_errors', [])
+                : [];
+            $detailMessages = [];
+            foreach ($allComponentFailures as $component) {
+                foreach ((array) data_get($componentErrors, $component, []) as $detail) {
+                    $message = trim((string) data_get($detail, 'message', ''));
+                    if ($message !== '') {
+                        $detailMessages[] = $component . ': ' . $message;
+                    }
+                }
+            }
+            if ($finalMessage && $detailMessages) {
+                $finalMessage .= ' — ' . implode(' | ', array_unique($detailMessages));
+                $finalMessage = \Illuminate\Support\Str::limit($finalMessage, 1000);
+            }
 
             $run->update([
                 'status' => $finalStatus,
@@ -348,8 +387,11 @@ class ShopeeAdsSyncJob implements ShouldQueue
 
     protected function isRunCancelled(MarketplaceAdsSyncRun $run): bool
     {
-        $run->refresh();
-        if ($run->status !== 'cancelled') {
+        // Jangan refresh() object $run di sini. Service mengumpulkan counter
+        // (requests/rows) di memory dan refresh akan membuang perubahan itu.
+        // Baca status langsung dari DB agar counter tetap utuh.
+        $status = MarketplaceAdsSyncRun::whereKey($run->getKey())->value('status');
+        if ($status !== 'cancelled') {
             return false;
         }
 

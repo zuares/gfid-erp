@@ -25,8 +25,8 @@ class ShopeeAdsSyncService
 
     public function syncBalance(Store $store, MarketplaceAdsSyncRun $run): void
     {
-        $res = $this->api->getAdsTotalBalance($store);
         $run->total_requests++;
+        $res = $this->api->getAdsTotalBalance($store);
         
         if (!empty($res['error'])) {
             throw new \Exception("Gagal mengambil saldo: " . ($res['message'] ?? $res['error']));
@@ -47,8 +47,8 @@ class ShopeeAdsSyncService
         $campaignIds = [];
         
         do {
-            $res = $this->api->getCampaignIdList($store, $pageNo, 100);
             $run->total_requests++;
+            $res = $this->api->getCampaignIdList($store, $pageNo, 100);
             
             if (!empty($res['error'])) {
                 throw new \Exception("Gagal mengambil campaign id list: " . ($res['message'] ?? $res['error']));
@@ -90,8 +90,8 @@ class ShopeeAdsSyncService
             $retry = 0;
             $res = null;
             while ($retry < 3) {
-                $res = $this->api->getCampaignSettingInfo($store, $chunk);
                 $run->total_requests++;
+                $res = $this->api->getCampaignSettingInfo($store, $chunk);
                 
                 if (!empty($res['error']) && $res['error'] === 'error_rate_limit') {
                     Log::warning("[ShopeeAdsSync] Rate limit hit for setting info chunk. Retrying in 2s...");
@@ -225,8 +225,8 @@ class ShopeeAdsSyncService
 
     public function syncShopDailyPerformance(Store $store, string $dateFrom, string $dateTo, MarketplaceAdsSyncRun $run): void
     {
-        $res = $this->api->getAdsShopDailyPerformance($store, Carbon::parse($dateFrom)->format('d-m-Y'), Carbon::parse($dateTo)->format('d-m-Y'));
         $run->total_requests++;
+        $res = $this->api->getAdsShopDailyPerformance($store, Carbon::parse($dateFrom)->format('d-m-Y'), Carbon::parse($dateTo)->format('d-m-Y'));
         
         if (!empty($res['error'])) {
             throw new \Exception("Gagal mengambil shop daily: " . ($res['message'] ?? $res['error']));
@@ -286,20 +286,52 @@ class ShopeeAdsSyncService
         
         foreach ($chunks as $chunk) {
             usleep(250000); // Rate limiter: 0.25 detik
+            $run->total_requests++;
             try {
                 $res = $this->api->getCampaignDailyPerformance($store, $chunk, Carbon::parse($dateFrom)->format('d-m-Y'), Carbon::parse($dateTo)->format('d-m-Y'));
-                $run->total_requests++;
             } catch (\App\Exceptions\ShopeeAdsRateLimitException $e) {
                 throw $e;
             } catch (\Throwable $e) {
                 $hasFailure = true;
-                Log::warning("[ShopeeAdsSync] Exception sync campaign daily: " . $e->getMessage());
+                $message = \Illuminate\Support\Str::limit($e->getMessage(), 500);
+                $this->recordComponentError($run, 'CPC', 'get_product_campaign_daily_performance', $message, [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                    'campaign_count' => count($chunk),
+                ]);
+                Log::warning('[ShopeeAdsSync] Exception sync campaign daily', [
+                    'store_id' => $store->id,
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                    'campaign_count' => count($chunk),
+                    'error' => $e->getMessage(),
+                ]);
                 continue;
             }
             
             if (!empty($res['error'])) {
                 $hasFailure = true;
-                Log::warning("[ShopeeAdsSync] Error sync campaign daily: " . ($res['message'] ?? $res['error']));
+                $message = (string) ($res['message'] ?? $res['error']);
+                $httpStatus = data_get($res, '_meta.http_status');
+                if ($httpStatus !== null) {
+                    $message .= " (HTTP {$httpStatus})";
+                }
+                $this->recordComponentError($run, 'CPC', 'get_product_campaign_daily_performance', $message, [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                    'campaign_count' => count($chunk),
+                    'http_status' => $httpStatus,
+                    'error_code' => $res['error'],
+                ]);
+                Log::warning('[ShopeeAdsSync] Error sync campaign daily', [
+                    'store_id' => $store->id,
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                    'campaign_count' => count($chunk),
+                    'error' => $res['error'],
+                    'message' => $message,
+                    'http_status' => $httpStatus,
+                ]);
                 continue;
             }
             
@@ -346,10 +378,36 @@ class ShopeeAdsSyncService
         return ! $hasFailure;
     }
 
+    /**
+     * Simpan detail kegagalan per komponen tanpa menaruh credential atau raw
+     * response Shopee ke database. Detail ini dipakai oleh sync run dan UI.
+     */
+    private function recordComponentError(
+        MarketplaceAdsSyncRun $run,
+        string $component,
+        string $endpoint,
+        string $message,
+        array $context = []
+    ): void {
+        $metadata = is_array($run->metadata) ? $run->metadata : [];
+        $componentErrors = data_get($metadata, 'component_errors', []);
+        $errors = (array) data_get($componentErrors, $component, []);
+
+        $errors[] = array_merge([
+            'endpoint' => $endpoint,
+            'message' => \Illuminate\Support\Str::limit($message, 500),
+            'at' => now()->toISOString(),
+        ], $context);
+
+        $componentErrors[$component] = array_slice($errors, -10);
+        $metadata['component_errors'] = $componentErrors;
+        $run->metadata = $metadata;
+    }
+
     public function syncShopHourlyPerformance(Store $store, string $date, MarketplaceAdsSyncRun $run): void
     {
-        $res = $this->api->getAdsShopHourlyPerformance($store, Carbon::parse($date)->format('d-m-Y'));
         $run->total_requests++;
+        $res = $this->api->getAdsShopHourlyPerformance($store, Carbon::parse($date)->format('d-m-Y'));
         
         if (!empty($res['error'])) {
             throw new \Exception("Gagal mengambil shop hourly: " . ($res['message'] ?? $res['error']));
@@ -447,8 +505,8 @@ class ShopeeAdsSyncService
             // 1. Campaign Performance (1 API call per day for global GMS)
             try {
                 // campaign_id bersifat opsional untuk mengambil performa GMS tingkat toko.
-                $res = $this->api->getGmsCampaignPerformance($store, null, $dCurrent, $dCurrent);
                 $run->total_requests++;
+                $res = $this->api->getGmsCampaignPerformance($store, null, $dCurrent, $dCurrent);
                 
                 if (!empty($res['error'])) {
                     $hasFailure = true;
@@ -499,8 +557,8 @@ class ShopeeAdsSyncService
             // 2. Item Performance
             usleep(120000);
             try {
-                $resItem = $this->api->getGmsItemPerformance($store, null, $dCurrent, $dCurrent);
                 $run->total_requests++;
+                $resItem = $this->api->getGmsItemPerformance($store, null, $dCurrent, $dCurrent);
                 
                 if (!empty($resItem['error'])) {
                     $hasFailure = true;

@@ -47,7 +47,7 @@
                     <th>Rentang Data</th>
                     <th>Status</th>
                     <th class="text-end">Durasi</th>
-                    <th class="text-end">Req / Baris</th>
+                    <th class="text-end" title="Jumlah request API dan baris performa yang berhasil disimpan">API / Baris Updated</th>
                     <th>Keterangan</th>
                 </tr>
             </thead>
