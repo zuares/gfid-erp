@@ -97,7 +97,8 @@ it('defaults unfilled periodic lines to zero and marks them as automatic', funct
 
     $this->get(route('inventory.stock_opnames.show', $opname))
         ->assertOk()
-        ->assertSee('Default 0');
+        ->assertSee('data-tooltip="Qty fisik otomatis dianggap 0 karena belum diinput."', false)
+        ->assertDontSee('Default 0');
 });
 
 it('shows an unfilled periodic line as zero with its calculated difference', function () {
@@ -145,5 +146,6 @@ it('shows an unfilled periodic line as zero with its calculated difference', fun
     $response->assertOk()
         ->assertSee('0.00')
         ->assertSee('-3.00')
-        ->assertSee('Default 0');
+        ->assertSee('data-tooltip="Qty fisik otomatis dianggap 0 karena belum diinput."', false)
+        ->assertDontSee('Default 0');
 });

@@ -233,20 +233,41 @@
             color: #854d0e;
         }
 
-        .badge-auto-zeroed {
-            display: inline-flex;
-            align-items: center;
-            gap: .18rem;
-            border-radius: 999px;
-            padding: .06rem .3rem;
-            border: 1px solid color-mix(in srgb, var(--gf-color-accent, #13b8c4) 28%, transparent);
-            font-size: .58rem;
-            line-height: 1.15;
-            font-weight: 800;
+        .so-default-zero-target {
+            position: relative;
+            cursor: help;
+            outline: none;
             background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 10%, transparent);
-            color: var(--gf-color-content, #101828);
-            white-space: nowrap;
-            vertical-align: middle;
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gf-color-accent, #13b8c4) 28%, transparent);
+        }
+
+        .so-default-zero-target::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 0;
+            top: calc(100% + .35rem);
+            z-index: 30;
+            width: max-content;
+            max-width: min(280px, 70vw);
+            padding: .35rem .5rem;
+            border-radius: 7px;
+            background: #0f172a;
+            color: #f8fafc;
+            font-size: .72rem;
+            line-height: 1.25;
+            font-weight: 700;
+            white-space: normal;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, .18);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-2px);
+            transition: opacity .12s ease, transform .12s ease;
+        }
+
+        .so-default-zero-target:hover::after,
+        .so-default-zero-target:focus-visible::after {
+            opacity: 1;
+            transform: translateY(0);
         }
 
         .so-item-code {
@@ -287,9 +308,8 @@
             transform: translateY(0);
         }
 
-        body[data-theme="dark"] .badge-auto-zeroed {
+        body[data-theme="dark"] .so-default-zero-target {
             background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 18%, transparent);
-            color: #bae6fd;
         }
 
         .mobile-stack {
@@ -1175,6 +1195,8 @@
                                                 $rowClasses = [];
                                                 $showNotCountedBadge = false;
                                                 $isAutoZeroed = (bool) ($line->is_auto_zeroed ?? false);
+                                                $isPendingDefaultZero = !$isOpening && !$hasPhysicalValue;
+                                                $isDefaultZero = $isPendingDefaultZero || $isAutoZeroed;
 
                                                 // ✅ opening & periodic: kalau belum input physical -> not counted
                                                 if (!$hasPhysicalValue) {
@@ -1204,13 +1226,8 @@
                                                     @if ($showNotCountedBadge)
                                                         <div class="d-md-none mt-1">
                                                             <span class="badge-not-counted">
-                                                                {{ $isOpening ? 'Belum dihitung' : 'Default 0 saat selesai' }}
+                                                                {{ $isOpening ? 'Belum dihitung' : 'Belum diinput' }}
                                                             </span>
-                                                        </div>
-                                                    @endif
-                                                    @if ($isAutoZeroed)
-                                                        <div class="d-md-none mt-1">
-                                                            <span class="badge-auto-zeroed">Default 0</span>
                                                         </div>
                                                     @endif
                                                 </td>
@@ -1222,7 +1239,13 @@
                                                 @endunless
 
                                                 {{-- ✅ Qty Fisik --}}
-                                                <td class="text-end col-physical" style="min-width:100px;">
+                                                <td class="text-end col-physical {{ $isDefaultZero ? 'so-default-zero-target' : '' }}"
+                                                    style="min-width:100px;"
+                                                    @if ($isDefaultZero)
+                                                        tabindex="0"
+                                                        data-tooltip="Qty fisik otomatis dianggap 0 karena belum diinput."
+                                                        aria-label="Qty fisik otomatis dianggap 0 karena belum diinput"
+                                                    @endif>
                                                     <span class="pill-label so-mobile-field-label d-md-none">Qty Fisik</span>
                                                     @if ($canModifyLines)
                                                         {{-- OPENING + PERIODIC: inline input --}}
@@ -1236,15 +1259,9 @@
                                                             data-original="{{ $hasPhysicalValue ? (float)$rawPhysical : '' }}"
                                                             data-unit-cost="{{ $effectiveUnitCost !== null ? $effectiveUnitCost : '' }}"
                                                             data-line-id="{{ $line->id }}">
-                                                        @if ($isAutoZeroed)
-                                                            <div class="mt-1"><span class="badge-auto-zeroed">Default 0</span></div>
-                                                        @endif
                                                     @elseif ($isOpening)
                                                         @if ($hasPhysicalForDisplay)
                                                             <span class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
-                                                            @if ($isAutoZeroed)
-                                                                <span class="badge-auto-zeroed">Default 0</span>
-                                                            @endif
                                                             <input type="hidden"
                                                                 name="{{ $inputNamePrefix }}[physical_qty]"
                                                                 value="{{ $rawPhysical }}">
@@ -1255,9 +1272,6 @@
                                                         {{-- READ-ONLY (reviewed/finalized) --}}
                                                         @if ($hasPhysicalForDisplay)
                                                             <span class="text-mono">{{ number_format($rawPhysical, 2) }}</span>
-                                                            @if ($isAutoZeroed)
-                                                                <span class="badge-auto-zeroed">Default 0</span>
-                                                            @endif
                                                         @else
                                                             <span class="meta">-</span>
                                                         @endif
@@ -1345,7 +1359,7 @@
                                     @if ($isOpening)
                                         Mode Opening • Tambah / edit item di atas, lalu simpan di sini.
                                     @else
-                                        Mode Periodik • Isi Qty Fisik untuk item yang dihitung. Item yang kosong saat selesai otomatis menjadi 0 dan diberi tanda Default 0.
+                                        Mode Periodik • Isi Qty Fisik untuk item yang dihitung. Item yang kosong saat selesai otomatis dianggap 0.
                                     @endif
                                 </div>
 
@@ -1473,7 +1487,7 @@
                 });
             }
 
-            // tombol finish: backend mengubah baris kosong menjadi 0 dan menyimpannya sebagai Default 0
+            // tombol finish: backend mengubah baris kosong menjadi 0 dan menyimpannya sebagai default nol
             if (soForm && markReviewedEl) {
                 const strictBtn = document.querySelector('[data-action="finish-counting-strict"]');
                 if (strictBtn) {
