@@ -66,6 +66,7 @@ class DashboardUnshippedItemColumnsTest extends TestCase
             ->assertOk()
             ->assertSee('Sedang jahit')
             ->assertSee('Belum jahit')
+            ->assertSee('Stok RTS')
             ->assertSee('DASH-SEWING-ITEM')
             ->assertSee('3 pcs')
             ->assertSee('5 pcs');

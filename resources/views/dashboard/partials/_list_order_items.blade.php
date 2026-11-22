@@ -125,7 +125,7 @@
                 </div>
                 <div class="ditem-legend" role="note">
                     <i class="bi bi-info-circle" aria-hidden="true"></i>
-                    <span><strong>Selisih kurang</strong> = (stok tersedia + stok produksi) dikurangi permintaan. Angka negatif berarti jumlah yang masih kurang.</span>
+                    <span><strong>Selisih kurang</strong> = (stok RTS + stok produksi) dikurangi permintaan. Angka negatif berarti jumlah yang masih kurang.</span>
                 </div>
                 <table class="ditem-table">
                     <caption class="visually-hidden">{{ $title }}</caption>
@@ -134,12 +134,12 @@
                             <th scope="col" class="numeric">No</th>
                             <th scope="col">Kode item internal</th>
                             <th scope="col" class="numeric">Permintaan</th>
-                            <th scope="col" class="numeric ditem-mobile-secondary">Stok Tersedia</th>
+                            <th scope="col" class="numeric ditem-mobile-secondary">Stok RTS</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok produksi</th>
                             <th scope="col" class="numeric">Belum jahit</th>
                             <th scope="col" class="numeric">Sedang jahit</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok WIP</th>
-                            <th scope="col" class="numeric" title="(Stok tersedia + stok produksi) dikurangi permintaan">Selisih kurang</th>
+                            <th scope="col" class="numeric" title="(Stok RTS + stok produksi) dikurangi permintaan">Selisih kurang</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -198,7 +198,7 @@
                                     <td class="numeric ditem-category-total">{{ $categorySummary['sewing_known'] ? $qty($categorySummary['sewing']) . ' pcs' : '—' }}</td>
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="numeric ditem-gap ditem-category-total">
-                                        <span class="ditem-category-gap-value {{ $categoryGapState }}" title="(Stok tersedia + stok produksi) dikurangi permintaan kategori">
+                                        <span class="ditem-category-gap-value {{ $categoryGapState }}" title="(Stok RTS + stok produksi) dikurangi permintaan kategori">
                                             {{ $categoryGap === null ? '—' : $qty($categoryGap) }}
                                         </span>
                                     </td>
