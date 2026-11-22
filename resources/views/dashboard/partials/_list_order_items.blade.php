@@ -49,24 +49,29 @@
                             'gap' => 0,
                         ];
                         $summary['demand'] += (float) ($summaryRow['demand_qty'] ?? 0);
-                        if (($summaryRow['stock_qty'] ?? null) === null) {
+                        $rowStock = $summaryRow['stock_qty'] ?? null;
+                        $rowProductionStock = $summaryRow['production_stock_qty'] ?? null;
+                        $rowDemand = (float) ($summaryRow['demand_qty'] ?? 0);
+                        if ($rowStock === null) {
                             $summary['stock_known'] = false;
                             $summaryGapKnown = false;
                         } else {
-                            $rowStock = (float) $summaryRow['stock_qty'];
-                            $rowDemand = (float) ($summaryRow['demand_qty'] ?? 0);
-                            $rowGap = min(0, $rowStock - $rowDemand);
-                            $summary['stock'] += $rowStock;
-                            $summary['gap'] += $rowGap;
-                            $summaryGap += $rowGap;
+                            $summary['stock'] += (float) $rowStock;
                         }
-                        if (($summaryRow['production_stock_qty'] ?? null) === null) {
+                        if ($rowProductionStock === null) {
                             $summary['production_known'] = false;
                             $summaryProductionKnown = false;
+                            $summary['stock_known'] = false;
+                            $summaryGapKnown = false;
                         } else {
-                            $productionStock = (float) $summaryRow['production_stock_qty'];
+                            $productionStock = (float) $rowProductionStock;
                             $summary['production_stock'] += $productionStock;
                             $summaryProductionStock += $productionStock;
+                        }
+                        if ($rowStock !== null && $rowProductionStock !== null) {
+                            $rowGap = min(0, (float) $rowStock + (float) $rowProductionStock - $rowDemand);
+                            $summary['gap'] += $rowGap;
+                            $summaryGap += $rowGap;
                         }
                         if (($summaryRow['wip_stock_qty'] ?? null) === null) {
                             $summary['wip_known'] = false;
@@ -120,7 +125,7 @@
                 </div>
                 <div class="ditem-legend" role="note">
                     <i class="bi bi-info-circle" aria-hidden="true"></i>
-                    <span><strong>Selisih kurang</strong> = stok tersedia dikurangi permintaan. Angka negatif berarti jumlah yang masih kurang.</span>
+                    <span><strong>Selisih kurang</strong> = (stok tersedia + stok produksi) dikurangi permintaan. Angka negatif berarti jumlah yang masih kurang.</span>
                 </div>
                 <table class="ditem-table">
                     <caption class="visually-hidden">{{ $title }}</caption>
@@ -129,12 +134,12 @@
                             <th scope="col" class="numeric">No</th>
                             <th scope="col">Kode item internal</th>
                             <th scope="col" class="numeric">Permintaan</th>
-                            <th scope="col" class="numeric">Sedang jahit</th>
-                            <th scope="col" class="numeric">Belum jahit</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok Tersedia</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok produksi</th>
+                            <th scope="col" class="numeric">Belum jahit</th>
+                            <th scope="col" class="numeric">Sedang jahit</th>
                             <th scope="col" class="numeric ditem-mobile-secondary">Stok WIP</th>
-                            <th scope="col" class="numeric" title="Stok tersedia dikurangi permintaan">Selisih kurang</th>
+                            <th scope="col" class="numeric" title="(Stok tersedia + stok produksi) dikurangi permintaan">Selisih kurang</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -157,8 +162,10 @@
                                     'FIN' => $row['wip_fin_qty'] ?? null,
                                     'PACK' => $row['wip_pack_qty'] ?? null,
                                 ];
-                                $short = $stock !== null && $stock < $demand;
-                                $gap = $stock === null ? null : $stock - $demand;
+                                $gap = ($stock === null || $productionStock === null)
+                                    ? null
+                                    : $stock + $productionStock - $demand;
+                                $short = $gap !== null && $gap < 0;
                             @endphp
                             @if($category !== $lastCategory)
                                 @php
@@ -185,13 +192,13 @@
                                     <td></td>
                                     <td><span class="ditem-category-name"><i class="bi bi-tag"></i> {{ $category }}</span></td>
                                     <td class="numeric ditem-category-total" title="Total permintaan kategori">{{ $qty($categorySummary['demand']) }} pcs</td>
-                                    <td class="numeric ditem-category-total">{{ $categorySummary['sewing_known'] ? $qty($categorySummary['sewing']) . ' pcs' : '—' }}</td>
+                                    <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
+                                    <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="numeric ditem-category-total">{{ $categorySummary['not_sewn_known'] ? $qty($categorySummary['not_sewn']) . ' pcs' : '—' }}</td>
-                                    <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
-                                    <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
+                                    <td class="numeric ditem-category-total">{{ $categorySummary['sewing_known'] ? $qty($categorySummary['sewing']) . ' pcs' : '—' }}</td>
                                     <td class="ditem-category-empty ditem-mobile-secondary" aria-hidden="true"></td>
                                     <td class="numeric ditem-gap ditem-category-total">
-                                        <span class="ditem-category-gap-value {{ $categoryGapState }}" title="Selisih stok tersedia dikurangi permintaan kategori">
+                                        <span class="ditem-category-gap-value {{ $categoryGapState }}" title="(Stok tersedia + stok produksi) dikurangi permintaan kategori">
                                             {{ $categoryGap === null ? '—' : $qty($categoryGap) }}
                                         </span>
                                     </td>
@@ -210,14 +217,6 @@
                                     <div class="ditem-code">{{ $row['code'] ?: 'Belum mapping' }}</div>
                                 </td>
                                 <td class="numeric ditem-demand">{{ $qty($demand) }} pcs</td>
-                                <td class="numeric ditem-sewing {{ $sewingQty !== null && $sewingQty > 0 ? 'has-stock' : '' }}"
-                                    title="Stok WIP-SEW, sedang dikerjakan penjahit">
-                                    {{ $sewingQty === null ? '—' : $qty($sewingQty) . ' pcs' }}
-                                </td>
-                                <td class="numeric ditem-not-sewn {{ $notSewnQty !== null && $notSewnQty > 0 ? 'has-stock' : '' }}"
-                                    title="Stok WIP-CUT, sudah dipotong tetapi belum masuk proses jahit">
-                                    {{ $notSewnQty === null ? '—' : $qty($notSewnQty) . ' pcs' }}
-                                </td>
                                 <td class="numeric ditem-stock ditem-mobile-secondary {{ $short ? 'short' : '' }}">
                                     {{ $stock === null ? '—' : $qty($stock) . ' pcs' }}
                                 </td>
@@ -232,6 +231,14 @@
                                     @else
                                         0 pcs
                                     @endif
+                                </td>
+                                <td class="numeric ditem-not-sewn {{ $notSewnQty !== null && $notSewnQty > 0 ? 'has-stock' : '' }}"
+                                    title="Stok WIP-CUT, sudah dipotong tetapi belum masuk proses jahit">
+                                    {{ $notSewnQty === null ? '—' : $qty($notSewnQty) . ' pcs' }}
+                                </td>
+                                <td class="numeric ditem-sewing {{ $sewingQty !== null && $sewingQty > 0 ? 'has-stock' : '' }}"
+                                    title="Stok WIP-SEW, sedang dikerjakan penjahit">
+                                    {{ $sewingQty === null ? '—' : $qty($sewingQty) . ' pcs' }}
                                 </td>
                                 <td class="numeric ditem-production-stock ditem-mobile-secondary {{ $wipStock !== null && $wipStock > 0 ? 'has-stock' : '' }}">
                                     @if($wipStock === null)

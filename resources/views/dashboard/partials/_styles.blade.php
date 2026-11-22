@@ -377,8 +377,8 @@
         .ditem-table th:nth-child(1), .ditem-table td:nth-child(1) { width: 7%; }
         .ditem-table th:nth-child(2), .ditem-table td:nth-child(2) { width: 34%; }
         .ditem-table th:nth-child(3), .ditem-table td:nth-child(3) { width: 17%; }
-        .ditem-table th:nth-child(4), .ditem-table td:nth-child(4) { width: 14%; }
-        .ditem-table th:nth-child(5), .ditem-table td:nth-child(5) { width: 14%; }
+        .ditem-table th:nth-child(6), .ditem-table td:nth-child(6) { width: 14%; }
+        .ditem-table th:nth-child(7), .ditem-table td:nth-child(7) { width: 14%; }
         .ditem-table th:nth-child(9), .ditem-table td:nth-child(9) { width: 14%; }
         .ditem-table .ditem-number { width: 24px; }
         .ditem-code { font-size: .68rem; overflow-wrap: anywhere; }

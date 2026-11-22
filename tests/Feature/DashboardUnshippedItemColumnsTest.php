@@ -79,8 +79,8 @@ class DashboardUnshippedItemColumnsTest extends TestCase
                 'category' => 'Celana',
                 'code' => 'CACHE-WIP-ITEM',
                 'demand_qty' => 12,
-                'stock_qty' => 0,
-                'production_stock_qty' => 0,
+                'stock_qty' => 2,
+                'production_stock_qty' => 5,
                 'wip_stock_qty' => 8,
                 'wip_cut_qty' => 5,
                 'wip_sew_qty' => 3,
@@ -91,6 +91,7 @@ class DashboardUnshippedItemColumnsTest extends TestCase
 
         $this->assertStringContainsString('3 pcs', $html);
         $this->assertStringContainsString('5 pcs', $html);
+        $this->assertStringContainsString('-5', $html);
         $this->assertStringContainsString('Selisih kurang', $html);
     }
 }
