@@ -295,11 +295,17 @@ class StockOpnameController extends Controller
             $physicalQty = $line->physical_qty !== null ? (float) $line->physical_qty : null;
 
             $isCounted = (bool) ($line->is_counted ?? false);
+            $isPendingDefaultZero = $stockOpname->isPeriodic()
+                && ! $isCounted
+                && $physicalQty === null;
+            $displayPhysicalQty = $isPendingDefaultZero ? 0.0 : $physicalQty;
 
-            // diff hanya meaningful kalau counted & physical ada
+            // Item periodik yang belum diinput ditampilkan sebagai default 0.
             $diff = null;
             if ($isCounted && $physicalQty !== null) {
                 $diff = (float) ($line->difference_qty ?? ($physicalQty - $systemQty));
+            } elseif ($isPendingDefaultZero) {
+                $diff = 0.0 - $systemQty;
             }
 
             // cost untuk nilai: line.unit_cost -> fallback item.hpp
@@ -318,11 +324,13 @@ class StockOpnameController extends Controller
             }
 
             $lineSystemValue = $unitCost > 0 ? $systemQty * $unitCost : null;
-            $linePhysicalValue = ($physicalQty !== null && $unitCost > 0) ? $physicalQty * $unitCost : null;
+            $linePhysicalValue = ($displayPhysicalQty !== null && $unitCost > 0)
+                ? $displayPhysicalQty * $unitCost
+                : null;
 
             if ($unitCost > 0) {
                 $systemValue += (float) ($lineSystemValue ?? 0);
-                if ($physicalQty !== null) {
+                if ($displayPhysicalQty !== null) {
                     $physicalValue += (float) ($linePhysicalValue ?? 0);
                 }
             } else {
@@ -350,9 +358,10 @@ class StockOpnameController extends Controller
                 'item_code' => $itemCode,
                 'item_name' => $itemName,
                 'system_qty' => $systemQty,
-                'physical_qty' => $physicalQty,
+                'physical_qty' => $displayPhysicalQty,
                 'diff_qty' => $diff,
                 'is_auto_zeroed' => (bool) ($line->is_auto_zeroed ?? false),
+                'is_default_zero' => $isPendingDefaultZero || (bool) ($line->is_auto_zeroed ?? false),
                 'tone' => $tone,
                 'line_id' => $line->id,
                 'unit_cost' => $unitCost > 0 ? $unitCost : null,

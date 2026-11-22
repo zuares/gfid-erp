@@ -732,10 +732,17 @@
                             $physical = $line->physical_qty !== null ? (float) $line->physical_qty : null;
                             $counted = (bool) ($line->is_counted ?? false);
                             $isAutoZeroed = (bool) ($line->is_auto_zeroed ?? false);
+                            $isPendingDefaultZero = $opname->isPeriodic() && !$counted && $physical === null;
+                            $isDefaultZero = $isPendingDefaultZero || $isAutoZeroed;
+                            if ($isPendingDefaultZero) {
+                                $physical = 0.0;
+                            }
 
                             $diff = null;
                             if ($counted && $physical !== null) {
                                 $diff = (float) ($line->difference_qty ?? ($physical - $system));
+                            } elseif ($isPendingDefaultZero) {
+                                $diff = 0.0 - $system;
                             }
 
                             $tone = '';
@@ -763,9 +770,9 @@
                                 </span>
                             </td>
                             <td class="text-end text-mono so-focus-physical-cell">
-                                @if ($physical !== null && $counted)
+                                @if ($physical !== null && ($counted || $isPendingDefaultZero))
                                     <span class="so-focus-number">{{ number_format($physical, 2) }}</span>
-                                    @if ($isAutoZeroed)
+                                    @if ($isDefaultZero)
                                         <span class="badge-auto-zeroed">Default 0</span>
                                     @endif
                                 @else
@@ -845,10 +852,17 @@
                             $physical = $line->physical_qty !== null ? (float) $line->physical_qty : null;
                             $counted = (bool) ($line->is_counted ?? false);
                             $isAutoZeroed = (bool) ($line->is_auto_zeroed ?? false);
+                            $isPendingDefaultZero = $opname->isPeriodic() && !$counted && $physical === null;
+                            $isDefaultZero = $isPendingDefaultZero || $isAutoZeroed;
+                            if ($isPendingDefaultZero) {
+                                $physical = 0.0;
+                            }
 
                             $diff = null;
                             if ($counted && $physical !== null) {
                                 $diff = (float) ($line->difference_qty ?? ($physical - $system));
+                            } elseif ($isPendingDefaultZero) {
+                                $diff = 0.0 - $system;
                             }
 
                             $tone = 'tone-success';
@@ -876,8 +890,8 @@
                                 </span>
 
                                 <div class="m-badges">
-                                    <span class="mini-badge so-mobile-focus-badge"><span class="k">Fisik</span><span class="v">{{ $physical !== null && $counted ? number_format($physical, 2) : '-' }}</span></span>
-                                    @if ($isAutoZeroed)
+                                    <span class="mini-badge so-mobile-focus-badge"><span class="k">Fisik</span><span class="v">{{ $physical !== null && ($counted || $isPendingDefaultZero) ? number_format($physical, 2) : '-' }}</span></span>
+                                    @if ($isDefaultZero)
                                         <span class="mini-badge tone-warning"><span class="k">Tanda</span><span class="v">Default 0</span></span>
                                     @endif
                                     <span class="mini-badge"><span class="k">Stok</span><span class="v">{{ number_format($system, 2) }}</span></span>
@@ -1162,7 +1176,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const notes = escapeHtml(r.notes);
             const setCostUrl = escapeHtml(r.set_cost_url || '#');
             const itemLabel = `<span class="so-item-code" tabindex="0" title="${itemName}" data-tooltip="${itemName || 'Nama item tidak tersedia'}">${itemCode}</span>`;
-            const autoZeroBadge = r.is_auto_zeroed ? `<span class="badge-auto-zeroed">Default 0</span>` : '';
+            const autoZeroBadge = r.is_default_zero ? `<span class="badge-auto-zeroed">Default 0</span>` : '';
 
             const sys = fmt2(r.system_qty);
 
@@ -1244,7 +1258,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const hpp = unitCost && unitCost > 0 ? fmt0abs(unitCost) : '-';
             const physicalValue = (r.physical_value === null || r.physical_value === undefined) ? '-' : fmt0abs(r.physical_value);
             const itemLabel = `<span class="m-item-title so-item-code" tabindex="0" title="${itemName}" data-tooltip="${itemName || 'Nama item tidak tersedia'}">${itemCode}</span>`;
-            const autoZeroBadge = r.is_auto_zeroed ? `<span class="mini-badge tone-warning"><span class="k">Tanda</span><span class="v">Default 0</span></span>` : '';
+            const autoZeroBadge = r.is_default_zero ? `<span class="mini-badge tone-warning"><span class="k">Tanda</span><span class="v">Default 0</span></span>` : '';
             const hppForm = (!unitCost || unitCost <= 0) && canSetUnitCost
                 ? `<form method="POST" action="${setCostUrl}" class="hpp-inline-form mt-2" style="justify-content:flex-start;">
                     <input type="hidden" name="_token" value="${csrf}">

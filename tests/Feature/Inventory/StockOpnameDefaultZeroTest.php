@@ -99,3 +99,51 @@ it('defaults unfilled periodic lines to zero and marks them as automatic', funct
         ->assertOk()
         ->assertSee('Default 0');
 });
+
+it('shows an unfilled periodic line as zero with its calculated difference', function () {
+    $user = User::factory()->create([
+        'employee_code' => 'SO-DISPLAY-ZERO',
+        'role' => 'owner',
+    ]);
+    $warehouse = Warehouse::create([
+        'code' => 'SO-DISPLAY-WH',
+        'name' => 'Display zero warehouse',
+        'type' => 'internal',
+        'active' => true,
+    ]);
+    $item = Item::create([
+        'code' => 'SO-DISPLAY-EMPTY',
+        'name' => 'Display empty item',
+        'unit' => 'pcs',
+        'type' => 'material',
+        'hpp' => 65_000,
+        'active' => true,
+    ]);
+    $opname = StockOpname::create([
+        'code' => 'SO-DISPLAY-ZERO-TEST',
+        'date' => now()->toDateString(),
+        'snapshot_at' => now(),
+        'warehouse_id' => $warehouse->id,
+        'type' => StockOpname::TYPE_PERIODIC,
+        'status' => StockOpname::STATUS_COUNTING,
+        'created_by' => $user->id,
+    ]);
+    StockOpnameLine::create([
+        'stock_opname_id' => $opname->id,
+        'item_id' => $item->id,
+        'system_qty' => 3,
+        'physical_qty' => null,
+        'difference_qty' => 0,
+        'is_counted' => false,
+        'is_auto_zeroed' => false,
+        'unit_cost' => 65_000,
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('inventory.stock_opnames.show', $opname));
+
+    $response->assertOk()
+        ->assertSee('0.00')
+        ->assertSee('-3.00')
+        ->assertSee('Default 0');
+});
