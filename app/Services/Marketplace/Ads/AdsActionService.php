@@ -12,18 +12,65 @@ class AdsActionService
 {
     public function realtimeStatus(Store $store, ShopeeAdsApiService $adsApi): array
     {
-        $balance = $adsApi->getAdsTotalBalance($store);
-        $toggleInfo = $adsApi->getAdsShopToggleInfo($store);
-        $facilRate = $adsApi->getAdsFacilShopRate($store);
+        $errors = [];
+        $balance = $this->readRealtimeEndpoint(
+            'balance',
+            fn () => $adsApi->getAdsTotalBalance($store),
+            $errors,
+        );
+        $toggleInfo = $this->readRealtimeEndpoint(
+            'toggle_info',
+            fn () => $adsApi->getAdsShopToggleInfo($store),
+            $errors,
+        );
+
+        // Ads Facil is optional and is not rendered by the dashboard. Shopee
+        // rejects this endpoint for the current app type with a permission
+        // error, so it must not be part of the realtime critical path.
+        $hasData = $balance !== [] || $toggleInfo !== [];
+        $status = empty($errors)
+            ? 'success'
+            : ($hasData ? 'partial' : 'error');
 
         return [
-            'status' => 'success',
+            'status' => $status,
+            'message' => empty($errors)
+                ? null
+                : 'Sebagian informasi real-time tidak tersedia saat ini.',
+            'errors' => array_keys($errors),
             'data' => [
-                'balance' => $balance['response'] ?? [],
-                'toggle_info' => $toggleInfo['response'] ?? [],
-                'facil_rate' => $facilRate['response'] ?? [],
+                'balance' => $balance,
+                'toggle_info' => $toggleInfo,
+                'facil_rate' => [],
             ],
         ];
+    }
+
+    /**
+     * Read one realtime endpoint without making the other cards fail when
+     * Shopee returns a permission, rate-limit, or transient error.
+     */
+    protected function readRealtimeEndpoint(string $name, callable $call, array &$errors): array
+    {
+        try {
+            $payload = $call();
+
+            if (! empty($payload['error'])) {
+                $errors[$name] = true;
+                return [];
+            }
+
+            $response = $payload['response'] ?? [];
+            if (! is_array($response)) {
+                $errors[$name] = true;
+                return [];
+            }
+
+            return $response;
+        } catch (\Throwable) {
+            $errors[$name] = true;
+            return [];
+        }
     }
 
     public function actionGmsItem(

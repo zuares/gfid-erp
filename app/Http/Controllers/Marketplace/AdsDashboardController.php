@@ -523,18 +523,34 @@ class AdsDashboardController extends Controller
             try {
                 $totalBalance = 0;
                 $autoTopUp = false;
+                $hasData = false;
+                $errors = [];
                 foreach ($stores as $st) {
                     $res = $actions->realtimeStatus($st, $adsApi);
-                    if (($res['status'] ?? '') === 'success') {
+                    if (in_array(($res['status'] ?? ''), ['success', 'partial'], true)) {
                         $totalBalance += (int) ($res['data']['balance']['total_balance'] ?? 0);
                         if (!empty($res['data']['toggle_info']['auto_top_up'])) {
                             $autoTopUp = true;
                         }
+                        $hasData = $hasData
+                            || ! empty($res['data']['balance'])
+                            || ! empty($res['data']['toggle_info']);
+                    }
+                    if (! empty($res['errors'])) {
+                        $errors = array_merge($errors, $res['errors']);
                     }
                 }
 
+                $status = empty($errors)
+                    ? 'success'
+                    : ($hasData ? 'partial' : 'error');
+
                 return response()->json([
-                    'status' => 'success',
+                    'status' => $status,
+                    'message' => empty($errors)
+                        ? null
+                        : 'Sebagian informasi real-time tidak tersedia saat ini.',
+                    'errors' => array_values(array_unique($errors)),
                     'data' => [
                         'balance' => [
                             'total_balance' => $totalBalance,

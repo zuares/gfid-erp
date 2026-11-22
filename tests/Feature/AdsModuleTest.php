@@ -10,7 +10,9 @@ use App\Models\MarketplaceAdsHourlyPerformance;
 use App\Models\MarketplaceAdsSyncRun;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\Marketplace\Ads\AdsActionService;
 use App\Services\Marketplace\Ads\AdsAnalyticsService;
+use App\Services\Marketplace\Ads\ShopeeAdsApiService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -47,6 +49,48 @@ class AdsModuleTest extends TestCase
             'employee_code' => 'EMP' . rand(100, 999),
             'role' => $role,
         ]);
+    }
+
+    public function test_realtime_status_does_not_require_ads_facil_permission(): void
+    {
+        $store = $this->createStore('REALTIME');
+        $adsApi = \Mockery::mock(ShopeeAdsApiService::class);
+        $adsApi->shouldReceive('getAdsTotalBalance')
+            ->once()
+            ->with($store)
+            ->andReturn(['response' => ['total_balance' => 125000]]);
+        $adsApi->shouldReceive('getAdsShopToggleInfo')
+            ->once()
+            ->with($store)
+            ->andReturn(['response' => ['auto_top_up' => true]]);
+        $adsApi->shouldNotReceive('getAdsFacilShopRate');
+
+        $result = (new AdsActionService())->realtimeStatus($store, $adsApi);
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame(125000, $result['data']['balance']['total_balance']);
+        $this->assertTrue($result['data']['toggle_info']['auto_top_up']);
+        $this->assertSame([], $result['data']['facil_rate']);
+    }
+
+    public function test_realtime_status_returns_partial_data_when_one_endpoint_fails(): void
+    {
+        $store = $this->createStore('REALTIME-PARTIAL');
+        $adsApi = \Mockery::mock(ShopeeAdsApiService::class);
+        $adsApi->shouldReceive('getAdsTotalBalance')
+            ->once()
+            ->andReturn(['error' => 'rate_limit', 'message' => 'Limit exceeded']);
+        $adsApi->shouldReceive('getAdsShopToggleInfo')
+            ->once()
+            ->andReturn(['response' => ['auto_top_up' => false]]);
+        $adsApi->shouldNotReceive('getAdsFacilShopRate');
+
+        $result = (new AdsActionService())->realtimeStatus($store, $adsApi);
+
+        $this->assertSame('partial', $result['status']);
+        $this->assertContains('balance', $result['errors']);
+        $this->assertSame([], $result['data']['balance']);
+        $this->assertFalse($result['data']['toggle_info']['auto_top_up']);
     }
 
     // 1. Guest tidak dapat membuka dashboard

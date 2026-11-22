@@ -2544,18 +2544,22 @@ function fetchRealtimeStatus() {
     fetch(`${window.AdsDashboardRoutes.realtimeStatus}?store_id=${storeId}`)
         .then(res => res.json())
         .then(data => {
-            if (data.status === 'success') {
+            if (data.status === 'success' || data.status === 'partial') {
                 const bal = data.data.balance || {};
                 const toggle = data.data.toggle_info || {};
+                const balanceAvailable = Object.prototype.hasOwnProperty.call(bal, 'total_balance');
+                const toggleAvailable = Object.prototype.hasOwnProperty.call(toggle, 'auto_top_up');
                 
                 const formatRp = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
                 
                 // Format total balance (gratis + berbayar)
-                const totalBal = formatRp(bal.total_balance || 0);
+                const totalBal = balanceAvailable ? formatRp(bal.total_balance) : '—';
                 
                 // Auto top-up status
                 let topupHtml = '';
-                if (toggle.auto_top_up === true) {
+                if (!toggleAvailable) {
+                    topupHtml = '<span style="color: var(--dsh-muted); font-weight: 700;"><i class="bi bi-dash-circle-fill"></i> TIDAK TERSEDIA</span>';
+                } else if (toggle.auto_top_up === true) {
                     topupHtml = `<span style="color: #16a34a; font-weight: 700;"><i class="bi bi-check-circle-fill"></i> AKTIF</span>`;
                 } else {
                     topupHtml = `<span style="color: var(--dsh-muted); font-weight: 700;"><i class="bi bi-x-circle-fill"></i> NON-AKTIF</span>`;
@@ -2576,6 +2580,15 @@ function fetchRealtimeStatus() {
                         </div>
                     </div>
                 `;
+
+                if (data.status === 'partial') {
+                    container.insertAdjacentHTML(
+                        'afterbegin',
+                        '<div class="dpanel p-2 w-100 mb-2" style="color: #92400e; border-left: 4px solid #f59e0b; font-size: .78rem;">' +
+                        (data.message || 'Sebagian informasi real-time tidak tersedia saat ini.') +
+                        '</div>'
+                    );
+                }
             } else {
                 container.innerHTML = `<div class="dpanel p-3 w-100" style="color: #dc2626; border-left: 4px solid #dc2626;">Gagal memuat informasi real-time.</div>`;
             }
