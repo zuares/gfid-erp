@@ -237,8 +237,8 @@
             position: relative;
             cursor: help;
             outline: none;
-            background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 10%, transparent);
-            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gf-color-accent, #13b8c4) 28%, transparent);
+            background: color-mix(in srgb, var(--gf-color-warning, #f59e0b) 14%, transparent);
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gf-color-warning, #f59e0b) 42%, transparent);
         }
 
         .so-default-zero-target::after {
@@ -309,7 +309,7 @@
         }
 
         body[data-theme="dark"] .so-default-zero-target {
-            background: color-mix(in srgb, var(--gf-color-accent, #13b8c4) 18%, transparent);
+            background: color-mix(in srgb, var(--gf-color-warning, #f59e0b) 20%, transparent);
         }
 
         .mobile-stack {

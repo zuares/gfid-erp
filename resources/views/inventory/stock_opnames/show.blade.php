@@ -316,10 +316,12 @@
     .so-item-code{ position:relative; display:inline-block; max-width:100%; font-weight:900; cursor:help; outline:none; }
     .so-item-code::after{ content:attr(data-tooltip); position:absolute; left:0; top:calc(100% + .35rem); z-index:20; width:max-content; max-width:min(280px,70vw); padding:.35rem .5rem; border-radius:7px; background:#0f172a; color:#f8fafc; font-size:.72rem; line-height:1.25; font-weight:700; white-space:normal; box-shadow:0 8px 20px rgba(15,23,42,.18); opacity:0; pointer-events:none; transform:translateY(-2px); transition:opacity .12s ease, transform .12s ease; }
     .so-item-code:hover::after,.so-item-code:focus-visible::after{ opacity:1; transform:translateY(0); }
-    .so-default-zero-target{ position:relative; cursor:help; outline:none; background:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 10%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--gf-color-accent, #13b8c4) 28%, transparent); }
+    .so-default-zero-target{ position:relative; cursor:help; outline:none; background:color-mix(in srgb, var(--gf-color-warning, #f59e0b) 14%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--gf-color-warning, #f59e0b) 42%, transparent); }
     .so-default-zero-target::after{ content:attr(data-tooltip); position:absolute; left:0; top:calc(100% + .35rem); z-index:20; width:max-content; max-width:min(280px,70vw); padding:.35rem .5rem; border-radius:7px; background:#0f172a; color:#f8fafc; font-size:.72rem; line-height:1.25; font-weight:700; white-space:normal; box-shadow:0 8px 20px rgba(15,23,42,.18); opacity:0; pointer-events:none; transform:translateY(-2px); transition:opacity .12s ease, transform .12s ease; }
     .so-default-zero-target:hover::after,.so-default-zero-target:focus-visible::after{ opacity:1; transform:translateY(0); }
-    body[data-theme=dark] .so-default-zero-target{ background:color-mix(in srgb, var(--gf-color-accent, #13b8c4) 18%, transparent); }
+    .mini-badge.so-default-zero-target{ background:color-mix(in srgb, var(--gf-color-warning, #f59e0b) 14%, transparent); border-color:color-mix(in srgb, var(--gf-color-warning, #f59e0b) 42%, transparent); color:#854d0e; }
+    body[data-theme=dark] .so-default-zero-target{ background:color-mix(in srgb, var(--gf-color-warning, #f59e0b) 20%, transparent); }
+    body[data-theme=dark] .mini-badge.so-default-zero-target{ color:#fde68a; }
 
     .m-badges{ margin-top:.30rem; display:flex; flex-wrap:wrap; gap:.30rem; }
     .mini-badge{ display:inline-flex; align-items:center; gap:.28rem; padding:.10rem .42rem; border-radius:999px; font-size:.64rem; font-weight:900; border:1px solid rgba(148,163,184,.22); background:rgba(15,23,42,.02); color:rgba(71,85,105,1); white-space:nowrap; }
