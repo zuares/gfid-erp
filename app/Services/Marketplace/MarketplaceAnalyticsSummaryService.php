@@ -2755,10 +2755,9 @@ class MarketplaceAnalyticsSummaryService
     }
 
     /**
-     * Resolve actual platform advertising mutations per store for the
-     * store-ledger fallback. This is intentionally separate from adsFacts():
-     * Ads Daily remains the primary delivery-cost source and mutations are
-     * only consulted when that store has no positive Ads Daily spend.
+     * Resolve actual TikTok platform advertising mutations per store for the
+     * store-ledger fallback. Shopee is intentionally excluded because its
+     * analytics source policy is Ads Daily only.
      */
     private function platformTransactionAdSpendByStore(array $filters)
     {
@@ -2788,16 +2787,6 @@ class MarketplaceAnalyticsSummaryService
                 ->each(function ($rows, string $storeId) use ($spendByStore): void {
                     $spendByStore->put((int) $storeId, round((float) $rows->sum(), 2));
                 });
-        }
-
-        $shopeeStoreIds = $storePlatforms
-            ->filter(fn (string $platform): bool => in_array($platform, self::SHOPEE_CHANNEL_CODES, true))
-            ->keys()
-            ->map(fn ($id): int => (int) $id)
-            ->values()
-            ->all();
-        foreach ($this->shopeePlatformAdSpendByStore($shopeeStoreIds, $filters['date_from'], $filters['date_to']) as $storeId => $spend) {
-            $spendByStore->put((int) $storeId, round((float) $spend, 2));
         }
 
         return $spendByStore;
@@ -2894,16 +2883,14 @@ class MarketplaceAnalyticsSummaryService
     /**
      * Return one authoritative ad-spend fact per store/day.
      *
-     * Ads Daily/API facts take precedence for Shopee and other platforms.
-     * Shopee wallet mutations fill the gap when a store/day has no positive
-     * Ads Daily spend. Imported income reports (including TikTok advertising
-     * deductions) fill the gap when a store/day has no positive API spend,
-     * matching AdsDashboardService's source policy.
+     * Ads Daily/API facts are the only advertising source for Shopee.
+     * Imported income reports (including TikTok advertising deductions) fill
+     * the gap when a non-Shopee store/day has no positive API spend, matching
+     * AdsDashboardService's source policy.
      * For TikTok, settlement.ad_cost is the next fallback because Finance
      * already normalizes the actual GMV Max advertising deduction there.
      * TikTok wallet ad mutations are the final fallback on the same store/day
-     * grain. Shopee wallet mutations are authoritative for Shopee, so KPI,
-     * daily, and store views use the same source policy.
+     * grain, so KPI, daily, and store views use the same source policy.
      *
      * @return array<int, array{store_id: int, date: string, spend: float}>
      */
@@ -2976,12 +2963,8 @@ class MarketplaceAnalyticsSummaryService
             $isShopeeStore = isset($shopeeStoreLookup[(int) $storeId]);
             $source = 'ads_api_or_import';
             if ($isShopeeStore) {
-                $spend = $apiSpend > 0
-                    ? $apiSpend
-                    : ($importedSpend > 0 ? $importedSpend : $platformSpend);
-                $source = ($apiSpend > 0 || $importedSpend > 0)
-                    ? 'ads_api_or_import'
-                    : ($platformSpend > 0 ? 'platform_transaction_fallback' : 'none');
+                $spend = $apiSpend > 0 ? $apiSpend : 0;
+                $source = $apiSpend > 0 ? 'ads_api_or_import' : 'none';
             } else {
                 $spend = $platformMutationIsPrimary && $platformSpend > 0
                     ? $platformSpend
@@ -3066,23 +3049,6 @@ class MarketplaceAnalyticsSummaryService
                     ->filter(fn (array $row): bool => $row['spend'] > 0)
                     ->values()
                     ->all(),
-            );
-        }
-
-        $shopeeStoreIds = $storePlatforms
-            ->filter(fn (string $platform): bool => in_array($platform, self::SHOPEE_CHANNEL_CODES, true))
-            ->keys()
-            ->map(fn ($id): int => (int) $id)
-            ->values()
-            ->all();
-
-        if ($shopeeStoreIds !== []) {
-            $facts = $facts->merge(
-                collect($this->shopeePlatformAdFacts(
-                    $shopeeStoreIds,
-                    $filters['date_from'],
-                    $filters['date_to'],
-                )),
             );
         }
 

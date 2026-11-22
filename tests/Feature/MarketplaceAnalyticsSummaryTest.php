@@ -348,7 +348,7 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
         $this->assertSame(246420.0, (float) $dailyRow['ad_cost']);
     }
 
-    public function test_shopee_ad_cost_falls_back_to_wallet_mutation_when_ads_daily_is_empty(): void
+    public function test_shopee_ad_cost_uses_ads_daily_only_without_wallet_fallback(): void
     {
         $channel = Channel::create(['code' => 'shopee', 'name' => 'Shopee']);
         $store = Store::create([
@@ -378,9 +378,9 @@ class MarketplaceAnalyticsSummaryTest extends TestCase
             'compare_mode' => 'prev_period',
         ]);
 
-        $this->assertSame(111000.0, (float) $summary['current']['ad_cost']);
-        $this->assertSame('platform_transaction_fallback', $summary['current']['ad_cost_source']);
-        $this->assertSame(111000.0, (float) $summary['daily'][0]['ad_cost']);
+        $this->assertSame(0.0, (float) $summary['current']['ad_cost']);
+        $this->assertSame('none', $summary['current']['ad_cost_source']);
+        $this->assertSame([], $summary['daily']);
     }
 
     public function test_tiktok_ad_cost_falls_back_to_settlement_ad_cost_when_ads_daily_is_empty(): void
