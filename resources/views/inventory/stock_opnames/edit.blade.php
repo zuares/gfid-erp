@@ -239,6 +239,11 @@
             outline: none;
             background: color-mix(in srgb, var(--gf-color-warning, #f59e0b) 14%, transparent);
             box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gf-color-warning, #f59e0b) 42%, transparent);
+            color: #b45309;
+        }
+
+        .so-default-zero-target .so-inline-qty {
+            color: #b45309;
         }
 
         .so-default-zero-target::after {
@@ -310,6 +315,11 @@
 
         body[data-theme="dark"] .so-default-zero-target {
             background: color-mix(in srgb, var(--gf-color-warning, #f59e0b) 20%, transparent);
+            color: #fde68a;
+        }
+
+        body[data-theme="dark"] .so-default-zero-target .so-inline-qty {
+            color: #fde68a;
         }
 
         .mobile-stack {
