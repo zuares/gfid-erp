@@ -76,16 +76,18 @@
                             $summary['wip_stock'] = ($summary['wip_stock'] ?? 0) + $wipStock;
                             $summaryWipStock += $wipStock;
                         }
-                        if (($summaryRow['sewing_qty'] ?? null) === null) {
+                        $summarySewingQty = $summaryRow['sewing_qty'] ?? ($summaryRow['wip_sew_qty'] ?? null);
+                        $summaryNotSewnQty = $summaryRow['not_sewn_qty'] ?? ($summaryRow['wip_cut_qty'] ?? null);
+                        if ($summarySewingQty === null) {
                             $summary['sewing_known'] = false;
                         } else {
-                            $sewingQty = (float) $summaryRow['sewing_qty'];
+                            $sewingQty = (float) $summarySewingQty;
                             $summary['sewing'] = ($summary['sewing'] ?? 0) + $sewingQty;
                         }
-                        if (($summaryRow['not_sewn_qty'] ?? null) === null) {
+                        if ($summaryNotSewnQty === null) {
                             $summary['not_sewn_known'] = false;
                         } else {
-                            $notSewnQty = (float) $summaryRow['not_sewn_qty'];
+                            $notSewnQty = (float) $summaryNotSewnQty;
                             $summary['not_sewn'] = ($summary['not_sewn'] ?? 0) + $notSewnQty;
                         }
                         $categorySummaries[$summaryCategory] = $summary;
@@ -144,8 +146,8 @@
                             @php
                                 $category = $row['category'] ?? 'Tanpa kategori';
                                 $demand = (float) ($row['demand_qty'] ?? 0);
-                                $sewingQty = $row['sewing_qty'] ?? null;
-                                $notSewnQty = $row['not_sewn_qty'] ?? null;
+                                $sewingQty = $row['sewing_qty'] ?? ($row['wip_sew_qty'] ?? null);
+                                $notSewnQty = $row['not_sewn_qty'] ?? ($row['wip_cut_qty'] ?? null);
                                 $stock = $row['stock_qty'] ?? null;
                                 $productionStock = $row['production_stock_qty'] ?? null;
                                 $wipStock = $row['wip_stock_qty'] ?? null;

@@ -56,7 +56,7 @@ class DashboardUnshippedItemColumnsTest extends TestCase
         InventoryStock::create(['warehouse_id' => $warehouseSew->id, 'item_id' => $item->id, 'qty' => 3]);
         InventoryStock::create(['warehouse_id' => $warehouseCut->id, 'item_id' => $item->id, 'qty' => 5]);
 
-        Cache::store('file')->forget('dashboard.admin.v14.' . today()->toDateString());
+        Cache::store('file')->forget('dashboard.admin.v15.' . today()->toDateString());
 
         $this->actingAs(User::factory()->create([
             'role' => 'admin',
@@ -69,5 +69,28 @@ class DashboardUnshippedItemColumnsTest extends TestCase
             ->assertSee('DASH-SEWING-ITEM')
             ->assertSee('3 pcs')
             ->assertSee('5 pcs');
+    }
+
+    public function test_dashboard_falls_back_to_wip_fields_from_an_existing_cached_row(): void
+    {
+        $html = view('dashboard.partials._list_order_items', [
+            'title' => 'Permintaan belum dikirim per item internal',
+            'rows' => [[
+                'category' => 'Celana',
+                'code' => 'CACHE-WIP-ITEM',
+                'demand_qty' => 12,
+                'stock_qty' => 0,
+                'production_stock_qty' => 0,
+                'wip_stock_qty' => 8,
+                'wip_cut_qty' => 5,
+                'wip_sew_qty' => 3,
+                'wip_fin_qty' => 0,
+                'wip_pack_qty' => 0,
+            ]],
+        ])->render();
+
+        $this->assertStringContainsString('3 pcs', $html);
+        $this->assertStringContainsString('5 pcs', $html);
+        $this->assertStringContainsString('Selisih kurang', $html);
     }
 }

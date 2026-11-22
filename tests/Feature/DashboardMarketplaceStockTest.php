@@ -41,8 +41,8 @@ class DashboardMarketplaceStockTest extends TestCase
         $operating = User::factory()->create(['role' => 'operating', 'employee_code' => 'DASH-STOCK-OPERATING']);
 
         foreach ([$owner, $admin] as $user) {
-            Cache::store('file')->forget('dashboard.owner.v15.'.today()->toDateString());
-            Cache::store('file')->forget('dashboard.admin.v14.'.today()->toDateString());
+            Cache::store('file')->forget('dashboard.owner.v16.'.today()->toDateString());
+            Cache::store('file')->forget('dashboard.admin.v15.'.today()->toDateString());
 
             $this->actingAs($user)
                 ->get(route('dashboard'))
