@@ -90,6 +90,97 @@ it('uses a 60-day FOB forecast and counts process WIP once', function () {
         ->and($rowProduction60->production_forecast)->toBe(120.0);
 });
 
+it('counts active cutting bundles that are still waiting for QC as available WIP', function () {
+    $item = Item::create([
+        'code' => 'PRE-QC-WIP-TEST',
+        'name' => 'Pre QC WIP Test',
+        'unit' => 'pcs',
+        'type' => 'finished_good',
+        'production_source' => Item::PRODUCTION_IN_HOUSE,
+        'base_unit_cost' => 100000,
+        'active' => true,
+    ]);
+
+    $rts = Warehouse::create([
+        'code' => 'WH-RTS',
+        'name' => 'WH-RTS',
+        'type' => 'fg',
+        'active' => true,
+    ]);
+
+    InventoryStock::create([
+        'warehouse_id' => $rts->id,
+        'item_id' => $item->id,
+        'qty' => 10,
+    ]);
+
+    $lotId = DB::table('lots')->insertGetId([
+        'code' => 'LOT-PRE-QC-WIP-TEST',
+        'item_id' => $item->id,
+        'initial_qty' => 100,
+        'initial_cost' => 0,
+        'qty_onhand' => 100,
+        'total_cost' => 0,
+        'avg_cost' => 0,
+        'status' => 'open',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $cutWarehouse = Warehouse::create([
+        'code' => 'CUT-PRE-QC-TEST',
+        'name' => 'CUT-PRE-QC-TEST',
+        'type' => 'internal',
+        'active' => true,
+    ]);
+
+    $jobId = DB::table('cutting_jobs')->insertGetId([
+        'code' => 'CUT-PRE-QC-WIP-TEST',
+        'date' => Carbon::today()->toDateString(),
+        'warehouse_id' => $cutWarehouse->id,
+        'lot_id' => $lotId,
+        'fabric_item_id' => $item->id,
+        'total_bundles' => 1,
+        'total_qty_pcs' => 12,
+        'status' => 'sent_to_qc',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('cutting_job_bundles')->insert([
+        'cutting_job_id' => $jobId,
+        'bundle_code' => 'BND-PRE-QC-WIP-TEST',
+        'bundle_no' => 1,
+        'lot_id' => $lotId,
+        'finished_item_id' => $item->id,
+        'qty_pcs' => 12,
+        'qty_used_fabric' => 0,
+        'status' => 'cut',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $today = Carbon::today();
+    for ($daysAgo = 0; $daysAgo < 30; $daysAgo++) {
+        DB::table('daily_item_sales')->insert([
+            'date' => $today->copy()->subDays($daysAgo)->toDateString(),
+            'item_id' => $item->id,
+            'qty_sold' => 2,
+            'value_sold' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    $row = app(InventoryIntelligenceService::class)->rows([])->firstWhere('item_id', $item->id);
+
+    expect($row)->not->toBeNull()
+        ->and($row->wip_pending_qc)->toBe(12.0)
+        ->and($row->wip_process)->toBe(12.0)
+        ->and($row->available_stock)->toBe(22.0)
+        ->and($row->production_suggested_qty)->toBe(38.0);
+});
+
 it('supports OR terms in the inventory intelligence item search', function () {
     $warehouse = Warehouse::create([
         'code' => 'WH-RTS',

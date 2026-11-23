@@ -71,9 +71,10 @@ class InventoryIntelligenceService
             $whPrd = (float) ($s->wh_prd ?? 0);
             $readyTotal = $readyRts + $whPrd;
             $wip = (float) ($s->wip_stock ?? 0);
+            $wipPendingQc = (float) ($s->pending_qc_wip ?? 0);
             // wip_stock juga membawa WH-PRD. Gunakan hanya WIP proses di sini
             // agar readyTotal + WIP tidak menghitung WH-PRD dua kali.
-            $wipProcess = max(0.0, $siapJahit + $sedangJahit);
+            $wipProcess = max(0.0, $siapJahit + $sedangJahit + $wipPendingQc);
             $availableStock = $readyTotal + $wipProcess;
             $ads = (float) ($s->ads ?? 0);
             $cover = $s->cover_days ?? null;
@@ -135,6 +136,7 @@ class InventoryIntelligenceService
                 'wh_prd' => $whPrd,
                 'ready_total' => $readyTotal,
                 'wip' => $wip,
+                'wip_pending_qc' => $wipPendingQc,
                 'siap_jahit' => $siapJahit,
                 'sedang_jahit' => $sedangJahit,
                 'wip_process' => $wipProcess,

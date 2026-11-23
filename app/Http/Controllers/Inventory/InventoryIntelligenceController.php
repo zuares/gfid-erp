@@ -275,7 +275,7 @@ class InventoryIntelligenceController extends Controller
         }
 
         $rows = Cache::remember(
-            'inv-intel:rows:v2:' . md5(json_encode($filters)),
+            'inv-intel:rows:v3:' . md5(json_encode($filters)),
             300,
             fn () => $this->service->rows($filters),
         );

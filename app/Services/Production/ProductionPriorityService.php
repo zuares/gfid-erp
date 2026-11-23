@@ -147,17 +147,19 @@ class ProductionPriorityService
      * Sumber kebenaran bersama untuk priorityList() dan dashboard inventory.
      * Filter: item_id, category_id. Window penjualan tetap 7/14/30 hari.
      *
-     * @return Collection keyBy item_id => {item_id, ready_stock, siap_jahit, sedang_jahit, wh_prd, wip_stock, s7, s14, s30, ads, cover_days, pipe_cover_days}
+     * @return Collection keyBy item_id => {item_id, ready_stock, siap_jahit, sedang_jahit, wh_prd, wip_stock, pending_qc_wip, s7, s14, s30, ads, cover_days, pipe_cover_days}
      */
     public function inventorySnapshot(array $filters): Collection
     {
         $stock = $this->stockPivot($filters);   // item_id => (ready, wip)
+        $pendingQcWip = $this->pendingQcWip($filters); // cutting yang belum punya hasil QC
         $sales = $this->salesWindows($filters); // item_id => (s7,s14,s30)
 
-        $ids = $stock->keys()->merge($sales->keys())->unique()->values();
+        $ids = $stock->keys()->merge($pendingQcWip->keys())->merge($sales->keys())->unique()->values();
 
-        return $ids->mapWithKeys(function ($id) use ($stock, $sales) {
+        return $ids->mapWithKeys(function ($id) use ($stock, $pendingQcWip, $sales) {
             $st = $stock->get($id);
+            $pendingQc = (float) ($pendingQcWip->get($id) ?? 0);
             $sa = $sales->get($id);
 
             $ready = (float) ($st->ready ?? 0);
@@ -181,6 +183,7 @@ class ProductionPriorityService
                 'sedang_jahit' => $sedangJahit,
                 'wh_prd' => $whPrd,
                 'wip_stock' => $wip,
+                'pending_qc_wip' => $pendingQc,
                 's7' => $s7,
                 's14' => $s14,
                 's30' => $s30,
@@ -263,6 +266,48 @@ class ProductionPriorityService
             ")
             ->get()
             ->keyBy('item_id');
+    }
+
+    /**
+     * Hasil cutting aktif yang belum memiliki hasil QC cutting.
+     *
+     * Qty ini belum masuk inventory_stocks karena posting WIP-CUT baru terjadi
+     * setelah QC. Tetap dihitung sebagai pipeline tersedia untuk forecast, tanpa
+     * mengubah ledger stok atau perilaku posting produksi.
+     */
+    private function pendingQcWip(array $f): Collection
+    {
+        $q = DB::table('cutting_job_bundles as b')
+            ->join('cutting_jobs as cj', 'cj.id', '=', 'b.cutting_job_id')
+            ->where('b.status', 'cut')
+            ->where('b.qty_pcs', '>', 0)
+            ->where('cj.status', '!=', 'voided')
+            ->whereNotExists(function ($subquery) {
+                $subquery->selectRaw('1')
+                    ->from('qc_results as q')
+                    ->where('q.stage', 'cutting')
+                    ->whereColumn('q.cutting_job_bundle_id', 'b.id');
+            });
+
+        if (!empty($f['item_id'])) {
+            $q->where('b.finished_item_id', $f['item_id']);
+        }
+        if (array_key_exists('item_ids', $f)) {
+            if (empty($f['item_ids'])) {
+                return collect();
+            }
+
+            $q->whereIn('b.finished_item_id', $f['item_ids']);
+        }
+        if (!empty($f['category_id'])) {
+            $q->join('items as i', 'i.id', '=', 'b.finished_item_id')
+                ->where('i.item_category_id', $f['category_id']);
+        }
+
+        return $q->groupBy('b.finished_item_id')
+            ->selectRaw('b.finished_item_id as item_id, COALESCE(SUM(b.qty_pcs),0) as qty')
+            ->pluck('qty', 'item_id')
+            ->map(fn ($qty) => (float) $qty);
     }
 
     /** Penjualan 7/14/30 hari per item. */

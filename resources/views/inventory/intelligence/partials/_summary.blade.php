@@ -307,6 +307,9 @@
                                         <div class="fw-semibold">{{ $fmt($r->available_stock) }}</div>
                                         <div class="text-muted-ii" style="font-size: .65rem; white-space: nowrap;">
                                             Ready+PRD: {{ $fmt($r->ready_total) }} | WIP: {{ $fmt($r->wip_process) }}
+                                            @if (($r->wip_pending_qc ?? 0) > 0)
+                                                <span class="d-block">Belum QC: {{ $fmt($r->wip_pending_qc) }}</span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
@@ -361,6 +364,9 @@
                                         <div class="fw-semibold">{{ $fmt($r->available_stock) }}</div>
                                         <div class="text-muted-ii" style="font-size: .65rem; white-space: nowrap;">
                                             Ready+PRD: {{ $fmt($r->ready_total) }} | WIP: {{ $fmt($r->wip_process) }}
+                                            @if (($r->wip_pending_qc ?? 0) > 0)
+                                                <span class="d-block">Belum QC: {{ $fmt($r->wip_pending_qc) }}</span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="text-end fw-semibold">{{ $fmt($r->ads, 1) }}</td>
